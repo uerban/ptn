@@ -20,7 +20,7 @@ describe("settingsStore", () => {
       departuresPerLine: 3,
       maxPopupLines: 4,
       urbanMode: true,
-      urbanLookaheadHours: 2,
+      urbanLookaheadHours: 1,
       mapDetailMode: "detailed",
       accessibilityScheme: "none",
       highContrastEnabled: false,
@@ -61,8 +61,8 @@ describe("settingsStore", () => {
     expect(useSettingsStore.getState().urbanMode).toBe(true);
   });
 
-  it("urbanLookaheadHours defaults to 2", () => {
-    expect(useSettingsStore.getState().urbanLookaheadHours).toBe(2);
+  it("urbanLookaheadHours defaults to 1", () => {
+    expect(useSettingsStore.getInitialState().urbanLookaheadHours).toBe(1);
   });
 
   it("setUrbanMode toggles urban mode", () => {
