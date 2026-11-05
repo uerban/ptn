@@ -70,3 +70,9 @@ the container network. The inherited 8080 host binding remains loopback-only.
 Use the same `-f` arguments for logs, restart and shutdown. Retain the volumes:
 `down -v` deletes transit data and certificate state. To inspect a failed
 startup, use `docker compose -f docker/compose.yml logs --tail 100`.
+
+The host image includes Java 21 and timezone data for mandatory GTFS validation.
+Its configuration accepts a raw publisher URL or a checksum-pinned community
+recipe; see [GTFS sources and refresh](../docs/gtfs-sources.md). For a private
+recipe repository, a reviewed archive can be placed in the existing configuration
+mount so no GitHub credential is needed in the containers.

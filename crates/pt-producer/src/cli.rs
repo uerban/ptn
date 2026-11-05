@@ -266,9 +266,9 @@ pub enum Command {
         #[arg(long, value_name = "SLUG")]
         city: String,
 
-        /// Local cached GTFS zip. Mandatory.
-        #[arg(long = "from-cache", value_name = "PATH")]
-        from_cache: PathBuf,
+        /// Local cached GTFS components, in stable source order. Repeat for unions.
+        #[arg(long = "from-cache", value_name = "PATH", required = true)]
+        from_cache: Vec<PathBuf>,
 
         /// Optional forensic archive destination. When set, the current
         /// generation's bundle + `current.json` are copied here under a

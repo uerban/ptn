@@ -1149,7 +1149,7 @@ const CITY_OSM_ADDRESS_SEARCH: &str = "address-search.fst";
 fn run_republish(
     data_root: &Path,
     city: &str,
-    from_cache: &Path,
+    from_cache: &[PathBuf],
     archive_to: Option<&Path>,
     anchor_date: Option<u32>,
     transfers_path: Option<refresh::TransfersSource<'_>>,
@@ -1160,7 +1160,7 @@ fn run_republish(
     derive_inseat: pt_producer::cli::DeriveInseat,
 ) -> Result<()> {
     let clock = SystemClock;
-    match republish::run_republish(
+    match republish::run_republish_many(
         data_root,
         city,
         from_cache,

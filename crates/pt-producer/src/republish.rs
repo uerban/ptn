@@ -71,11 +71,48 @@ pub fn run_republish(
     derive_inseat: crate::cli::DeriveInseat,
     clock: &dyn Clock,
 ) -> Result<PublishOutcome> {
+    run_republish_many(
+        data_root,
+        city,
+        &[cache_zip.to_path_buf()],
+        archive_to,
+        anchor_date,
+        transfers_path,
+        address_search_path,
+        max_retained_generations,
+        city_tz_offset_seconds,
+        city_tz_iana,
+        derive_inseat,
+        clock,
+    )
+}
+
+/// Publish a complete ordered component set through the same atomic protocol.
+/// Input order is stable; callers must supply source-scoped IDs for unions.
+#[allow(clippy::too_many_arguments)]
+pub fn run_republish_many(
+    data_root: &Path,
+    city: &str,
+    cache_zips: &[std::path::PathBuf],
+    archive_to: Option<&Path>,
+    anchor_date: Option<u32>,
+    transfers_path: Option<crate::refresh::TransfersSource<'_>>,
+    address_search_path: Option<&Path>,
+    max_retained_generations: usize,
+    city_tz_offset_seconds: Option<i32>,
+    city_tz_iana: Option<&str>,
+    derive_inseat: crate::cli::DeriveInseat,
+    clock: &dyn Clock,
+) -> Result<PublishOutcome> {
     eprintln!(
         "[producer] republish start data_root={} city={} cache={} archive_to={}",
         data_root.display(),
         city,
-        cache_zip.display(),
+        cache_zips
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(","),
         archive_to
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "<none>".into()),
@@ -87,11 +124,10 @@ pub fn run_republish(
             data_root.display()
         )));
     }
-    if !cache_zip.exists() {
-        return Err(Error::Config(format!(
-            "cache zip does not exist: {} — supply a valid --from-cache path",
-            cache_zip.display()
-        )));
+    if cache_zips.is_empty() || cache_zips.iter().any(|p| !p.is_file()) {
+        return Err(Error::Config(
+            "supply a complete, nonempty set of --from-cache files".into(),
+        ));
     }
 
     // Step 1: producer.lock. Same guard semantics as periodic-refresh.
@@ -122,11 +158,14 @@ pub fn run_republish(
 
     // Step 3..10 via the shared trunk. We pre-built FeedRecord same as the
     // periodic-refresh wrapper does in main.rs.
-    let feed = download::record_for_local(cache_zip)?;
+    let feeds = cache_zips
+        .iter()
+        .map(|path| download::record_for_local(path))
+        .collect::<Result<Vec<_>>>()?;
     refresh::publish_inner(
         data_root,
         city,
-        vec![feed],
+        feeds,
         anchor_date,
         transfers_path,
         address_search_path,

@@ -217,3 +217,42 @@ fn managed_osm_inputs_are_explicit_and_conflict_with_mutable_fixture_paths() {
     conflicting.extend(["--city-osm-dir", "/mutable"]);
     assert!(Args::try_parse_from_with_env(conflicting, &[]).is_err());
 }
+
+#[test]
+fn republish_preserves_complete_component_order_and_requires_inputs() {
+    use clap::Parser;
+    use pt_producer::cli::Command;
+    let args = Args::try_parse_from([
+        "pt-producer",
+        "republish",
+        "--data-root",
+        "/tmp/data",
+        "--city",
+        "tricity",
+        "--from-cache",
+        "gdansk.zip",
+        "--from-cache",
+        "gdynia.zip",
+        "--from-cache",
+        "skm.zip",
+    ])
+    .unwrap();
+    match args.command {
+        Some(Command::Republish { from_cache, .. }) => {
+            assert_eq!(
+                from_cache,
+                ["gdansk.zip", "gdynia.zip", "skm.zip"].map(std::path::PathBuf::from)
+            );
+        }
+        other => panic!("unexpected command: {other:?}"),
+    }
+    assert!(Args::try_parse_from([
+        "pt-producer",
+        "republish",
+        "--data-root",
+        "/tmp/data",
+        "--city",
+        "tricity"
+    ])
+    .is_err());
+}

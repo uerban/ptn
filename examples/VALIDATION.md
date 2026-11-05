@@ -50,3 +50,11 @@ requests. It also checks API/asset 404s and internal-listener isolation.
 It blocks external requests during the test. Local-CA browser checks can set
 `PTN_TEST_LOCAL_CA=1`; separately verify the certificate with `curl --cacert`.
 This flag is not a production TLS setting or proof of public ACME issuance.
+
+## Source-driven refresh changes
+
+The community recipe and mandatory canonical-validation path changes the runtime
+dependencies: Java 21 and timezone data are now required for refresh. The earlier
+hosting results above predate this change. The release workflow must rerun native
+and Docker lifecycle acceptance before publishing an archive with this path.
+See [GTFS sources](../docs/gtfs-sources.md) for the separate preparation contract.

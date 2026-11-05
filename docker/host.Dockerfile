@@ -2,7 +2,7 @@
 # The first archive supports only this architecture; keep the interpreter and
 # native tools on the same platform even with a classic cross-host builder.
 FROM --platform=linux/amd64 docker.io/library/alpine:3.23
-RUN apk add --no-cache python3 ca-certificates
+RUN apk add --no-cache python3 ca-certificates tzdata openjdk21-jre-headless
 WORKDIR /opt/ptn
 COPY release/ptn-linux-x86_64/ ./
 ENTRYPOINT ["python3", "/opt/ptn/examples/native/host.py", "--config", "/config/config.json"]
