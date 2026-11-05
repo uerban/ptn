@@ -32,3 +32,16 @@ cc_target=${target//-/_}
   fi
 } >> "$GITHUB_ENV"
 echo "$bin_dir" >> "$GITHUB_PATH"
+if [ "$target" = arm-unknown-linux-musleabihf ]; then
+  # Match Rust's -nodefaultlibs link and the explicit libgcc in .cargo/config.toml.
+  # A 64-bit atomic operation pulls in libatomic's Armv6 memory-barrier dependency.
+  probe="$RUNNER_TEMP/armv6-atomic-probe"
+  "$cc" -march=armv6 -mfpu=vfp -mfloat-abi=hard -static -nodefaultlibs \
+    -x c - -latomic -lc -lgcc -o "$probe" <<'C'
+static unsigned long long counter;
+int main(void) {
+    return (int)__atomic_load_n(&counter, __ATOMIC_SEQ_CST);
+}
+C
+  qemu-arm -cpu arm1176 "$probe"
+fi
