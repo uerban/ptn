@@ -2,6 +2,10 @@
 import importlib.util
 from pathlib import Path
 import struct
+import sys
+import tarfile
+import hashlib
+from unittest.mock import patch
 import tempfile
 import unittest
 
@@ -89,3 +93,36 @@ class BinaryCompatibility(unittest.TestCase):
         for platform in package.PLATFORMS:
             with self.assertRaises(ValueError):
                 self.verify(b"\x7fELF", platform)
+
+
+class ArchiveContents(unittest.TestCase):
+    def test_archive_contains_checksummed_recipe_runtime_and_guide(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            binaries = root / "binaries"
+            binaries.mkdir()
+            for name in package.BINARIES:
+                (binaries / name).write_bytes(elf(64, 62))
+            for name, content in {
+                "packages/frontend/dist/index.html": "PWA",
+                "packages/frontend/dist/assets/test.wasm": "WASM",
+                "release-builder/packages/backend/src/poi/buildArtifacts.mjs": "builder",
+                "release-builder/packages/backend/scripts/extract-addr-fixture.mjs": "extractor",
+                "examples/native/gtfs.py": "recipe runtime",
+                "examples/native/host.py": "host",
+                "examples/VALIDATION.md": "validation",
+                "docs/release-platforms.md": "platforms",
+                "docs/gtfs-sources.md": "sources",
+                "LICENSE": "license", "LICENSE-MIT": "MIT", "LICENSE-APACHE": "Apache",
+                "THIRD_PARTY_NOTICES.md": "notices",
+            }.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            with patch.object(package, "ROOT", root), patch.object(sys, "argv", ["package-release.py", "--platform", "linux-x86_64", "--bin-dir", str(binaries), "--out", str(root / "out")]), patch.object(package.subprocess, "check_output", side_effect=["a" * 40, b""]), patch("builtins.print"):
+                package.main()
+            with tarfile.open(root / "out/ptn-linux-x86_64.tar.gz") as archive:
+                checksums = archive.extractfile("ptn-linux-x86_64/SHA256SUMS").read().decode()
+                for relative in ["examples/native/gtfs.py", "docs/gtfs-sources.md"]:
+                    content = archive.extractfile("ptn-linux-x86_64/" + relative).read()
+                    self.assertIn(hashlib.sha256(content).hexdigest() + "  " + relative, checksums)

@@ -147,3 +147,7 @@ Transit feeds, OpenStreetMap data, fonts and other third-party material keep
 their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+GTFS can come directly from its publisher or from a pinned community preparation
+recipe. See [source-driven feed ingestion](docs/gtfs-sources.md). The refresh
+runtime is included in native archives and the Docker host image.

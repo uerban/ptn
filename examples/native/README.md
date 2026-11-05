@@ -7,7 +7,8 @@ Use the matching binaries and web assets from one archive. See
 for the Linux and macOS matrix, and [validation](../VALIDATION.md) for checks
 and limitations. `v0.1.0` provides Linux x86_64 only.
 
-Runtime requirements: Python 3.9+, a system CA bundle, and Caddy 2.11.7.
+Runtime requirements: Python 3.9+, timezone data, a system CA bundle, Java 21+
+for feed validation, and Caddy 2.11.7.
 Building your own OSM catalog additionally needs Node 22.22+ and osmium-tool.
 Rust, pnpm, node_modules, and a source checkout are not needed on a release host.
 The third-party MOTIS/OTP adapter and other cities are outside this example.
@@ -75,7 +76,7 @@ python3 examples/native/host.py --config /absolute/path/config.json serve
 ```
 
 The first command installs and verifies OSM artifacts, downloads the current
-GTFS feed, obtains the reader-version sentinel from the matching server, then
+GTFS feed, validates its canonical GTFS and upcoming service coverage, obtains the reader-version sentinel from the matching server, then
 publishes a complete generation. It explicitly selects the Rust color and
 schedule-tile builders, so generation publishing needs no Node helper.
 
@@ -94,6 +95,11 @@ sync to finish, then search between two stops. A missing asset or API returns
 an error rather than the SPA document. Metrics and the internal departure
 listener are not exposed by this proxy. The base map may use its configured
 external tile service; transit queries run on the device.
+
+See [GTFS sources and recipes](../../docs/gtfs-sources.md) for direct publisher
+URLs, pinned community preparation, evidence, cadence and retention. The
+preparation command supports additional cities; this PWA/proxy example remains
+Vilnius-specific.
 
 ## Public HTTPS
 

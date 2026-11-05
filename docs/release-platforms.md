@@ -52,6 +52,12 @@ catalog, and the local Node builder is not an ARMv6 runtime option. Building
 OSM data and producing a large GTFS generation can exceed a small board's
 memory. Binary compatibility does not guarantee that a particular city fits.
 
+Source-driven GTFS refresh additionally requires Java 21 and timezone data for
+canonical validation. On boards without a suitable JVM or memory capacity, run
+[feed preparation](gtfs-sources.md) on a larger worker and transfer its validated
+prepared inputs for generation building. Serving already-built generations does
+not require Java. The ARM tool smoke checks do not validate this worker handoff.
+
 ## Versions
 
 Download only assets actually listed on the chosen release. `v0.1.0` contains

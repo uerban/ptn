@@ -106,6 +106,7 @@ def main():
         shutil.copy2(ROOT / "examples/VALIDATION.md", bundle / "examples/VALIDATION.md")
         (bundle / "docs").mkdir()
         shutil.copy2(ROOT / "docs/release-platforms.md", bundle / "docs/release-platforms.md")
+        shutil.copy2(ROOT / "docs/gtfs-sources.md", bundle / "docs/gtfs-sources.md")
         shutil.copytree(ROOT / "release-builder", bundle / "builder")
         for filename in ("LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_NOTICES.md"):
             shutil.copy2(ROOT / filename, bundle / filename)
@@ -125,12 +126,14 @@ def main():
         lines = []
         for path in sorted(bundle.rglob("*")):
             if path.is_file():
-                lines.append(f"{hashlib.file_digest(path.open('rb'), 'sha256').hexdigest()}  {path.relative_to(bundle)}\n")
+                with path.open("rb") as stream:
+                    lines.append(f"{hashlib.file_digest(stream, 'sha256').hexdigest()}  {path.relative_to(bundle)}\n")
         (bundle / "SHA256SUMS").write_text("".join(lines))
         archive = args.out / f"{name}.tar.gz"
         with tarfile.open(archive, "w:gz") as output:
             output.add(bundle, arcname=name)
-    digest = hashlib.file_digest(archive.open("rb"), "sha256").hexdigest()
+    with archive.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
     archive.with_suffix(archive.suffix + ".sha256").write_text(f"{digest}  {archive.name}\n")
     print(archive)
 
