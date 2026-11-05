@@ -2,9 +2,10 @@
 
 This reference setup serves Vilnius with the PWA, local transit planning,
 walking transfers, addresses, managed POIs, and GTFS realtime updates.
-Use the matching binaries and web assets from one archive. The initial
-release target is Linux x86_64. See [validation](../VALIDATION.md) for actual
-checks and any release blockers.
+Use the matching binaries and web assets from one archive. See
+[release platforms](../../docs/release-platforms.md) in the source repository
+for the Linux and macOS matrix, and [validation](../VALIDATION.md) for checks
+and limitations. `v0.1.0` provides Linux x86_64 only.
 
 Runtime requirements: Python 3.9+, a system CA bundle, and Caddy 2.11.7.
 Building your own OSM catalog additionally needs Node 22.22+ and osmium-tool.
@@ -13,24 +14,34 @@ The third-party MOTIS/OTP adapter and other cities are outside this example.
 
 ## Obtain the installation
 
-Once a release has been published, choose its explicit tag (replace `vX.Y.Z`):
+Choose an explicit release tag and an archive platform listed on that release
+(replace `vX.Y.Z`). The example below uses Linux x86_64. Other platform names
+are `linux-armv6-rpi1`, `linux-aarch64-rpi3`, `darwin-arm64`, and
+`darwin-x86_64`:
 
 ```sh
 VERSION=vX.Y.Z
-curl --fail --location --remote-name "https://github.com/uerban/ptn/releases/download/$VERSION/ptn-linux-x86_64.tar.gz"
-curl --fail --location --remote-name "https://github.com/uerban/ptn/releases/download/$VERSION/ptn-linux-x86_64.tar.gz.sha256"
-sha256sum --check ptn-linux-x86_64.tar.gz.sha256
-tar -xzf ptn-linux-x86_64.tar.gz
-cd ptn-linux-x86_64
+PLATFORM=linux-x86_64
+curl --fail --location --remote-name "https://github.com/uerban/ptn/releases/download/$VERSION/ptn-$PLATFORM.tar.gz"
+curl --fail --location --remote-name "https://github.com/uerban/ptn/releases/download/$VERSION/ptn-$PLATFORM.tar.gz.sha256"
+sha256sum --check "ptn-$PLATFORM.tar.gz.sha256"
+tar -xzf "ptn-$PLATFORM.tar.gz"
+cd "ptn-$PLATFORM"
 sha256sum --check SHA256SUMS
 ```
 
-Before the first release exists, build and package using the
+On macOS, use `shasum -a 256 --check` in place of `sha256sum --check`.
+To build an archive yourself, use the
 [source build instructions](https://github.com/uerban/ptn#build).
 The extracted archive has the same layout. Checksums
 detect corruption; obtain the archive and checksum from the intended release.
 
 ## Prepare OSM data locally
+
+On ARMv6 boards, prepare OSM data on a larger host, then copy the signed
+repository and public trust configuration to the board. Node 22 is not an
+ARMv6 runtime option. A small board may also lack enough memory for a full
+city build; the archive's CPU compatibility does not establish a memory budget.
 
 From the extracted archive, choose a separate private working directory:
 

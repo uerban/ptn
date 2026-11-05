@@ -32,9 +32,12 @@ pub const MAX_FEED_BYTES: u64 = 64 * 1024 * 1024;
 /// share the connection pool), but calling `rt_agent()` per fetch or per
 /// cycle builds a fresh pool each time and silently defeats keep-alive.
 pub fn rt_agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout(FEED_FETCH_TIMEOUT)
-        .build()
+    let builder = ureq::AgentBuilder::new().timeout(FEED_FETCH_TIMEOUT);
+    #[cfg(all(target_arch = "arm", target_env = "musl"))]
+    let builder = builder.tls_connector(std::sync::Arc::new(
+        ureq::native_tls::TlsConnector::new().expect("initialize RT TLS connector"),
+    ));
+    builder.build()
 }
 
 /// One feed fetch. `Err` strings land verbatim in `FeedHealth.last_error`

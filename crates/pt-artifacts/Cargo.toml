@@ -20,10 +20,18 @@ pt-walk = { path = "../pt-walk" }
 flate2 = "1"
 brotli = "7"
 tar = "0.4"
-ureq = { version = "2", default-features = false, features = ["tls"] }
+ureq = { version = "2", default-features = false }
 url = "2"
 clap = { version = "4", features = ["derive"] }
 jiff.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(not(all(target_arch = "arm", target_env = "musl")))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[target.'cfg(all(target_arch = "arm", target_env = "musl"))'.dependencies]
+# Keep every host tool on the same Armv6-compatible TLS provider.
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+openssl = { version = "0.10", features = ["vendored"] }

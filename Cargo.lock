@@ -1035,6 +1035,7 @@ dependencies = [
  "ed25519-dalek",
  "flate2",
  "jiff",
+ "openssl",
  "pt-geocode",
  "pt-shared",
  "pt-walk",
