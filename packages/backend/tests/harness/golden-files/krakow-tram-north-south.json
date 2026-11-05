@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.0780, "lon": 19.8960 },
+    "to": { "lat": 50.0150, "lon": 19.9650 },
+    "description": "tram-north-south: Bronowice (west terminus) to Kurdwanow (south terminus)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["TRAM", "BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

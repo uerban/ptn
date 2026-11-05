@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "vilnius",
+    "from": { "lat": 54.7018, "lon": 25.1720 },
+    "to": { "lat": 54.7229, "lon": 25.3187 },
+    "description": "cross-city-ew: Pilaitė (far west) to Antakalnis (east terminus)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

@@ -1,0 +1,121 @@
+[package]
+name = "pt-serve"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "AGPL-3.0-or-later"
+
+[features]
+default = []
+# The handler blocks on a process-global mpsc channel until either the timeout watchdog flips the
+# request's `timed_out` flag or a test thread delivers a release. NEVER enable in production — the
+# route accepts any GET and would deadlock a worker.
+test-park = []
+
+# lib + bin split is REQUIRED: `tests/server.rs` (an integration test) imports
+# `pt_serve::*`, and a bin-only crate is not importable. main.rs is a thin shell over the lib.
+[lib]
+name = "pt_serve"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pt-serve"
+path = "src/main.rs"
+
+[dependencies]
+pt-core = { path = "../pt-core" }
+pt-geocode = { path = "../pt-geocode" }
+# `pt-shared` carries manifest types, the cross-platform fsync helper, the `Clock` trait, and the
+# validation surface (fills in validators). pt-core stays no_std + serde-free; anything std+serde
+# lives in pt-shared.
+pt-shared = { path = "../pt-shared" }
+tiny_http = "0.12"
+# Decode Fastify-style percent-encoded POI route captures before app-layer
+# validation. The lockfile already carries this crate through `url`.
+percent-encoding = "2"
+memmap2 = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+flate2 = "1"
+sha2 = "0.10"
+# Insertion-order map backing the schedule-tile response `TileCache`
+# (`ops/tile_cache.rs`) — same version pt-shared/pt-producer already carry.
+indexmap = "2"
+# Schedule-tile ETag: `sha256(bytes).base64()[..16]`, byte-parity with
+# Node's `createHash("sha256").update(buf).digest("base64").slice(0,16)`.
+# Already in the lockfile transitively (ureq's TLS stack) at this version —
+# promoting to a direct dep, no new compile cost.
+base64 = "0.22"
+# clap v4 with `derive` + `env` powers the `ServerConfig` surface: every flag has a matching
+# `PT_SERVE_*` env var, types are validated at parse time, and `--help` is generated from the
+# doc-comments.
+clap = { version = "4", features = ["derive", "env"] }
+# arc-swap drives the P4 hot-reload swap of the active `Generation` behind a shared
+# `ArcSwap<Generation>` handle.
+arc-swap = "1"
+# `assert_impl_all!` is a compile-time Send+Sync guard on `Generation` so a
+# future field that accidentally regresses cross-thread sharing breaks the
+# build at the assertion, not in production.
+static_assertions = "1"
+# Used by `bundle/loader.rs` to typed-error the startup load path.
+thiserror = "1"
+# Used by `bundle/loader.rs::producer_lock_held` for the non-blocking flock probe over
+# `<.publishing>/<dir>/producer.lock`.
+rustix = { version = "0.38", features = ["fs"] }
+# `signal_hook` powers the P4 reload runner's typed-signal iterator. The `iterator` feature pulls in
+# the `Signals` adapter (typed i32 events from a self-pipe) rather than the legacy
+# `low_level::pipe::register` byte-pipe, which can't distinguish SIGHUP from SIGTERM.
+signal-hook = { version = "0.3", features = ["iterator"] }
+# libc for the defense-in-depth pthread_sigmask call in `reload::signals::install_signal_handlers`.
+# signal_hook 0.3 does not export a `block_signal` helper; rustix's sigmask is gated behind the
+# unstable `runtime` feature. libc is already a transitive dep via rustix/signal-hook and a direct
+# dev-dep; the explicit listing keeps the prod build compilable without relying on transitive
+# closure.
+libc = "0.2"
+# Dates/instants and the bundled IANA tzdb shared with the producer. Resolve
+# zones through pt_shared::tz; pt-core stays free of date/time dependencies.
+jiff.workspace = true
+# ureq (blocking HTTP) powers the GTFS-RT TripUpdates fetch loop
+# (`src/rt/fetch.rs`). `gzip` keeps transparent-decompression parity with
+# Node's fetch. TLS providers are selected below: rustls/ring normally, and
+# vendored OpenSSL's Armv6-compatible C path for 32-bit musl ARM.
+ureq = { version = "2", default-features = false, features = ["gzip"] }
+# Pure-Rust brotli decompressor for the rt-tile overlay route's server-side
+# tile decode (`app/rt_tile.rs`) — same crate + version pt-producer already
+# uses for tile compression (`crates/pt-producer/src/schedule_tiles/brotli_tile.rs`),
+# already vetted safe for cross-compile this session.
+brotli = "7"
+
+[dev-dependencies]
+pt-core = { path = "../pt-core", features = ["test-helpers"] }
+flate2 = "1" # gzip decompression in raptor_bundle_etag_and_gzip test
+url = "2"    # URL parsing in ureq_get_gzip raw-TCP helper
+
+syn = { version = "2", features = ["full"] }
+quote = "1"
+walkdir = "2"
+# `tempfile` is used by `tests/startup_fallback.rs` (and the shared
+# `tests/common::isolated_config` harness) to mint a per-test data_root. Each
+# test gets its own dir; `TempDir`'s `Drop` cleans up.
+tempfile = "3"
+# pidfile race tests need `libc::kill(pid, SIGTERM/SIGKILL)` to drive the lock-holder's lifecycle.
+# libc is also a regular dep (see [dependencies] above for the defense-in-depth pthread_sigmask
+# call); leaving this dev-deps entry is a no-op but documents the test usage.
+libc = "0.2"
+
+# `build.rs` greps `packages/backend/src/health/feedStaleConstants.ts` to extract `FEED_STALE_DAYS`
+# and pin the Rust constant against the Node one at compile time. `regex` is build-only — never
+# linked into the runtime.
+[build-dependencies]
+regex = "1"
+jiff.workspace = true
+
+[target.'cfg(not(all(target_arch = "arm", target_env = "musl")))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[target.'cfg(all(target_arch = "arm", target_env = "musl"))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+# The direct dependency enables `openssl-sys/vendored` for native-tls. CI pins
+# OpenSSL's `linux-armv4` build and every native object to Armv6 hard-float.
+openssl = { version = "0.10", features = ["vendored"] }

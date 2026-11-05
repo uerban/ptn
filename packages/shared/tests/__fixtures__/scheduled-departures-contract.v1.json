@@ -1,0 +1,44 @@
+{
+  "contractVersion": 1,
+  "stopId": "S1",
+  "windowStart": 1777957200,
+  "windowEnd": 1777960800,
+  "generationId": "0000000000000000000000000000000000000000000000000000000000000000",
+  "cityTzIana": "Europe/Vilnius",
+  "truncated": false,
+  "windowOutsideServiceRange": false,
+  "departures": [
+    {
+      "tripId": "T1",
+      "routeId": "R_BUS",
+      "routeShortName": "10",
+      "routeColor": "FF0000",
+      "routeTextColor": "FFFFFF",
+      "mode": "BUS",
+      "subMode": null,
+      "serviceId": "svc:0",
+      "headsign": "Downtown",
+      "directionId": 0,
+      "stopSequence": 1,
+      "scheduledDepartureSecs": 1777957200,
+      "scheduledArrivalSecs": 1777957800,
+      "wheelchairAccessible": 1
+    },
+    {
+      "tripId": "T2",
+      "routeId": "R_TRAM",
+      "routeShortName": "T1",
+      "routeColor": "",
+      "routeTextColor": "",
+      "mode": "TRAM",
+      "subMode": null,
+      "serviceId": "svc:0",
+      "headsign": "Uptown",
+      "directionId": null,
+      "stopSequence": 1,
+      "scheduledDepartureSecs": 1777959000,
+      "scheduledArrivalSecs": 1777959300,
+      "wheelchairAccessible": 0
+    }
+  ]
+}

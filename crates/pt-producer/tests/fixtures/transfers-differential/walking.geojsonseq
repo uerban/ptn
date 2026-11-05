@@ -1,0 +1,4 @@
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.280,54.680],[25.281,54.680],[25.282,54.680]]}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.281,54.680],[25.281,54.681]]}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[-0.001,54.680],[-0.0,54.680]]}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[0.0,54.680],[0.001,54.680]]}}

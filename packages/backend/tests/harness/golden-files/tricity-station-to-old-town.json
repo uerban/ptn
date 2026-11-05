@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.3557, "lon": 18.6442 },
+    "to": { "lat": 54.3482, "lon": 18.6533 },
+    "description": "station-to-old-town: Gdańsk Główny to Długi Targ (Old Town)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["WALK", "BUS", "TRAM"],
+  "maxLatencyMs": 3000
+}

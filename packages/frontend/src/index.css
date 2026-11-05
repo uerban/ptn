@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+@import "./styles/fonts.css";
+@import "@fontsource-variable/geist-mono";
+@import "./styles/themes.css";
+
+/* Bridge semantic tokens to Tailwind v4 utility classes */
+@theme {
+  --font-sans: "Open Sans Variable", "Noto Sans Georgian Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-divider: var(--divider);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-badge-text: var(--badge-text);
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-fg: var(--nav-fg);
+  --color-nav-fg-active: var(--nav-fg-active);
+  --color-input-bg: var(--input-bg);
+  --color-sheet-handle: var(--sheet-handle);
+  --color-favorite: var(--favorite);
+  --color-warning-fg: var(--warning-fg);
+  --color-connector-line: var(--connector-line);
+}
+
+/* Elevation utilities — use `shadow-1` / `shadow-2` instead of pairing
+   Tailwind's default shadows with a border. Tokens resolve per-theme
+   from themes.css. */
+@utility shadow-1 {
+  box-shadow: var(--shadow-1);
+}
+@utility shadow-2 {
+  box-shadow: var(--shadow-2);
+}
+
+/* Skeleton shimmer — subtler than animate-pulse full-opacity swing.
+   Cycles through ~0.55–1.0 opacity over 1.4s. `animation-delay` on each
+   instance creates a staggered content-reveal feel.
+   Respects `prefers-reduced-motion` via `motion-reduce:animate-none`. */
+@keyframes ptn-shimmer {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@utility animate-shimmer {
+  animation: ptn-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Smooth color transitions on route badges when scheme/overrides change */
+[style*="--route-color"] {
+  transition: background 150ms ease, color 150ms ease;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  /* Without this, unstyled descendants fall back to the user-agent default
+     (effectively black) regardless of theme — fine on the light scheme,
+     unreadable on dark. Per-element `text-fg` utilities still work and take
+     precedence; this is the safety net for any text node that forgets one
+     (the Power-variant itinerary numerics were the canary for this bug). */
+  color: var(--color-fg);
+  /* The canvas behind anything without its own surface (the status banners
+     above the app shell) follows the theme, or a dark-theme banner sits on
+     white. */
+  background-color: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* iOS Safari auto-zooms the visual viewport when a focused form control's
+   font-size is < 16px, and (because the viewport meta has no maximum-scale —
+   kept that way so the page stays accessible-zoomable and the Lighthouse
+   meta-viewport a11y audit passes) never restores the zoom afterward. On a
+   full-screen MapLibre PWA the only "page" you can pinch back out over is the
+   header, so the page stays stuck zoomed-in. Raise form-control text to the
+   16px threshold on touch devices so focusing the search inputs (or any input)
+   doesn't trigger the zoom. Unlayered so it wins over Tailwind's `text-sm`
+   utility (layered) without `!important`; coarse-pointer-gated so desktop keeps
+   its compact 14px controls. Range/checkbox/radio have no text to zoom on. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Countdown figures use tabular-nums to prevent shifting as digits change */
+[data-countdown] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+/* Safe-area utilities for iOS notch / home indicator. Used on the bottom
+   nav and any element anchored to screen edges. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* GPS pause toggle inside the locate control group. */
+.maplibregl-ctrl-group button.ptn-gps-pause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.maplibregl-ctrl-group button.ptn-gps-pause[hidden] { display: none; }
+.ptn-gps-pause .gps-pause-slash { display: none; }
+.ptn-gps-pause[aria-pressed="true"] { color: var(--fg-muted); }
+.ptn-gps-pause[aria-pressed="true"] .gps-pause-slash { display: inline; }
+/* Muted dot: a paused fix is no longer current. */
+.user-position-marker[data-paused="true"] { filter: grayscale(1); opacity: 0.55; }

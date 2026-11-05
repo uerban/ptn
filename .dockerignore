@@ -1,0 +1,22 @@
+node_modules/
+dist/
+target/
+.git/
+.gitignore
+.github/
+.ralphex/
+.turbo/
+.DS_Store
+.env
+.env.local
+*.tsbuildinfo
+*.log
+coverage/
+docs/
+PLAN.md
+# Generated deployment data never enters application image build contexts.
+.poi-pbf-cache/
+.osm-pbf-cache/
+.city-osm/
+packages/frontend/public/poi/
+packages/frontend/public/walk-graph/

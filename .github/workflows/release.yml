@@ -1,0 +1,193 @@
+name: Build and validate installable release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-validation-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build and test release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.22.0"
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools pkg-config osmium-tool
+          corepack enable
+          rustup show
+          cargo install wasm-pack --version 0.15.0 --locked
+      - name: Build the browser engine from clean source
+        working-directory: crates/pt-wasm
+        env:
+          CARGO_PROFILE_RELEASE_PANIC: abort
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+          CARGO_PROFILE_RELEASE_LTO: "true"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+        run: wasm-pack build --release --target web --out-dir pkg-web
+      - name: Build and test source
+        run: |
+          pnpm install --frozen-lockfile
+          node --test scripts/hosting-navigation.test.mjs
+          cargo build --release --locked --workspace
+          cargo test --workspace --locked
+          pnpm build
+          pnpm test
+          pnpm typecheck
+          pnpm lint
+      - name: Release completed native test outputs
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          du -sh target
+          # All workspace tests passed; packaging consumes only release outputs.
+          rm -rf target/debug
+      - name: Package Linux x86_64 archive
+        run: |
+          cargo build --release --locked --target x86_64-unknown-linux-musl \
+            -p pt-serve -p pt-producer -p pt-artifacts -p pt-walk --features pt-walk/build
+          node scripts/package-osm-builder.mjs
+          python3 scripts/package-release.py --platform linux-x86_64 \
+            --bin-dir target/x86_64-unknown-linux-musl/release
+          tar -xzf release/ptn-linux-x86_64.tar.gz -C release
+          cd release/ptn-linux-x86_64
+          sha256sum --check SHA256SUMS
+          python3 -c 'import json, os; r = json.load(open("release.json")); assert not r["sourceDirty"]; assert r["revision"] == os.environ["GITHUB_SHA"]'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ptn-linux-x86_64-candidate
+          retention-days: 7
+          compression-level: 0
+          path: |
+            release/ptn-linux-x86_64.tar.gz
+            release/ptn-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+
+  validate:
+    name: Validate extracted release on a fresh host
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      # Native test/release outputs consumed the build runner's disk before
+      # OSM download. This job receives only the archive, never target/.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.22.0"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ptn-linux-x86_64-candidate
+          path: release
+      - name: Install validation tools and verify release
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool
+          corepack enable
+          pnpm install --frozen-lockfile
+          cd release
+          sha256sum --check ptn-linux-x86_64.tar.gz.sha256
+          tar -xzf ptn-linux-x86_64.tar.gz
+          cd ptn-linux-x86_64
+          sha256sum --check SHA256SUMS
+          python3 -c 'import json, os; r = json.load(open("release.json")); assert not r["sourceDirty"]; assert r["revision"] == os.environ["GITHUB_SHA"]'
+      - name: Check disk capacity before OSM extraction
+        run: |
+          df -h "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
+          python3 - <<'PYTHON'
+          import os
+          import shutil
+          path = os.environ["RUNNER_TEMP"]
+          free = shutil.disk_usage(path).free
+          minimum = 6 * 1024**3
+          print(f"OSM/hosting scratch available: {free / 1024**3:.1f} GiB")
+          if free < minimum:
+              raise SystemExit("Need at least 6 GiB free for reference-city OSM and hosting validation")
+          PYTHON
+      - name: Build a local signed OSM catalog from the extracted archive
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/ptn-evidence"
+          bundle="$GITHUB_WORKSPACE/release/ptn-linux-x86_64"
+          node "$bundle/examples/native/prepare-osm.mjs" "$RUNNER_TEMP/ptn-osm"
+          PT_ADDRESS_EXTRACT_SCRIPT="$bundle/builder/packages/backend/scripts/extract-addr-fixture.mjs" \
+            node "$bundle/builder/packages/backend/src/poi/buildArtifacts.mjs" "$RUNNER_TEMP/ptn-osm/builder.json" \
+              2>&1 | tee "$RUNNER_TEMP/ptn-evidence/osm-build.log"
+      - name: Install browser and test web server
+        run: |
+          pnpm --filter @pt/frontend exec playwright install --with-deps chromium
+          docker pull caddy:2.11.7-alpine
+          container=$(docker create caddy:2.11.7-alpine)
+          docker cp "$container:/usr/bin/caddy" "$RUNNER_TEMP/caddy"
+          docker rm "$container"
+      - name: Validate native fresh-host lifecycle over HTTP and TLS
+        run: |
+          python3 scripts/verify-native-installation.py \
+            --bundle release/ptn-linux-x86_64 \
+            --source-config "$RUNNER_TEMP/ptn-osm/artifact-source.json" \
+            --caddy "$RUNNER_TEMP/caddy" --evidence "$RUNNER_TEMP/ptn-evidence/native"
+      - name: Validate Docker fresh-host lifecycle over HTTP and TLS
+        run: |
+          python3 scripts/verify-docker-installation.py \
+            --source-config "$RUNNER_TEMP/ptn-osm/artifact-source.json" \
+            --probe "$RUNNER_TEMP/ptn-evidence/native/probe.json" \
+            --evidence "$RUNNER_TEMP/ptn-evidence/docker"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ptn-linux-x86_64
+          retention-days: 30
+          compression-level: 0
+          path: |
+            release/ptn-linux-x86_64.tar.gz
+            release/ptn-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+      - name: Report validation disk usage
+        if: always()
+        run: |
+          df -h "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
+          du -sh "$RUNNER_TEMP/ptn-osm" "$RUNNER_TEMP/ptn-evidence" release 2>/dev/null || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: hosting-validation
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ptn-evidence/**/*.log
+            ${{ runner.temp }}/ptn-evidence/**/result.json
+            ${{ runner.temp }}/ptn-evidence/**/*.png
+          if-no-files-found: warn
+
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ptn-linux-x86_64
+          path: release
+      - name: Create a draft for manual publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --draft \
+            --title "$RELEASE_TAG" \
+            --notes 'Linux x86_64 PWA host archive. Includes matching native tools, web assets, local OSM builder, checksums, and hosting instructions. Native and Docker lifecycle checks passed before this draft was created. Public DNS and ACME configuration remain host-specific.' \
+            release/ptn-linux-x86_64.tar.gz release/ptn-linux-x86_64.tar.gz.sha256

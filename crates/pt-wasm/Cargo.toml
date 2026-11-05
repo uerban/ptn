@@ -1,0 +1,60 @@
+[package]
+name = "pt-wasm"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "AGPL-3.0-or-later"
+
+# cdylib is the form wasm-bindgen consumes. lib name MUST be pt_wasm
+# (matches the wasm-bindgen output convention — pt_wasm_bg.wasm).
+#
+# cdylib ONLY, on purpose. When a lib also lists rlib, Cargo drops the
+# release profile's `lto` for it (an rlib cannot be link-time optimised), so
+# the CARGO_PROFILE_RELEASE_LTO=true set by every wasm-pack build was silently
+# ignored. The unit tests in src/ still run under `cargo test -p pt-wasm`:
+# Cargo builds the lib's test harness from source whatever the crate type.
+# Nothing links pt_wasm as a Rust library, and there are no doctests or
+# integration tests that would need an rlib.
+[lib]
+name = "pt_wasm"
+crate-type = ["cdylib"]
+
+# Rust 1.97's wasm32 standard library uses bulk-memory and nontrapping
+# float-to-int operations. wasm-pack's pinned optimizer supports both proposals
+# but requires them to be enabled explicitly while loading the module.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
+
+# Separate diagnostic artifact: retain names without changing optimizer flags.
+# Profiler-on timings are not release latency qualification.
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "-g"]
+
+[features]
+# Experimental direct-only kernels; absent from production WASM by default.
+temporal-direct-r3 = ["pt-core/temporal-experiment"]
+temporal-direct-m4 = ["pt-core/temporal-experiment"]
+# Isolated deadline benchmark handle; never enabled by production builds.
+temporal-deadline = ["pt-core/temporal-experiment"]
+# Setup attribution markers for the deadline handle (H67); never in production.
+temporal-setup-profile = ["temporal-deadline"]
+
+[dependencies]
+pt-core = { path = "../pt-core" }
+# Local address search in the browser reads the SAME packed artifact pt-serve
+# does, through the same crate — so an offline query resolves identically.
+pt-geocode = { path = "../pt-geocode" }
+# On-device walking routes; the library half only (no `build` feature).
+pt-walk = { path = "../pt-walk" }
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+serde = { version = "1", features = ["derive"] }
+# js_sys provides typed JsValue helpers used in error mapping. Pin minor
+# so it stays version-matched with wasm-bindgen.
+js-sys = "0.3"
+
+[dev-dependencies]
+# Host-target serde JSON round-trip for the wire-shape unit tests in
+# output.rs. Dev-only — not bundled into the wasm artifact.
+serde_json = "1"

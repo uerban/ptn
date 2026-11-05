@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.3966, "lon": 18.6701 },
+    "to": { "lat": 54.3245, "lon": 18.6293 },
+    "description": "tram-cross-gdansk: Nowy Port (tram terminus north) to Gdańsk Południe"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["TRAM", "BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

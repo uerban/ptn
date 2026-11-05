@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.0645, "lon": 19.9600 },
+    "to": { "lat": 50.0589, "lon": 19.9580 },
+    "description": "rondo-to-rondo: Rondo Mogilskie to Rondo Grzegorzeckie (adjacent tram hubs)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["TRAM", "WALK"],
+  "maxLatencyMs": 3000
+}

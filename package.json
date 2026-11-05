@@ -1,0 +1,26 @@
+{
+  "name": "ptn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public Transport Navigator — flexible, offline-first transit routing PWA",
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@11.2.2",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean",
+    "check:i18n": "node scripts/check-i18n-parity.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.14",
+    "typescript": "^5.7.0",
+    "yaml": "^2.8.3"
+  }
+}

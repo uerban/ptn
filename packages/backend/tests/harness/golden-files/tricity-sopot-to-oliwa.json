@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.4416, "lon": 18.5598 },
+    "to": { "lat": 54.4103, "lon": 18.5563 },
+    "description": "sopot-detour: Sopot to Gdańsk Oliwa — short SKM hop between resort towns"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

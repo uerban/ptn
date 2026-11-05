@@ -1,0 +1,97 @@
+{
+  "_comment": "Deterministic synthetic GTFS-RT payloads for docker-heap-bench's RT-poller capture lane (--rt-poller-mode fixture).",
+  "_whyPinnedAndNotLive": "A poller-on/off capture pair runs sequentially. Immutable local payloads prevent upstream feed drift from entering the delta and provide a known merged-entry denominator.",
+  "_whatTheSnapshotActuallyStores": "pt-serve retains one 8-byte TripUpdate per trip key plus merged/by_trip hash-map storage. StopTimeUpdates exercise decoding but collapse to the final delay. With no startDate, by_trip holds one clone of each bare trip id.",
+  "_regenerating": "Run pnpm --filter @pt/backend generate:rt-fixtures, then run the fixture and Rust parser tests. Any generated-byte change requires a new same-runner poller-on/off capture; never infer memory numbers locally.",
+  "_shapeProvenance": "Feed count, entity-type counts, StopTimeUpdate density, trip-id byte totals, and zero-startDate shape were retained from the superseded 2026-08-09 benchmark inputs. The identifiers and all protobuf bytes are generated here and contain no agency data.",
+  "_scope": "Wire/parser/memory fixture only. Synthetic trip and stop ids intentionally do not claim to resolve against the production PTB staged by a runner; /health/rt proves ingestion, not overlay coverage.",
+  "_rights": {
+    "publicReleaseBlocked": false,
+    "reviewedAt": "2026-09-12",
+    "reason": "Original deterministic test data generated solely from numeric benchmark dimensions; no third-party identifiers or payload bytes are included.",
+    "license": "AGPL-3.0-or-later"
+  },
+  "generatedAt": "2026-09-12T00:00:00Z",
+  "generator": "packages/backend/scripts/generate-rt-feed-fixtures.ts",
+  "pollIntervalMsForCapture": 12000,
+  "_pollIntervalRationale": "Matches pt-serve's deployed default, pinned by build.rs to RT_BACKEND_POLL_INTERVAL_MS.",
+  "feeds": [
+    {
+      "city": "vilnius",
+      "file": "vilnius-trip-updates.pb",
+      "sourceUrl": "synthetic://ptn/rt-poller/vilnius-trip-updates.pb",
+      "sha256": "e669617f07cf0dccbe86661921ee2df3d622a416e95d7243c1ba1de7010d4e06",
+      "bytes": 47073,
+      "entities": 506,
+      "tripUpdates": 506,
+      "vehiclePositions": 0,
+      "stopTimeUpdates": 506,
+      "tripIdBytes": 11695,
+      "meanTripIdLength": 23.1,
+      "withStartDate": 0
+    },
+    {
+      "city": "krakow",
+      "file": "krakow-trip-updates-a.pb",
+      "sourceUrl": "synthetic://ptn/rt-poller/krakow-trip-updates-a.pb",
+      "sha256": "13ccaf1b4f10bcf97a798319cc84701c6b06095ecf1f04eb11f6286841f7ae7f",
+      "bytes": 201831,
+      "entities": 364,
+      "tripUpdates": 364,
+      "vehiclePositions": 0,
+      "stopTimeUpdates": 5253,
+      "tripIdBytes": 8329,
+      "meanTripIdLength": 22.9,
+      "withStartDate": 0
+    },
+    {
+      "city": "krakow",
+      "file": "krakow-trip-updates-m.pb",
+      "sourceUrl": "synthetic://ptn/rt-poller/krakow-trip-updates-m.pb",
+      "sha256": "285ac0aab937c34db78c9b628bbdb516413f7bb40a1657f879577c2a129cf21c",
+      "bytes": 73509,
+      "entities": 108,
+      "tripUpdates": 108,
+      "vehiclePositions": 0,
+      "stopTimeUpdates": 1988,
+      "tripIdBytes": 1035,
+      "meanTripIdLength": 9.6,
+      "withStartDate": 0
+    },
+    {
+      "city": "krakow",
+      "file": "krakow-trip-updates-t.pb",
+      "sourceUrl": "synthetic://ptn/rt-poller/krakow-trip-updates-t.pb",
+      "sha256": "30e558b4a99884b3cb0936b627b7bb324278519d0e17678330907db514083e6c",
+      "bytes": 111690,
+      "entities": 197,
+      "tripUpdates": 197,
+      "vehiclePositions": 0,
+      "stopTimeUpdates": 2907,
+      "tripIdBytes": 5298,
+      "meanTripIdLength": 26.9,
+      "withStartDate": 0
+    },
+    {
+      "city": "tricity",
+      "file": "tricity-trip-updates.pb",
+      "sourceUrl": "synthetic://ptn/rt-poller/tricity-trip-updates.pb",
+      "sha256": "74be97b809f18edca82bee41c5e913f4cf1efce3ad93bdb14a2f8e3a570bc470",
+      "bytes": 106538,
+      "entities": 331,
+      "tripUpdates": 193,
+      "vehiclePositions": 138,
+      "stopTimeUpdates": 2220,
+      "tripIdBytes": 4838,
+      "meanTripIdLength": 25.1,
+      "withStartDate": 0,
+      "_note": "Carries synthetic VehiclePosition entities so the TripUpdates poller's discard path remains exercised."
+    }
+  ],
+  "_expectedMergedEntries": {
+    "_comment": "Expected /health/rt denominator. The v/a/m/t/g namespaces make all TripUpdate keys distinct across feeds.",
+    "vilnius": 506,
+    "krakow": 669,
+    "tricity": 193
+  }
+}

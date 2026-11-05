@@ -1,0 +1,27 @@
+{
+  "forward": [
+    {"label": "Vilnius spring gap 03:30", "tz": "Europe/Vilnius", "ymd": 20260329, "secs": 12600, "dstKind": "none", "expectedUnix": 1774747800},
+    {"label": "Paris spring gap 02:30", "tz": "Europe/Paris", "ymd": 20260329, "secs": 9000, "dstKind": "none", "expectedUnix": 1774747800},
+    {"label": "Oslo spring gap 02:30", "tz": "Europe/Oslo", "ymd": 20260329, "secs": 9000, "dstKind": "none", "expectedUnix": 1774747800},
+    {"label": "Warsaw spring gap 02:30", "tz": "Europe/Warsaw", "ymd": 20260329, "secs": 9000, "dstKind": "none", "expectedUnix": 1774747800},
+    {"label": "Vilnius fall overlap 03:30", "tz": "Europe/Vilnius", "ymd": 20261025, "secs": 12600, "dstKind": "ambiguous", "expectedUnix": 1792888200},
+    {"label": "Paris fall overlap 02:30", "tz": "Europe/Paris", "ymd": 20261025, "secs": 9000, "dstKind": "ambiguous", "expectedUnix": 1792888200},
+    {"label": "Oslo fall overlap 02:30", "tz": "Europe/Oslo", "ymd": 20261025, "secs": 9000, "dstKind": "ambiguous", "expectedUnix": 1792888200},
+    {"label": "Warsaw fall overlap 02:30", "tz": "Europe/Warsaw", "ymd": 20261025, "secs": 9000, "dstKind": "ambiguous", "expectedUnix": 1792888200},
+    {"label": "Tbilisi no-DST noon", "tz": "Asia/Tbilisi", "ymd": 20260329, "secs": 43200, "dstKind": "single", "expectedUnix": 1774771200},
+    {"label": "Paris overnight 25:30", "tz": "Europe/Paris", "ymd": 20260115, "secs": 91800, "dstKind": "single", "expectedUnix": 1768523400},
+    {"label": "Vilnius overnight 27:00", "tz": "Europe/Vilnius", "ymd": 20260115, "secs": 97200, "dstKind": "single", "expectedUnix": 1768525200},
+    {"label": "Vilnius winter noon", "tz": "Europe/Vilnius", "ymd": 20260115, "secs": 43200, "dstKind": "single", "expectedUnix": 1768471200},
+    {"label": "Paris overnight into valid post-spring", "tz": "Europe/Paris", "ymd": 20260328, "secs": 99000, "dstKind": "single", "expectedUnix": 1774747800},
+    {"label": "Vilnius pre-midnight -00:30", "tz": "Europe/Vilnius", "ymd": 20260115, "secs": -1800, "dstKind": "single", "expectedUnix": 1768426200}
+  ],
+  "inverse": [
+    {"label": "inv: Vilnius winter noon", "tz": "Europe/Vilnius", "unixSec": 1768471200, "expectedServiceDateYmd": 20260115, "expectedSecsOfServiceDay": 43200},
+    {"label": "inv: Vilnius late-evening (cross-tz civil date)", "tz": "Europe/Vilnius", "unixSec": 1768518000, "expectedServiceDateYmd": 20260116, "expectedSecsOfServiceDay": 3600},
+    {"label": "inv: Paris overnight tail 01:30", "tz": "Europe/Paris", "unixSec": 1768523400, "expectedServiceDateYmd": 20260116, "expectedSecsOfServiceDay": 5400},
+    {"label": "inv: Paris post-spring 03:30", "tz": "Europe/Paris", "unixSec": 1774747800, "expectedServiceDateYmd": 20260329, "expectedSecsOfServiceDay": 12600},
+    {"label": "inv: Vilnius fall-back 03:30 (earlier)", "tz": "Europe/Vilnius", "unixSec": 1792888200, "expectedServiceDateYmd": 20261025, "expectedSecsOfServiceDay": 12600},
+    {"label": "inv: Vilnius spring gap-exit 04:00", "tz": "Europe/Vilnius", "unixSec": 1774746000, "expectedServiceDateYmd": 20260329, "expectedSecsOfServiceDay": 14400},
+    {"label": "inv: Tbilisi no-DST noon", "tz": "Asia/Tbilisi", "unixSec": 1774771200, "expectedServiceDateYmd": 20260329, "expectedSecsOfServiceDay": 43200}
+  ]
+}

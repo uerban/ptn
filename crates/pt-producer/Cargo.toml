@@ -1,0 +1,94 @@
+[package]
+name = "pt-producer"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "AGPL-3.0-or-later"
+
+[[bin]]
+name = "pt-producer"
+path = "src/main.rs"
+
+[[bin]]
+name = "pt-build-transfers"
+path = "src/bin/build_transfers.rs"
+
+[[bin]]
+name = "pt-ptb-v2-stage"
+path = "src/bin/ptb_v2_stage.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["csv-mmap"]
+csv-bufwriter = []
+csv-mmap = []
+hand-rolled = ["csv-mmap"]
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+tiny_http = "0.12"
+ureq = { version = "2", default-features = false }
+# "deflate-flate2", not "deflate": zip 9's "deflate" switches flate2 to the
+# zlib-rs backend, which changes the PTB gzip bytes. flate2's backend comes
+# from this crate's own flate2 dependency (rust_backend, miniz_oxide).
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+# Deterministic gzip of the PTB v1 compatibility bytes (ptb_v2.rs). Same
+# version/backend the zip crate already links.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+csv = "1.3"
+memmap2 = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+signal-hook = "0.3"
+tempfile = "3"
+thiserror = "2"
+# P4 publish protocol — manifest types, fsync helper, metadata validators.
+# The producer consumes the SAME workspace-owned wire-format types that
+# pt-serve reads, without re-implementing GenerationManifest/PointerManifest.
+pt-shared = { path = "../pt-shared" }
+# Packs the address artifact (`pack-address-search`). Same crate pt-serve
+# reads it back with, so the writer and the reader can never drift.
+pt-geocode = { path = "../pt-geocode" }
+# windowDays derive + bitmask-stride helpers — the SAME pure-integer
+# `derive_window_days` / `bytes_per_service` / `WindowClampEvent` the readers
+# decode against (the I2 single-implementation guarantee). `default-features =
+# false` keeps pt-core no_std (it has no default features today, but pin it so a
+# future std feature is never silently pulled into the producer and never
+# breaks pt-core's CI `no_std` boundary.
+pt-core = { path = "../pt-core", default-features = false }
+# Direct rustix dep for producer.lock flock semantics — same pattern pt-serve
+# uses for its pidfile. Version pinned to the same major as pt-shared's
+# rustix (0.38) so both crates link the same backend. The producer also pulls a
+# newer rustix (1.x) transitively via tempfile; cargo allows multiple major
+# versions side-by-side without conflict.
+rustix = { version = "0.38", features = ["fs"] }
+jiff.workspace = true
+jiff-tzdb.workspace = true
+# Schedule-tile Rust-native build (Approach B — retires schedule-tile-gen.mjs).
+# brotli: q=11 tile compression (bytes may differ from Node's libbrotli; the
+# differential gate compares DECOMPRESSED payloads, never compressed streams).
+brotli = "7"
+# NFC normalization for tile string interning (mirrors String.prototype.normalize("NFC")).
+unicode-normalization = "0.1"
+# Insertion-order-preserving maps: tile `stops` object, cells map, stop→tile map.
+# JSON key order is part of the Node-parity contract.
+indexmap = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+regex = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(not(all(target_arch = "arm", target_env = "musl")))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[target.'cfg(all(target_arch = "arm", target_env = "musl"))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+# The direct dependency enables `openssl-sys/vendored` for native-tls. CI pins
+# OpenSSL's `linux-armv4` build and every native object to Armv6 hard-float.
+openssl = { version = "0.10", features = ["vendored"] }

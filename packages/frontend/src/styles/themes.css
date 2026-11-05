@@ -1,0 +1,183 @@
+/* ==========================================================================
+   Design Tokens — Flat semantic variables
+   Each theme redefines the full set. Accessibility scheme overrides use
+   [data-a11y-scheme] attribute selectors at the bottom.
+   ========================================================================== */
+
+:root, [data-theme="light"] {
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-overlay: #f9fafb;
+  --fg: #111827;
+  --fg-secondary: #374151;
+  --fg-muted: #6b7280;
+  --divider: #e5e7eb;
+  /* Text tokens meet 4.5:1 on every surface and, for the four colours
+     below, on their own 10% tint too (`text-warning` on `bg-warning/10`);
+     tests/styles/theme-contrast.test.ts holds every theme to it. */
+  --accent: #235edf;
+  --success: #107736;
+  --warning: #b44409;
+  --danger: #c62222;
+  --badge-text: #ffffff;
+  --nav-bg: #ffffff;
+  --nav-fg: #6b7280;
+  --nav-fg-active: #235edf;
+  --input-bg: #f9fafb;
+  --sheet-handle: #d1d5db;
+  --favorite: #facc15;
+  --warning-fg: #ffffff;
+  --connector-line: #3b82f6;
+  /* Two-stop elevation ramp — soft ambient + tighter contact shadow.
+     Replaces generic shadow-md/lg and removes the need for a paired border. */
+  --shadow-1: 0 1px 2px rgb(17 24 39 / 0.04), 0 2px 8px rgb(17 24 39 / 0.06);
+  --shadow-2: 0 2px 4px rgb(17 24 39 / 0.05), 0 8px 24px rgb(17 24 39 / 0.10);
+}
+
+[data-theme="dark"] {
+  --surface: #030712;
+  --surface-raised: #111827;
+  --surface-overlay: #1f2937;
+  --fg: #ffffff;
+  --fg-secondary: #d1d5db;
+  --fg-muted: #9ca3af;
+  --divider: #374151;
+  --accent: #60a5fa;
+  --success: #4ade80;
+  --warning: #fb923c;
+  --danger: #f87171;
+  --badge-text: #ffffff;
+  --nav-bg: #111827;
+  --nav-fg: #9ca3af;
+  --nav-fg-active: #60a5fa;
+  --input-bg: #1f2937;
+  --sheet-handle: #4b5563;
+  --favorite: #fbbf24;
+  --warning-fg: #431407;
+  --connector-line: #60a5fa;
+  /* Darker backdrop → shadows are deeper. On dark surfaces the ambient
+     stop does most of the lifting; contact stays subtle. */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.30), 0 8px 24px rgb(0 0 0 / 0.55);
+}
+
+/* Pending-geometry overlay opacity tokens.
+   Dashed-march walking animation: deferred to Phase 2f. */
+:root {
+  --overlay-opacity-pending: 0.5;
+  --overlay-opacity-default: 1;
+}
+
+/* Accessibility scheme overrides for semantic status colors.
+   Each value meets 4.5:1 on its theme's surfaces and on its own 10% tint
+   (tests/styles/theme-contrast.test.ts). Dark-theme compound selectors
+   supply lighter variants. */
+[data-a11y-scheme="deuteranopia"] {
+  --success: #235edf;
+  --warning: #a94e08;
+  --warning-fg: #ffffff;
+  --danger: #7c3aed;
+}
+[data-theme="dark"][data-a11y-scheme="deuteranopia"] {
+  --success: #60a5fa;
+  --warning: #fbbf24;
+  --warning-fg: #1a1a1a;
+  --danger: #c084fc;
+}
+
+[data-a11y-scheme="protanopia"] {
+  --success: #0e718c;
+  --warning: #965b07;
+  --warning-fg: #ffffff;
+  --danger: #aa3377;
+}
+[data-theme="dark"][data-a11y-scheme="protanopia"] {
+  --success: #33bbee;
+  --warning: #ddaa33;
+  --warning-fg: #1a1a1a;
+  --danger: #ef72a1;
+}
+
+[data-a11y-scheme="tritanopia"] {
+  --success: #0f766e;
+  --warning: #c23010;
+  --warning-fg: #ffffff;
+  --danger: #be185d;
+}
+[data-theme="dark"][data-a11y-scheme="tritanopia"] {
+  --success: #14b8a6;
+  --warning: #f97316;
+  --warning-fg: #1a1a1a;
+  --danger: #fb7185;
+}
+
+[data-a11y-scheme="monochrome"] {
+  --success: #4b5563;
+  --warning: #1f2937;
+  --warning-fg: #ffffff;
+  --danger: #000000;
+}
+[data-theme="dark"][data-a11y-scheme="monochrome"] {
+  --success: #9ca3af;
+  --warning: #d1d5db;
+  --warning-fg: #1a1a1a;
+  --danger: #ffffff;
+}
+
+[data-a11y-scheme="universal"] {
+  --success: #235edf;
+  --warning: #a94e08;
+  --warning-fg: #ffffff;
+  --danger: #7c3aed;
+}
+[data-theme="dark"][data-a11y-scheme="universal"] {
+  --success: #60a5fa;
+  --warning: #fbbf24;
+  --warning-fg: #1a1a1a;
+  --danger: #c084fc;
+}
+
+/* ---------- Appearance (variant) density tokens ---------- */
+/* Fallback when `[data-variant]` is absent (e.g., test harnesses,
+   isolated component renders before the attribute is applied).
+   Must match the [data-variant="consumer"] block below — enforced by
+   tests/styles/variant-tokens.test.ts. */
+:root {
+  --variant-row-pad: 0.5rem 0.75rem;
+  --variant-row-min-height: 3rem;
+  --variant-primary-text-size: 0.875rem;
+  --variant-meta-text-size: 0.75rem;
+  --variant-icon-size: 16px;
+  --variant-chip-gap: 0.375rem;
+  --variant-row-separator: var(--color-divider);
+}
+
+[data-variant="consumer"] {
+  --variant-row-pad: 0.5rem 0.75rem;
+  --variant-row-min-height: 3rem;
+  --variant-primary-text-size: 0.875rem;
+  --variant-meta-text-size: 0.75rem;
+  --variant-icon-size: 16px;
+  --variant-chip-gap: 0.375rem;
+  --variant-row-separator: var(--color-divider);
+}
+
+[data-variant="power"] {
+  --variant-row-pad: 0.375rem 0.625rem;
+  --variant-row-min-height: 2.25rem;
+  --variant-primary-text-size: 0.75rem;
+  --variant-meta-text-size: 0.6875rem;
+  --variant-icon-size: 14px;
+  --variant-chip-gap: 0.25rem;
+  --variant-row-separator: color-mix(in srgb, var(--color-divider) 60%, transparent);
+}
+
+[data-variant="accessible"] {
+  --variant-row-pad: 0.75rem 1rem;
+  --variant-row-min-height: 3.75rem;
+  --variant-primary-text-size: 1rem;
+  --variant-meta-text-size: 0.875rem;
+  --variant-icon-size: 20px;
+  --variant-chip-gap: 0.5rem;
+  --variant-row-separator: var(--color-divider-strong, var(--color-divider));
+}

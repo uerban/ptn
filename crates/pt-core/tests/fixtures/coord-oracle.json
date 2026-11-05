@@ -1,0 +1,23 @@
+[
+  { "in": "-0.00000005", "axis": "lat", "i32": -1, "prod_hex": "bfe0000000000000" },
+  { "in": "0.00000005", "axis": "lat", "i32": 1, "prod_hex": "3fe0000000000000" },
+  { "in": "0.0", "axis": "lat", "i32": 0, "prod_hex": "0000000000000000" },
+  { "in": "-0.0", "axis": "lat", "i32": 0, "prod_hex": "8000000000000000" },
+  { "in": "0.0", "axis": "lon", "i32": 0, "prod_hex": "0000000000000000" },
+  { "in": "90.0", "axis": "lat", "i32": 900000000, "prod_hex": "41cad27480000000" },
+  { "in": "-90.0", "axis": "lat", "i32": -900000000, "prod_hex": "c1cad27480000000" },
+  { "in": "180.0", "axis": "lon", "i32": 1800000000, "prod_hex": "41dad27480000000" },
+  { "in": "-180.0", "axis": "lon", "i32": -1800000000, "prod_hex": "c1dad27480000000" },
+  { "in": "89.9999999", "axis": "lat", "i32": 899999999, "prod_hex": "41cad2747f800000" },
+  { "in": "-89.9999999", "axis": "lat", "i32": -899999999, "prod_hex": "c1cad2747f800000" },
+  { "in": "179.9999999", "axis": "lon", "i32": 1799999999, "prod_hex": "41dad2747fc00000" },
+  { "in": "90.0000001", "axis": "lat", "reject": true },
+  { "in": "180.0000001", "axis": "lon", "reject": true },
+  { "in": "nan", "axis": "lat", "reject": true },
+  { "in": "inf", "axis": "lon", "reject": true },
+  { "in": "-73.9857", "axis": "lon", "i32": -739857000, "prod_hex": "c1c60ca934000000" },
+  { "in": "25.2797171", "axis": "lon", "i32": 252797171, "prod_hex": "41ae22c1e6000000" },
+  { "in": "54.6912345", "axis": "lat", "i32": 546912345, "prod_hex": "41c04c9c2c800000" },
+  { "in": "54.69", "axis": "lat", "i32": 546900000, "prod_hex": "41c04c8410000000", "_note": "f32-divergence witness: f64->546900000 vs f32->546899986 differ at e7; keep" },
+  { "in": "54.6900007", "axis": "lat", "i32": 546900007, "prod_hex": "41c04c8413800000", "_note": "1e5-obliteration witness: a 1e5 grid collapses it; 1e7 preserves" }
+]

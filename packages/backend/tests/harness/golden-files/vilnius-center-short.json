@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "vilnius",
+    "from": { "lat": 54.6711, "lon": 25.2868 },
+    "to": { "lat": 54.6853, "lon": 25.2877 },
+    "description": "center-short: Train station (Stotis) to Cathedral area (Katedros aikštė)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

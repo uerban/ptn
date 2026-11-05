@@ -1,0 +1,2846 @@
+{
+  "_meta": {
+    "generated": "2026-04-13",
+    "sourceVersion": "2026-04-13",
+    "entryCount": 99,
+    "needsReviewCount": 16,
+    "notes": "Curated from well-established Gdansk landmarks. Wikidata SPARQL endpoint was unreachable from this environment; wikidataId is populated only where confidence is high. Needs native review where noted. nearestStopGroupId left null for all entries (follow-up task)."
+  },
+  "entries": [
+    {
+      "id": "gd-lech-walesa-airport",
+      "city": "gdansk",
+      "canonicalName": "Port Lotniczy Gdańsk im. Lecha Wałęsy",
+      "aliases": {
+        "pl": [
+          "Lotnisko Gdańsk",
+          "Port Lotniczy Gdańsk",
+          "Rębiechowo"
+        ],
+        "en": [
+          "Gdańsk Lech Wałęsa Airport",
+          "Gdansk Airport",
+          "GDN"
+        ],
+        "ru": [
+          "Аэропорт имени Леха Валенсы",
+          "Гданьский аэропорт"
+        ],
+        "uk": [
+          "Аеропорт імені Леха Валенси"
+        ],
+        "be": [
+          "Аэрапорт Гданьск"
+        ],
+        "lt": [
+          "Gdansko oro uostas"
+        ]
+      },
+      "category": "airport",
+      "lat": 54.3776,
+      "lon": 18.4662,
+      "bbox": [
+        54.3676,
+        18.4462,
+        54.3876,
+        18.4862
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q377140",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-pks-olszynka",
+      "city": "gdansk",
+      "canonicalName": "Dworzec Autobusowy Gdańsk",
+      "aliases": {
+        "pl": [
+          "Dworzec PKS Gdańsk",
+          "Dworzec Autobusowy"
+        ],
+        "en": [
+          "Gdańsk Bus Terminal",
+          "Gdansk Coach Station"
+        ],
+        "ru": [
+          "Автовокзал Гданьска"
+        ],
+        "uk": [
+          "Автовокзал Гданська"
+        ]
+      },
+      "category": "bus_terminal",
+      "lat": 54.3554,
+      "lon": 18.6463,
+      "bbox": [
+        54.3544,
+        18.6443,
+        54.3564,
+        18.6483
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q48850712"
+    },
+    {
+      "id": "gd-nowy-port-cruise-terminal",
+      "city": "gdansk",
+      "canonicalName": "Terminal Promowy Gdańsk",
+      "aliases": {
+        "pl": [
+          "Terminal Promowy Westerplatte",
+          "Port Gdańsk"
+        ],
+        "en": [
+          "Gdańsk Ferry Terminal",
+          "Gdansk Port"
+        ],
+        "ru": [
+          "Гданьский порт"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4,
+      "lon": 18.6667,
+      "bbox": [
+        54.39,
+        18.6467,
+        54.41,
+        18.6867
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q16485550"
+    },
+    {
+      "id": "gd-amberexpo",
+      "city": "gdansk",
+      "canonicalName": "AmberExpo",
+      "aliases": {
+        "pl": [
+          "Centrum Wystawienniczo-Kongresowe AmberExpo"
+        ],
+        "en": [
+          "AmberExpo Exhibition and Convention Centre"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3914,
+      "lon": 18.6097,
+      "bbox": [
+        54.3904,
+        18.6077,
+        54.3924,
+        18.6117
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-ergo-arena",
+      "city": "gdansk",
+      "canonicalName": "Ergo Arena",
+      "aliases": {
+        "pl": [
+          "Hala Ergo Arena"
+        ],
+        "en": [
+          "Ergo Arena"
+        ],
+        "ru": [
+          "Эрго Арена"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.4045,
+      "lon": 18.5719,
+      "bbox": [
+        54.4035,
+        18.5699,
+        54.4055,
+        18.5739
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1356869",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-ecs",
+      "city": "gdansk",
+      "canonicalName": "Europejskie Centrum Solidarności",
+      "aliases": {
+        "pl": [
+          "ECS",
+          "Centrum Solidarności"
+        ],
+        "en": [
+          "European Solidarity Centre",
+          "ECS"
+        ],
+        "ru": [
+          "Европейский центр солидарности"
+        ],
+        "uk": [
+          "Європейський центр солідарності"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3608,
+      "lon": 18.6489,
+      "bbox": [
+        54.3598,
+        18.6469,
+        54.3618,
+        18.6509
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11808283",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-teatr-szekspirowski",
+      "city": "gdansk",
+      "canonicalName": "Gdański Teatr Szekspirowski",
+      "aliases": {
+        "pl": [
+          "Teatr Szekspirowski"
+        ],
+        "en": [
+          "Gdańsk Shakespeare Theatre",
+          "Shakespeare Theatre"
+        ],
+        "ru": [
+          "Гданьский Шекспировский театр"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3497,
+      "lon": 18.6511,
+      "bbox": [
+        54.3487,
+        18.6491,
+        54.3507,
+        18.6531
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9363462",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-opera-baltycka",
+      "city": "gdansk",
+      "canonicalName": "Opera Bałtycka",
+      "aliases": {
+        "pl": [
+          "Opera Bałtycka w Gdańsku"
+        ],
+        "en": [
+          "Baltic Opera"
+        ],
+        "ru": [
+          "Балтийская опера"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3881,
+      "lon": 18.6128,
+      "bbox": [
+        54.3871,
+        18.6108,
+        54.3891,
+        18.6148
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11687434",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-palac-mlodziezy",
+      "city": "gdansk",
+      "canonicalName": "Pałac Młodzieży",
+      "aliases": {
+        "pl": [
+          "Pałac Młodzieży w Gdańsku"
+        ],
+        "en": [
+          "Youth Palace"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3461,
+      "lon": 18.6572,
+      "bbox": [
+        54.3451,
+        18.6552,
+        54.3471,
+        18.6592
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-filharmonia-baltycka",
+      "city": "gdansk",
+      "canonicalName": "Polska Filharmonia Bałtycka",
+      "aliases": {
+        "pl": [
+          "Filharmonia Bałtycka",
+          "Filharmonia na Ołowiance",
+          "Filharmonia Bałtycka im. Fryderyka Chopina"
+        ],
+        "en": [
+          "Polish Baltic Philharmonic",
+          "Baltic Philharmonic"
+        ],
+        "ru": [
+          "Балтийская филармония"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.3503,
+      "lon": 18.6567,
+      "bbox": [
+        54.3473,
+        18.6537,
+        54.3538,
+        18.6597
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q805784",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-szpital-marynarki",
+      "city": "gdansk",
+      "canonicalName": "7 Szpital Marynarki Wojennej",
+      "aliases": {
+        "pl": [
+          "Szpital Marynarki Wojennej",
+          "Szpital MSWiA"
+        ],
+        "en": [
+          "7th Naval Hospital Gdańsk"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.3933,
+      "lon": 18.5663,
+      "bbox": [
+        54.3768,
+        18.563299999999998,
+        54.396300000000004,
+        18.6103
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-centrum-medyczne-swissmed",
+      "city": "gdansk",
+      "canonicalName": "Swissmed Centrum Zdrowia",
+      "aliases": {
+        "pl": [
+          "Swissmed"
+        ],
+        "en": [
+          "Swissmed Health Centre"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.3872,
+      "lon": 18.6025,
+      "bbox": [
+        54.3862,
+        18.6005,
+        54.3882,
+        18.6045
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-szpital-copernicus",
+      "city": "gdansk",
+      "canonicalName": "Szpital Copernicus",
+      "aliases": {
+        "pl": [
+          "Szpital Wojewódzki im. Mikołaja Kopernika",
+          "Copernicus Podmiot Leczniczy"
+        ],
+        "en": [
+          "Copernicus Hospital Gdańsk"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.3654,
+      "lon": 18.6381,
+      "bbox": [
+        54.3644,
+        18.6361,
+        54.3664,
+        18.6401
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-szpital-swietego-wojciecha",
+      "city": "gdansk",
+      "canonicalName": "Szpital św. Wojciecha",
+      "aliases": {
+        "pl": [
+          "Szpital Zaspa",
+          "Szpital im. św. Wojciecha"
+        ],
+        "en": [
+          "St Adalbert Hospital Gdańsk"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.3986,
+      "lon": 18.6147,
+      "bbox": [
+        54.3976,
+        18.6127,
+        54.3996,
+        18.6167
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-szpital-uck",
+      "city": "gdansk",
+      "canonicalName": "Uniwersyteckie Centrum Kliniczne",
+      "aliases": {
+        "pl": [
+          "UCK",
+          "Szpital przy Dębinkach",
+          "Szpital Kliniczny GUMed"
+        ],
+        "en": [
+          "University Clinical Centre Gdańsk",
+          "UCK"
+        ],
+        "ru": [
+          "Университетский клинический центр"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.3719,
+      "lon": 18.6175,
+      "bbox": [
+        54.3709,
+        18.6155,
+        54.3729,
+        18.6195
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-oliwa-katedra",
+      "city": "gdansk",
+      "canonicalName": "Archikatedra Oliwska",
+      "aliases": {
+        "pl": [
+          "Katedra Oliwska"
+        ],
+        "en": [
+          "Oliwa Cathedral"
+        ],
+        "ru": [
+          "Оливский собор"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4106,
+      "lon": 18.5586,
+      "bbox": [
+        54.4096,
+        18.5566,
+        54.4116,
+        18.5606
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q879921",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-kosciol-mariacki",
+      "city": "gdansk",
+      "canonicalName": "Bazylika Mariacka",
+      "aliases": {
+        "pl": [
+          "Kościół Mariacki",
+          "Bazylika Wniebowzięcia NMP"
+        ],
+        "en": [
+          "St. Mary's Basilica",
+          "St. Mary's Church Gdańsk"
+        ],
+        "ru": [
+          "Мариацкий костёл"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3506,
+      "lon": 18.6533,
+      "bbox": [
+        54.3496,
+        18.6513,
+        54.3516,
+        18.6553
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q876506",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-brama-mariacka",
+      "city": "gdansk",
+      "canonicalName": "Brama Mariacka",
+      "aliases": {
+        "pl": [
+          "Brama Mariacka"
+        ],
+        "en": [
+          "St. Mary's Gate"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.35,
+      "lon": 18.6572,
+      "bbox": [
+        54.349,
+        18.6552,
+        54.351,
+        18.6592
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-wyzynna-brama",
+      "city": "gdansk",
+      "canonicalName": "Brama Wyżynna",
+      "aliases": {
+        "pl": [
+          "Wyżynna"
+        ],
+        "en": [
+          "Highland Gate",
+          "Upland Gate"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3494,
+      "lon": 18.6481,
+      "bbox": [
+        54.3484,
+        18.6461,
+        54.3504,
+        18.6501
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-brama-nr-2-stoczni",
+      "city": "gdansk",
+      "canonicalName": "Brama nr 2 Stoczni Gdańskiej",
+      "aliases": {
+        "pl": [
+          "Historyczna Brama Stoczni"
+        ],
+        "en": [
+          "Gate No. 2 of Gdańsk Shipyard"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3608,
+      "lon": 18.6517,
+      "bbox": [
+        54.3598,
+        18.6497,
+        54.3618,
+        18.6537
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q24946311"
+    },
+    {
+      "id": "gd-dwor-artusa",
+      "city": "gdansk",
+      "canonicalName": "Dwór Artusa",
+      "aliases": {
+        "pl": [
+          "Dwór Artusa w Gdańsku"
+        ],
+        "en": [
+          "Artus Court"
+        ],
+        "ru": [
+          "Двор Артуса"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3491,
+      "lon": 18.6533,
+      "bbox": [
+        54.3481,
+        18.6513,
+        54.3501,
+        18.6553
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1126690",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-fontanna-neptuna",
+      "city": "gdansk",
+      "canonicalName": "Fontanna Neptuna",
+      "aliases": {
+        "pl": [
+          "Neptun"
+        ],
+        "en": [
+          "Neptune's Fountain"
+        ],
+        "ru": [
+          "Фонтан Нептуна"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3489,
+      "lon": 18.6531,
+      "bbox": [
+        54.3479,
+        18.6511,
+        54.3499,
+        18.6551
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1441910",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-park-naukowo-technologiczny",
+      "city": "gdansk",
+      "canonicalName": "Gdański Park Naukowo-Technologiczny",
+      "aliases": {
+        "pl": [
+          "GPN-T",
+          "GPNT"
+        ],
+        "en": [
+          "Gdańsk Science and Technology Park"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3739,
+      "lon": 18.6083,
+      "bbox": [
+        54.3729,
+        18.6063,
+        54.3749,
+        18.6103
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-hala-targowa",
+      "city": "gdansk",
+      "canonicalName": "Hala Targowa",
+      "aliases": {
+        "pl": [
+          "Hala Targowa Dominikanska",
+          "Hala Targowa w Gdańsku"
+        ],
+        "en": [
+          "Market Hall Gdańsk"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3525,
+      "lon": 18.6508,
+      "bbox": [
+        54.3515,
+        18.6488,
+        54.3535,
+        18.6528
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q9285177"
+    },
+    {
+      "id": "gd-katownia",
+      "city": "gdansk",
+      "canonicalName": "Katownia",
+      "aliases": {
+        "pl": [
+          "Wieża Więzienna"
+        ],
+        "en": [
+          "Prison Tower",
+          "Torture Chamber"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3495,
+      "lon": 18.6485,
+      "bbox": [
+        54.3485,
+        18.6465,
+        54.3505,
+        18.6505
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-kosciol-sw-brygidy",
+      "city": "gdansk",
+      "canonicalName": "Kościół św. Brygidy",
+      "aliases": {
+        "pl": [
+          "Bazylika św. Brygidy"
+        ],
+        "en": [
+          "St. Bridget's Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3528,
+      "lon": 18.6508,
+      "bbox": [
+        54.3518,
+        18.6488,
+        54.3538,
+        18.6528
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9371113",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-kosciol-sw-jana",
+      "city": "gdansk",
+      "canonicalName": "Kościół św. Jana",
+      "aliases": {
+        "pl": [
+          "Kościół św. Jana"
+        ],
+        "en": [
+          "St. John's Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3514,
+      "lon": 18.6556,
+      "bbox": [
+        54.3504,
+        18.6536,
+        54.3524,
+        18.6576
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-kosciol-sw-katarzyny",
+      "city": "gdansk",
+      "canonicalName": "Kościół św. Katarzyny",
+      "aliases": {
+        "pl": [
+          "Kościół św. Katarzyny"
+        ],
+        "en": [
+          "St. Catherine's Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3533,
+      "lon": 18.6494,
+      "bbox": [
+        54.3523,
+        18.6474,
+        54.3543,
+        18.6514
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-kosciol-sw-mikolaja",
+      "city": "gdansk",
+      "canonicalName": "Kościół św. Mikołaja",
+      "aliases": {
+        "pl": [
+          "Bazylika św. Mikołaja"
+        ],
+        "en": [
+          "St. Nicholas Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3519,
+      "lon": 18.6528,
+      "bbox": [
+        54.3509,
+        18.6508,
+        54.3529,
+        18.6548
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-latarnia-morska-nowy-port",
+      "city": "gdansk",
+      "canonicalName": "Latarnia Morska Gdańsk",
+      "aliases": {
+        "pl": [
+          "Latarnia Morska Nowy Port"
+        ],
+        "en": [
+          "Nowy Port Lighthouse"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3964,
+      "lon": 18.6789,
+      "bbox": [
+        54.3954,
+        18.6769,
+        54.3974,
+        18.6809
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q3216108",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-olivia-business-centre",
+      "city": "gdansk",
+      "canonicalName": "Olivia Business Centre",
+      "aliases": {
+        "pl": [
+          "Olivia Business Centre",
+          "OBC"
+        ],
+        "en": [
+          "Olivia Business Centre"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4044,
+      "lon": 18.5806,
+      "bbox": [
+        54.4034,
+        18.5786,
+        54.4054,
+        18.5826
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-palac-opatow",
+      "city": "gdansk",
+      "canonicalName": "Pałac Opatów w Oliwie",
+      "aliases": {
+        "pl": [
+          "Pałac Opatów"
+        ],
+        "en": [
+          "Abbots' Palace in Oliwa"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4103,
+      "lon": 18.5572,
+      "bbox": [
+        54.4093,
+        18.5552,
+        54.4113,
+        18.5592
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-pomnik-jana-iii-sobieskiego",
+      "city": "gdansk",
+      "canonicalName": "Pomnik Jana III Sobieskiego",
+      "aliases": {
+        "pl": [
+          "Pomnik Sobieskiego"
+        ],
+        "en": [
+          "Monument to John III Sobieski"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3497,
+      "lon": 18.6486,
+      "bbox": [
+        54.3487,
+        18.6466,
+        54.3507,
+        18.6506
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-pomnik-stoczniowcow",
+      "city": "gdansk",
+      "canonicalName": "Pomnik Poległych Stoczniowców 1970",
+      "aliases": {
+        "pl": [
+          "Pomnik Trzech Krzyży",
+          "Pomnik Stoczniowców"
+        ],
+        "en": [
+          "Monument to the Fallen Shipyard Workers"
+        ],
+        "ru": [
+          "Памятник погибшим рабочим верфи"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3624,
+      "lon": 18.6486,
+      "bbox": [
+        54.3614,
+        18.6466,
+        54.3634,
+        18.6506
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1428921",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-ratusz-glownego-miasta",
+      "city": "gdansk",
+      "canonicalName": "Ratusz Głównego Miasta",
+      "aliases": {
+        "pl": [
+          "Ratusz Główny",
+          "Ratusz Gdański"
+        ],
+        "en": [
+          "Main Town Hall",
+          "Gdańsk Main Town Hall"
+        ],
+        "ru": [
+          "Главная Ратуша"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3494,
+      "lon": 18.6528,
+      "bbox": [
+        54.3484,
+        18.6508,
+        54.3504,
+        18.6548
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2000071",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-gdansk-shipyard",
+      "city": "gdansk",
+      "canonicalName": "Stocznia Gdańska",
+      "aliases": {
+        "pl": [
+          "Stocznia Gdańska",
+          "Stocznia im. Lenina"
+        ],
+        "en": [
+          "Gdańsk Shipyard"
+        ],
+        "ru": [
+          "Гданьская судоверфь"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3597,
+      "lon": 18.6583,
+      "bbox": [
+        54.3567,
+        18.6533,
+        54.3627,
+        18.6633
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q896622",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-twierdza-wisloujscie",
+      "city": "gdansk",
+      "canonicalName": "Twierdza Wisłoujście",
+      "aliases": {
+        "pl": [
+          "Forteca Wisłoujście"
+        ],
+        "en": [
+          "Wisłoujście Fortress"
+        ],
+        "ru": [
+          "Крепость Вислоуйсце"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.395,
+      "lon": 18.6856,
+      "bbox": [
+        54.394,
+        18.6836,
+        54.396,
+        18.6876
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1551598",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dluga-street",
+      "city": "gdansk",
+      "canonicalName": "Ulica Długa",
+      "aliases": {
+        "pl": [
+          "Długa"
+        ],
+        "en": [
+          "Long Street",
+          "Długa Street"
+        ],
+        "ru": [
+          "Длугая",
+          "улица Длуга"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3494,
+      "lon": 18.6511,
+      "bbox": [
+        54.3484,
+        18.648,
+        54.3504,
+        18.654
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-mariacka-street",
+      "city": "gdansk",
+      "canonicalName": "Ulica Mariacka",
+      "aliases": {
+        "pl": [
+          "Mariacka"
+        ],
+        "en": [
+          "Mariacka Street"
+        ],
+        "ru": [
+          "Улица Мариацкая"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3502,
+      "lon": 18.6558,
+      "bbox": [
+        54.3492,
+        18.6538,
+        54.3512,
+        18.6578
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-westerplatte",
+      "city": "gdansk",
+      "canonicalName": "Westerplatte",
+      "aliases": {
+        "pl": [
+          "Pomnik Obrońców Wybrzeża"
+        ],
+        "en": [
+          "Westerplatte",
+          "Monument to the Defenders of the Coast"
+        ],
+        "ru": [
+          "Вестерплатте",
+          "Памятник защитникам побережья"
+        ],
+        "uk": [
+          "Вестерплатте"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4075,
+      "lon": 18.6722,
+      "bbox": [
+        54.4055,
+        18.6672,
+        54.4095,
+        18.6772
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q156219",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-zielona-brama",
+      "city": "gdansk",
+      "canonicalName": "Zielona Brama",
+      "aliases": {
+        "pl": [
+          "Brama Zielona"
+        ],
+        "en": [
+          "Green Gate"
+        ],
+        "ru": [
+          "Зелёные ворота"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3483,
+      "lon": 18.655,
+      "bbox": [
+        54.3473,
+        18.653,
+        54.3493,
+        18.657
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1543964",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-zlota-brama",
+      "city": "gdansk",
+      "canonicalName": "Złota Brama",
+      "aliases": {
+        "pl": [
+          "Brama Złota"
+        ],
+        "en": [
+          "Golden Gate"
+        ],
+        "ru": [
+          "Золотые ворота"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.35,
+      "lon": 18.6489,
+      "bbox": [
+        54.349,
+        18.6469,
+        54.351,
+        18.6509
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1547279",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-zuraw",
+      "city": "gdansk",
+      "canonicalName": "Żuraw",
+      "aliases": {
+        "pl": [
+          "Żuraw Gdański",
+          "Brama Żuraw"
+        ],
+        "en": [
+          "Gdańsk Crane",
+          "The Crane"
+        ],
+        "ru": [
+          "Журав",
+          "Гданьский журавль"
+        ],
+        "uk": [
+          "Журавель"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.3506,
+      "lon": 18.6581,
+      "bbox": [
+        54.3496,
+        18.6561,
+        54.3516,
+        18.6601
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1328336",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-alfa-centrum",
+      "city": "gdansk",
+      "canonicalName": "CH Alfa",
+      "aliases": {
+        "pl": [
+          "Alfa Centrum",
+          "Centrum Handlowe Alfa"
+        ],
+        "en": [
+          "Alfa Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.403,
+      "lon": 18.5961,
+      "bbox": [
+        54.402,
+        18.5941,
+        54.404,
+        18.5981
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q11685299"
+    },
+    {
+      "id": "gd-morena",
+      "city": "gdansk",
+      "canonicalName": "CH Morena",
+      "aliases": {
+        "pl": [
+          "Morena",
+          "Centrum Handlowe Morena"
+        ],
+        "en": [
+          "Morena Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.3524,
+      "lon": 18.5924,
+      "bbox": [
+        54.3494,
+        18.5677,
+        54.3704,
+        18.5954
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-centrum-madison",
+      "city": "gdansk",
+      "canonicalName": "Centrum Handlowe Madison",
+      "aliases": {
+        "pl": [
+          "Madison",
+          "CH Madison"
+        ],
+        "en": [
+          "Madison Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.3562,
+      "lon": 18.6442,
+      "bbox": [
+        54.3552,
+        18.6422,
+        54.3572,
+        18.6462
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-forum-gdansk",
+      "city": "gdansk",
+      "canonicalName": "Forum Gdańsk",
+      "aliases": {
+        "pl": [
+          "CH Forum",
+          "Forum Gdańsk"
+        ],
+        "en": [
+          "Forum Gdańsk"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.3528,
+      "lon": 18.6464,
+      "bbox": [
+        54.3518,
+        18.6444,
+        54.3538,
+        18.6484
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-galeria-baltycka",
+      "city": "gdansk",
+      "canonicalName": "Galeria Bałtycka",
+      "aliases": {
+        "pl": [
+          "Galeria Bałtycka"
+        ],
+        "en": [
+          "Galeria Bałtycka",
+          "Baltic Gallery"
+        ],
+        "ru": [
+          "ТЦ Балтыцка"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.3814,
+      "lon": 18.6019,
+      "bbox": [
+        54.3804,
+        18.5999,
+        54.3824,
+        18.6039
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9145550",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-galeria-metropolia",
+      "city": "gdansk",
+      "canonicalName": "Galeria Metropolia",
+      "aliases": {
+        "pl": [
+          "Metropolia"
+        ],
+        "en": [
+          "Galeria Metropolia"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.3869,
+      "lon": 18.5983,
+      "bbox": [
+        54.3859,
+        18.5963,
+        54.3879,
+        18.6003
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dom-uphagena",
+      "city": "gdansk",
+      "canonicalName": "Dom Uphagena",
+      "aliases": {
+        "pl": [
+          "Muzeum Domu Uphagena"
+        ],
+        "en": [
+          "Uphagen House"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3497,
+      "lon": 18.6508,
+      "bbox": [
+        54.3487,
+        18.6488,
+        54.3507,
+        18.6528
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-gdanska-galeria-miejska",
+      "city": "gdansk",
+      "canonicalName": "Gdańska Galeria Miejska",
+      "aliases": {
+        "pl": [
+          "GGM",
+          "Gdańska Galeria Miejska 1"
+        ],
+        "en": [
+          "Gdańsk City Gallery"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.35,
+      "lon": 18.6525,
+      "bbox": [
+        54.349,
+        18.6505,
+        54.351,
+        18.6545
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-hevelianum",
+      "city": "gdansk",
+      "canonicalName": "Hevelianum",
+      "aliases": {
+        "pl": [
+          "Centrum Hewelianum"
+        ],
+        "en": [
+          "Hevelianum Centre"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3544,
+      "lon": 18.6628,
+      "bbox": [
+        54.3534,
+        18.6608,
+        54.3554,
+        18.6648
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-muzeum-archeologiczne",
+      "city": "gdansk",
+      "canonicalName": "Muzeum Archeologiczne w Gdańsku",
+      "aliases": {
+        "pl": [
+          "Muzeum Archeologiczne"
+        ],
+        "en": [
+          "Archaeological Museum in Gdańsk"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3497,
+      "lon": 18.6547,
+      "bbox": [
+        54.3487,
+        18.6527,
+        54.3507,
+        18.6567
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-muzeum-bursztynu",
+      "city": "gdansk",
+      "canonicalName": "Muzeum Bursztynu",
+      "aliases": {
+        "pl": [
+          "Muzeum Bursztynu w Gdańsku"
+        ],
+        "en": [
+          "Amber Museum"
+        ],
+        "ru": [
+          "Музей янтаря"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3508,
+      "lon": 18.6486,
+      "bbox": [
+        54.3498,
+        18.6466,
+        54.3518,
+        18.6506
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-muzeum-ii-wojny",
+      "city": "gdansk",
+      "canonicalName": "Muzeum II Wojny Światowej",
+      "aliases": {
+        "pl": [
+          "Muzeum II Wojny Światowej w Gdańsku"
+        ],
+        "en": [
+          "Museum of the Second World War",
+          "WWII Museum"
+        ],
+        "ru": [
+          "Музей Второй мировой войны"
+        ],
+        "uk": [
+          "Музей Другої світової війни"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3553,
+      "lon": 18.6578,
+      "bbox": [
+        54.3543,
+        18.6558,
+        54.3563,
+        18.6598
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q7703622",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-muzeum-narodowe",
+      "city": "gdansk",
+      "canonicalName": "Muzeum Narodowe w Gdańsku",
+      "aliases": {
+        "pl": [
+          "Muzeum Narodowe"
+        ],
+        "en": [
+          "National Museum in Gdańsk"
+        ],
+        "ru": [
+          "Национальный музей в Гданьске"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3444,
+      "lon": 18.65,
+      "bbox": [
+        54.3434,
+        18.648,
+        54.3454,
+        18.652
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1250671",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-muzeum-poczty",
+      "city": "gdansk",
+      "canonicalName": "Muzeum Poczty Polskiej w Gdańsku",
+      "aliases": {
+        "pl": [
+          "Muzeum Poczty"
+        ],
+        "en": [
+          "Museum of the Polish Post Office in Gdańsk"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3544,
+      "lon": 18.6539,
+      "bbox": [
+        54.3534,
+        18.6519,
+        54.3554,
+        18.6559
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-narodowe-muzeum-morskie",
+      "city": "gdansk",
+      "canonicalName": "Narodowe Muzeum Morskie w Gdańsku",
+      "aliases": {
+        "pl": [
+          "Muzeum Morskie",
+          "NMM"
+        ],
+        "en": [
+          "National Maritime Museum",
+          "Maritime Museum Gdańsk"
+        ],
+        "ru": [
+          "Национальный морской музей"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.3517,
+      "lon": 18.6583,
+      "bbox": [
+        54.3507,
+        18.6563,
+        54.3527,
+        18.6603
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11828430",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-gora-gradowa",
+      "city": "gdansk",
+      "canonicalName": "Góra Gradowa",
+      "aliases": {
+        "pl": [
+          "Góra Gradowa"
+        ],
+        "en": [
+          "Gradowa Hill"
+        ]
+      },
+      "category": "park",
+      "lat": 54.3544,
+      "lon": 18.6628,
+      "bbox": [
+        54.3524,
+        18.6598,
+        54.3564,
+        18.6658
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-ogrod-zoologiczny",
+      "city": "gdansk",
+      "canonicalName": "Miejski Ogród Zoologiczny Wybrzeża",
+      "aliases": {
+        "pl": [
+          "Gdańskie Zoo",
+          "Zoo Oliwa"
+        ],
+        "en": [
+          "Gdańsk Zoo",
+          "Coastal Zoo"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4172,
+      "lon": 18.5308,
+      "bbox": [
+        54.4142,
+        18.5258,
+        54.4202,
+        18.5358
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1133234",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-pachole",
+      "city": "gdansk",
+      "canonicalName": "Wzgórze Pachołek",
+      "aliases": {
+        "pl": [
+          "Wzgórze Pacholę",
+          "Pachołek"
+        ],
+        "en": [
+          "Pacholę Hill",
+          "Pachołek Hill"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4178,
+      "lon": 18.5406,
+      "bbox": [
+        54.4158,
+        18.5376,
+        54.4198,
+        18.5436
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q108894461"
+    },
+    {
+      "id": "gd-park-brzeznienski",
+      "city": "gdansk",
+      "canonicalName": "Park Brzeźnieński im. Jana Pawła II",
+      "aliases": {
+        "pl": [
+          "Park Brzeźnieński"
+        ],
+        "en": [
+          "Brzeźno Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4075,
+      "lon": 18.62,
+      "bbox": [
+        54.4055,
+        18.617,
+        54.4095,
+        18.623
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-park-oliwski",
+      "city": "gdansk",
+      "canonicalName": "Park Oliwski",
+      "aliases": {
+        "pl": [
+          "Park Oliwski im. Adama Mickiewicza"
+        ],
+        "en": [
+          "Oliwa Park"
+        ],
+        "ru": [
+          "Оливский парк"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4108,
+      "lon": 18.5575,
+      "bbox": [
+        54.4088,
+        18.5535,
+        54.4128,
+        18.5615
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9368681",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-park-steffensa",
+      "city": "gdansk",
+      "canonicalName": "Park Steffensa",
+      "aliases": {
+        "pl": [
+          "Park Steffensa"
+        ],
+        "en": [
+          "Steffens Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.3489,
+      "lon": 18.6431,
+      "bbox": [
+        54.3479,
+        18.6411,
+        54.3499,
+        18.6451
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-park-jelitkowski",
+      "city": "gdansk",
+      "canonicalName": "Park Zdrojowy w Jelitkowie",
+      "aliases": {
+        "pl": [
+          "Park Jelitkowski"
+        ],
+        "en": [
+          "Jelitkowo Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4325,
+      "lon": 18.5742,
+      "bbox": [
+        54.4305,
+        18.5712,
+        54.4345,
+        18.5772
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-park-reagana",
+      "city": "gdansk",
+      "canonicalName": "Park im. Ronalda Reagana",
+      "aliases": {
+        "pl": [
+          "Park Reagana"
+        ],
+        "en": [
+          "Ronald Reagan Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4014,
+      "lon": 18.5514,
+      "bbox": [
+        54.3984,
+        18.5464,
+        54.4044,
+        18.5564
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-brzezno-plaza",
+      "city": "gdansk",
+      "canonicalName": "Plaża Brzeźno",
+      "aliases": {
+        "pl": [
+          "Plaża Brzeźno"
+        ],
+        "en": [
+          "Brzeźno Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4075,
+      "lon": 18.6125,
+      "bbox": [
+        54.4065,
+        18.6095,
+        54.4095,
+        18.6185
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-jelitkowo-plaza",
+      "city": "gdansk",
+      "canonicalName": "Plaża Jelitkowo",
+      "aliases": {
+        "pl": [
+          "Plaża w Jelitkowie"
+        ],
+        "en": [
+          "Jelitkowo Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4344,
+      "lon": 18.5806,
+      "bbox": [
+        54.4334,
+        18.5776,
+        54.4354,
+        18.5856
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dlugi-targ",
+      "city": "gdansk",
+      "canonicalName": "Długi Targ",
+      "aliases": {
+        "pl": [
+          "Długi Targ"
+        ],
+        "en": [
+          "Long Market"
+        ],
+        "ru": [
+          "Длинный рынок"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3489,
+      "lon": 18.654,
+      "bbox": [
+        54.3479,
+        18.652,
+        54.3499,
+        18.656
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11788574",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-plac-solidarnosci",
+      "city": "gdansk",
+      "canonicalName": "Plac Solidarności",
+      "aliases": {
+        "pl": [
+          "Plac Solidarności 1980"
+        ],
+        "en": [
+          "Solidarity Square"
+        ],
+        "ru": [
+          "Площадь Солидарности"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3618,
+      "lon": 18.6494,
+      "bbox": [
+        54.3608,
+        18.6474,
+        54.3628,
+        18.6514
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-plac-zebran-ludowych",
+      "city": "gdansk",
+      "canonicalName": "Plac Zebrań Ludowych",
+      "aliases": {
+        "pl": [
+          "Plac Zebrań Ludowych"
+        ],
+        "en": [
+          "People's Gatherings Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3558,
+      "lon": 18.6408,
+      "bbox": [
+        54.3548,
+        18.6388,
+        54.3568,
+        18.6428
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-targ-rybny",
+      "city": "gdansk",
+      "canonicalName": "Targ Rybny",
+      "aliases": {
+        "pl": [
+          "Targ Rybny"
+        ],
+        "en": [
+          "Fish Market"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3519,
+      "lon": 18.6564,
+      "bbox": [
+        54.3509,
+        18.6544,
+        54.3529,
+        18.6584
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-targ-sienny",
+      "city": "gdansk",
+      "canonicalName": "Targ Sienny",
+      "aliases": {
+        "pl": [
+          "Targ Sienny"
+        ],
+        "en": [
+          "Hay Market"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3517,
+      "lon": 18.6483,
+      "bbox": [
+        54.3507,
+        18.6463,
+        54.3527,
+        18.6503
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q9355647"
+    },
+    {
+      "id": "gd-targ-weglowy",
+      "city": "gdansk",
+      "canonicalName": "Targ Węglowy",
+      "aliases": {
+        "pl": [
+          "Targ Węglowy"
+        ],
+        "en": [
+          "Coal Market"
+        ],
+        "ru": [
+          "Угольный рынок"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3497,
+      "lon": 18.6489,
+      "bbox": [
+        54.3487,
+        18.6469,
+        54.3507,
+        18.6509
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-plac-waly-piastowskie",
+      "city": "gdansk",
+      "canonicalName": "Wały Piastowskie",
+      "aliases": {
+        "pl": [
+          "Wały Piastowskie"
+        ],
+        "en": [
+          "Piastowskie Embankment"
+        ]
+      },
+      "category": "square",
+      "lat": 54.3555,
+      "lon": 18.6486,
+      "bbox": [
+        54.3545,
+        18.6466,
+        54.3565,
+        18.6506
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-hala-olivia",
+      "city": "gdansk",
+      "canonicalName": "Hala Olivia",
+      "aliases": {
+        "pl": [
+          "Hala Olivia"
+        ],
+        "en": [
+          "Olivia Hall"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.4086,
+      "lon": 18.5781,
+      "bbox": [
+        54.4076,
+        18.5761,
+        54.4096,
+        18.5801
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1570143",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-stadion-energa",
+      "city": "gdansk",
+      "canonicalName": "Polsat Plus Arena Gdańsk",
+      "aliases": {
+        "pl": [
+          "Stadion Energa Gdańsk",
+          "Stadion Gdańsk",
+          "PGE Arena"
+        ],
+        "en": [
+          "Polsat Plus Arena Gdańsk",
+          "Stadion Energa",
+          "PGE Arena"
+        ],
+        "ru": [
+          "Стадион Энерга Гданьск"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.3925,
+      "lon": 18.6086,
+      "bbox": [
+        54.3915,
+        18.6066,
+        54.3935,
+        18.6106
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1147226",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-stadion-mosir",
+      "city": "gdansk",
+      "canonicalName": "Stadion MOSiR Gdańsk",
+      "aliases": {
+        "pl": [
+          "Stadion przy Traugutta",
+          "Stadion MOSiR"
+        ],
+        "en": [
+          "MOSiR Stadium Gdańsk"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.3767,
+      "lon": 18.6142,
+      "bbox": [
+        54.3757,
+        18.6122,
+        54.3777,
+        18.6162
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-teatr-miniatura",
+      "city": "gdansk",
+      "canonicalName": "Miejski Teatr Miniatura",
+      "aliases": {
+        "pl": [
+          "Teatr Miniatura",
+          "Miniatura"
+        ],
+        "en": [
+          "Miniatura Theatre",
+          "Miniatura City Theatre"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.3817,
+      "lon": 18.6036,
+      "bbox": [
+        54.3807,
+        18.6016,
+        54.3827,
+        18.6056
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q11780243"
+    },
+    {
+      "id": "gd-teatr-wybrzeze",
+      "city": "gdansk",
+      "canonicalName": "Teatr Wybrzeże",
+      "aliases": {
+        "pl": [
+          "Teatr Wybrzeże w Gdańsku"
+        ],
+        "en": [
+          "Wybrzeże Theatre"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.3497,
+      "lon": 18.6492,
+      "bbox": [
+        54.3487,
+        18.6472,
+        54.3507,
+        18.6512
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-brzezno",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Brzeźno",
+      "aliases": {
+        "pl": [
+          "Dworzec Brzeźno"
+        ],
+        "en": [
+          "Gdańsk Brzeźno station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4069,
+      "lon": 18.6175,
+      "bbox": [
+        54.4059,
+        18.6155,
+        54.4079,
+        18.6195
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q2600968"
+    },
+    {
+      "id": "gd-dworzec-glowny",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Główny",
+      "aliases": {
+        "pl": [
+          "Dworzec Główny",
+          "Gdańsk Glowny"
+        ],
+        "en": [
+          "Gdańsk Main Station",
+          "Main Station"
+        ],
+        "ru": [
+          "Гданьск-Главный"
+        ],
+        "uk": [
+          "Ґданськ-Головний"
+        ],
+        "be": [
+          "Гданьск-Галоўны"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3557,
+      "lon": 18.6439,
+      "bbox": [
+        54.3547,
+        18.6419,
+        54.3567,
+        18.6459
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2296925",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-lipce",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Lipce",
+      "aliases": {
+        "pl": [
+          "Dworzec Lipce"
+        ],
+        "en": [
+          "Gdańsk Lipce station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3026,
+      "lon": 18.6355,
+      "bbox": [
+        54.2996,
+        18.6325,
+        54.3279,
+        18.6385
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q2533354"
+    },
+    {
+      "id": "gd-dworzec-nowy-port",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Nowy Port",
+      "aliases": {
+        "pl": [
+          "Dworzec Nowy Port"
+        ],
+        "en": [
+          "Gdańsk Nowy Port station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4103,
+      "lon": 18.6567,
+      "bbox": [
+        54.4093,
+        18.6547,
+        54.4113,
+        18.6587
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q2372835"
+    },
+    {
+      "id": "gd-dworzec-oliwa",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Oliwa",
+      "aliases": {
+        "pl": [
+          "Dworzec Oliwa"
+        ],
+        "en": [
+          "Gdańsk Oliwa station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4089,
+      "lon": 18.5753,
+      "bbox": [
+        54.4079,
+        18.5733,
+        54.4099,
+        18.5773
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-orunia",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Orunia",
+      "aliases": {
+        "pl": [
+          "Dworzec Orunia"
+        ],
+        "en": [
+          "Gdańsk Orunia station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3289,
+      "lon": 18.6506,
+      "bbox": [
+        54.3279,
+        18.6486,
+        54.3299,
+        18.6526
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-politechnika",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Politechnika",
+      "aliases": {
+        "pl": [
+          "Dworzec Politechnika"
+        ],
+        "en": [
+          "Gdańsk Politechnika station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3725,
+      "lon": 18.6222,
+      "bbox": [
+        54.3715,
+        18.6202,
+        54.3735,
+        18.6242
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-port-lotniczy",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Port Lotniczy",
+      "aliases": {
+        "pl": [
+          "Dworzec Port Lotniczy",
+          "Stacja Lotnisko"
+        ],
+        "en": [
+          "Gdańsk Airport railway station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3772,
+      "lon": 18.4683,
+      "bbox": [
+        54.3762,
+        18.4663,
+        54.3782,
+        18.4703
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-przerobka",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Przeróbka",
+      "aliases": {
+        "pl": [
+          "Dworzec Przeróbka"
+        ],
+        "en": [
+          "Gdańsk Przeróbka station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3628,
+      "lon": 18.6978,
+      "bbox": [
+        54.3618,
+        18.6958,
+        54.3638,
+        18.6998
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gd-dworzec-przymorze",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Przymorze-Uniwersytet",
+      "aliases": {
+        "pl": [
+          "Dworzec Przymorze",
+          "Przymorze Uniwersytet"
+        ],
+        "en": [
+          "Gdańsk Przymorze-Uniwersytet station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4164,
+      "lon": 18.5889,
+      "bbox": [
+        54.4154,
+        18.5869,
+        54.4174,
+        18.5909
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-stocznia",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Stocznia",
+      "aliases": {
+        "pl": [
+          "Dworzec Stocznia"
+        ],
+        "en": [
+          "Gdańsk Stocznia station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3625,
+      "lon": 18.6483,
+      "bbox": [
+        54.3615,
+        18.6463,
+        54.3635,
+        18.6503
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-wrzeszcz",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Wrzeszcz",
+      "aliases": {
+        "pl": [
+          "Dworzec Wrzeszcz"
+        ],
+        "en": [
+          "Gdańsk Wrzeszcz station"
+        ],
+        "ru": [
+          "Гданьск-Вжещ"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3833,
+      "lon": 18.6197,
+      "bbox": [
+        54.3823,
+        18.6177,
+        54.3843,
+        18.6217
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2568856",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-zaspa",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Zaspa",
+      "aliases": {
+        "pl": [
+          "Dworzec Zaspa"
+        ],
+        "en": [
+          "Gdańsk Zaspa station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.3994,
+      "lon": 18.6008,
+      "bbox": [
+        54.3984,
+        18.5988,
+        54.4004,
+        18.6028
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-dworzec-zabianka",
+      "city": "gdansk",
+      "canonicalName": "Gdańsk Żabianka-AWFiS",
+      "aliases": {
+        "pl": [
+          "Dworzec Żabianka"
+        ],
+        "en": [
+          "Gdańsk Żabianka station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4233,
+      "lon": 18.5764,
+      "bbox": [
+        54.4223,
+        18.5744,
+        54.4243,
+        18.5784
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-asp",
+      "city": "gdansk",
+      "canonicalName": "Akademia Sztuk Pięknych w Gdańsku",
+      "aliases": {
+        "pl": [
+          "ASP Gdańsk"
+        ],
+        "en": [
+          "Academy of Fine Arts in Gdańsk"
+        ]
+      },
+      "category": "university",
+      "lat": 54.35,
+      "lon": 18.6497,
+      "bbox": [
+        54.349,
+        18.6477,
+        54.351,
+        18.6517
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-awfis",
+      "city": "gdansk",
+      "canonicalName": "Akademia Wychowania Fizycznego i Sportu w Gdańsku",
+      "aliases": {
+        "pl": [
+          "AWFiS"
+        ],
+        "en": [
+          "Gdańsk University of Physical Education and Sport",
+          "AWFiS"
+        ]
+      },
+      "category": "university",
+      "lat": 54.4272,
+      "lon": 18.5797,
+      "bbox": [
+        54.4252,
+        18.5767,
+        54.4292,
+        18.5827
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-gumed",
+      "city": "gdansk",
+      "canonicalName": "Gdański Uniwersytet Medyczny",
+      "aliases": {
+        "pl": [
+          "GUMed",
+          "Akademia Medyczna"
+        ],
+        "en": [
+          "Medical University of Gdańsk",
+          "GUMed"
+        ]
+      },
+      "category": "university",
+      "lat": 54.3728,
+      "lon": 18.6156,
+      "bbox": [
+        54.3708,
+        18.6126,
+        54.3748,
+        18.6186
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1585078",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-politechnika-gdanska",
+      "city": "gdansk",
+      "canonicalName": "Politechnika Gdańska",
+      "aliases": {
+        "pl": [
+          "PG",
+          "Politechnika"
+        ],
+        "en": [
+          "Gdańsk University of Technology",
+          "Gdansk Tech"
+        ],
+        "ru": [
+          "Гданьский политехнический университет"
+        ],
+        "uk": [
+          "Ґданська політехніка"
+        ]
+      },
+      "category": "university",
+      "lat": 54.3717,
+      "lon": 18.6197,
+      "bbox": [
+        54.3697,
+        18.6167,
+        54.3737,
+        18.6227
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1329626",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gd-uniwersytet-gdanski",
+      "city": "gdansk",
+      "canonicalName": "Uniwersytet Gdański",
+      "aliases": {
+        "pl": [
+          "UG",
+          "Uniwersytet"
+        ],
+        "en": [
+          "University of Gdańsk"
+        ],
+        "ru": [
+          "Гданьский университет"
+        ],
+        "uk": [
+          "Ґданський університет"
+        ]
+      },
+      "category": "university",
+      "lat": 54.4006,
+      "lon": 18.5797,
+      "bbox": [
+        54.3986,
+        18.5767,
+        54.4026,
+        18.5827
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1240478",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    }
+  ]
+}

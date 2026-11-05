@@ -1,0 +1,80 @@
+node_modules/
+dist/
+dev-dist/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+*.log
+coverage/
+
+# Local data (GTFS datasets, etc.)
+data/
+
+# SHA-pinned GTFS feed artifacts fetched by CI / the dev harness
+# (.github/actions/fetch-feed-artifact). SP-2 stopped committing these blobs —
+# keep them untracked so a stray `git add -A` can't re-commit them.
+.feeds/
+
+# Local PBF cache for POI bundle generation
+.poi-pbf-cache/*
+!.poi-pbf-cache/.gitkeep
+.osm-pbf-cache/
+.city-osm/
+
+# Micromap intermediates (clipped PBF + per-family GeoJSON); the artifacts
+# themselves are committed under packages/frontend/public/micromap/
+.micromap-cache/
+
+# Generated per-city walk graphs (scripts/build-walk-graphs.mjs; built in the
+# frontend image, never committed — ~1.5 MB per city).
+packages/frontend/public/walk-graph/
+
+# Generated POI bundles — regenerated from Geofabrik PBFs by CI on a weekly schedule
+packages/frontend/public/poi/*.br
+packages/frontend/public/poi/tiles/
+
+# ralphex local config + progress logs (developer-local, not versioned)
+.ralphex/config
+.ralphex/progress/
+.superpowers/
+
+# Git worktrees
+.worktrees/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Benchmark results (regenerated on each CI run, not source)
+packages/frontend/tests/benchmarks/.results.json
+
+# Lighthouse CI output (regenerated per run, archived as CI artifact)
+packages/frontend/.lighthouseci/
+
+# Consolidated perf summary (regenerated per CI run, archived as artifact)
+packages/frontend/perf-summary.json
+
+# Agent helper build/check logs and exit metadata (never commit transcripts).
+.agent-runs/
+
+# Generated build-info module — produced by scripts/build-info.mjs
+# during prebuild / predev / pretest. Do not commit.
+packages/backend/src/generated/
+
+# Workspace-local pnpm store used by the self-hosted CI runner
+# (npm_config_store_dir in .github/workflows/ci.yml keeps writes inside
+# the workspace). Do not commit.
+.pnpm-store/
+
+# Root Cargo workspace build output (distinct from the probe target/)
+/target
+# Local release packaging and self-host data.
+/release/
+/release-builder/
+/release-bin/
+/selfhost/
+__pycache__/
+*.pyc

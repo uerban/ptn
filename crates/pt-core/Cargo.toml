@@ -1,0 +1,44 @@
+[package]
+name = "pt-core"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "MIT OR Apache-2.0"
+
+[features]
+# Test/benchmark-only dated entry-event enumeration. OFF by default and never
+# included by the production engine, WASM, or serving crates unless explicitly
+# requested by an experiment build.
+temporal-experiment = []
+
+# Un-gate `engine::testkit` as a `pub` module so a downstream crate's tests can
+# call the shared PTB builders. OFF by default and never activated by a plain
+# `cargo build --release`, so testkit stays compiled out of production.
+# `pt-serve` turns this on only via `[dev-dependencies]`, which Cargo unifies onto
+# the normal dep when building its tests — see `engine/mod.rs`'s
+# `cfg(any(test, feature = …))` gate.
+test-helpers = []
+
+# Build the band-path index AND the flat-path index over the SAME bundle and
+# assert per-(route,pattern) structural equality (`stop_ids`, each trip's
+# `pos_to_row`, trip order, `routes_at_stop`). The symmetric-gate firewall for
+# B1.2: the TS≡Rust differential cannot catch a band path that round-trips its
+# own wrong grouping, so this independent oracle cross-checks the band-built
+# index against the flat-built one. OFF by default; a mismatch panics with the
+# diverging pattern/trip/position. Run via `cargo test -p pt-core --features
+# pattern-crosscheck`.
+pattern-crosscheck = []
+
+[dependencies]
+# Fixed hasher + no_std map. NO getrandom, NO std default RandomState.
+hashbrown = "0.15"
+rustc-hash = { version = "2", default-features = false }
+# Checked u8->u32 cast for the page-aligned CSR / tripStarts arrays (zero-copy
+# views). `try_cast_slice` returns Err on misalignment / len % 4 != 0 — NEVER
+# `align_to` (which silently drops a misaligned head/tail). no_std-clean.
+bytemuck = { version = "1", default-features = false }
+# PTB v2 `0x19 BlockDerivationCommitment`: every `Index::build` recomputes the
+# SHA-256 of the derived block tuples and rejects a mismatch before routing.
+# `default-features = false` keeps it no_std (no `std` feature, no asm).
+sha2 = { version = "0.10", default-features = false }

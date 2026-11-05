@@ -1,0 +1,210 @@
+packages:
+  - "packages/*"
+  - "subprojects/*"
+  # wasm-pack output (built into the worktree before pnpm install in CI).
+  # Only pkg-web (target=web, package name `pt-wasm`) is workspace-linked.
+  # pkg-node (target=nodejs) shares the same package name `pt-wasm` after
+  # wasm-pack runs, so it would conflict with pkg-web; it's consumed by
+  # Node `.mjs` smoke tests under crates/pt-wasm/tests/ via relative
+  # imports and does NOT need a workspace entry.
+  - "crates/pt-wasm/pkg-web"
+# pnpm 11 no longer runs dependency build scripts unless allow-listed here
+# (replaces the v9 default + the removed onlyBuiltDependencies setting).
+# better-sqlite3 (native binding) and esbuild (platform binary) must build
+# or the backend/bundler break; protobufjs's postinstall is benign.
+# Security overrides (pnpm reads overrides from here, not package.json, as of
+# pnpm 10+). Every entry floors a TRANSITIVE package whose parent cannot fix it
+# — either the parent hard-pins a vulnerable version, or the parent is already
+# the latest published release. Keep the GHSA ids in the comments: they are how
+# the next sweep tells a still-needed floor from a stale one.
+#
+# `gtfs-realtime-bindings` hard-pins protobufjs to 7.5.4, which is vulnerable to
+# GHSA-xq3m-2v4x-88gg (arbitrary code execution); force the 7.x line to a
+# patched release. GHSA-j3f2-48v5-ccww (infinite loop in .proto option parsing)
+# and GHSA-f38q-mgvj-vph7 (schema-derived names shadowing runtime-significant
+# properties) later raised that floor to >=7.6.5. The 8.x line is fixed via the
+# direct spec bump in packages/shared (>=8.0.2).
+overrides:
+  protobufjs@7: ">=7.6.5 <8"
+  # protobufjs-cli is a build-time codegen tool pulled (transitively, unused at
+  # runtime) by gtfs-realtime-bindings; its <1.2.1 versions carry advisories.
+  # GHSA-f38q-mgvj-vph7 (the protobufjs advisory above, which also lands in the
+  # generated-code path) raised the floor to >=2.5.1. Every published release at
+  # or above that floor declares a `protobufjs ^8.x` peer while its parent
+  # gtfs-realtime-bindings pins the 7.x line, so `pnpm peers check` reports one
+  # unmet peer here. That mismatch predates the floor (2.5.0 already peered
+  # ^8.5.0) and is inert — the CLI is codegen tooling that is never executed.
+  protobufjs-cli: ">=2.5.1"
+  # fast-uri (transitive, mainly via fastify) has path-traversal + host-
+  # confusion advisories on BOTH the 3.x line (<3.1.4, GHSA-v2hh-gcrm-f6hx /
+  # GHSA-4c8g-83qw-93j6) and the 4.x line (<4.0.1 / <=4.1.0, same two
+  # advisories' 4.x variants) — an unbounded ">=3.1.4" floor let pnpm resolve
+  # straight to the still-vulnerable 4.x latest instead of a patched one.
+  # GHSA-5jgf-p345-68v8 / GHSA-f65p-4m7j-42xc /
+  # GHSA-fph4-wmhf-6fwf / GHSA-jqff-g426-hqxp later raised the 4.x floor:
+  # >=4.1.3 clears every known advisory on both lines.
+  # 2026-10: GHSA-hrr3-gc8f-f4qj and GHSA-jvvf-x445-j334 need 4.1.5.
+  fast-uri: ">=4.1.5 <5"
+  # lodash + tmp are pulled ONLY by gtfs-realtime-bindings>protobufjs-cli (jsdoc
+  # → lodash; protobufjs-cli → tmp) — build-time codegen tooling that never runs
+  # in production, but `pnpm audit --prod` still scopes them as runtime. Floor
+  # both to the patched line so the prod audit gate is genuinely clean.
+  # (lodash 4.17.21 was long the last release; ≥4.17.24 resolves to 4.18.x.)
+  lodash: ">=4.17.24"
+  tmp: ">=0.2.6"
+  # linkify-it is pulled by jsdoc/markdown-it under the same unused GTFS-RT
+  # codegen path; floor to the patched mailto: scan-loop ReDoS fix
+  # (GHSA-v245-v573-v5vm) for the prod audit gate.
+  linkify-it: ">=5.0.2"
+  # brace-expansion (transitive, via glob>minimatch) reaches @pt/backend's
+  # prod dependency tree through two separate chains — gtfs-realtime-bindings
+  # >protobufjs-cli>glob>minimatch and @fastify/static>glob>minimatch.
+  #
+  # This began as two range-scoped floors, one per major line, for
+  # GHSA-3jxr-9vmj-r5cp. GHSA-mh99-v99m-4gvg (DoS via unbounded expansion
+  # length causing an out-of-memory process crash) cannot be handled that
+  # way: its vulnerable range is a single unbounded "<=5.0.7" spanning every
+  # published line, and the only patched release was 5.0.8. There is no in-line
+  # fix on the 1.x or 2.x series to floor to, so keeping the per-line scopes
+  # would leave both permanently vulnerable. Collapse to one unscoped floor
+  # forcing every instance onto the single patched version — same shape as the
+  # unscoped lodash/tmp/fast-uri entries above. GHSA-rgw5-rvv9-x895 raised the
+  # floor again to 5.0.9; GHSA-6j4f-fj2g-mc7p (DoS via uncontrolled recursion
+  # in parseCommaParts), GHSA-qhr7-859c-m2p7, and GHSA-q2hr-2g5m-vwhr raised it
+  # to 5.0.12.
+  brace-expansion: ">=5.0.12"
+  # find-my-way is pulled by fastify, whose own ^9.0.0 range already permits
+  # the fix — only the lockfile pin at 9.5.0 held us on a vulnerable version.
+  # GHSA-c96f-x56v-gq3h (DDoS with HTTP2) names 9.6.1 as its patched version,
+  # but 9.6.1 was never published: the line went 9.6.0 -> 9.7.0. Floor to the
+  # release that exists and carries the fix.
+  find-my-way: ">=9.7.0"
+  # --- 2026-08-21 dependency sweep -------------------------------------------
+  # Everything below is a transitive package with an open Dependabot alert whose
+  # parent cannot carry the fix: @lhci/cli 0.15.1, lighthouse 12.6.1, jsdoc
+  # 4.0.5 and gtfs-realtime-bindings 1.1.1 are each already the latest published
+  # release, so there is nothing to bump above them. Floors are scoped to the
+  # major line already resolved in the tree, so the sweep takes patch/minor
+  # bumps only — uuid is the single deliberate cross-major entry.
+  #
+  # vite dev-server advisories: GHSA-p9ff-h696-f583 (arbitrary file read over
+  # the dev-server websocket), GHSA-fx2h-pf6j-xcff (`server.fs.deny` bypass via
+  # Windows alternate paths), GHSA-4w7w-66w2-5vf9 (path traversal in optimized
+  # -deps `.map` handling) and GHSA-v6wh-96g9-6wx3 (launch-editor UNC NTLMv2
+  # hash disclosure). @pt/frontend already resolves 6.4.3; this drags the second
+  # copy vitest pulls (6.4.1) up to match instead of leaving two lines.
+  vite@6: ">=6.4.3 <7"
+  # postcss (via vite) sourceMappingURL handling: GHSA-6g55-p6wh-862q, its
+  # incomplete-fix follow-up GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849 (previous
+  # -source-map auto-loading path traversal) and GHSA-qx2v-qp2m-jg93 (XSS via an
+  # unescaped `</style>` in stringify output).
+  postcss@8: ">=8.5.23 <9"
+  # nanoid, pulled only by postcss, hangs the calling thread on an out-of-range
+  # size: GHSA-28wg-ghj8-5hjv (negative size) and GHSA-2v37-7h3g-55p8 (size 0).
+  # Only the 3.x line is installed.
+  nanoid@3: ">=3.3.18 <4"
+  # picomatch (via vite and fdir): GHSA-c2c7-rcm5-vvqj (ReDoS via extglob
+  # quantifiers) and GHSA-3v7f-55p6-f55p (method injection in POSIX character
+  # classes, which silently changes glob matching).
+  picomatch@4: ">=4.0.4 <5"
+  # @babel/core (via @vitejs/plugin-react): GHSA-4x5r-pxfx-6jf8, arbitrary file
+  # read through a sourceMappingURL comment. Scoped to 7.x on purpose — an
+  # unbounded floor resolves straight to 8.0.x, which is a framework major.
+  "@babel/core@7": ">=7.29.6 <8"
+  # flatted (via eslint's flat-cache): GHSA-rf6f-7fwh-wjgh (prototype pollution
+  # in parse()) and GHSA-25h7-pfq9-p65f (unbounded recursion DoS in the revive
+  # phase of the same function).
+  flatted: ">=3.4.2 <4"
+  # ws has two independent lines in the tree and each needs its own floor: 7.x
+  # comes from lighthouse, 8.x from jsdom and puppeteer-core. GHSA-96hv-2xvq
+  # -fx4p (memory-exhaustion DoS from tiny fragments/data chunks) is filed
+  # against both; GHSA-58qx-3vcg-4xpx (uninitialized memory disclosure) is 8.x.
+  ws@7: ">=7.5.11 <8"
+  ws@8: ">=8.21.0 <9"
+  # js-yaml 3.x (via @lhci/utils) quadratic-CPU DoS trio: GHSA-5p4m-2wfm-xmqj
+  # (`!!omap` resolution), GHSA-52cp-r559-cp3m (merge-key chains) and
+  # GHSA-h67p-54hq-rp68 (repeated aliases in merge keys). 3.15.1 is the 3.x
+  # backport — the tree has no 4.x copy to floor separately. The 2026-09 sweep
+  # raised it to 3.15.2 for GHSA-2883-xcg3-v3hh (`maxTotalMergeKeys` does not
+  # bound CPU when the merge sources are empty).
+  js-yaml@3: ">=3.15.2 <4"
+  # markdown-it, pulled by jsdoc on the unused GTFS-RT codegen path (same chain
+  # as the linkify-it floor above): GHSA-6v5v-wf23-fmfq, quadratic-complexity
+  # DoS in the smartquotes rule.
+  # 2026-10: GHSA-r7fv-28h4-cvq7 (unmatched smartquotes) and
+  # GHSA-gfr2-rv44-r23c (multiline link definitions) require 14.3.3.
+  markdown-it@14: ">=14.3.3 <15"
+  # express 4's body-parser/qs pair, pulled by @lhci/cli's report server:
+  # GHSA-v422-hmwv-36x6 (an invalid `limit` value silently disables size
+  # enforcement) and GHSA-q8mj-m7cp-5q26 (remotely triggerable qs.stringify
+  # crash on null/undefined entries in comma-format arrays). Both stay on the
+  # line express 4 expects — express 5 / body-parser 2 is not this change.
+  # The 2026-09 sweep raised the qs floor to 6.16.0: GHSA-4mjr-xmp4-gh2g
+  # (DoS through an attacker-controlled `isBuffer`) and GHSA-x5fp-wj9c-mxmx
+  # (array-limit bypass via bracket-key comma parsing).
+  body-parser@1: ">=1.20.6 <2"
+  qs: ">=6.16.0 <7"
+  # The proxy-agent chain under puppeteer-core (lighthouse): basic-ftp
+  # GHSA-rpmf-866q-6p89 and GHSA-rp42-5vxx-qpwr (client-side DoS from unbounded
+  # buffering), ip-address GHSA-mwp4-54f8-5fhr (leading-zero octets decoded as
+  # decimal where resolvers read them as octal — SSRF / trust-boundary bypass)
+  # and GHSA-v2v4-37r5-5v8g (XSS in the Address6 HTML-emitting methods).
+  basic-ftp: ">=5.3.1 <6"
+  ip-address: ">=10.3.1 <11"
+  # protocol-buffers-schema, via resolve-protobuf-schema on the vector-tile
+  # parsing chain: GHSA-j452-xhg8-qg39, prototype pollution.
+  protocol-buffers-schema: ">=3.6.1 <4"
+  # uuid is the one cross-major floor. GHSA-w5hq-g745-h8pq (missing buffer
+  # bounds check in v3/v5/v6 when `buf` is supplied) was fixed in 11.1.1 with no
+  # backport to the 8.x line the tree resolves, and the only consumer is
+  # @lhci/cli — dev-only Lighthouse CI tooling, never shipped. Capped at <12 so
+  # the floor does not quietly walk the tree to 14.x on the next resolution.
+  uuid: ">=11.1.1 <12"
+  # --- 2026-09-24 dependency sweep -------------------------------------------
+  # @humanfs/node (via eslint): GHSA-p498-v437-472g, recursive copy follows
+  # symlinked files out of the source tree. eslint's own ^0.16.6 range already
+  # permits the fix — only the lockfile pin held 0.16.7 — but floor it so a
+  # fresh resolution cannot fall back. Capped at the 0.16 line eslint accepts.
+  "@humanfs/node": ">=0.16.8 <0.17"
+# Accepted prod advisories with no reachable fix. The blocking npm-audit gate
+# (.github/workflows/dependency-audit.yml) skips these GHSA ids. Every entry
+# must state why the advisory cannot apply to this codebase AND why it cannot
+# simply be patched — an entry that is merely inconvenient to fix does not
+# belong here. Re-check on each dependency sweep and delete once a fix lands.
+#
+# Empty as of the 2026-08-21 sweep: the sole entry was GHSA-qwww-vcr4-c8h2
+# (React Router RSC-mode CSRF bypass), accepted when the only fix was
+# react-router >=8.3.0 — a package react-router-dom has no release of. The fix
+# has since been backported to the 7.x line as 7.18.2, which react-router-dom
+# 7.18.2 pins and @pt/frontend's ^7.18.1 range already permits, so the ignore
+# is gone and the advisory is genuinely patched.
+auditConfig:
+  ignoreGhsas: []
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
+# pnpm 10+ guards node_modules purges behind a TTY confirmation. The backend
+# Dockerfile's prod-deps stage strips devDependencies (`pnpm install --prod`)
+# non-interactively, which trips this guard, so disable the prompt for the
+# container build.
+confirmModulesPurge: false
+# Supply-chain cooldown: refuse to install any dependency version published less
+# than this many MINUTES ago, so a freshly-compromised release is not pulled in
+# the window before it's detected/yanked (applies to ALL deps, incl. transitive).
+# 1440 = 24h. This is ALSO the pnpm 11 default, but pinning it here makes the
+# policy explicit and version-controlled — it survives a future change to pnpm's
+# default and is enforced identically on local installs and CI.
+minimumReleaseAge: 1440
+# Exempt high-frequency, build-time-only browser-data transitives that republish
+# multiple times per day (electron-to-chromium tracks every Chromium release;
+# caniuse-lite / baseline-browser-mapping / node-releases ride the browserslist
+# data cadence). They carry no runtime/executable code, so the cooldown buys
+# little for them — but WITHOUT this exemption every lockfile resolution and
+# every `@dependabot rebase` trips the gate on a <24h version of one of these,
+# stalling otherwise-clean dependency PRs (e.g. #300/#277/#314, 2026-06-19).
+minimumReleaseAgeExclude:
+  - electron-to-chromium
+  - caniuse-lite
+  - baseline-browser-mapping
+  - node-releases

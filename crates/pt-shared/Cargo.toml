@@ -1,0 +1,53 @@
+[package]
+name = "pt-shared"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "MIT OR Apache-2.0"
+
+# `pt-shared` is the home for serde-bearing types (manifest JSON shapes) and
+# `String`-payload-bearing validation errors. `pt-core` stays a pure no_std
+# engine crate; anything that needs std + serde + thiserror lives here.
+#
+# CI boundary check (ptb-fixture-parity.yml) asserts:
+#   - `pt-core` dep tree: no serde, no serde_json, no thiserror, no tiny_http
+#   - `pt-shared` dep tree: no tiny_http
+# i.e. `pt-shared` is a strict superset (server-side; no transport).
+
+[features]
+# Producer and server builds require the durable publish helpers. Consumers
+# that only read shared wire formats disable this feature, so
+# they never compile host fsync policy.
+default = ["durable-fsync"]
+durable-fsync = ["dep:rustix"]
+
+[dependencies]
+# `pt-core` carries the `no_std` structural-validation surface
+# (`pt_core::validate::structural`). pt-shared wraps it in the 5-class
+# `ValidationError` enum and adds the metadata layer on top. The boundary
+# stays one-way: pt-core never sees pt-shared (CI asserts via `cargo tree -p
+# pt-core | grep -v serde …`).
+pt-core = { path = "../pt-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+thiserror = "1"
+sha2 = "0.10"
+rustix = { version = "0.38", features = ["fs"], optional = true }
+# Jiff: shared city-timezone offset computation consumed by both
+# the producer (build.rs::resolve_city_tz_offset) and pt-serve's T13 cross-check
+# (bundle/handle.rs). Centralised here so both sides are structurally coupled to
+# the same code — drift between them would cause every publish to fail the
+# load-time offset cross-check. pt-core MUST NOT gain this dep (CI-asserted).
+jiff.workspace = true
+jiff-tzdb.workspace = true
+# Schedule-tile manifest `subdivisions` map: order-preserving Deserialize
+# (mirrors the producer's `WireManifest` IndexMap on the write side, though
+# insertion order isn't load-bearing here — keyed lookup only). Same version
+# pt-producer already carries.
+indexmap = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+# `fsync` smoke test writes to a tempfile; tempfile is the workspace-standard
+# cross-platform tmpdir guard. Not needed at build time (no public API uses it).
+tempfile = "3"

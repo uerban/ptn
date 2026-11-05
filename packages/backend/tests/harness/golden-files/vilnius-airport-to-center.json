@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "vilnius",
+    "from": { "lat": 54.6340, "lon": 25.2790 },
+    "to": { "lat": 54.6853, "lon": 25.2877 },
+    "description": "airport-to-center: Oro uostas (airport) to Cathedral area"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

@@ -1,0 +1,1717 @@
+{
+  "stops": [
+    {
+      "id": "vilnius-seskinespoliklinika",
+      "name": "Šeškinės poliklinika",
+      "lat": 54.7155,
+      "lon": 25.2471
+    },
+    {
+      "id": "vilnius-ukmergesst",
+      "name": "Ukmergės st.",
+      "lat": 54.712,
+      "lon": 25.25
+    },
+    {
+      "id": "vilnius-europosaikste",
+      "name": "Europos aikštė",
+      "lat": 54.6923,
+      "lon": 25.2741
+    },
+    {
+      "id": "test-A",
+      "name": "Alpha Terminal",
+      "lat": 54.687,
+      "lon": 25.279
+    },
+    {
+      "id": "test-B",
+      "name": "Bravo Center",
+      "lat": 54.6872,
+      "lon": 25.2797
+    },
+    {
+      "id": "test-X",
+      "name": "Xanadu Return-Only",
+      "lat": 54.6874,
+      "lon": 25.2802
+    },
+    {
+      "id": "s1",
+      "name": "Gedimino pr.",
+      "lat": 54.6872,
+      "lon": 25.2797
+    },
+    {
+      "id": "s2",
+      "name": "Lukiškių aikštė",
+      "lat": 54.6876,
+      "lon": 25.2808
+    },
+    {
+      "id": "s3",
+      "name": "Seimo rūmai",
+      "lat": 54.6865,
+      "lon": 25.2785
+    },
+    {
+      "id": "s4",
+      "name": "Vilniaus g.",
+      "lat": 54.688,
+      "lon": 25.2815
+    },
+    {
+      "id": "s5",
+      "name": "Katedra",
+      "lat": 54.686,
+      "lon": 25.282
+    }
+  ],
+  "routes": [
+    {
+      "id": "3G",
+      "shortName": "3G",
+      "mode": "BUS",
+      "color": "00a651",
+      "textColor": "ffffff",
+      "stopIds": [
+        "vilnius-seskinespoliklinika",
+        "vilnius-ukmergesst",
+        "vilnius-europosaikste"
+      ],
+      "trips": [
+        {
+          "tripId": "3G-00",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            0,
+            600,
+            1200
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-01",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            3600,
+            4200,
+            4800
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-02",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            7200,
+            7800,
+            8400
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-03",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            10800,
+            11400,
+            12000
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-04",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            14400,
+            15000,
+            15600
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-05",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            18000,
+            18600,
+            19200
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-06",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            21600,
+            22200,
+            22800
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-07",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            25200,
+            25800,
+            26400
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-08",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            28800,
+            29400,
+            30000
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-09",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            32400,
+            33000,
+            33600
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-10",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            36000,
+            36600,
+            37200
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-11",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            39600,
+            40200,
+            40800
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-12",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            43200,
+            43800,
+            44400
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-13",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            46800,
+            47400,
+            48000
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-14",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            50400,
+            51000,
+            51600
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-15",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            54000,
+            54600,
+            55200
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-16",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            57600,
+            58200,
+            58800
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-17",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            61200,
+            61800,
+            62400
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-18",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            64800,
+            65400,
+            66000
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-19",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            68400,
+            69000,
+            69600
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-20",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            72000,
+            72600,
+            73200
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-21",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            75600,
+            76200,
+            76800
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-22",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            79200,
+            79800,
+            80400
+          ],
+          "shapeId": "3G-shape"
+        },
+        {
+          "tripId": "3G-23",
+          "serviceId": "svc-daily",
+          "headsign": "Oro uostas",
+          "departureSecs": [
+            82800,
+            83400,
+            84000
+          ],
+          "shapeId": "3G-shape"
+        }
+      ]
+    },
+    {
+      "id": "test-route-1",
+      "shortName": "1",
+      "mode": "BUS",
+      "color": "0073AC",
+      "textColor": "ffffff",
+      "stopIds": [
+        "test-A",
+        "test-B"
+      ],
+      "directionPatterns": [
+        {
+          "headsign": "Bravo Center",
+          "stopIds": [
+            "test-A",
+            "test-B"
+          ]
+        },
+        {
+          "headsign": "Alpha Terminal",
+          "stopIds": [
+            "test-B",
+            "test-X",
+            "test-A"
+          ]
+        }
+      ],
+      "trips": [
+        {
+          "tripId": "test-route-1-00",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            0,
+            600
+          ]
+        },
+        {
+          "tripId": "test-route-1-01",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            3600,
+            4200
+          ]
+        },
+        {
+          "tripId": "test-route-1-02",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            7200,
+            7800
+          ]
+        },
+        {
+          "tripId": "test-route-1-03",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            10800,
+            11400
+          ]
+        },
+        {
+          "tripId": "test-route-1-04",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            14400,
+            15000
+          ]
+        },
+        {
+          "tripId": "test-route-1-05",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            18000,
+            18600
+          ]
+        },
+        {
+          "tripId": "test-route-1-06",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            21600,
+            22200
+          ]
+        },
+        {
+          "tripId": "test-route-1-07",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            25200,
+            25800
+          ]
+        },
+        {
+          "tripId": "test-route-1-08",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            28800,
+            29400
+          ]
+        },
+        {
+          "tripId": "test-route-1-09",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            32400,
+            33000
+          ]
+        },
+        {
+          "tripId": "test-route-1-10",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            36000,
+            36600
+          ]
+        },
+        {
+          "tripId": "test-route-1-11",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            39600,
+            40200
+          ]
+        },
+        {
+          "tripId": "test-route-1-12",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            43200,
+            43800
+          ]
+        },
+        {
+          "tripId": "test-route-1-13",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            46800,
+            47400
+          ]
+        },
+        {
+          "tripId": "test-route-1-14",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            50400,
+            51000
+          ]
+        },
+        {
+          "tripId": "test-route-1-15",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            54000,
+            54600
+          ]
+        },
+        {
+          "tripId": "test-route-1-16",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            57600,
+            58200
+          ]
+        },
+        {
+          "tripId": "test-route-1-17",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            61200,
+            61800
+          ]
+        },
+        {
+          "tripId": "test-route-1-18",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            64800,
+            65400
+          ]
+        },
+        {
+          "tripId": "test-route-1-19",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            68400,
+            69000
+          ]
+        },
+        {
+          "tripId": "test-route-1-20",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            72000,
+            72600
+          ]
+        },
+        {
+          "tripId": "test-route-1-21",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            75600,
+            76200
+          ]
+        },
+        {
+          "tripId": "test-route-1-22",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            79200,
+            79800
+          ]
+        },
+        {
+          "tripId": "test-route-1-23",
+          "serviceId": "svc-daily",
+          "headsign": "Bravo Center",
+          "departureSecs": [
+            82800,
+            83400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r1",
+      "shortName": "1",
+      "mode": "BUS",
+      "color": "0073AC",
+      "textColor": "FFFFFF",
+      "stopIds": [
+        "s1",
+        "s4"
+      ],
+      "trips": [
+        {
+          "tripId": "r1-00",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            0,
+            600
+          ]
+        },
+        {
+          "tripId": "r1-01",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            3600,
+            4200
+          ]
+        },
+        {
+          "tripId": "r1-02",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            7200,
+            7800
+          ]
+        },
+        {
+          "tripId": "r1-03",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            10800,
+            11400
+          ]
+        },
+        {
+          "tripId": "r1-04",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            14400,
+            15000
+          ]
+        },
+        {
+          "tripId": "r1-05",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            18000,
+            18600
+          ]
+        },
+        {
+          "tripId": "r1-06",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            21600,
+            22200
+          ]
+        },
+        {
+          "tripId": "r1-07",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            25200,
+            25800
+          ]
+        },
+        {
+          "tripId": "r1-08",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            28800,
+            29400
+          ]
+        },
+        {
+          "tripId": "r1-09",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            32400,
+            33000
+          ]
+        },
+        {
+          "tripId": "r1-10",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            36000,
+            36600
+          ]
+        },
+        {
+          "tripId": "r1-11",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            39600,
+            40200
+          ]
+        },
+        {
+          "tripId": "r1-12",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            43200,
+            43800
+          ]
+        },
+        {
+          "tripId": "r1-13",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            46800,
+            47400
+          ]
+        },
+        {
+          "tripId": "r1-14",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            50400,
+            51000
+          ]
+        },
+        {
+          "tripId": "r1-15",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            54000,
+            54600
+          ]
+        },
+        {
+          "tripId": "r1-16",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            57600,
+            58200
+          ]
+        },
+        {
+          "tripId": "r1-17",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            61200,
+            61800
+          ]
+        },
+        {
+          "tripId": "r1-18",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            64800,
+            65400
+          ]
+        },
+        {
+          "tripId": "r1-19",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            68400,
+            69000
+          ]
+        },
+        {
+          "tripId": "r1-20",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            72000,
+            72600
+          ]
+        },
+        {
+          "tripId": "r1-21",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            75600,
+            76200
+          ]
+        },
+        {
+          "tripId": "r1-22",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            79200,
+            79800
+          ]
+        },
+        {
+          "tripId": "r1-23",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            82800,
+            83400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r2",
+      "shortName": "2",
+      "mode": "BUS",
+      "color": "DC143C",
+      "textColor": "FFFFFF",
+      "stopIds": [
+        "s1",
+        "s5"
+      ],
+      "trips": [
+        {
+          "tripId": "r2-00",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            0,
+            600
+          ]
+        },
+        {
+          "tripId": "r2-01",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            3600,
+            4200
+          ]
+        },
+        {
+          "tripId": "r2-02",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            7200,
+            7800
+          ]
+        },
+        {
+          "tripId": "r2-03",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            10800,
+            11400
+          ]
+        },
+        {
+          "tripId": "r2-04",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            14400,
+            15000
+          ]
+        },
+        {
+          "tripId": "r2-05",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            18000,
+            18600
+          ]
+        },
+        {
+          "tripId": "r2-06",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            21600,
+            22200
+          ]
+        },
+        {
+          "tripId": "r2-07",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            25200,
+            25800
+          ]
+        },
+        {
+          "tripId": "r2-08",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            28800,
+            29400
+          ]
+        },
+        {
+          "tripId": "r2-09",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            32400,
+            33000
+          ]
+        },
+        {
+          "tripId": "r2-10",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            36000,
+            36600
+          ]
+        },
+        {
+          "tripId": "r2-11",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            39600,
+            40200
+          ]
+        },
+        {
+          "tripId": "r2-12",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            43200,
+            43800
+          ]
+        },
+        {
+          "tripId": "r2-13",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            46800,
+            47400
+          ]
+        },
+        {
+          "tripId": "r2-14",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            50400,
+            51000
+          ]
+        },
+        {
+          "tripId": "r2-15",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            54000,
+            54600
+          ]
+        },
+        {
+          "tripId": "r2-16",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            57600,
+            58200
+          ]
+        },
+        {
+          "tripId": "r2-17",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            61200,
+            61800
+          ]
+        },
+        {
+          "tripId": "r2-18",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            64800,
+            65400
+          ]
+        },
+        {
+          "tripId": "r2-19",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            68400,
+            69000
+          ]
+        },
+        {
+          "tripId": "r2-20",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            72000,
+            72600
+          ]
+        },
+        {
+          "tripId": "r2-21",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            75600,
+            76200
+          ]
+        },
+        {
+          "tripId": "r2-22",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            79200,
+            79800
+          ]
+        },
+        {
+          "tripId": "r2-23",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            82800,
+            83400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r3",
+      "shortName": "3G",
+      "mode": "BUS",
+      "color": "008000",
+      "textColor": "FFFFFF",
+      "stopIds": [
+        "s2"
+      ],
+      "trips": [
+        {
+          "tripId": "r3-00",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            0
+          ]
+        },
+        {
+          "tripId": "r3-01",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            3600
+          ]
+        },
+        {
+          "tripId": "r3-02",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            7200
+          ]
+        },
+        {
+          "tripId": "r3-03",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            10800
+          ]
+        },
+        {
+          "tripId": "r3-04",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            14400
+          ]
+        },
+        {
+          "tripId": "r3-05",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            18000
+          ]
+        },
+        {
+          "tripId": "r3-06",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            21600
+          ]
+        },
+        {
+          "tripId": "r3-07",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            25200
+          ]
+        },
+        {
+          "tripId": "r3-08",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            28800
+          ]
+        },
+        {
+          "tripId": "r3-09",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            32400
+          ]
+        },
+        {
+          "tripId": "r3-10",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            36000
+          ]
+        },
+        {
+          "tripId": "r3-11",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            39600
+          ]
+        },
+        {
+          "tripId": "r3-12",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            43200
+          ]
+        },
+        {
+          "tripId": "r3-13",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            46800
+          ]
+        },
+        {
+          "tripId": "r3-14",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            50400
+          ]
+        },
+        {
+          "tripId": "r3-15",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            54000
+          ]
+        },
+        {
+          "tripId": "r3-16",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            57600
+          ]
+        },
+        {
+          "tripId": "r3-17",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            61200
+          ]
+        },
+        {
+          "tripId": "r3-18",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            64800
+          ]
+        },
+        {
+          "tripId": "r3-19",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            68400
+          ]
+        },
+        {
+          "tripId": "r3-20",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            72000
+          ]
+        },
+        {
+          "tripId": "r3-21",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            75600
+          ]
+        },
+        {
+          "tripId": "r3-22",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            79200
+          ]
+        },
+        {
+          "tripId": "r3-23",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            82800
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r4",
+      "shortName": "6",
+      "mode": "TRAM",
+      "color": "16A34A",
+      "textColor": "FFFFFF",
+      "stopIds": [
+        "s3"
+      ],
+      "trips": [
+        {
+          "tripId": "r4-00",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            0
+          ]
+        },
+        {
+          "tripId": "r4-01",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            3600
+          ]
+        },
+        {
+          "tripId": "r4-02",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            7200
+          ]
+        },
+        {
+          "tripId": "r4-03",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            10800
+          ]
+        },
+        {
+          "tripId": "r4-04",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            14400
+          ]
+        },
+        {
+          "tripId": "r4-05",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            18000
+          ]
+        },
+        {
+          "tripId": "r4-06",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            21600
+          ]
+        },
+        {
+          "tripId": "r4-07",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            25200
+          ]
+        },
+        {
+          "tripId": "r4-08",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            28800
+          ]
+        },
+        {
+          "tripId": "r4-09",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            32400
+          ]
+        },
+        {
+          "tripId": "r4-10",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            36000
+          ]
+        },
+        {
+          "tripId": "r4-11",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            39600
+          ]
+        },
+        {
+          "tripId": "r4-12",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            43200
+          ]
+        },
+        {
+          "tripId": "r4-13",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            46800
+          ]
+        },
+        {
+          "tripId": "r4-14",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            50400
+          ]
+        },
+        {
+          "tripId": "r4-15",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            54000
+          ]
+        },
+        {
+          "tripId": "r4-16",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            57600
+          ]
+        },
+        {
+          "tripId": "r4-17",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            61200
+          ]
+        },
+        {
+          "tripId": "r4-18",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            64800
+          ]
+        },
+        {
+          "tripId": "r4-19",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            68400
+          ]
+        },
+        {
+          "tripId": "r4-20",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            72000
+          ]
+        },
+        {
+          "tripId": "r4-21",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            75600
+          ]
+        },
+        {
+          "tripId": "r4-22",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            79200
+          ]
+        },
+        {
+          "tripId": "r4-23",
+          "serviceId": "svc-daily",
+          "headsign": "Centras",
+          "departureSecs": [
+            82800
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r5",
+      "shortName": "16",
+      "mode": "TRAM",
+      "color": "DC2626",
+      "textColor": "FFFFFF",
+      "stopIds": [
+        "s4",
+        "s5"
+      ],
+      "trips": [
+        {
+          "tripId": "r5-00",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            0,
+            600
+          ]
+        },
+        {
+          "tripId": "r5-01",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            3600,
+            4200
+          ]
+        },
+        {
+          "tripId": "r5-02",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            7200,
+            7800
+          ]
+        },
+        {
+          "tripId": "r5-03",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            10800,
+            11400
+          ]
+        },
+        {
+          "tripId": "r5-04",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            14400,
+            15000
+          ]
+        },
+        {
+          "tripId": "r5-05",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            18000,
+            18600
+          ]
+        },
+        {
+          "tripId": "r5-06",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            21600,
+            22200
+          ]
+        },
+        {
+          "tripId": "r5-07",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            25200,
+            25800
+          ]
+        },
+        {
+          "tripId": "r5-08",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            28800,
+            29400
+          ]
+        },
+        {
+          "tripId": "r5-09",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            32400,
+            33000
+          ]
+        },
+        {
+          "tripId": "r5-10",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            36000,
+            36600
+          ]
+        },
+        {
+          "tripId": "r5-11",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            39600,
+            40200
+          ]
+        },
+        {
+          "tripId": "r5-12",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            43200,
+            43800
+          ]
+        },
+        {
+          "tripId": "r5-13",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            46800,
+            47400
+          ]
+        },
+        {
+          "tripId": "r5-14",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            50400,
+            51000
+          ]
+        },
+        {
+          "tripId": "r5-15",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            54000,
+            54600
+          ]
+        },
+        {
+          "tripId": "r5-16",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            57600,
+            58200
+          ]
+        },
+        {
+          "tripId": "r5-17",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            61200,
+            61800
+          ]
+        },
+        {
+          "tripId": "r5-18",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            64800,
+            65400
+          ]
+        },
+        {
+          "tripId": "r5-19",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            68400,
+            69000
+          ]
+        },
+        {
+          "tripId": "r5-20",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            72000,
+            72600
+          ]
+        },
+        {
+          "tripId": "r5-21",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            75600,
+            76200
+          ]
+        },
+        {
+          "tripId": "r5-22",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            79200,
+            79800
+          ]
+        },
+        {
+          "tripId": "r5-23",
+          "serviceId": "svc-daily",
+          "headsign": "Katedra",
+          "departureSecs": [
+            82800,
+            83400
+          ]
+        }
+      ]
+    }
+  ],
+  "calendar": [
+    {
+      "serviceId": "svc-daily",
+      "days": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "startDate": "20260101",
+      "endDate": "20271231",
+      "exceptions": {}
+    }
+  ],
+  "meta": {
+    "generatedAt": "2026-04-22T00:00:00Z",
+    "cityId": "vilnius",
+    "shapesArtifact": {
+      "url": "/api/vilnius/gtfs/shapes/shapes-HASH_PLACEHOLDER.json",
+      "hash": "HASH_PLACEHOLDER",
+      "sizeBytes": 120
+    }
+  }
+}

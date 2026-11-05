@@ -1,0 +1,57 @@
+# The same routes serve localhost HTTP and a public HTTPS hostname.
+# https://caddyserver.com/docs/automatic-https
+{
+	admin off
+	skip_install_trust
+}
+
+{$PTN_SITE:http://localhost:8080} {
+	encode gzip
+	header Cache-Control "no-cache"
+
+	@aux path_regexp aux ^/api/vilnius/(health|ready|version)$
+	handle @aux {
+		rewrite * /{re.aux.1}
+		reverse_proxy {$PTN_AUX:127.0.0.1:9001}
+	}
+	@transit path /api/vilnius/plan /api/vilnius/raptor-bundle /api/vilnius/transfers/fetch /api/vilnius/route-geometry/fetch /api/vilnius/stops/all /api/vilnius/stops/nearby /api/vilnius/departures-for-stop /api/vilnius/color-config /api/vilnius/rt/* /api/vilnius/client-report /api/vilnius/gtfs/* /api/vilnius/address-search* /api/gtfs/poi-tile/*
+	handle @transit {
+		request_body {
+			max_size 32768
+		}
+		reverse_proxy {$PTN_MAIN:127.0.0.1:9000}
+	}
+	handle /api/* {
+		respond 404
+	}
+	handle /deployment-config.js {
+		header Content-Type application/javascript
+		respond "globalThis.__PTN_DEPLOYMENT__={\"schemaVersion\":1,\"cities\":[\"vilnius\"]};" 200
+	}
+	@osm path_regexp osm ^/osm/(current/vilnius\.json|releases/[0-9a-f]{64}/(manifest\.json|walk-graph\.ptwg\.br))$
+	handle @osm {
+		uri strip_prefix /osm
+		root * {$PTN_ARTIFACT_PUBLIC}/
+		# /osm/current and /osm/releases map into the public artifact tree.
+		file_server
+	}
+	@poi path_regexp poi ^/poi/(manifest\.json|releases/[0-9a-f]{64}/[a-z0-9_-]+(\.loose)?\.br)$
+	handle @poi {
+		root * {$PTN_ARTIFACT_PUBLIC}
+		file_server
+	}
+	@missing path /osm/* /poi/* /walk-graph/* /micromap/*
+	handle @missing {
+		respond 404
+	}
+	@assets path /assets/* /glyphs/*
+	handle @assets {
+		root * {$PTN_WEB_ROOT}
+		file_server
+	}
+	handle {
+		root * {$PTN_WEB_ROOT}
+		try_files {path} /index.html
+		file_server
+	}
+}

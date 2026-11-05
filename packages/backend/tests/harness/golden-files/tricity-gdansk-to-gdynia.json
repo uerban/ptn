@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.3557, "lon": 18.6442 },
+    "to": { "lat": 54.5206, "lon": 18.5313 },
+    "description": "gdansk-to-gdynia: Cross-Tricity rail Gdańsk Główny to Gdynia Główna (SKM)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

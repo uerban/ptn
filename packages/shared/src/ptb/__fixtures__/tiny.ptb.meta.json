@@ -1,0 +1,1 @@
+{"schemaVersion":1,"producerGitSha":"tiny-fixture","feedStartDate":"2026-05-01","feeds":[{"url":"file:///crates/pt-producer/tests/fixtures/tiny-gtfs.zip","blobSha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","etag":"\"W/\\\"tiny-fixture-etag\\\"\""}]}

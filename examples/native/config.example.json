@@ -1,0 +1,10 @@
+{
+  "stateDirectory": "state",
+  "gtfsURL": "https://stops.lt/vilnius/vilnius/gtfs.zip",
+  "tripUpdatesURL": "https://www.stops.lt/vilnius/trip_updates.pb",
+  "artifactSource": {
+    "kind": "https",
+    "url": "https://REPLACE-WITH-YOUR-ARTIFACT-HOST"
+  },
+  "trustedKeys": ["REPLACE-WITH-64-LOWERCASE-HEX-ED25519-PUBLIC-KEY"]
+}

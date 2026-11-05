@@ -1,0 +1,11 @@
+[
+  {"id": "stop-a", "lat": 54.6800, "lon": 25.2800},
+  {"id": "stop-b", "lat": 54.6800, "lon": 25.2815},
+  {"id": "stop-c", "lat": 54.6800, "lon": 25.2820},
+  {"id": "stop-d", "lat": 54.6805, "lon": 25.2810},
+  {"id": "stop-e-unreachable", "lat": 54.7000, "lon": 25.2800},
+  {"id": "stop-zero-west", "lat": 54.6800, "lon": -0.0010},
+  {"id": "stop-zero-east", "lat": 54.6800, "lon": 0.0010},
+  {"id": "stop-off-graph", "lat": 54.68015, "lon": 0.0004},
+  {"id": "stop-off-graph-twin", "lat": 54.68015, "lon": 0.0004}
+]

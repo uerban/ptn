@@ -1,0 +1,15 @@
+[package]
+name = "pt-geocode"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+fst = "0.4"
+unicode-normalization = "0.1"
+# The packed artifact's metadata section is a small JSON blob (see
+# artifact.rs), so serde is part of the lib surface now, not dev-only.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -1,0 +1,16 @@
+# Clippy configuration shared across the workspace.
+#
+# `arc_swap::ArcSwap::load_full` is restricted to a tight whitelist of files at the http↔app seam:
+# an `Arc<Generation>` must live ONLY on the request stack. Outside the seam, hot paths should hold
+# a borrowed `&Generation`; ambient `Arc<Generation>` clones pin the previous generation against an
+# in-flight swap, defeating the lock-free reload.
+#
+# The boundary test (`crates/pt-serve/tests/boundaries.rs`) enforces the same
+# whitelist at the source-text level; clippy catches violations earlier in the
+# dev loop. Both are kept on purpose.
+# `load_full` is defined on `ArcSwapAny<T, S>` (of which `ArcSwap<T>` is a type
+# alias — `pub type ArcSwap<T> = ArcSwapAny<Arc<T>>`). The disallowed-methods
+# lint resolves through the type alias, so we name the underlying impl path.
+disallowed-methods = [
+    { path = "arc_swap::ArcSwapAny::load_full", reason = "Arc<Generation> must live only on the request stack; load via ServerCtx::current_generation (the http↔app seam)." },
+]

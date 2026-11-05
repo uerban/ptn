@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "vilnius",
+    "from": { "lat": 54.6719, "lon": 25.2834 },
+    "to": { "lat": 54.7391, "lon": 25.2415 },
+    "description": "station-to-north: Stotis (train station) to Fabijoniškių žiedas (north terminus)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

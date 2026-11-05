@@ -1,0 +1,90 @@
+{
+  "name": "@pt/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./ptb/sidecars": {
+      "import": "./dist/ptb/sidecars.js",
+      "types": "./dist/ptb/sidecars.d.ts"
+    },
+    "./ptb": {
+      "import": "./dist/ptb/index.js",
+      "types": "./dist/ptb/index.d.ts"
+    },
+    "./constants": {
+      "import": "./dist/constants/index.js",
+      "types": "./dist/constants/index.d.ts"
+    },
+    "./util": {
+      "import": "./dist/util/index.js",
+      "types": "./dist/util/index.d.ts"
+    },
+    "./poi": {
+      "import": "./dist/poi/index.js",
+      "types": "./dist/poi/index.d.ts"
+    },
+    "./address-search": {
+      "import": "./dist/addressSearch/index.js",
+      "types": "./dist/addressSearch/index.d.ts"
+    },
+    "./privacy": {
+      "import": "./dist/types/privacy.js",
+      "types": "./dist/types/privacy.d.ts"
+    },
+    "./proto": {
+      "import": "./dist/proto/route-update.js",
+      "types": "./dist/proto/route-update.d.ts"
+    },
+    "./routing": {
+      "import": "./dist/routing/index.js",
+      "types": "./dist/routing/index.d.ts"
+    },
+    "./schedule-tile": {
+      "import": "./dist/types/scheduleTile.js",
+      "types": "./dist/types/scheduleTile.d.ts"
+    },
+    "./route-endpoint": {
+      "import": "./dist/types/routeEndpoint.js",
+      "types": "./dist/types/routeEndpoint.d.ts"
+    },
+    "./time": {
+      "import": "./dist/time/timeDomain.js",
+      "types": "./dist/time/timeDomain.d.ts"
+    },
+    "./transit": {
+      "import": "./dist/transit/index.js",
+      "types": "./dist/transit/index.d.ts"
+    },
+    "./transfers": {
+      "import": "./dist/transfers/index.js",
+      "types": "./dist/transfers/index.d.ts"
+    },
+    "./raptor": {
+      "import": "./dist/raptor/index.js",
+      "types": "./dist/raptor/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "protobufjs": "^8.6.6"
+  }
+}

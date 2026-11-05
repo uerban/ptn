@@ -1,0 +1,3219 @@
+{
+  "_meta": {
+    "generated": "2026-04-13",
+    "sourceVersion": "2026-04-13",
+    "entryCount": 104,
+    "needsReviewCount": 15,
+    "notes": "Curated from well-established Vilnius landmarks. Wikidata SPARQL endpoint was unreachable from this environment; wikidataId is populated only where confidence is high. Canonical names use Lithuanian; Polish (pl) aliases included because Vilnius has a significant Polish-speaking population. nearestStopGroupId left null for all entries (follow-up task)."
+  },
+  "entries": [
+    {
+      "id": "vln-oro-uostas",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus oro uostas",
+      "aliases": {
+        "lt": [
+          "Vilniaus tarptautinis oro uostas",
+          "VNO"
+        ],
+        "en": [
+          "Vilnius International Airport",
+          "Vilnius Airport",
+          "VNO"
+        ],
+        "ru": [
+          "Вильнюсский аэропорт",
+          "Аэропорт Вильнюс"
+        ],
+        "pl": [
+          "Port Lotniczy Wilno"
+        ],
+        "uk": [
+          "Вільнюський аеропорт"
+        ],
+        "be": [
+          "Віленскі аэрапорт"
+        ]
+      },
+      "category": "airport",
+      "lat": 54.6341,
+      "lon": 25.2858,
+      "bbox": [
+        54.6241,
+        25.2658,
+        54.6441,
+        25.3058
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q16125",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-autobusu-stotis",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus autobusų stotis",
+      "aliases": {
+        "lt": [
+          "Autobusų stotis"
+        ],
+        "en": [
+          "Vilnius Bus Station",
+          "Vilnius Coach Station"
+        ],
+        "ru": [
+          "Вильнюсский автовокзал",
+          "Автовокзал Вильнюса"
+        ],
+        "pl": [
+          "Dworzec Autobusowy w Wilnie"
+        ],
+        "be": [
+          "Аўтавакзал Вільнюса"
+        ]
+      },
+      "category": "bus_terminal",
+      "lat": 54.6708,
+      "lon": 25.28,
+      "bbox": [
+        54.6698,
+        25.278,
+        54.6718,
+        25.282
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q12665103",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-siemens-arena",
+      "city": "vilnius",
+      "canonicalName": "Avia Solutions Group Arena",
+      "aliases": {
+        "lt": [
+          "Siemens arena"
+        ],
+        "en": [
+          "Avia Solutions Group Arena",
+          "Siemens Arena"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.7247,
+      "lon": 25.2539,
+      "bbox": [
+        54.7237,
+        25.2519,
+        54.7257,
+        25.2559
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1765175",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-compensa-koncertu-sale",
+      "city": "vilnius",
+      "canonicalName": "Compensa koncertų salė",
+      "aliases": {
+        "lt": [
+          "Compensa",
+          "Litexpo koncertų salė"
+        ],
+        "en": [
+          "Compensa Concert Hall"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.7118,
+      "lon": 25.2767,
+      "bbox": [
+        54.6801,
+        25.2197,
+        54.7148,
+        25.279700000000002
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-mazvydas-biblio",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos nacionalinė Martyno Mažvydo biblioteka",
+      "aliases": {
+        "lt": [
+          "Martyno Mažvydo biblioteka"
+        ],
+        "en": [
+          "Martynas Mažvydas National Library of Lithuania"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6889,
+      "lon": 25.2669,
+      "bbox": [
+        54.6879,
+        25.2649,
+        54.6899,
+        25.2689
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1348975",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-nacionaline-filharmonija",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos nacionalinė filharmonija",
+      "aliases": {
+        "lt": [
+          "Filharmonija"
+        ],
+        "en": [
+          "Lithuanian National Philharmonic Society"
+        ],
+        "ru": [
+          "Литовская национальная филармония"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6772,
+      "lon": 25.2903,
+      "bbox": [
+        54.6762,
+        25.2883,
+        54.6782,
+        25.2923
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q12680290",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-litexpo",
+      "city": "vilnius",
+      "canonicalName": "Litexpo",
+      "aliases": {
+        "lt": [
+          "Lietuvos parodų ir kongresų centras Litexpo"
+        ],
+        "en": [
+          "Litexpo Lithuanian Exhibition and Convention Centre"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6806,
+      "lon": 25.2214,
+      "bbox": [
+        54.6796,
+        25.2194,
+        54.6816,
+        25.2234
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-lukiskiu-kalejimas",
+      "city": "vilnius",
+      "canonicalName": "Lukiškių kalėjimas 2.0",
+      "aliases": {
+        "lt": [
+          "Lukiškių kalėjimas"
+        ],
+        "en": [
+          "Lukiškės Prison 2.0"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6911,
+      "lon": 25.2672,
+      "bbox": [
+        54.6901,
+        25.2652,
+        54.6921,
+        25.2692
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1587852",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-kongresu-rumai",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus kongresų rūmai",
+      "aliases": {
+        "lt": [
+          "LRT kongresų rūmai"
+        ],
+        "en": [
+          "Vilnius Congress Concert Hall"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6917,
+      "lon": 25.2697,
+      "bbox": [
+        54.6907,
+        25.2677,
+        54.6927,
+        25.2717
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilniaus-univ-biblio",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus universiteto biblioteka",
+      "aliases": {
+        "lt": [
+          "VU biblioteka"
+        ],
+        "en": [
+          "Vilnius University Library"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.6839,
+      "lon": 25.2878,
+      "bbox": [
+        54.6829,
+        25.2858,
+        54.6849,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2480849",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-onkologijos-institutas",
+      "city": "vilnius",
+      "canonicalName": "Nacionalinis vėžio institutas",
+      "aliases": {
+        "lt": [
+          "Onkologijos institutas"
+        ],
+        "en": [
+          "National Cancer Institute of Lithuania"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.7308,
+      "lon": 25.2917,
+      "bbox": [
+        54.6698,
+        25.2413,
+        54.7338,
+        25.2947
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q15115554"
+    },
+    {
+      "id": "vln-psichiatrijos-ligonine",
+      "city": "vilnius",
+      "canonicalName": "Respublikinė Vilniaus psichiatrijos ligoninė",
+      "aliases": {
+        "lt": [
+          "Naujosios Vilnios psichiatrijos ligoninė"
+        ],
+        "en": [
+          "Vilnius Republican Psychiatric Hospital"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.6843,
+      "lon": 25.418,
+      "bbox": [
+        54.6813,
+        25.3544,
+        54.7116,
+        25.421
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q2115906"
+    },
+    {
+      "id": "vln-respublikine-ligonine",
+      "city": "vilnius",
+      "canonicalName": "Respublikinė Vilniaus universitetinė ligoninė",
+      "aliases": {
+        "lt": [
+          "RVUL",
+          "Antakalnio ligoninė"
+        ],
+        "en": [
+          "Republican Vilnius University Hospital"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.6687,
+      "lon": 25.2081,
+      "bbox": [
+        54.6657,
+        25.2051,
+        54.7079,
+        25.3173
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q15126052"
+    },
+    {
+      "id": "vln-santaros-klinikos",
+      "city": "vilnius",
+      "canonicalName": "VUL Santaros klinikos",
+      "aliases": {
+        "lt": [
+          "Santaros klinikos",
+          "Santariškių klinikos"
+        ],
+        "en": [
+          "Vilnius University Hospital Santaros Clinics"
+        ],
+        "ru": [
+          "Клиники Сантарос"
+        ],
+        "pl": [
+          "Szpital Uniwersytecki Santariszki"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.7267,
+      "lon": 25.2869,
+      "bbox": [
+        54.7247,
+        25.2839,
+        54.7287,
+        25.2899
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q12665122",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-santara-vaikai",
+      "city": "vilnius",
+      "canonicalName": "Vaikų ligoninė Santaros klinikų filialas",
+      "aliases": {
+        "lt": [
+          "Vaikų ligoninė"
+        ],
+        "en": [
+          "Children's Hospital, Santaros Clinics"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.7519,
+      "lon": 25.2778,
+      "bbox": [
+        54.7262,
+        25.2748,
+        54.7549,
+        25.2895
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-sv-rocho-ligonine",
+      "city": "vilnius",
+      "canonicalName": "Šv. Roko ligoninė",
+      "aliases": {
+        "lt": [
+          "Šv. Roko ligoninė"
+        ],
+        "en": [
+          "St. Roch's Hospital"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.6767,
+      "lon": 25.2878,
+      "bbox": [
+        54.6757,
+        25.2858,
+        54.6777,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-antakalnis-kapines",
+      "city": "vilnius",
+      "canonicalName": "Antakalnio kapinės",
+      "aliases": {
+        "lt": [
+          "Antakalnio kapinės"
+        ],
+        "en": [
+          "Antakalnis Cemetery"
+        ],
+        "ru": [
+          "Антакальнисское кладбище"
+        ],
+        "pl": [
+          "Cmentarz na Antokolu"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.7033,
+      "lon": 25.3028,
+      "bbox": [
+        54.7013,
+        25.2998,
+        54.7053,
+        25.3058
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1810836",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-antakalnis",
+      "city": "vilnius",
+      "canonicalName": "Antakalnis",
+      "aliases": {
+        "lt": [
+          "Antakalnis"
+        ],
+        "en": [
+          "Antakalnis"
+        ],
+        "pl": [
+          "Antokol"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.7058,
+      "lon": 25.3111,
+      "bbox": [
+        54.6958,
+        25.2911,
+        54.7158,
+        25.3311
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-ausros-vartai",
+      "city": "vilnius",
+      "canonicalName": "Aušros Vartai",
+      "aliases": {
+        "lt": [
+          "Aušros Vartai",
+          "Medininkų vartai"
+        ],
+        "en": [
+          "Gate of Dawn"
+        ],
+        "ru": [
+          "Острая брама",
+          "Ворота Зари"
+        ],
+        "pl": [
+          "Ostra Brama"
+        ],
+        "uk": [
+          "Гостра брама"
+        ],
+        "be": [
+          "Вострая брама"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6742,
+      "lon": 25.2894,
+      "bbox": [
+        54.6732,
+        25.2874,
+        54.6752,
+        25.2914
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1128330",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-baltasis-tiltas",
+      "city": "vilnius",
+      "canonicalName": "Baltasis tiltas",
+      "aliases": {
+        "lt": [
+          "Baltasis tiltas"
+        ],
+        "en": [
+          "White Bridge"
+        ],
+        "ru": [
+          "Белый мост"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6919,
+      "lon": 25.2747,
+      "bbox": [
+        54.6909,
+        25.2727,
+        54.6929,
+        25.2767
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-bernardinu-baznycia",
+      "city": "vilnius",
+      "canonicalName": "Bernardinų bažnyčia",
+      "aliases": {
+        "lt": [
+          "Šv. Pranciškaus Asyžiečio bažnyčia"
+        ],
+        "en": [
+          "Bernardine Church"
+        ],
+        "pl": [
+          "Kościół Bernardynów"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6839,
+      "lon": 25.2942,
+      "bbox": [
+        54.6829,
+        25.2922,
+        54.6849,
+        25.2962
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-didzioji-gatve",
+      "city": "vilnius",
+      "canonicalName": "Didžioji gatvė",
+      "aliases": {
+        "lt": [
+          "Didžioji gatvė"
+        ],
+        "en": [
+          "Didžioji Street",
+          "Great Street"
+        ],
+        "pl": [
+          "Ulica Wielka"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6792,
+      "lon": 25.2883,
+      "bbox": [
+        54.6772,
+        25.2863,
+        54.6812,
+        25.2903
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-didzioji-vilniaus-sinagoga-site",
+      "city": "vilnius",
+      "canonicalName": "Didžiosios Vilniaus sinagogos vieta",
+      "aliases": {
+        "lt": [
+          "Didžioji sinagoga"
+        ],
+        "en": [
+          "Site of the Great Synagogue of Vilna"
+        ],
+        "ru": [
+          "Большая синагога Вильны"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6789,
+      "lon": 25.2833,
+      "bbox": [
+        54.6779,
+        25.2813,
+        54.6799,
+        25.2853
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1780689",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-fabijoniskes",
+      "city": "vilnius",
+      "canonicalName": "Fabijoniškės",
+      "aliases": {
+        "lt": [
+          "Fabijoniškės"
+        ],
+        "en": [
+          "Fabijoniškės"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.7297,
+      "lon": 25.2458,
+      "bbox": [
+        54.7247,
+        25.2358,
+        54.7347,
+        25.2558
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q61379328"
+    },
+    {
+      "id": "vln-frank-zappa",
+      "city": "vilnius",
+      "canonicalName": "Franko Zappos paminklas",
+      "aliases": {
+        "lt": [
+          "Zappos biustas"
+        ],
+        "en": [
+          "Frank Zappa Memorial"
+        ],
+        "ru": [
+          "Памятник Фрэнку Заппе"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6844,
+      "lon": 25.2639,
+      "bbox": [
+        54.6834,
+        25.2619,
+        54.6854,
+        25.2659
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2085117",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-gediminas-tower",
+      "city": "vilnius",
+      "canonicalName": "Gedimino pilies bokštas",
+      "aliases": {
+        "lt": [
+          "Gedimino bokštas",
+          "Gedimino pilis"
+        ],
+        "en": [
+          "Gediminas' Tower",
+          "Gediminas Tower"
+        ],
+        "ru": [
+          "Башня Гедимина"
+        ],
+        "pl": [
+          "Wieża Giedymina"
+        ],
+        "uk": [
+          "Вежа Гедиміна"
+        ],
+        "be": [
+          "Вежа Гедыміна"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6867,
+      "lon": 25.2908,
+      "bbox": [
+        54.6857,
+        25.2888,
+        54.6877,
+        25.2928
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1046858",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-gedimino-prospektas",
+      "city": "vilnius",
+      "canonicalName": "Gedimino prospektas",
+      "aliases": {
+        "lt": [
+          "Gedimino prospektas"
+        ],
+        "en": [
+          "Gediminas Avenue"
+        ],
+        "ru": [
+          "Проспект Гедимина"
+        ],
+        "pl": [
+          "Aleja Giedymina"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6875,
+      "lon": 25.2783,
+      "bbox": [
+        54.6855,
+        25.265,
+        54.6895,
+        25.29
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-halle",
+      "city": "vilnius",
+      "canonicalName": "Halės turgus",
+      "aliases": {
+        "lt": [
+          "Halės turgus",
+          "Senoji halė"
+        ],
+        "en": [
+          "Halės Market"
+        ],
+        "ru": [
+          "Галерея-рынок Халес"
+        ],
+        "pl": [
+          "Hale Targowe w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6725,
+      "lon": 25.2858,
+      "bbox": [
+        54.6715,
+        25.2838,
+        54.6735,
+        25.2878
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-justiniskes",
+      "city": "vilnius",
+      "canonicalName": "Justiniškės",
+      "aliases": {
+        "lt": [
+          "Justiniškės"
+        ],
+        "en": [
+          "Justiniškės"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.7186,
+      "lon": 25.2264,
+      "bbox": [
+        54.7136,
+        25.2164,
+        54.7236,
+        25.2364
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q16454631"
+    },
+    {
+      "id": "vln-mindaugo-tiltas",
+      "city": "vilnius",
+      "canonicalName": "Karaliaus Mindaugo tiltas",
+      "aliases": {
+        "lt": [
+          "Mindaugo tiltas"
+        ],
+        "en": [
+          "King Mindaugas Bridge"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6869,
+      "lon": 25.2825,
+      "bbox": [
+        54.6859,
+        25.2805,
+        54.6879,
+        25.2845
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-karoliniskes",
+      "city": "vilnius",
+      "canonicalName": "Karoliniškės",
+      "aliases": {
+        "lt": [
+          "Karoliniškės"
+        ],
+        "en": [
+          "Karoliniškės"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6889,
+      "lon": 25.2289,
+      "bbox": [
+        54.6839,
+        25.2189,
+        54.6939,
+        25.2389
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q1514004"
+    },
+    {
+      "id": "vln-lazdynai",
+      "city": "vilnius",
+      "canonicalName": "Lazdynai",
+      "aliases": {
+        "lt": [
+          "Lazdynai"
+        ],
+        "en": [
+          "Lazdynai"
+        ],
+        "pl": [
+          "Leszczyniaki"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6817,
+      "lon": 25.2017,
+      "bbox": [
+        54.6717,
+        25.1917,
+        54.6917,
+        25.2117
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-seimas",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos Respublikos Seimas",
+      "aliases": {
+        "lt": [
+          "Seimo rūmai"
+        ],
+        "en": [
+          "Seimas Palace",
+          "Parliament of Lithuania"
+        ],
+        "ru": [
+          "Сейм Литвы"
+        ],
+        "pl": [
+          "Sejm Republiki Litewskiej"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6903,
+      "lon": 25.2664,
+      "bbox": [
+        54.6893,
+        25.2644,
+        54.6913,
+        25.2684
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2079575",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-prezidentura",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos Respublikos prezidento rūmai",
+      "aliases": {
+        "lt": [
+          "Prezidentūra"
+        ],
+        "en": [
+          "Presidential Palace, Vilnius"
+        ],
+        "ru": [
+          "Президентский дворец Литвы"
+        ],
+        "pl": [
+          "Pałac Prezydencki w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6836,
+      "lon": 25.2869,
+      "bbox": [
+        54.6826,
+        25.2849,
+        54.6846,
+        25.2889
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1766942",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-naujamiestis",
+      "city": "vilnius",
+      "canonicalName": "Naujamiestis",
+      "aliases": {
+        "lt": [
+          "Naujamiestis"
+        ],
+        "en": [
+          "Naujamiestis"
+        ],
+        "pl": [
+          "Nowe Miasto"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6875,
+      "lon": 25.2556,
+      "bbox": [
+        54.6825,
+        25.2456,
+        54.6925,
+        25.2656
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-paneriu-memorialas",
+      "city": "vilnius",
+      "canonicalName": "Panerių memorialas",
+      "aliases": {
+        "lt": [
+          "Panerių memorialas"
+        ],
+        "en": [
+          "Paneriai Memorial"
+        ],
+        "ru": [
+          "Панеряйский мемориал"
+        ],
+        "pl": [
+          "Miejsce pamięci w Ponarach"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6389,
+      "lon": 25.1678,
+      "bbox": [
+        54.6379,
+        25.1658,
+        54.6399,
+        25.1698
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1130741",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-pasilaiciai",
+      "city": "vilnius",
+      "canonicalName": "Pašilaičiai",
+      "aliases": {
+        "lt": [
+          "Pašilaičiai"
+        ],
+        "en": [
+          "Pašilaičiai"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.7389,
+      "lon": 25.2225,
+      "bbox": [
+        54.7339,
+        25.2125,
+        54.7439,
+        25.2325
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q7157121"
+    },
+    {
+      "id": "vln-pilies-gatve",
+      "city": "vilnius",
+      "canonicalName": "Pilies gatvė",
+      "aliases": {
+        "lt": [
+          "Pilies gatvė"
+        ],
+        "en": [
+          "Pilies Street",
+          "Castle Street"
+        ],
+        "ru": [
+          "Замковая улица"
+        ],
+        "pl": [
+          "Ulica Zamkowa w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6825,
+      "lon": 25.2889,
+      "bbox": [
+        54.68,
+        25.2869,
+        54.685,
+        25.2909
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-rasu-kapines",
+      "city": "vilnius",
+      "canonicalName": "Rasų kapinės",
+      "aliases": {
+        "lt": [
+          "Rasų kapinės"
+        ],
+        "en": [
+          "Rasos Cemetery"
+        ],
+        "ru": [
+          "Кладбище Расу"
+        ],
+        "pl": [
+          "Cmentarz na Rossie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.675,
+      "lon": 25.3025,
+      "bbox": [
+        54.673,
+        25.2995,
+        54.677,
+        25.3055
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1760283",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-precistenskes-soboras",
+      "city": "vilnius",
+      "canonicalName": "Skaisčiausiosios Dievo Motinos soboras",
+      "aliases": {
+        "lt": [
+          "Prečistenskaja soboras"
+        ],
+        "en": [
+          "Cathedral of the Theotokos"
+        ],
+        "ru": [
+          "Пречистенский собор"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6786,
+      "lon": 25.2967,
+      "bbox": [
+        54.6776,
+        25.2947,
+        54.6796,
+        25.2987
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q1736161"
+    },
+    {
+      "id": "vln-trijų-kryžių-kalnas",
+      "city": "vilnius",
+      "canonicalName": "Trijų kryžių kalnas",
+      "aliases": {
+        "lt": [
+          "Trijų kryžių kalnas"
+        ],
+        "en": [
+          "Hill of Three Crosses"
+        ],
+        "ru": [
+          "Гора Трёх крестов"
+        ],
+        "pl": [
+          "Góra Trzykrzyska"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6881,
+      "lon": 25.2978,
+      "bbox": [
+        54.6871,
+        25.2958,
+        54.6891,
+        25.2998
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1506075",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-uzupio-angel",
+      "city": "vilnius",
+      "canonicalName": "Užupio angelas",
+      "aliases": {
+        "lt": [
+          "Užupio angelas"
+        ],
+        "en": [
+          "Angel of Užupis"
+        ],
+        "ru": [
+          "Ангел Ужуписа"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6817,
+      "lon": 25.2972,
+      "bbox": [
+        54.6807,
+        25.2952,
+        54.6827,
+        25.2992
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-uzupis",
+      "city": "vilnius",
+      "canonicalName": "Užupis",
+      "aliases": {
+        "lt": [
+          "Užupio Respublika"
+        ],
+        "en": [
+          "Užupis",
+          "Republic of Užupis"
+        ],
+        "ru": [
+          "Ужупис"
+        ],
+        "pl": [
+          "Zarzecze"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6803,
+      "lon": 25.2986,
+      "bbox": [
+        54.6783,
+        25.2946,
+        54.6823,
+        25.3026
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q484843",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilnelia",
+      "city": "vilnius",
+      "canonicalName": "Vilnelė",
+      "aliases": {
+        "lt": [
+          "Vilnia",
+          "Upė Vilnelė"
+        ],
+        "en": [
+          "Vilnia River"
+        ],
+        "ru": [
+          "Вильня"
+        ],
+        "pl": [
+          "Wilenka"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6817,
+      "lon": 25.2956,
+      "bbox": [
+        54.67,
+        25.2856,
+        54.69,
+        25.3156
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1345303",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilniaus-katedra",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus arkikatedra",
+      "aliases": {
+        "lt": [
+          "Vilniaus katedra",
+          "Šv. Stanislovo ir Šv. Vladislovo arkikatedra"
+        ],
+        "en": [
+          "Vilnius Cathedral",
+          "Cathedral Basilica of Vilnius"
+        ],
+        "ru": [
+          "Вильнюсский кафедральный собор"
+        ],
+        "pl": [
+          "Katedra Wileńska",
+          "Bazylika archikatedralna w Wilnie"
+        ],
+        "uk": [
+          "Віленський кафедральний собор"
+        ],
+        "be": [
+          "Віленскі катэдральны сабор"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6856,
+      "lon": 25.2878,
+      "bbox": [
+        54.6846,
+        25.2858,
+        54.6866,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q752783",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-choralin-sinagoga",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus choralinė sinagoga",
+      "aliases": {
+        "lt": [
+          "Choralinė sinagoga"
+        ],
+        "en": [
+          "Choral Synagogue of Vilnius"
+        ],
+        "ru": [
+          "Хоральная синагога"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6772,
+      "lon": 25.2822,
+      "bbox": [
+        54.6762,
+        25.2802,
+        54.6782,
+        25.2842
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2460834",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-savivaldybe",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus miesto savivaldybė",
+      "aliases": {
+        "lt": [
+          "Savivaldybė"
+        ],
+        "en": [
+          "Vilnius City Municipality",
+          "Vilnius City Hall"
+        ],
+        "ru": [
+          "Мэрия Вильнюса"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6889,
+      "lon": 25.2861,
+      "bbox": [
+        54.6879,
+        25.2841,
+        54.6899,
+        25.2881
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilniaus-rotuse",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus rotušė",
+      "aliases": {
+        "lt": [
+          "Vilniaus rotušė"
+        ],
+        "en": [
+          "Vilnius Town Hall"
+        ],
+        "ru": [
+          "Вильнюсская ратуша"
+        ],
+        "pl": [
+          "Ratusz wileński"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6775,
+      "lon": 25.2889,
+      "bbox": [
+        54.6765,
+        25.2869,
+        54.6785,
+        25.2909
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1572747",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilniaus-senamiestis",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus senamiestis",
+      "aliases": {
+        "lt": [
+          "Senamiestis"
+        ],
+        "en": [
+          "Vilnius Old Town"
+        ],
+        "ru": [
+          "Старый город Вильнюса"
+        ],
+        "pl": [
+          "Stare Miasto w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6794,
+      "lon": 25.2881,
+      "bbox": [
+        54.6744,
+        25.2781,
+        54.6844,
+        25.2981
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1427203",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-televizijos-bokstas",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus televizijos bokštas",
+      "aliases": {
+        "lt": [
+          "TV bokštas"
+        ],
+        "en": [
+          "Vilnius TV Tower"
+        ],
+        "ru": [
+          "Вильнюсская телебашня"
+        ],
+        "pl": [
+          "Wieża telewizyjna w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6881,
+      "lon": 25.2139,
+      "bbox": [
+        54.6871,
+        25.2119,
+        54.6891,
+        25.2159
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q639034",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-visu-sventuju-baznycia",
+      "city": "vilnius",
+      "canonicalName": "Visų Šventųjų bažnyčia",
+      "aliases": {
+        "lt": [
+          "Visų Šventųjų bažnyčia"
+        ],
+        "en": [
+          "All Saints Church"
+        ],
+        "pl": [
+          "Kościół Wszystkich Świętych"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6772,
+      "lon": 25.2786,
+      "bbox": [
+        54.6762,
+        25.2766,
+        54.6782,
+        25.2806
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q2390932"
+    },
+    {
+      "id": "vln-vokieciu-gatve",
+      "city": "vilnius",
+      "canonicalName": "Vokiečių gatvė",
+      "aliases": {
+        "lt": [
+          "Vokiečių gatvė"
+        ],
+        "en": [
+          "Vokiečių Street",
+          "German Street"
+        ],
+        "pl": [
+          "Ulica Niemiecka"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6789,
+      "lon": 25.2844,
+      "bbox": [
+        54.6779,
+        25.2824,
+        54.6799,
+        25.2864
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-snipiskes",
+      "city": "vilnius",
+      "canonicalName": "Šnipiškės",
+      "aliases": {
+        "lt": [
+          "Šnipiškės"
+        ],
+        "en": [
+          "Šnipiškės"
+        ],
+        "pl": [
+          "Szuszków"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6969,
+      "lon": 25.2817,
+      "bbox": [
+        54.6919,
+        25.2717,
+        54.7019,
+        25.2917
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q2573951"
+    },
+    {
+      "id": "vln-sv-dvasios",
+      "city": "vilnius",
+      "canonicalName": "Šv. Dvasios cerkvė",
+      "aliases": {
+        "lt": [
+          "Šv. Dvasios cerkvė"
+        ],
+        "en": [
+          "Church of the Holy Spirit"
+        ],
+        "ru": [
+          "Свято-Духов монастырь"
+        ],
+        "pl": [
+          "Cerkiew Świętego Ducha"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6772,
+      "lon": 25.2906,
+      "bbox": [
+        54.6762,
+        25.2886,
+        54.6782,
+        25.2926
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-sv-jonu-baznycia",
+      "city": "vilnius",
+      "canonicalName": "Šv. Jonų bažnyčia",
+      "aliases": {
+        "lt": [
+          "Jonų bažnyčia"
+        ],
+        "en": [
+          "Church of St. Johns"
+        ],
+        "pl": [
+          "Kościół św. Jana Chrzciciela"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6825,
+      "lon": 25.2864,
+      "bbox": [
+        54.6815,
+        25.2844,
+        54.6835,
+        25.2884
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-sv-kazimiero-baznycia",
+      "city": "vilnius",
+      "canonicalName": "Šv. Kazimiero bažnyčia",
+      "aliases": {
+        "lt": [
+          "Šv. Kazimiero bažnyčia"
+        ],
+        "en": [
+          "Church of St. Casimir"
+        ],
+        "ru": [
+          "Костёл Святого Казимира"
+        ],
+        "pl": [
+          "Kościół św. Kazimierza"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6786,
+      "lon": 25.2894,
+      "bbox": [
+        54.6776,
+        25.2874,
+        54.6796,
+        25.2914
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-sv-onos-baznycia",
+      "city": "vilnius",
+      "canonicalName": "Šv. Onos bažnyčia",
+      "aliases": {
+        "lt": [
+          "Onos bažnyčia"
+        ],
+        "en": [
+          "St. Anne's Church"
+        ],
+        "ru": [
+          "Костёл Святой Анны"
+        ],
+        "pl": [
+          "Kościół św. Anny w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6836,
+      "lon": 25.2942,
+      "bbox": [
+        54.6826,
+        25.2922,
+        54.6846,
+        25.2962
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1428099",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-sv-petro-ir-povilo",
+      "city": "vilnius",
+      "canonicalName": "Šv. apaštalų Petro ir Povilo bažnyčia",
+      "aliases": {
+        "lt": [
+          "Petro ir Povilo bažnyčia"
+        ],
+        "en": [
+          "Church of St. Peter and St. Paul"
+        ],
+        "ru": [
+          "Костёл святых Петра и Павла"
+        ],
+        "pl": [
+          "Kościół św. Piotra i Pawła"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6931,
+      "lon": 25.3047,
+      "bbox": [
+        54.6921,
+        25.3027,
+        54.6941,
+        25.3067
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1995745",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-zaliasis-tiltas",
+      "city": "vilnius",
+      "canonicalName": "Žaliasis tiltas",
+      "aliases": {
+        "lt": [
+          "Žaliasis tiltas"
+        ],
+        "en": [
+          "Green Bridge"
+        ],
+        "ru": [
+          "Зелёный мост"
+        ],
+        "pl": [
+          "Zielony Most w Wilnie"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6886,
+      "lon": 25.2833,
+      "bbox": [
+        54.6876,
+        25.2813,
+        54.6896,
+        25.2853
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1778013",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-zverynas",
+      "city": "vilnius",
+      "canonicalName": "Žvėrynas",
+      "aliases": {
+        "lt": [
+          "Žvėrynas"
+        ],
+        "en": [
+          "Žvėrynas"
+        ],
+        "pl": [
+          "Zwierzyniec"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.6917,
+      "lon": 25.2531,
+      "bbox": [
+        54.6867,
+        25.2431,
+        54.6967,
+        25.2631
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-akropolis",
+      "city": "vilnius",
+      "canonicalName": "Akropolis Vilnius",
+      "aliases": {
+        "lt": [
+          "Akropolis"
+        ],
+        "en": [
+          "Akropolis Vilnius"
+        ],
+        "ru": [
+          "Акрополис Вильнюс"
+        ],
+        "pl": [
+          "Akropolis Wilno"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.715,
+      "lon": 25.2403,
+      "bbox": [
+        54.714,
+        25.2383,
+        54.716,
+        25.2423
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1139920",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-europa",
+      "city": "vilnius",
+      "canonicalName": "Europa",
+      "aliases": {
+        "lt": [
+          "Prekybos centras Europa"
+        ],
+        "en": [
+          "Europa Shopping Centre"
+        ],
+        "ru": [
+          "ТЦ Европа"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.6919,
+      "lon": 25.2683,
+      "bbox": [
+        54.6909,
+        25.2663,
+        54.6929,
+        25.2703
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-g9",
+      "city": "vilnius",
+      "canonicalName": "GO9",
+      "aliases": {
+        "lt": [
+          "Prekybos centras GO9",
+          "G9",
+          "Gedimino 9"
+        ],
+        "en": [
+          "GO9 Shopping Centre",
+          "G9 shopping center"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.6869,
+      "lon": 25.2842,
+      "bbox": [
+        54.6859,
+        25.2822,
+        54.6879,
+        25.2862
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q1385330"
+    },
+    {
+      "id": "vln-ozas",
+      "city": "vilnius",
+      "canonicalName": "Ozas",
+      "aliases": {
+        "lt": [
+          "Prekybos centras Ozas"
+        ],
+        "en": [
+          "Ozas Shopping Centre"
+        ],
+        "ru": [
+          "ТЦ Озас"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.7225,
+      "lon": 25.2589,
+      "bbox": [
+        54.7215,
+        25.2569,
+        54.7235,
+        25.2609
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q12670617",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-panorama",
+      "city": "vilnius",
+      "canonicalName": "Panorama",
+      "aliases": {
+        "lt": [
+          "Prekybos centras Panorama"
+        ],
+        "en": [
+          "Panorama Shopping Centre"
+        ],
+        "ru": [
+          "ТЦ Панорама"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.6683,
+      "lon": 25.2633,
+      "bbox": [
+        54.6673,
+        25.2613,
+        54.6693,
+        25.2653
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-energetikos-muziejus",
+      "city": "vilnius",
+      "canonicalName": "Energetikos ir technikos muziejus",
+      "aliases": {
+        "lt": [
+          "ETM"
+        ],
+        "en": [
+          "Energy and Technology Museum"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.69,
+      "lon": 25.2878,
+      "bbox": [
+        54.689,
+        25.2858,
+        54.691,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q5377018"
+    },
+    {
+      "id": "vln-nacionalinis-muziejus",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos nacionalinis muziejus",
+      "aliases": {
+        "lt": [
+          "Nacionalinis muziejus"
+        ],
+        "en": [
+          "National Museum of Lithuania"
+        ],
+        "ru": [
+          "Национальный музей Литвы"
+        ],
+        "pl": [
+          "Muzeum Narodowe Litwy"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6875,
+      "lon": 25.2906,
+      "bbox": [
+        54.6865,
+        25.2886,
+        54.6885,
+        25.2926
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1754258",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-valdovu-rumai",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos valdovų rūmai",
+      "aliases": {
+        "lt": [
+          "Valdovų rūmai"
+        ],
+        "en": [
+          "Palace of the Grand Dukes of Lithuania"
+        ],
+        "ru": [
+          "Дворец великих князей литовских"
+        ],
+        "pl": [
+          "Pałac Wielkich Książąt Litewskich"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6867,
+      "lon": 25.2886,
+      "bbox": [
+        54.6857,
+        25.2866,
+        54.6877,
+        25.2906
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1810831",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-mo-muziejus",
+      "city": "vilnius",
+      "canonicalName": "MO muziejus",
+      "aliases": {
+        "lt": [
+          "MO"
+        ],
+        "en": [
+          "MO Museum"
+        ],
+        "ru": [
+          "Музей МО"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6781,
+      "lon": 25.275,
+      "bbox": [
+        54.6771,
+        25.273,
+        54.6791,
+        25.277
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q48835229",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-ndg",
+      "city": "vilnius",
+      "canonicalName": "Nacionalinė dailės galerija",
+      "aliases": {
+        "lt": [
+          "NDG"
+        ],
+        "en": [
+          "National Gallery of Art",
+          "NDG"
+        ],
+        "ru": [
+          "Национальная художественная галерея"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6983,
+      "lon": 25.28,
+      "bbox": [
+        54.6973,
+        25.278,
+        54.6993,
+        25.282
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1973358",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-okupaciju-muziejus",
+      "city": "vilnius",
+      "canonicalName": "Okupacijų ir laisvės kovų muziejus",
+      "aliases": {
+        "lt": [
+          "KGB muziejus"
+        ],
+        "en": [
+          "Museum of Occupations and Freedom Fights",
+          "KGB Museum"
+        ],
+        "ru": [
+          "Музей оккупаций и борьбы за свободу"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6897,
+      "lon": 25.2706,
+      "bbox": [
+        54.6887,
+        25.2686,
+        54.6907,
+        25.2726
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2337670",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-pinigu-muziejus",
+      "city": "vilnius",
+      "canonicalName": "Pinigų muziejus",
+      "aliases": {
+        "lt": [
+          "Lietuvos banko pinigų muziejus"
+        ],
+        "en": [
+          "Money Museum of the Bank of Lithuania"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6897,
+      "lon": 25.2736,
+      "bbox": [
+        54.6887,
+        25.2716,
+        54.6907,
+        25.2756
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-zydu-muziejus",
+      "city": "vilnius",
+      "canonicalName": "Valstybinis Vilniaus Gaono žydų muziejus",
+      "aliases": {
+        "lt": [
+          "Gaono žydų muziejus"
+        ],
+        "en": [
+          "Vilna Gaon Museum of Jewish History"
+        ],
+        "ru": [
+          "Еврейский музей имени Виленского Гаона"
+        ],
+        "pl": [
+          "Żydowskie Muzeum Państwowe im. Gaona z Wilna"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.6894,
+      "lon": 25.2742,
+      "bbox": [
+        54.6884,
+        25.2722,
+        54.6904,
+        25.2762
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1808744",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-bernardinu-sodas",
+      "city": "vilnius",
+      "canonicalName": "Bernardinų sodas",
+      "aliases": {
+        "lt": [
+          "Bernardinų sodas"
+        ],
+        "en": [
+          "Bernardine Garden"
+        ],
+        "ru": [
+          "Бернардинский сад"
+        ],
+        "pl": [
+          "Ogród Bernardyński"
+        ]
+      },
+      "category": "park",
+      "lat": 54.6847,
+      "lon": 25.2961,
+      "bbox": [
+        54.6827,
+        25.2931,
+        54.6867,
+        25.2991
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1857928",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-kalnu-parkas",
+      "city": "vilnius",
+      "canonicalName": "Kalnų parkas",
+      "aliases": {
+        "lt": [
+          "Kalnų parkas"
+        ],
+        "en": [
+          "Kalnai Park"
+        ],
+        "ru": [
+          "Парк Калну"
+        ]
+      },
+      "category": "park",
+      "lat": 54.6881,
+      "lon": 25.2964,
+      "bbox": [
+        54.6861,
+        25.2934,
+        54.6901,
+        25.2994
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-sereikiskiu-parkas",
+      "city": "vilnius",
+      "canonicalName": "Sereikiškių parkas",
+      "aliases": {
+        "lt": [
+          "Sereikiškės"
+        ],
+        "en": [
+          "Sereikiškės Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.6839,
+      "lon": 25.2942,
+      "bbox": [
+        54.6819,
+        25.2912,
+        54.6859,
+        25.2972
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-verkiu-parkas",
+      "city": "vilnius",
+      "canonicalName": "Verkių regioninis parkas",
+      "aliases": {
+        "lt": [
+          "Verkių parkas"
+        ],
+        "en": [
+          "Verkiai Regional Park"
+        ],
+        "pl": [
+          "Werki"
+        ]
+      },
+      "category": "park",
+      "lat": 54.7383,
+      "lon": 25.2906,
+      "bbox": [
+        54.7333,
+        25.2806,
+        54.7433,
+        25.3006
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-botanikos-sodas",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus universiteto Botanikos sodas",
+      "aliases": {
+        "lt": [
+          "VU Botanikos sodas",
+          "Kairėnų botanikos sodas"
+        ],
+        "en": [
+          "Vilnius University Botanical Garden"
+        ]
+      },
+      "category": "park",
+      "lat": 54.7322,
+      "lon": 25.3911,
+      "bbox": [
+        54.7302,
+        25.3881,
+        54.7342,
+        25.3941
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q6016145",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vingio-parkas",
+      "city": "vilnius",
+      "canonicalName": "Vingio parkas",
+      "aliases": {
+        "lt": [
+          "Vingio parkas"
+        ],
+        "en": [
+          "Vingis Park"
+        ],
+        "ru": [
+          "Вингис-парк"
+        ],
+        "pl": [
+          "Park Zakret"
+        ]
+      },
+      "category": "park",
+      "lat": 54.6858,
+      "lon": 25.2361,
+      "bbox": [
+        54.6808,
+        25.2261,
+        54.6908,
+        25.2461
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1858023",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-katedros-aikste",
+      "city": "vilnius",
+      "canonicalName": "Katedros aikštė",
+      "aliases": {
+        "lt": [
+          "Katedros aikštė"
+        ],
+        "en": [
+          "Cathedral Square"
+        ],
+        "ru": [
+          "Кафедральная площадь"
+        ],
+        "pl": [
+          "Plac Katedralny w Wilnie"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6858,
+      "lon": 25.2875,
+      "bbox": [
+        54.6848,
+        25.2855,
+        54.6868,
+        25.2895
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1753572",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-kennedy-plaza",
+      "city": "vilnius",
+      "canonicalName": "Laisvės aikštė",
+      "aliases": {
+        "lt": [
+          "Laisvės aikštė"
+        ],
+        "en": [
+          "Liberty Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.7069,
+      "lon": 25.2822,
+      "bbox": [
+        54.7059,
+        25.2802,
+        54.7079,
+        25.2842
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-lukiskiu-aikste",
+      "city": "vilnius",
+      "canonicalName": "Lukiškių aikštė",
+      "aliases": {
+        "lt": [
+          "Lukiškių aikštė"
+        ],
+        "en": [
+          "Lukiškės Square"
+        ],
+        "ru": [
+          "Лукишская площадь"
+        ],
+        "pl": [
+          "Plac Łukiski"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6897,
+      "lon": 25.2686,
+      "bbox": [
+        54.6887,
+        25.2666,
+        54.6907,
+        25.2706
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1878559",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-rotuses-aikste",
+      "city": "vilnius",
+      "canonicalName": "Rotušės aikštė",
+      "aliases": {
+        "lt": [
+          "Rotušės aikštė Vilniuje"
+        ],
+        "en": [
+          "Town Hall Square"
+        ],
+        "ru": [
+          "Ратушная площадь"
+        ],
+        "pl": [
+          "Plac Ratuszowy"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6772,
+      "lon": 25.2889,
+      "bbox": [
+        54.6762,
+        25.2869,
+        54.6782,
+        25.2909
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11777167",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-stotis-aikste",
+      "city": "vilnius",
+      "canonicalName": "Stoties aikštė",
+      "aliases": {
+        "lt": [
+          "Stoties aikštė"
+        ],
+        "en": [
+          "Station Square"
+        ],
+        "ru": [
+          "Привокзальная площадь"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6714,
+      "lon": 25.2817,
+      "bbox": [
+        54.6704,
+        25.2797,
+        54.6724,
+        25.2837
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vinco-kudirkos-aikste",
+      "city": "vilnius",
+      "canonicalName": "Vinco Kudirkos aikštė",
+      "aliases": {
+        "lt": [
+          "Kudirkos aikštė"
+        ],
+        "en": [
+          "Vincas Kudirka Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6853,
+      "lon": 25.2817,
+      "bbox": [
+        54.6843,
+        25.2797,
+        54.6863,
+        25.2837
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vokieciu-aikste",
+      "city": "vilnius",
+      "canonicalName": "Vokiečių aikštė",
+      "aliases": {
+        "lt": [
+          "Vokiečių aikštė"
+        ],
+        "en": [
+          "Vokiečių Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.6786,
+      "lon": 25.2844,
+      "bbox": [
+        54.6776,
+        25.2824,
+        54.6796,
+        25.2864
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-lfb-stadionas",
+      "city": "vilnius",
+      "canonicalName": "LFF stadionas",
+      "aliases": {
+        "lt": [
+          "LFF stadionas"
+        ],
+        "en": [
+          "LFF Stadium"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.7167,
+      "lon": 25.2494,
+      "bbox": [
+        54.7157,
+        25.2474,
+        54.7177,
+        25.2514
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1809974",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilnius-arena",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus sporto rūmai",
+      "aliases": {
+        "lt": [
+          "Sporto rūmai"
+        ],
+        "en": [
+          "Vilnius Sports Palace"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.6861,
+      "lon": 25.2983,
+      "bbox": [
+        54.6851,
+        25.2963,
+        54.6871,
+        25.3003
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q7931195"
+    },
+    {
+      "id": "vln-nacionalinis-dramos",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos nacionalinis dramos teatras",
+      "aliases": {
+        "lt": [
+          "LNDT",
+          "Nacionalinis dramos teatras"
+        ],
+        "en": [
+          "Lithuanian National Drama Theatre"
+        ],
+        "ru": [
+          "Литовский национальный драматический театр"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.6867,
+      "lon": 25.2822,
+      "bbox": [
+        54.6857,
+        25.2802,
+        54.6877,
+        25.2842
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q10354648",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-opera-ir-baletas",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos nacionalinis operos ir baleto teatras",
+      "aliases": {
+        "lt": [
+          "LNOBT",
+          "Operos ir baleto teatras"
+        ],
+        "en": [
+          "Lithuanian National Opera and Ballet Theatre"
+        ],
+        "ru": [
+          "Литовский национальный театр оперы и балета"
+        ],
+        "pl": [
+          "Litewski Narodowy Teatr Opery i Baletu"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.69,
+      "lon": 25.2819,
+      "bbox": [
+        54.689,
+        25.2799,
+        54.691,
+        25.2839
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1817307",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-jaunimo-teatras",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus senasis teatras",
+      "aliases": {
+        "lt": [
+          "Rusų dramos teatras",
+          "Senasis teatras",
+          "Lietuvos rusų dramos teatras"
+        ],
+        "en": [
+          "Old Theatre of Vilnius"
+        ],
+        "ru": [
+          "Русский драматический театр Литвы"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.681,
+      "lon": 25.2734,
+      "bbox": [
+        54.678,
+        25.2704,
+        54.6882,
+        25.2817
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-lele-teatras",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus teatras Lėlė",
+      "aliases": {
+        "lt": [
+          "Teatras Lėlė"
+        ],
+        "en": [
+          "Vilnius Puppet Theatre Lėlė"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.6828,
+      "lon": 25.2878,
+      "bbox": [
+        54.6818,
+        25.2858,
+        54.6838,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q20503755"
+    },
+    {
+      "id": "vln-kirtimu-stotis",
+      "city": "vilnius",
+      "canonicalName": "Kirtimų geležinkelio stotis",
+      "aliases": {
+        "lt": [
+          "Kirtimai"
+        ],
+        "en": [
+          "Kirtimai railway station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.6331,
+      "lon": 25.2738,
+      "bbox": [
+        54.6301,
+        25.2436,
+        54.641,
+        25.2768
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "vln-naujoji-vilnia-stotis",
+      "city": "vilnius",
+      "canonicalName": "Naujosios Vilnios geležinkelio stotis",
+      "aliases": {
+        "lt": [
+          "Naujoji Vilnia"
+        ],
+        "en": [
+          "Naujoji Vilnia railway station"
+        ],
+        "ru": [
+          "Новая Вильня"
+        ],
+        "pl": [
+          "Nowa Wilejka"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.6922,
+      "lon": 25.4117,
+      "bbox": [
+        54.6912,
+        25.4097,
+        54.6932,
+        25.4137
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-paneriu-stotis",
+      "city": "vilnius",
+      "canonicalName": "Panerių geležinkelio stotis",
+      "aliases": {
+        "lt": [
+          "Paneriai"
+        ],
+        "en": [
+          "Paneriai railway station"
+        ],
+        "ru": [
+          "Панеряй"
+        ],
+        "pl": [
+          "Ponary"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.6331,
+      "lon": 25.1781,
+      "bbox": [
+        54.6321,
+        25.1761,
+        54.6341,
+        25.1801
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q15682274"
+    },
+    {
+      "id": "vln-gelezinkelio-stotis",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus geležinkelio stotis",
+      "aliases": {
+        "lt": [
+          "Vilnius centrinė stotis",
+          "Geležinkelio stotis"
+        ],
+        "en": [
+          "Vilnius railway station",
+          "Vilnius Central Station"
+        ],
+        "ru": [
+          "Вильнюс центральный",
+          "Железнодорожный вокзал Вильнюс"
+        ],
+        "pl": [
+          "Dworzec Kolejowy Wilno"
+        ],
+        "uk": [
+          "Вільнюс-центральний"
+        ],
+        "be": [
+          "Вільня-Пасажырская"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.6704,
+      "lon": 25.2822,
+      "bbox": [
+        54.6694,
+        25.2802,
+        54.6714,
+        25.2842
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q803619",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vilniaus-oro-uostas-stotis",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus oro uosto geležinkelio stotis",
+      "aliases": {
+        "lt": [
+          "Oro uosto stotis"
+        ],
+        "en": [
+          "Vilnius Airport railway station"
+        ],
+        "ru": [
+          "Станция Вильнюс-аэропорт"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.6372,
+      "lon": 25.2897,
+      "bbox": [
+        54.6362,
+        25.2877,
+        54.6382,
+        25.2917
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-eheu",
+      "city": "vilnius",
+      "canonicalName": "Europos humanitarinis universitetas",
+      "aliases": {
+        "lt": [
+          "EHU"
+        ],
+        "en": [
+          "European Humanities University",
+          "EHU"
+        ],
+        "ru": [
+          "Европейский гуманитарный университет"
+        ],
+        "be": [
+          "Еўрапейскі гуманітарны ўніверсітэт"
+        ]
+      },
+      "category": "university",
+      "lat": 54.6864,
+      "lon": 25.2842,
+      "bbox": [
+        54.6854,
+        25.2822,
+        54.6874,
+        25.2862
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1156635",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-ism",
+      "city": "vilnius",
+      "canonicalName": "ISM Vadybos ir ekonomikos universitetas",
+      "aliases": {
+        "lt": [
+          "ISM"
+        ],
+        "en": [
+          "ISM University of Management and Economics"
+        ]
+      },
+      "category": "university",
+      "lat": 54.6864,
+      "lon": 25.2814,
+      "bbox": [
+        54.6854,
+        25.2794,
+        54.6874,
+        25.2834
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q1626754"
+    },
+    {
+      "id": "vln-lmta",
+      "city": "vilnius",
+      "canonicalName": "Lietuvos muzikos ir teatro akademija",
+      "aliases": {
+        "lt": [
+          "LMTA"
+        ],
+        "en": [
+          "Lithuanian Academy of Music and Theatre",
+          "LMTA"
+        ],
+        "ru": [
+          "Литовская академия музыки и театра"
+        ]
+      },
+      "category": "university",
+      "lat": 54.6828,
+      "lon": 25.2742,
+      "bbox": [
+        54.6818,
+        25.2722,
+        54.6838,
+        25.2762
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1824170",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-mruni",
+      "city": "vilnius",
+      "canonicalName": "Mykolo Romerio universitetas",
+      "aliases": {
+        "lt": [
+          "MRU"
+        ],
+        "en": [
+          "Mykolas Romeris University",
+          "MRU"
+        ],
+        "ru": [
+          "Университет Миколаса Ромериса"
+        ],
+        "pl": [
+          "Uniwersytet im. Mykolasa Romerisa"
+        ]
+      },
+      "category": "university",
+      "lat": 54.7217,
+      "lon": 25.2361,
+      "bbox": [
+        54.7207,
+        25.2341,
+        54.7227,
+        25.2381
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q633685",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vda",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus dailės akademija",
+      "aliases": {
+        "lt": [
+          "VDA"
+        ],
+        "en": [
+          "Vilnius Academy of Arts",
+          "VDA"
+        ],
+        "ru": [
+          "Вильнюсская академия художеств"
+        ],
+        "pl": [
+          "Wileńska Akademia Sztuk Pięknych"
+        ]
+      },
+      "category": "university",
+      "lat": 54.6822,
+      "lon": 25.2867,
+      "bbox": [
+        54.6812,
+        25.2847,
+        54.6832,
+        25.2887
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q636488",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vu",
+      "city": "vilnius",
+      "canonicalName": "Vilniaus universitetas",
+      "aliases": {
+        "lt": [
+          "VU"
+        ],
+        "en": [
+          "Vilnius University",
+          "VU"
+        ],
+        "ru": [
+          "Вильнюсский университет"
+        ],
+        "pl": [
+          "Uniwersytet Wileński"
+        ],
+        "uk": [
+          "Вільнюський університет"
+        ],
+        "be": [
+          "Віленскі ўніверсітэт"
+        ]
+      },
+      "category": "university",
+      "lat": 54.6831,
+      "lon": 25.2878,
+      "bbox": [
+        54.6821,
+        25.2858,
+        54.6841,
+        25.2898
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q219563",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "vln-vgtu",
+      "city": "vilnius",
+      "canonicalName": "Vilnius Tech",
+      "aliases": {
+        "lt": [
+          "Vilniaus Gedimino technikos universitetas",
+          "VGTU"
+        ],
+        "en": [
+          "Vilnius Gediminas Technical University",
+          "Vilnius Tech",
+          "VGTU"
+        ],
+        "ru": [
+          "Вильнюсский технический университет имени Гедиминаса"
+        ],
+        "pl": [
+          "Uniwersytet Techniczny im. Giedymina"
+        ]
+      },
+      "category": "university",
+      "lat": 54.7211,
+      "lon": 25.3331,
+      "bbox": [
+        54.7191,
+        25.3301,
+        54.7231,
+        25.3361
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q636418",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    }
+  ]
+}

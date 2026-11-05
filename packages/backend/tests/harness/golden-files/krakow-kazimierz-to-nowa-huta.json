@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.0510, "lon": 19.9460 },
+    "to": { "lat": 50.0725, "lon": 20.0375 },
+    "description": "kazimierz-to-nowa-huta: Historic Jewish quarter to eastern industrial district via tram"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["TRAM", "BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

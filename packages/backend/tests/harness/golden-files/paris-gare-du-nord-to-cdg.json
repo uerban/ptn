@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "paris",
+    "from": { "lat": 48.8809, "lon": 2.3553 },
+    "to": { "lat": 49.0097, "lon": 2.5479 },
+    "description": "gare-du-nord-to-cdg: Gare du Nord to CDG Airport via RER B (~35 min)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

@@ -1,0 +1,69 @@
+{
+  "data": [
+    {
+      "routeId": "r1",
+      "routeShortName": "1",
+      "routeColor": "0073AC",
+      "mode": "BUS",
+      "subMode": "BUS",
+      "headsign": "Fabijoniškės",
+      "scheduledTime": "PLACEHOLDER_DUE",
+      "predictedTime": "PLACEHOLDER_DUE",
+      "delaySeconds": 0,
+      "tripId": "t1",
+      "cancelled": false
+    },
+    {
+      "routeId": "r1",
+      "routeShortName": "1",
+      "routeColor": "0073AC",
+      "mode": "BUS",
+      "subMode": "BUS",
+      "headsign": "Fabijoniškės",
+      "scheduledTime": "PLACEHOLDER_10MIN",
+      "predictedTime": null,
+      "delaySeconds": 0,
+      "tripId": "t2",
+      "cancelled": false
+    },
+    {
+      "routeId": "r2",
+      "routeShortName": "2",
+      "routeColor": "DC143C",
+      "mode": "BUS",
+      "subMode": "BUS",
+      "headsign": "Centras",
+      "scheduledTime": "PLACEHOLDER_5MIN",
+      "predictedTime": "PLACEHOLDER_8MIN",
+      "delaySeconds": 180,
+      "tripId": "t3",
+      "cancelled": false
+    },
+    {
+      "routeId": "r3",
+      "routeShortName": "3G",
+      "routeColor": "008000",
+      "mode": "BUS",
+      "subMode": "BUS",
+      "headsign": "Pilaitė",
+      "scheduledTime": "PLACEHOLDER_15MIN",
+      "predictedTime": null,
+      "delaySeconds": 0,
+      "tripId": "t4",
+      "cancelled": true
+    },
+    {
+      "routeId": "r2",
+      "routeShortName": "2",
+      "routeColor": "DC143C",
+      "mode": "BUS",
+      "subMode": "BUS",
+      "headsign": "Centras",
+      "scheduledTime": "PLACEHOLDER_25MIN",
+      "predictedTime": null,
+      "delaySeconds": 0,
+      "tripId": "t5",
+      "cancelled": false
+    }
+  ]
+}

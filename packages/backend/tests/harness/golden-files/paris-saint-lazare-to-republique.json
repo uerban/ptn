@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "paris",
+    "from": { "lat": 48.8762, "lon": 2.3250 },
+    "to": { "lat": 48.8675, "lon": 2.3637 },
+    "description": "saint-lazare-to-republique: Central metro ride Saint-Lazare to Republique"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["METRO", "BUS"],
+  "maxLatencyMs": 3000
+}

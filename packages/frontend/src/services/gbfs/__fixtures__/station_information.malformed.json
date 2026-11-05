@@ -1,0 +1,53 @@
+{
+  "last_updated": 1784314672,
+  "ttl": 300,
+  "version": "2.3",
+  "data": {
+    "stations": [
+      {
+        "station_id": "1",
+        "name": "ARKIKATEDRA",
+        "lat": 54.685908,
+        "lon": 25.2856,
+        "address": "Šventaragio g.",
+        "capacity": 21
+      },
+      {
+        "name": "MISSING STATION ID",
+        "lat": 54.684471,
+        "lon": 25.28937,
+        "address": "Pilies g. – Radvilaitės g. sankryža",
+        "capacity": 21
+      },
+      {
+        "station_id": "3",
+        "name": "MISSING LAT",
+        "lon": 25.288465,
+        "address": "Pilies g. – Bokšto g. sankryža",
+        "capacity": 18
+      },
+      {
+        "station_id": "4",
+        "name": "LAT WRONG TYPE",
+        "lat": "54.677889",
+        "lon": 25.287452,
+        "address": "Didžioji g.",
+        "capacity": 12
+      },
+      {
+        "station_id": 5,
+        "name": "STATION ID WRONG TYPE",
+        "lat": 54.676227,
+        "lon": 25.288612,
+        "address": "Didžioji g. – Subačiaus g. sankryža",
+        "capacity": 12
+      },
+      {
+        "station_id": "6",
+        "name": "VALID MINIMAL",
+        "lat": 54.678412,
+        "lon": 25.28214
+      }
+    ]
+  }
+}

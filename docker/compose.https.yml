@@ -1,0 +1,10 @@
+# Add to compose.yml for a public DNS name. The inherited localhost port
+# stays bound to loopback; Caddy listens on 80/443 for this site.
+services:
+  web:
+    environment:
+      PTN_SITE: ${PTN_DOMAIN:?Set PTN_DOMAIN to your public DNS name}
+    ports:
+      - "${PTN_PUBLIC_HTTP_PORT:-80}:80"
+      - "${PTN_HTTPS_PORT:-443}:443"
+      - "${PTN_HTTPS_PORT:-443}:443/udp"

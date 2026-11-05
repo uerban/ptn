@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "vilnius",
+    "from": { "lat": 54.7099, "lon": 25.2520 },
+    "to": { "lat": 54.6776, "lon": 25.2126 },
+    "description": "suburb-to-suburb-ns: Šeškinė (northwest) to Lazdynai (southwest)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

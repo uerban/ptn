@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "paris",
+    "from": { "lat": 48.8713, "lon": 2.3317 },
+    "to": { "lat": 48.8612, "lon": 2.3470 },
+    "description": "opera-to-chatelet: Short center trip Opera to Chatelet via Metro 7 (~5 min)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["METRO", "WALK"],
+  "maxLatencyMs": 3000
+}

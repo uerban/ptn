@@ -1,0 +1,23 @@
+{
+  "modes": [
+    { "id": "BUS", "label": "Bus (blue)", "parentMode": "BUS", "color": "#0073AC", "routeCount": 10, "sampleRoutes": ["1", "2", "3"] },
+    { "id": "TRAM", "label": "Tram (green)", "parentMode": "TRAM", "color": "#16a34a", "routeCount": 5, "sampleRoutes": ["T1", "T2"] }
+  ],
+  "palettes": {
+    "light": {
+      "universal": { "BUS": "#2B7AB5", "TRAM": "#5BAA55" },
+      "deuteranopia": { "BUS": "#3366CC", "TRAM": "#CC8833" },
+      "protanopia": { "BUS": "#2255BB", "TRAM": "#BB9944" },
+      "tritanopia": { "BUS": "#0073AC", "TRAM": "#AC3355" },
+      "highContrast": { "BUS": "#0055FF", "TRAM": "#FF8800" }
+    },
+    "dark": {
+      "universal": { "BUS": "#5BA8D9", "TRAM": "#8BD98B" },
+      "deuteranopia": { "BUS": "#66AAFF", "TRAM": "#FFBB66" },
+      "protanopia": { "BUS": "#5599DD", "TRAM": "#DDBB77" },
+      "tritanopia": { "BUS": "#33AADD", "TRAM": "#DD6688" },
+      "highContrast": { "BUS": "#55AAFF", "TRAM": "#FFAA44" }
+    }
+  },
+  "universalLimited": false
+}

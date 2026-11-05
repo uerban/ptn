@@ -1,0 +1,5 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence
+tŠ-1,00:01:57,00:02:00,Aa,1
+tŠ-1,00:04:00,00:04:00,Žz,300
+tŠ-2,00:12:00,00:12:00,Aa,1
+tŠ-2,00:14:00,00:14:00,Žz,300

@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "paris",
+    "from": { "lat": 48.8809, "lon": 2.3553 },
+    "to": { "lat": 48.8443, "lon": 2.3735 },
+    "description": "gare-du-nord-to-gare-de-lyon: Station to station via Metro 4+5 or RER D"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["METRO", "RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

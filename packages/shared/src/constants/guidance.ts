@@ -1,0 +1,8 @@
+export const WAYPOINT_REACHED_RADIUS_M = 30;
+export const LEG_ARRIVAL_RADIUS_M = 50;
+export const VEHICLE_SPEED_THRESHOLD_MS = 4.2;
+export const PEDESTRIAN_SPEED_THRESHOLD_MS = 2.0;
+export const STOP_CONTEXT_WINDOW_MS = 10 * 60 * 1000;
+export const MAX_RIDER_CANDIDATES = 3;
+export const TRANSFER_BADGE_THRESHOLD_S = 15 * 60;
+export const AUTO_FOLLOW_PADDING_PX = 60;

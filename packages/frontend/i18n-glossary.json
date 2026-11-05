@@ -1,0 +1,2340 @@
+{
+  "$comment": [
+    "PTN translation dictionary — the terms every locale must render the same way.",
+    "Modelled on the Ubuntu Belarusian Translators' dictionary:",
+    "https://wiki.ubuntu.com/UbuntuBelarusianTranslators/Dictionary",
+    "",
+    "Two consumers, one source of truth:",
+    "  * scripts/i18n-deepl.mjs uploads `term` to DeepL as a glossary, so a machine",
+    "    translation lands on the house word instead of a synonym of the day.",
+    "  * scripts/check-i18n-glossary.mjs greps every locale string whose English",
+    "    source contains one of `match` for that locale's `stem`, and reports the",
+    "    ones that drifted.",
+    "",
+    "`stem` is the inflection-proof prefix the checker looks for, not a word:",
+    "Slavic and Finnic cases mean the surface form in a string rarely equals the",
+    "dictionary form. A stem may be a list when a locale has two legitimate roots.",
+    "`status`: confirmed = the word a human translator already used in this repo;",
+    "proposed = written for a language PTN has no native reviewer for yet — a",
+    "reviewer changes it here, then reruns the two scripts above.",
+    "`enforce`: glossary = uploaded to DeepL so the engine must use this word;",
+    "check = verified after translation only. Forcing a heavily inflected noun",
+    "through a glossary makes DeepL paste the dictionary form into a slot that",
+    "needed a different case (Latvian produced the non-word \"atiejošajiem\" that",
+    "way), so prose nouns are checked, and only labels and words the engine gets",
+    "outright wrong are forced.",
+    "`exceptions` lists keys where the English word appears in some other sense.",
+    "DeepL supports a glossary for every locale here except be (Belarusian), where",
+    "the dictionary is enforced by the checker alone.",
+    "",
+    "`doNotTranslate` is uploaded to DeepL verbatim. Most entries are proper",
+    "nouns; \"LIVE\" is there for layout, not language. It is a fixed-width mono",
+    "all-caps marker sharing a row with a truncated stop name, so every locale",
+    "renders the same four characters and the badge keeps a known size. The",
+    "title-case prose around it (route.live_prefix, route.may_miss) is still",
+    "translated normally — only the badge label is pinned."
+  ],
+  "doNotTranslate": [
+    "PTN",
+    "transitous",
+    "OpenStreetMap",
+    "ODbL",
+    "GTFS",
+    "MapLibre",
+    "OSRM",
+    "RAPTOR",
+    "CO₂",
+    "LIVE"
+  ],
+  "terms": {
+    "stop": {
+      "note": "A transit stop — the place a vehicle calls at. Never the verb 'to stop', never 'station'.",
+      "match": [
+        "stop",
+        "stops"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "alarm.next_stop",
+        "alarm.your_stop",
+        "notif.getoff_alert",
+        "notif.getoff_alert_body",
+        "guidance.stop_navigation",
+        "settings.offline_prep_stop"
+      ],
+      "locales": {
+        "lt": {
+          "term": "stotelė",
+          "stem": "stotel",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "przystanek",
+          "stem": "przystan",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "прыпынак",
+          "stem": "прыпын",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "остановка",
+          "stem": "останов",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "зупинка",
+          "stem": "зупин",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "pietura",
+          "stem": "pietur",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "peatus",
+          "stem": "peatus",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "hållplats",
+          "stem": "hållplats",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "holdeplass",
+          "stem": "holdeplass",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "pysäkki",
+          "stem": "pysäk",
+          "status": "proposed"
+        }
+      }
+    },
+    "departure": {
+      "note": "A scheduled departure from a stop, the noun the whole departures board is built on.",
+      "match": [
+        "departure",
+        "departures",
+        "departing"
+      ],
+      "enforce": "glossary",
+      "exceptions": [
+        "route.leading_wait_banner",
+        "settings.run_to_catch_desc"
+      ],
+      "locales": {
+        "lt": {
+          "term": "išvykimas",
+          "stem": "išvyk",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "odjazd",
+          "stem": [
+            "odjazd",
+            "odjeżdż"
+          ],
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "адпраўленне",
+          "stem": [
+            "адпраўлен",
+            "адпраўля"
+          ],
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "отправление",
+          "stem": [
+            "отправлен",
+            "отправля"
+          ],
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "відправлення",
+          "stem": [
+            "відправлен",
+            "відправля"
+          ],
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "atiešana",
+          "stem": [
+            "atieš",
+            "atiet",
+            "izbrauk"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "väljumine",
+          "stem": [
+            "väljumi",
+            "välju"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "avgång",
+          "stem": [
+            "avgång",
+            "avgår"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "avgang",
+          "stem": [
+            "avgang",
+            "avgår"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "lähtö",
+          "stem": [
+            "läht",
+            "lähd"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "transfer": {
+      "note": "Changing from one vehicle to another mid-trip. Not a file transfer, not a money transfer.",
+      "match": [
+        "transfer",
+        "transfers"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "persėdimas",
+          "stem": "persėd",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "przesiadka",
+          "stem": "przesiad",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "перасадка",
+          "stem": "перасад",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "пересадка",
+          "stem": "пересад",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "пересадка",
+          "stem": "пересад",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "pārsēšanās",
+          "stem": "pārsēš",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "ümberistumine",
+          "stem": "ümberistu",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "byte",
+          "stem": [
+            "byte",
+            "byten"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "bytte",
+          "stem": "bytte",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "vaihto",
+          "stem": "vaiht",
+          "status": "proposed"
+        }
+      }
+    },
+    "route": {
+      "note": "A computed itinerary shown to the user. The drawn transit line is 'line', not 'route'.",
+      "match": [
+        "route",
+        "routes"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "maršrutas",
+          "stem": "maršrut",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "trasa",
+          "stem": "tras",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "маршрут",
+          "stem": "маршрут",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "маршрут",
+          "stem": "маршрут",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "маршрут",
+          "stem": "маршрут",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "maršruts",
+          "stem": "maršrut",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "marsruut",
+          "stem": "marsruu",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "rutt",
+          "stem": "rutt",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "rute",
+          "stem": "rute",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "reitti",
+          "stem": [
+            "reit",
+            "reiti"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "trip": {
+      "note": "The user's journey end to end, across every leg. GTFS's own `trip` (one run of a service) is a different word in Slavic transit usage — рейс / рэйс — and the rt.* warnings and the trip sheet's status lines (trip.cancelled / removed / finished) use that sense.",
+      "match": [
+        "trip",
+        "trips"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "rt.cancelled_warning",
+        "rt.timing_unreliable_warning",
+        "settings.routing_source",
+        "trip.cancelled",
+        "trip.removed",
+        "trip.finished"
+      ],
+      "locales": {
+        "lt": {
+          "term": "kelionė",
+          "stem": "kelion",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "podróż",
+          "stem": "podróż",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "паездка",
+          "stem": "паезд",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "поездка",
+          "stem": "поезд",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "поїздка",
+          "stem": "поїзд",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "brauciens",
+          "stem": [
+            "brauc",
+            "ceļojum"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "reis",
+          "stem": "reis",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "resa",
+          "stem": [
+            "res"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "reise",
+          "stem": [
+            "reis",
+            "tur"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "matka",
+          "stem": [
+            "matk",
+            "reissu"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "walk": {
+      "note": "Travelling on foot as a leg of a trip.",
+      "match": [
+        "walk",
+        "walking"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "guidance.walk_direction",
+        "settings.walk_speed_wheelchair_hint"
+      ],
+      "locales": {
+        "lt": {
+          "term": "pėsčiomis",
+          "stem": [
+            "pėsč",
+            "ėjim",
+            "eiti"
+          ],
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "pieszo",
+          "stem": [
+            "piesz",
+            "chod",
+            "marsz"
+          ],
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "пешшу",
+          "stem": [
+            "пеш",
+            "хад",
+            "ход"
+          ],
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "пешком",
+          "stem": [
+            "пешк",
+            "ходьб"
+          ],
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "пішки",
+          "stem": [
+            "піш",
+            "ходьб"
+          ],
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "kājām",
+          "stem": [
+            "kāj",
+            "gājien",
+            "iet",
+            "ej"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "jalgsi",
+          "stem": [
+            "jalgsi",
+            "jaluta",
+            "kõndi",
+            "käik"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "gång",
+          "stem": [
+            "gång",
+            "gå",
+            "promenad"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "gange",
+          "stem": [
+            "gang",
+            "gå"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "kävely",
+          "stem": "kävel",
+          "status": "proposed"
+        }
+      }
+    },
+    "schedule": {
+      "note": "The timetable a city publishes. 'Schedule view' is the map-free departures screen.",
+      "match": [
+        "schedule",
+        "schedules",
+        "timetable"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "tvarkaraštis",
+          "stem": "tvarkaraš",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "rozkład",
+          "stem": "rozkład",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "расклад",
+          "stem": "расклад",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "расписание",
+          "stem": "расписан",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "розклад",
+          "stem": "розклад",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "saraksts",
+          "stem": "saraks",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "sõiduplaan",
+          "stem": "sõiduplaan",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "tidtabell",
+          "stem": "tidtabell",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "rutetabell",
+          "stem": "rutetabell",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "aikataulu",
+          "stem": "aikataul",
+          "status": "proposed"
+        }
+      }
+    },
+    "platform": {
+      "note": "A numbered boarding position inside a stop group.",
+      "match": [
+        "platform",
+        "platforms"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "platforma",
+          "stem": "platform",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "peron",
+          "stem": "peron",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "платформа",
+          "stem": "платформ",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "платформа",
+          "stem": "платформ",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "платформа",
+          "stem": "платформ",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "perons",
+          "stem": [
+            "peron",
+            "platform"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "platvorm",
+          "stem": "platvorm",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "plattform",
+          "stem": "plattform",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "plattform",
+          "stem": "plattform",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "laituri",
+          "stem": "laitur",
+          "status": "proposed"
+        }
+      }
+    },
+    "line": {
+      "note": "A transit line (bus 10, tram 3). Never a line of text — that is 'row'.",
+      "match": [
+        "line",
+        "lines"
+      ],
+      "enforce": "glossary",
+      "exceptions": [
+        "settings.max_popup_lines"
+      ],
+      "locales": {
+        "lt": {
+          "term": "linija",
+          "stem": "linij",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "linia",
+          "stem": "lini",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "лінія",
+          "stem": "лін",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "линия",
+          "stem": "лин",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "лінія",
+          "stem": "лін",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "līnija",
+          "stem": "līnij",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "liin",
+          "stem": "liin",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "linje",
+          "stem": "linje",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "linje",
+          "stem": "linje",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "linja",
+          "stem": "linj",
+          "status": "proposed"
+        }
+      }
+    },
+    "map": {
+      "note": "The map view.",
+      "match": [
+        "map",
+        "maps"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "settings.osm_attribution"
+      ],
+      "locales": {
+        "lt": {
+          "term": "žemėlapis",
+          "stem": "žemėlap",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "mapa",
+          "stem": "map",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "мапа",
+          "stem": "мап",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "карта",
+          "stem": "карт",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "карта",
+          "stem": "карт",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "karte",
+          "stem": "kart",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "kaart",
+          "stem": "kaar",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "karta",
+          "stem": "kart",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "kart",
+          "stem": "kart",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "kartta",
+          "stem": "kart",
+          "status": "proposed"
+        }
+      }
+    },
+    "settings": {
+      "note": "The settings screen and the word on its tab.",
+      "match": [
+        "settings"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "nustatymai",
+          "stem": "nustatym",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "ustawienia",
+          "stem": "ustawie",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "налады",
+          "stem": "налад",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "настройки",
+          "stem": "настрой",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "налаштування",
+          "stem": "налаштув",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "iestatījumi",
+          "stem": "iestatījum",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "seaded",
+          "stem": "seade",
+          "status": "proposed",
+          "note": "Estonian 'seaded' (settings) and 'seade' (device) share a stem, so the checker cannot tell them apart here — it is the common Android wording and worth the blind spot."
+        },
+        "sv": {
+          "term": "inställningar",
+          "stem": "inställning",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "innstillinger",
+          "stem": "innstilling",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "asetukset",
+          "stem": "asetu",
+          "status": "proposed"
+        }
+      }
+    },
+    "delay": {
+      "note": "A vehicle running late against its schedule.",
+      "match": [
+        "delay",
+        "delays",
+        "delayed"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "vėlavimas",
+          "stem": "vėlav",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "opóźnienie",
+          "stem": "opóźni",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "спазненне",
+          "stem": "спазн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "опоздание",
+          "stem": "опоздан",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "затримка",
+          "stem": "затрим",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "kavēšanās",
+          "stem": "kavē",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "hilinemine",
+          "stem": "hiline",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "försening",
+          "stem": "försen",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "forsinkelse",
+          "stem": "forsink",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "viivästys",
+          "stem": [
+            "viivästy",
+            "viive",
+            "myöhäs"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "cancelled": {
+      "note": "A trip the operator has cancelled. Rail wording, not 'deleted'.",
+      "match": [
+        "cancelled",
+        "canceled"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "atšaukta",
+          "stem": "atšauk",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "odwołany",
+          "stem": "odwoła",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "скасавана",
+          "stem": "скасав",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "отменён",
+          "stem": [
+            "отмен",
+            "отмён"
+          ],
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "скасовано",
+          "stem": "скасов",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "atcelts",
+          "stem": "atcel",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "tühistatud",
+          "stem": "tühista",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "inställd",
+          "stem": "inställd",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "innstilt",
+          "stem": "innstilt",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "peruttu",
+          "stem": "peru",
+          "status": "proposed"
+        }
+      }
+    },
+    "bike share": {
+      "note": "The shared-bike layer (GBFS). One noun, the name people know it by locally.",
+      "match": [
+        "bike share",
+        "bike-share",
+        "bikeshare"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "dviračių dalijimasis",
+          "stem": [
+            "dalijim",
+            "nuom"
+          ],
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "rower miejski",
+          "stem": "rower miejsk",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "пракат ровараў",
+          "stem": "пракат ровар",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "велопрокат",
+          "stem": "велопрокат",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "велопрокат",
+          "stem": "велопрокат",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "velonoma",
+          "stem": "velonom",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "rattaringlus",
+          "stem": "rattaringlus",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "lånecykel",
+          "stem": "lånecyk",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "bysykkel",
+          "stem": "bysyk",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "kaupunkipyörä",
+          "stem": "kaupunkipyör",
+          "status": "proposed"
+        }
+      }
+    },
+    "bike": {
+      "note": "A bicycle — the vehicle, and the mobility profile. Belarusian uses ровар, not the Russian-influenced веласіпед: a reviewer's call, and the reason the be column reads the way it does.",
+      "match": [
+        "bike",
+        "bikes",
+        "bicycle",
+        "bicycles"
+      ],
+      "enforce": "glossary",
+      "exceptions": [
+        "bikeShare.toggle",
+        "settings.mode_bike_share"
+      ],
+      "locales": {
+        "lt": {
+          "term": "dviratis",
+          "stem": "dvira",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "rower",
+          "stem": "rower",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "ровар",
+          "stem": "ровар",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "велосипед",
+          "stem": "велосипед",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "велосипед",
+          "stem": "велосипед",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "velosipēds",
+          "stem": "velosipēd",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "jalgratas",
+          "stem": "jalgrat",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "cykel",
+          "stem": "cyk",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "sykkel",
+          "stem": "syk",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "polkupyörä",
+          "stem": "pyör",
+          "status": "proposed"
+        }
+      }
+    },
+    "vehicle": {
+      "note": "Any transit vehicle, mode-agnostic.",
+      "match": [
+        "vehicle",
+        "vehicles"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "settings.run_to_catch_desc",
+        "route.on_vehicle"
+      ],
+      "locales": {
+        "lt": {
+          "term": "transportas",
+          "stem": "transport",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "pojazd",
+          "stem": "pojazd",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "транспарт",
+          "stem": "транспарт",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "транспорт",
+          "stem": "транспорт",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "транспорт",
+          "stem": "транспорт",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "transportlīdzeklis",
+          "stem": "transportlīdzek",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "sõiduk",
+          "stem": "sõiduk",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "fordon",
+          "stem": "fordon",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "kjøretøy",
+          "stem": "kjøretøy",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "ajoneuvo",
+          "stem": "ajoneuv",
+          "status": "proposed"
+        }
+      }
+    },
+    "wheelchair": {
+      "note": "The wheelchair mobility profile.",
+      "match": [
+        "wheelchair"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "neįgaliojo vežimėlis",
+          "stem": "vežimėl",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "wózek inwalidzki",
+          "stem": "wózek inwalidzk",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "інваліднае крэсла",
+          "stem": "інвалідн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "инвалидная коляска",
+          "stem": "инвалидн",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "інвалідний візок",
+          "stem": "інвалідн",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "ratiņkrēsls",
+          "stem": "ratiņkrēsl",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "ratastool",
+          "stem": "ratastool",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "rullstol",
+          "stem": "rullstol",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "rullestol",
+          "stem": "rullestol",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "pyörätuoli",
+          "stem": "pyörätuol",
+          "status": "proposed"
+        }
+      }
+    },
+    "device": {
+      "note": "The user's phone or computer — the thing routing runs on. Privacy copy leans on it.",
+      "match": [
+        "device",
+        "devices"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "įrenginys",
+          "stem": "įrengin",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "urządzenie",
+          "stem": "urządze",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "прылада",
+          "stem": "прылад",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "устройство",
+          "stem": "устройств",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "пристрій",
+          "stem": [
+            "пристр",
+            "пристро"
+          ],
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "ierīce",
+          "stem": "ierīc",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "seade",
+          "stem": [
+            "seade",
+            "seadme"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "enhet",
+          "stem": "enhet",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "enhet",
+          "stem": "enhet",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "laite",
+          "stem": [
+            "laite",
+            "laitte"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "server": {
+      "note": "PTN's own server.",
+      "match": [
+        "server",
+        "servers"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "serveris",
+          "stem": "server",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "serwer",
+          "stem": "serwer",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "сервер",
+          "stem": "сервер",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "сервер",
+          "stem": "сервер",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "сервер",
+          "stem": "сервер",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "serveris",
+          "stem": "server",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "server",
+          "stem": "server",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "server",
+          "stem": "server",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "server",
+          "stem": "server",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "palvelin",
+          "stem": "palvel",
+          "status": "proposed"
+        }
+      }
+    },
+    "offline": {
+      "note": "No network. The app is built to keep working here, so the word carries weight.",
+      "match": [
+        "offline"
+      ],
+      "enforce": "glossary",
+      "exceptions": [
+        "settings.map_mode_demoted",
+        "settings.map_mode_micromap"
+      ],
+      "locales": {
+        "lt": {
+          "term": "neprisijungus",
+          "stem": "neprisijung",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "offline",
+          "stem": "offline",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "афлайн",
+          "stem": "афлайн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "офлайн",
+          "stem": "офлайн",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "офлайн",
+          "stem": "офлайн",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "bezsaistē",
+          "stem": "bezsaist",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "võrguühenduseta",
+          "stem": "võrguühendus",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "offline",
+          "stem": "offline",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "frakoblet",
+          "stem": "frakoblet",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "ei verkkoyhteyttä",
+          "stem": "verkkoyhtey",
+          "status": "proposed"
+        }
+      }
+    },
+    "destination": {
+      "note": "Where the user is going.",
+      "match": [
+        "destination",
+        "destinations"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "settings.get_off_alarm_desc"
+      ],
+      "locales": {
+        "lt": {
+          "term": "kelionės tikslas",
+          "stem": "tiksl",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "cel",
+          "stem": "cel",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "пункт прызначэння",
+          "stem": "прызначэн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "пункт назначения",
+          "stem": "назначен",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "пункт призначення",
+          "stem": "призначен",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "galamērķis",
+          "stem": "galamērķ",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "sihtkoht",
+          "stem": "sihtko",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "destination",
+          "stem": "destination",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "destinasjon",
+          "stem": "destinasjon",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "määränpää",
+          "stem": "määränpä",
+          "status": "proposed"
+        }
+      }
+    },
+    "origin": {
+      "note": "Where the trip starts.",
+      "match": [
+        "origin",
+        "starting point"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "išvykimo vieta",
+          "stem": "išvykimo viet",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "punkt początkowy",
+          "stem": "początk",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "пачатковы пункт",
+          "stem": "пачатков",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "отправная точка",
+          "stem": "отправн",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "початкова точка",
+          "stem": "початков",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "sākumpunkts",
+          "stem": [
+            "sākum"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "lähtepunkt",
+          "stem": [
+            "lähtepunkt",
+            "lähteko"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "startpunkt",
+          "stem": [
+            "startpunkt",
+            "utgångspunkt"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "startpunkt",
+          "stem": [
+            "startpunkt",
+            "utgangspunkt"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "lähtöpaikka",
+          "stem": [
+            "lähtöpaik",
+            "lähtöpist"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "privacy": {
+      "note": "The privacy model and its levels. Swedish 'integritet' and Norwegian 'personvern' are the standard terms — a machine will otherwise reach for 'privatliv', which means private life.",
+      "match": [
+        "privacy"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "privatumas",
+          "stem": "privatum",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "prywatność",
+          "stem": "prywatno",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "прыватнасць",
+          "stem": "прыватн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "конфиденциальность",
+          "stem": "конфиденциальн",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "конфіденційність",
+          "stem": "конфіденційн",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "privātums",
+          "stem": "privātum",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "privaatsus",
+          "stem": "privaatsus",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "integritet",
+          "stem": "integritet",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "personvern",
+          "stem": "personvern",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "yksityisyys",
+          "stem": "yksityisyy",
+          "status": "proposed"
+        }
+      }
+    },
+    "hub": {
+      "note": "A stop flagged as an interchange.",
+      "match": [
+        "hub",
+        "hubs"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "mazgas",
+          "stem": "mazg",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "węzeł",
+          "stem": [
+            "węz",
+            "węzł"
+          ],
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "вузел",
+          "stem": [
+            "вуз",
+            "вузл"
+          ],
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "узел",
+          "stem": [
+            "узел",
+            "узл"
+          ],
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "вузол",
+          "stem": [
+            "вуз",
+            "вузл"
+          ],
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "mezgls",
+          "stem": "mezgl",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "sõlm",
+          "stem": "sõlm",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "knutpunkt",
+          "stem": "knutpunkt",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "knutepunkt",
+          "stem": "knutepunkt",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "solmukohta",
+          "stem": "solmukoh",
+          "status": "proposed"
+        }
+      }
+    },
+    "notification": {
+      "note": "A browser/system notification.",
+      "match": [
+        "notification",
+        "notifications"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "pranešimas",
+          "stem": "praneš",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "powiadomienie",
+          "stem": "powiadom",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "апавяшчэнне",
+          "stem": "апавяшч",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "уведомление",
+          "stem": "уведомл",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "сповіщення",
+          "stem": "сповіщ",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "paziņojums",
+          "stem": "paziņojum",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "teade",
+          "stem": [
+            "teade",
+            "teat",
+            "teavit"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "avisering",
+          "stem": [
+            "avisering",
+            "meddelande"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "varsel",
+          "stem": [
+            "varsl",
+            "varsel",
+            "melding"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "ilmoitus",
+          "stem": "ilmoit",
+          "status": "proposed"
+        }
+      }
+    },
+    "arrival": {
+      "note": "Arriving at a stop or at the destination.",
+      "match": [
+        "arrival",
+        "arrive",
+        "arrives",
+        "arrived"
+      ],
+      "enforce": "check",
+      "exceptions": [
+        "notif.trip_complete_body",
+        "settings.pre_stop_buffer_desc"
+      ],
+      "locales": {
+        "lt": {
+          "term": "atvykimas",
+          "stem": "atvyk",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "przyjazd",
+          "stem": [
+            "przyja",
+            "dotar",
+            "dojech",
+            "przyby"
+          ],
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "прыбыццё",
+          "stem": "прыбы",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "прибытие",
+          "stem": "приб",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "прибуття",
+          "stem": "приб",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "ierašanās",
+          "stem": [
+            "ieraš",
+            "ierad",
+            "pienāk"
+          ],
+          "status": "proposed"
+        },
+        "et": {
+          "term": "saabumine",
+          "stem": [
+            "saabu",
+            "jõud",
+            "kohale"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "ankomst",
+          "stem": [
+            "ankom",
+            "kommit fram",
+            "kommit till"
+          ],
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "ankomst",
+          "stem": [
+            "ankom",
+            "kommet frem",
+            "kommet til"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "saapuminen",
+          "stem": [
+            "saapu",
+            "perillä"
+          ],
+          "status": "proposed"
+        }
+      }
+    },
+    "accessibility": {
+      "note": "Accessibility features — colour schemes, screen-reader support, mobility profiles.",
+      "match": [
+        "accessibility",
+        "accessible"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "prieinamumas",
+          "stem": "prieinam",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "dostępność",
+          "stem": "dostępno",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "даступнасць",
+          "stem": "даступн",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "доступность",
+          "stem": "доступн",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "доступність",
+          "stem": "доступн",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "pieejamība",
+          "stem": "pieejam",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "juurdepääsetavus",
+          "stem": [
+            "juurdepääse",
+            "ligipääse"
+          ],
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "tillgänglighet",
+          "stem": "tillgänglighet",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "tilgjengelighet",
+          "stem": "tilgjengelighet",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "esteettömyys",
+          "stem": [
+            "esteettöm",
+            "saavutettavu"
+          ],
+          "status": "proposed"
+        }
+      },
+      "exceptions": [
+        "route.profile_wheelchair_desc",
+        "settings.variant_accessible"
+      ]
+    },
+    "micromap": {
+      "note": "PTN's own on-device basemap. A coined product word: translate it as a compound, do not borrow the English.",
+      "match": [
+        "micromap"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "mikrožemėlapis",
+          "stem": "mikrožemėlap",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "mikromapa",
+          "stem": "mikromap",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "мікрамапа",
+          "stem": "мікрамап",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "микрокарта",
+          "stem": "микрокарт",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "мікрокарта",
+          "stem": "мікрокарт",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "mikrokarte",
+          "stem": "mikrokart",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "minikaart",
+          "stem": "minikaar",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "minikarta",
+          "stem": "minikart",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "minikart",
+          "stem": "minikart",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "minikartta",
+          "stem": "minikart",
+          "status": "proposed"
+        }
+      }
+    },
+    "bus": {
+      "note": "GTFS route_type 3.",
+      "match": [
+        "bus",
+        "buses"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "autobusas",
+          "stem": "autobus",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "autobus",
+          "stem": "autobus",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "аўтобус",
+          "stem": "аўтобус",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "автобус",
+          "stem": "автобус",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "автобус",
+          "stem": "автобус",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "autobuss",
+          "stem": "autobus",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "buss",
+          "stem": "buss",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "buss",
+          "stem": "buss",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "buss",
+          "stem": "buss",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "bussi",
+          "stem": "buss",
+          "status": "proposed"
+        }
+      }
+    },
+    "tram": {
+      "note": "GTFS route_type 0.",
+      "match": [
+        "tram",
+        "trams"
+      ],
+      "enforce": "glossary",
+      "exceptions": [
+        "settings.mode_cable_tram"
+      ],
+      "locales": {
+        "lt": {
+          "term": "tramvajus",
+          "stem": "tramvaj",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "tramwaj",
+          "stem": "tramwaj",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "трамвай",
+          "stem": "трамва",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "трамвай",
+          "stem": "трамва",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "трамвай",
+          "stem": "трамва",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "tramvajs",
+          "stem": "tramvaj",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "tramm",
+          "stem": "tramm",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "spårvagn",
+          "stem": "spårvagn",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "trikk",
+          "stem": "trikk",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "raitiovaunu",
+          "stem": "raitiovaun",
+          "status": "proposed"
+        }
+      }
+    },
+    "trolleybus": {
+      "note": "GTFS route_type 11. Vilnius and Gdynia both run them, so the word is load-bearing.",
+      "match": [
+        "trolleybus",
+        "trolleybuses"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "troleibusas",
+          "stem": "troleibus",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "trolejbus",
+          "stem": "trolejbus",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "тралейбус",
+          "stem": "тралейбус",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "троллейбус",
+          "stem": "троллейбус",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "тролейбус",
+          "stem": "тролейбус",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "trolejbuss",
+          "stem": "trolejbus",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "trollibuss",
+          "stem": "trolli",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "trådbuss",
+          "stem": "trådbuss",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "trolleybuss",
+          "stem": "trolleybuss",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "johdinauto",
+          "stem": "johdinaut",
+          "status": "proposed"
+        }
+      }
+    },
+    "metro": {
+      "note": "GTFS route_type 1.",
+      "match": [
+        "metro",
+        "subway",
+        "underground"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "metro",
+          "stem": "metro",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "metro",
+          "stem": "metro",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "метро",
+          "stem": "метро",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "метро",
+          "stem": "метро",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "метро",
+          "stem": "метро",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "metro",
+          "stem": "metro",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "metroo",
+          "stem": "metro",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "tunnelbana",
+          "stem": "tunnelban",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "T-bane",
+          "stem": [
+            "t-bane",
+            "tbane"
+          ],
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "metro",
+          "stem": "metro",
+          "status": "proposed"
+        }
+      }
+    },
+    "rail": {
+      "note": "GTFS route_type 2 — a train. Locale terms here follow each city's habit rather than a literal 'rail': ru/uk say электричка/електричка, be чыгунка.",
+      "match": [
+        "rail",
+        "train",
+        "trains"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "geležinkelis",
+          "stem": [
+            "geležinkel",
+            "traukin"
+          ],
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "kolej",
+          "stem": [
+            "kole",
+            "pociąg"
+          ],
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "чыгунка",
+          "stem": [
+            "чыгун",
+            "цягнік"
+          ],
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "электричка",
+          "stem": [
+            "электричк",
+            "поезд"
+          ],
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "електричка",
+          "stem": [
+            "електричк",
+            "поїзд"
+          ],
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "vilciens",
+          "stem": "vilcien",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "rong",
+          "stem": "rong",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "tåg",
+          "stem": "tåg",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "tog",
+          "stem": "tog",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "juna",
+          "stem": "jun",
+          "status": "proposed"
+        }
+      }
+    },
+    "ferry": {
+      "note": "GTFS route_type 4.",
+      "match": [
+        "ferry",
+        "ferries"
+      ],
+      "enforce": "glossary",
+      "locales": {
+        "lt": {
+          "term": "keltas",
+          "stem": "kelt",
+          "status": "confirmed"
+        },
+        "pl": {
+          "term": "prom",
+          "stem": "prom",
+          "status": "confirmed"
+        },
+        "be": {
+          "term": "паром",
+          "stem": "паром",
+          "status": "confirmed"
+        },
+        "ru": {
+          "term": "паром",
+          "stem": "паром",
+          "status": "confirmed"
+        },
+        "uk": {
+          "term": "пором",
+          "stem": "пором",
+          "status": "confirmed"
+        },
+        "lv": {
+          "term": "prāmis",
+          "stem": "prām",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "praam",
+          "stem": "praam",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "färja",
+          "stem": "färj",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "ferge",
+          "stem": "ferg",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "lautta",
+          "stem": "lautt",
+          "status": "proposed"
+        }
+      }
+    }
+  }
+}

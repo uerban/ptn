@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "bundleHash": "abc123",
+  "generatedAt": 1752300000000,
+  "tileSize": 6000,
+  "subdivisions": {
+    "1_2": {
+      "leaves": [
+        {
+          "suffix": "0",
+          "bbox": {
+            "minLat": 1.5,
+            "maxLat": 2.5,
+            "minLon": 3.5,
+            "maxLon": 4.5
+          },
+          "compressedBytes": 123,
+          "oversized": false
+        }
+      ]
+    },
+    "0_0": {
+      "leaves": [
+        {
+          "suffix": "2",
+          "bbox": {
+            "minLat": 0,
+            "maxLat": 0.05390377113111174,
+            "minLon": 0,
+            "maxLon": 0.05390463256446938
+          },
+          "compressedBytes": 456,
+          "oversized": true
+        }
+      ]
+    }
+  }
+}

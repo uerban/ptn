@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.3809, "lon": 18.5997 },
+    "to": { "lat": 54.5206, "lon": 18.5313 },
+    "description": "multi-operator-transfer: Gdańsk Wrzeszcz to Gdynia Główna (ZTM→SKM→ZKM)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

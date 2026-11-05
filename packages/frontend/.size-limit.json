@@ -1,0 +1,101 @@
+[
+  {
+    "name": "First paint JS",
+    "path": [
+      "dist/assets/index-*.js",
+      "dist/assets/walkGraphClient-*.js",
+      "dist/assets/vendor-react-*.js",
+      "dist/assets/vendor-state-*.js",
+      "dist/assets/vendor-db-*.js"
+    ],
+    "limit": "180 kB",
+    "gzip": true
+  },
+  {
+    "name": "Entry chunk",
+    "path": "dist/assets/index-*.js",
+    "limit": "120 kB",
+    "gzip": true
+  },
+  {
+    "name": "MapLibre chunk (lazy)",
+    "path": "dist/assets/vendor-map-*.js",
+    "limit": "280 kB",
+    "gzip": true
+  },
+  {
+    "name": "MapLibre worker (lazy)",
+    "path": "dist/assets/maplibre-gl-worker-*.js",
+    "limit": "140 kB",
+    "gzip": true
+  },
+  {
+    "name": "pt-wasm chunk (lazy)",
+    "path": [
+      "dist/assets/pt_wasm*-*.wasm",
+      "dist/assets/pt_wasm*-*.js"
+    ],
+    "limit": "270 kB",
+    "gzip": true
+  },
+  {
+    "name": "raptorWasm adapter + planner",
+    "path": [
+      "dist/assets/raptorWasm-*.js",
+      "dist/assets/wasmPlanner-*.js"
+    ],
+    "limit": "18 kB",
+    "gzip": true
+  },
+  {
+    "name": "PTB catalog decoder + worker (lazy)",
+    "path": "dist/assets/ptbCatalog*.js",
+    "limit": "55 kB",
+    "gzip": true
+  },
+  {
+    "name": "Core non-wasm Total JS (separately-gated payloads excluded)",
+    "path": [
+      "dist/assets/*.js",
+      "!dist/assets/pt_wasm*-*.js",
+      "!dist/assets/ptbCatalog*.js",
+      "!dist/assets/lt-*.js",
+      "!dist/assets/pl-*.js",
+      "!dist/assets/be-*.js",
+      "!dist/assets/ru-*.js",
+      "!dist/assets/uk-*.js",
+      "!dist/assets/lv-*.js",
+      "!dist/assets/et-*.js",
+      "!dist/assets/sv-*.js",
+      "!dist/assets/nb-*.js",
+      "!dist/assets/fi-*.js",
+      "!dist/assets/privacy.*-*.js"
+    ],
+    "limit": "800 kB",
+    "gzip": true
+  },
+  {
+    "name": "Offline glyphs (precached)",
+    "path": "dist/glyphs/**/*.pbf",
+    "limit": "80 kB",
+    "gzip": true
+  },
+  {
+    "name": "Per-locale i18n chunks (lazy, one locale per reader)",
+    "path": [
+      "dist/assets/lt-*.js",
+      "dist/assets/pl-*.js",
+      "dist/assets/be-*.js",
+      "dist/assets/ru-*.js",
+      "dist/assets/uk-*.js",
+      "dist/assets/lv-*.js",
+      "dist/assets/et-*.js",
+      "dist/assets/sv-*.js",
+      "dist/assets/nb-*.js",
+      "dist/assets/fi-*.js",
+      "dist/assets/privacy.*-*.js"
+    ],
+    "limit": "200 kB",
+    "gzip": true
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "last_updated": 1784316132,
+  "ttl": 300,
+  "version": "2.3",
+  "data": {
+    "stations": [
+      {
+        "station_id": "1",
+        "name": "ARKIKATEDRA",
+        "lat": 54.685908,
+        "lon": 25.2856,
+        "address": "\u0160ventaragio g.",
+        "capacity": 21
+      },
+      {
+        "station_id": "2",
+        "name": "BARBOROS RADVILAIT\u0116S",
+        "lat": 54.684471,
+        "lon": 25.28937,
+        "address": "Pilies g. \u2013 Radvilait\u0117s g. sankry\u017ea",
+        "capacity": 21
+      },
+      {
+        "station_id": "3",
+        "name": "K. SIRVYDO SKVERAS",
+        "lat": 54.68093,
+        "lon": 25.288465,
+        "address": "Pilies g. \u2013 Bok\u0161to g. sankry\u017ea",
+        "capacity": 18
+      },
+      {
+        "station_id": "4",
+        "name": "ROTU\u0160\u0116",
+        "lat": 54.677889,
+        "lon": 25.287452,
+        "address": "Did\u017eioji g.",
+        "capacity": 12
+      },
+      {
+        "station_id": "5",
+        "name": "FILHARMONIJA",
+        "lat": 54.676227,
+        "lon": 25.288612,
+        "address": "Did\u017eioji g. \u2013 Suba\u010diaus g. sankry\u017ea",
+        "capacity": 12
+      }
+    ]
+  }
+}

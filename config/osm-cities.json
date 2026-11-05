@@ -1,0 +1,72 @@
+{
+  "vilnius": {
+    "pbf": "https://download.geofabrik.de/europe/lithuania-latest.osm.pbf",
+    "bbox": [
+      25.12,
+      54.59,
+      25.45,
+      54.78
+    ],
+    "poiCorpora": [
+      "vilnius"
+    ]
+  },
+  "tricity": {
+    "pbf": "https://download.geofabrik.de/europe/poland/pomorskie-latest.osm.pbf",
+    "bbox": [
+      18.42,
+      54.25,
+      18.88,
+      54.57
+    ],
+    "poiCorpora": [
+      "gdansk",
+      "gdynia",
+      "sopot"
+    ]
+  },
+  "krakow": {
+    "pbf": "https://download.geofabrik.de/europe/poland/malopolskie-latest.osm.pbf",
+    "bbox": [
+      19.74,
+      49.94,
+      20.2,
+      50.16
+    ],
+    "poiCorpora": []
+  },
+  "oslo": {
+    "pbf": "https://download.geofabrik.de/europe/norway-latest.osm.pbf",
+    "bbox": [
+      10.37,
+      59.77,
+      11.03,
+      60.08
+    ],
+    "poiCorpora": []
+  },
+  "tbilisi": {
+    "pbf": "https://download.geofabrik.de/europe/georgia-latest.osm.pbf",
+    "bbox": [
+      44.57,
+      41.57,
+      45.08,
+      41.88
+    ],
+    "poiCorpora": [
+      "tbilisi"
+    ]
+  },
+  "paris": {
+    "pbf": "https://download.geofabrik.de/europe/france/ile-de-france-latest.osm.pbf",
+    "bbox": [
+      2.12,
+      48.72,
+      2.58,
+      49.05
+    ],
+    "poiCorpora": [],
+    "walkGraph": false,
+    "producerInputs": false
+  }
+}

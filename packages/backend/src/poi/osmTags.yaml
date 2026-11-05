@@ -1,0 +1,143 @@
+# OSM POI tag filter spec for M7c bundled geocoder.
+# Current policy: the poi categories notes
+# Original research: the 04 osm poi tag filter notes
+#
+# Two profiles:
+#   - strict: named destination landmarks, cultural/civic venues, major
+#     recreation venues, parks/beaches, and malls, plus transit/public buildings.
+#   - loose: optional bus stops, schools, kindergartens, tourism/accommodation,
+#     and supermarkets. Users select categories locally from a whole-city bundle.
+# Tag vocabulary: https://wiki.openstreetmap.org/wiki/Map_features
+#
+# Rule grammar:
+#   A rule is an AND-list of predicates. Each predicate is one of:
+#     "<key>=<value>"        exact key=value match
+#     "<key>=<v1>|<v2>|..."  key matches any of the pipe-separated values
+#     "<key>=*"              key is present with a non-empty value
+#
+# An entry matches a category if ANY include-rule matches AND NO exclude-rule
+# matches. `name_required: true` further requires tags.name to be non-empty.
+# `qualifiers` are metadata kept in output for downstream use but do not
+# affect matching.
+
+strict:
+  transit_entrance:
+    include:
+      - railway=station
+      - railway=halt
+      - railway=tram_stop + name=*
+      - public_transport=station
+      - aerialway=station
+      - amenity=bus_station
+    exclude:
+      - highway=bus_stop
+      - public_transport=platform
+      - public_transport=stop_position
+    name_required: true
+    qualifiers:
+      - station=subway|light_rail|monorail
+
+  named_junction:
+    include:
+      - highway=motorway_junction + name=*
+      - junction=yes + name=*
+    exclude:
+      - traffic_signals=*
+      - crossing=*
+    name_required: true
+
+  public_building:
+    include:
+      - amenity=hospital + name=*
+      - amenity=university + name=*
+      - amenity=college + name=*
+      - aeroway=aerodrome + aerodrome:type=international|regional|public + name=*
+      - aeroway=aerodrome + iata=* + name=*
+      - aeroway=terminal + name=*
+    exclude:
+      - amenity=clinic
+      - amenity=doctors
+      - amenity=dentist
+      - amenity=pharmacy
+      - amenity=school
+      - amenity=kindergarten
+      - building=dormitory
+      - building=residential
+      - building=apartments
+    name_required: true
+
+  named_square:
+    include:
+      - place=square + name=*
+      - highway=pedestrian + area=yes + name=*
+      - leisure=plaza + name=*
+    exclude: []
+    name_required: true
+
+  culture:
+    include:
+      - tourism=museum + name=*
+      - amenity=theatre|cinema|arts_centre + name=*
+    exclude: []
+    name_required: true
+
+  civic:
+    include:
+      - amenity=library|townhall|community_centre + name=*
+    exclude: []
+    name_required: true
+
+  recreation:
+    include:
+      - leisure=stadium|sports_centre|water_park + name=*
+    exclude:
+      - access=private|no
+    name_required: true
+
+  outdoor:
+    include:
+      - leisure=park|garden + name=*
+      - natural=beach + name=*
+    exclude:
+      - access=private|no
+      - garden:type=residential
+    name_required: true
+
+  mall:
+    include:
+      - shop=mall + name=*
+    exclude: []
+    name_required: true
+
+loose:
+  named_bus_stop:
+    include:
+      - highway=bus_stop + name=*
+    exclude: []
+    name_required: true
+
+  school:
+    include:
+      - amenity=school + name=*
+    exclude: []
+    name_required: true
+
+  kindergarten:
+    include:
+      - amenity=kindergarten + name=*
+    exclude: []
+    name_required: true
+
+  tourism:
+    include:
+      - tourism=* + name=*
+    exclude:
+      - tourism=information|museum
+      - tourism=viewpoint
+    name_required: true
+
+  retail:
+    include:
+      - shop=supermarket + name=*
+    exclude: []
+    name_required: true

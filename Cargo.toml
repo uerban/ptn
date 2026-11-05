@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+# pt-wasm is a wasm32-only cdylib (P5). Excluding it from default-members keeps
+# host `cargo build` / `cargo test` from trying to build it for the native target,
+# which would fail (or pull in wasm-bindgen unnecessarily). Build it explicitly:
+# `cargo build -p pt-wasm --target wasm32-unknown-unknown --release`.
+default-members = [
+    "crates/pt-artifacts",
+    "crates/pt-core",
+    "crates/pt-core-emit",
+    "crates/pt-producer",
+    "crates/pt-serve",
+    "crates/pt-walk",
+]
+
+[workspace.package]
+# Development and release builds use rust-toolchain.toml's newer exact pin.
+# This is the independently-gated minimum compiler supported by every crate.
+rust-version = "1.88"
+
+[workspace.dependencies]
+# One bundled tzdb for producer/server reproducibility. Disable host timezone
+# discovery and platform dependencies; serde is enabled only by pt-loadtest.
+jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }
+jiff-tzdb = "=0.1.9"
+
+# NOTE on the wasm release profile: P5 wants `panic = "abort"` + size-opts (opt-level=z, lto,
+# codegen-units=1, strip) for the pt-wasm cdylib to hit the byte budget. Cargo silently ignores
+# `[profile.*]` blocks in non-root workspace members, so a wasm-only profile here would also force
+# those settings on the host crates (pt-core/pt-core-emit/pt-serve) — including panic=abort, which
+# changes test runner semantics. Host profiles stay at Cargo defaults.

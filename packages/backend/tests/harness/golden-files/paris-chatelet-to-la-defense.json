@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "paris",
+    "from": { "lat": 48.8612, "lon": 2.3470 },
+    "to": { "lat": 48.8920, "lon": 2.2360 },
+    "description": "chatelet-to-la-defense: Chatelet-Les Halles to La Defense via RER A / Metro 1"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["METRO", "RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

@@ -1,0 +1,31 @@
+{
+  "ci": {
+    "collect": {
+      "staticDistDir": "./dist",
+      "_comment": "Strict PR-gate config used by .github/workflows/lighthouse-ci.yml. Single URL only — staticDistDir + react-router-dom serves index.html for any path, so /search would measure the same shell as /. chromeFlags target Chromium-in-LXC constraints: --no-sandbox lets Chrome run as the runner's root user (Chrome refuses otherwise), --disable-dev-shm-usage avoids /dev/shm exhaustion in containerized environments, --headless=new and --disable-gpu are conventional for CI.",
+      "url": [
+        "http://localhost/"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "throttlingMethod": "simulate",
+        "chromeFlags": "--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "_assertions_comment": "These absolute thresholds are for LOCAL runs (`pnpm --filter @pt/frontend lhci`): they encode what a developer machine should reach. CI does NOT gate on them — the same dist scores ~0.98/TBT ~0 ms on a laptop and 0.64-0.68/TBT ~1 s on a 2-core hosted runner, so a constant either fails everywhere or nowhere. `.github/workflows/lighthouse-ci.yml` builds the merge target and the merge result on one runner and gates on the delta (`scripts/lighthouse-ab.mjs`). interaction-to-next-paint is intentionally absent: LHCI's `lhci assert` reports an `auditRan` failure (value 0) when Lighthouse can't compute INP, which happens in no-user-flow headless runs (the audit needs an interaction event to record). Adding it back fails the gate on every run regardless of the metric's true value. total-blocking-time is the desktop-Lighthouse stand-in for the same responsiveness concern and IS measurable headless. Restore INP only alongside a scripted user-flow in collect.settings (or a user-flow YAML).",
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.85 }],
+        "categories:accessibility": ["error", { "minScore": 0.95 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 300 }]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

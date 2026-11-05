@@ -1,0 +1,11 @@
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.28,54.68],[25.281,54.68],[25.282,54.68]]},"properties":{"highway":"residential","name":"Gedimino pr."}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.281,54.68],[25.281,54.681]]},"properties":{"highway":"footway"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.281,54.68],[25.281,54.679]]},"properties":{"highway":"steps"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.282,54.68],[25.282,54.6805]]},"properties":{"highway":"footway","footway":"crossing"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.28,54.68],[25.28,54.681]]},"properties":{"highway":"service","access":"private"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.281,54.679],[25.283,54.679]]},"properties":{"highway":"footway","foot":"no"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.281,54.681],[25.28,54.681]]},"properties":{"highway":"path","access":"private","foot":"yes"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.28,54.68],[25.281,54.68]]},"properties":{"highway":"residential","name":"Other"}}
+{"type":"Feature","geometry":{"type":"Point","coordinates":[25.28,54.68]},"properties":{"highway":"crossing"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[25.29,54.69],[25.291,54.69]]},"properties":{"highway":"motorway"}}
+{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[25.29,54.69],[25.29,54.69]]]},"properties":{"highway":"path"}}

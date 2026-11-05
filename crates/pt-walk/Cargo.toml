@@ -1,0 +1,28 @@
+[package]
+name = "pt-walk"
+version = "0.0.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+license = "MIT OR Apache-2.0"
+
+# The library has no dependencies on purpose: it is linked into pt-wasm (byte
+# budget). Only the OSM reader and the CLI need JSON.
+[features]
+build = ["dep:serde_json"]
+
+[dependencies]
+serde_json = { version = "1", optional = true }
+
+[[bin]]
+name = "pt-walk-build"
+path = "src/bin/pt_walk_build.rs"
+required-features = ["build"]
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+required-features = ["build"]
+
+[dev-dependencies]
+serde_json = "1"

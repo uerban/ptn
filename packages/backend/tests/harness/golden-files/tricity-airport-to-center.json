@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "tricity",
+    "from": { "lat": 54.3776, "lon": 18.4662 },
+    "to": { "lat": 54.3557, "lon": 18.6442 },
+    "description": "airport-to-center: Port Lotniczy (airport) to Gdańsk Główny via PKM rail"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["RAIL", "BUS"],
+  "maxLatencyMs": 3000
+}

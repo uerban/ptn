@@ -1,0 +1,10 @@
+{
+  "pattern": {
+    "poi-bundle": 10,
+    "health": 2,
+    "color-config": 1,
+    "stops-all": 1,
+    "catalog-bundle": 1,
+    "catalog-ready": 2
+  }
+}

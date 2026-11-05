@@ -1,0 +1,1791 @@
+{
+  "_meta": {
+    "generated": "2026-04-13",
+    "sourceVersion": "2026-04-13",
+    "entryCount": 66,
+    "needsReviewCount": 11,
+    "notes": "Curated from well-established Gdynia landmarks. Wikidata SPARQL endpoint was unreachable from this environment; wikidataId is populated only where confidence is high. nearestStopGroupId left null for all entries (follow-up task)."
+  },
+  "entries": [
+    {
+      "id": "gdy-dworzec-pks",
+      "city": "gdynia",
+      "canonicalName": "Dworzec PKS Gdynia",
+      "aliases": {
+        "pl": [
+          "Dworzec Autobusowy Gdynia"
+        ],
+        "en": [
+          "Gdynia Bus Terminal"
+        ]
+      },
+      "category": "bus_terminal",
+      "lat": 54.5178,
+      "lon": 18.5317,
+      "bbox": [
+        54.5168,
+        18.5297,
+        54.5188,
+        18.5337
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11738082"
+    },
+    {
+      "id": "gdy-port-pasazerski",
+      "city": "gdynia",
+      "canonicalName": "Port Gdynia – Terminal Promowy",
+      "aliases": {
+        "pl": [
+          "Terminal Promowy Gdynia"
+        ],
+        "en": [
+          "Gdynia Ferry Terminal"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5378,
+      "lon": 18.5347,
+      "bbox": [
+        54.5358,
+        18.5317,
+        54.5398,
+        18.5377
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-gdynia-arena",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Arena",
+      "aliases": {
+        "pl": [
+          "Hala Gdynia Arena"
+        ],
+        "en": [
+          "Gdynia Arena"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.4961,
+      "lon": 18.5317,
+      "bbox": [
+        54.4951,
+        18.5297,
+        54.4971,
+        18.5337
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-gdyniakulture-centrum",
+      "city": "gdynia",
+      "canonicalName": "Gdyńskie Centrum Filmowe",
+      "aliases": {
+        "pl": [
+          "GCF"
+        ],
+        "en": [
+          "Gdynia Film Centre"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.5171,
+      "lon": 18.543,
+      "bbox": [
+        54.5161,
+        18.541,
+        54.5181,
+        18.545
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-centrum-kultury",
+      "city": "gdynia",
+      "canonicalName": "Gdyńskie Centrum Kultury",
+      "aliases": {
+        "pl": [
+          "GCK"
+        ],
+        "en": [
+          "Gdynia Culture Centre"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.5086,
+      "lon": 18.5397,
+      "bbox": [
+        54.5076,
+        18.5377,
+        54.5096,
+        18.5417
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-szpital-wojskowy",
+      "city": "gdynia",
+      "canonicalName": "7 Szpital Marynarki Wojennej Oddział Gdynia",
+      "aliases": {
+        "pl": [
+          "Szpital Wojskowy Gdynia"
+        ],
+        "en": [
+          "Military Hospital Gdynia"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.5394,
+      "lon": 18.5464,
+      "bbox": [
+        54.5384,
+        18.5444,
+        54.5404,
+        18.5484
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-centrum-onkologii",
+      "city": "gdynia",
+      "canonicalName": "Gdyńskie Centrum Onkologii",
+      "aliases": {
+        "pl": [
+          "Centrum Onkologii"
+        ],
+        "en": [
+          "Gdynia Oncology Centre"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.4839,
+      "lon": 18.5422,
+      "bbox": [
+        54.4829,
+        18.5402,
+        54.4849,
+        18.5442
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-szpital-miejski",
+      "city": "gdynia",
+      "canonicalName": "Szpital Miejski w Gdyni",
+      "aliases": {
+        "pl": [
+          "Szpital Miejski"
+        ],
+        "en": [
+          "Gdynia Municipal Hospital"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.5156,
+      "lon": 18.5244,
+      "bbox": [
+        54.5146,
+        18.5224,
+        54.5166,
+        18.5264
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-szpital-morski",
+      "city": "gdynia",
+      "canonicalName": "Szpital Morski im. PCK",
+      "aliases": {
+        "pl": [
+          "Szpital Morski Redłowo"
+        ],
+        "en": [
+          "Maritime Hospital Gdynia"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.4833,
+      "lon": 18.5411,
+      "bbox": [
+        54.4823,
+        18.5391,
+        54.4843,
+        18.5431
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q9362654"
+    },
+    {
+      "id": "gdy-dar-mlodziezy",
+      "city": "gdynia",
+      "canonicalName": "Dar Młodzieży",
+      "aliases": {
+        "pl": [
+          "Dar Młodzieży"
+        ],
+        "en": [
+          "Dar Młodzieży"
+        ],
+        "ru": [
+          "Дар Молодёжи"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5189,
+      "lon": 18.5544,
+      "bbox": [
+        54.5179,
+        18.5524,
+        54.5199,
+        18.5564
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1164574",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-infobox",
+      "city": "gdynia",
+      "canonicalName": "InfoBox Gdynia",
+      "aliases": {
+        "pl": [
+          "InfoBox"
+        ],
+        "en": [
+          "Gdynia InfoBox Observatory"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5197,
+      "lon": 18.5411,
+      "bbox": [
+        54.5187,
+        18.5391,
+        54.5207,
+        18.5431
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-kosciol-kolegiata",
+      "city": "gdynia",
+      "canonicalName": "Kolegiata Najświętszej Maryi Panny Królowej Polski",
+      "aliases": {
+        "pl": [
+          "Kolegiata Morska",
+          "Bazylika Morska",
+          "Kolegiata Gdynia"
+        ],
+        "en": [
+          "Gdynia Collegiate Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5183,
+      "lon": 18.5508,
+      "bbox": [
+        54.5173,
+        18.5488,
+        54.5193,
+        18.5528
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11754069"
+    },
+    {
+      "id": "gdy-kosciol-nmp",
+      "city": "gdynia",
+      "canonicalName": "Kościół NMP Królowej Polski",
+      "aliases": {
+        "pl": [
+          "Kościół na Polance",
+          "Kościół Morski"
+        ],
+        "en": [
+          "Church of Mary Queen of Poland"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5197,
+      "lon": 18.5453,
+      "bbox": [
+        54.5187,
+        18.5433,
+        54.5207,
+        18.5473
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-kosciol-sw-michala",
+      "city": "gdynia",
+      "canonicalName": "Kościół św. Michała Archanioła",
+      "aliases": {
+        "pl": [
+          "Kościół Oksywski"
+        ],
+        "en": [
+          "Church of St. Michael the Archangel"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5503,
+      "lon": 18.54,
+      "bbox": [
+        54.5493,
+        18.538,
+        54.5513,
+        18.542
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-latarnia-morska",
+      "city": "gdynia",
+      "canonicalName": "Latarnia Morska Gdynia",
+      "aliases": {
+        "pl": [
+          "Latarnia Morska na Nabrzeżu Rumuńskim"
+        ],
+        "en": [
+          "Gdynia Lighthouse"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5306,
+      "lon": 18.5642,
+      "bbox": [
+        54.5296,
+        18.5622,
+        54.5316,
+        18.5662
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-mech-dok",
+      "city": "gdynia",
+      "canonicalName": "Stocznia Gdynia",
+      "aliases": {
+        "pl": [
+          "Stocznia Gdynia",
+          "Dawna Stocznia Gdynia",
+          "Mechanik Dok"
+        ],
+        "en": [
+          "Gdynia Shipyard"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5331,
+      "lon": 18.5428,
+      "bbox": [
+        54.5301,
+        18.5378,
+        54.5361,
+        18.5478
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q1792653"
+    },
+    {
+      "id": "gdy-molo-orlowo",
+      "city": "gdynia",
+      "canonicalName": "Molo Orłowo",
+      "aliases": {
+        "pl": [
+          "Molo w Orłowie"
+        ],
+        "en": [
+          "Orłowo Pier"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4853,
+      "lon": 18.5636,
+      "bbox": [
+        54.4843,
+        18.5616,
+        54.4863,
+        18.5656
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-molo-poludniowe",
+      "city": "gdynia",
+      "canonicalName": "Molo Południowe",
+      "aliases": {
+        "pl": [
+          "Południowe Molo"
+        ],
+        "en": [
+          "Southern Pier"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5194,
+      "lon": 18.5533,
+      "bbox": [
+        54.5174,
+        18.5503,
+        54.5214,
+        18.5563
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-pomnik-gdynia-sign",
+      "city": "gdynia",
+      "canonicalName": "Napis Gdynia",
+      "aliases": {
+        "pl": [
+          "Gdynia Moje Miasto"
+        ],
+        "en": [
+          "Gdynia Sign"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5203,
+      "lon": 18.5544,
+      "bbox": [
+        54.5193,
+        18.5524,
+        54.5213,
+        18.5564
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-pomnik-jana-pawla",
+      "city": "gdynia",
+      "canonicalName": "Pomnik Jana Pawła II",
+      "aliases": {
+        "pl": [
+          "Pomnik Jana Pawła II w Gdyni"
+        ],
+        "en": [
+          "Monument to Pope John Paul II"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5206,
+      "lon": 18.5522,
+      "bbox": [
+        54.5196,
+        18.5502,
+        54.5216,
+        18.5542
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-pomnik-marynarza-polskiego",
+      "city": "gdynia",
+      "canonicalName": "Pomnik Polskiego Marynarza",
+      "aliases": {
+        "pl": [
+          "Pomnik Marynarza"
+        ],
+        "en": [
+          "Monument to the Polish Sailor"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5203,
+      "lon": 18.555,
+      "bbox": [
+        54.5193,
+        18.553,
+        54.5213,
+        18.557
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-ulica-swietojanska",
+      "city": "gdynia",
+      "canonicalName": "Ulica Świętojańska",
+      "aliases": {
+        "pl": [
+          "Świętojańska"
+        ],
+        "en": [
+          "Świętojańska Street"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5169,
+      "lon": 18.5411,
+      "bbox": [
+        54.5109,
+        18.5381,
+        54.5229,
+        18.5441
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-urzad-miasta",
+      "city": "gdynia",
+      "canonicalName": "Urząd Miasta Gdyni",
+      "aliases": {
+        "pl": [
+          "Ratusz Gdynia"
+        ],
+        "en": [
+          "Gdynia City Hall"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.5114,
+      "lon": 18.5339,
+      "bbox": [
+        54.5104,
+        18.5319,
+        54.5124,
+        18.5359
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-batory",
+      "city": "gdynia",
+      "canonicalName": "CH Batory",
+      "aliases": {
+        "pl": [
+          "Batory",
+          "Centrum Handlowe Batory"
+        ],
+        "en": [
+          "Batory Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.5219,
+      "lon": 18.5419,
+      "bbox": [
+        54.5209,
+        18.5399,
+        54.5229,
+        18.5439
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q9171761"
+    },
+    {
+      "id": "gdy-klif",
+      "city": "gdynia",
+      "canonicalName": "CH Klif",
+      "aliases": {
+        "pl": [
+          "Klif",
+          "Centrum Handlowe Klif"
+        ],
+        "en": [
+          "Klif Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.4753,
+      "lon": 18.5614,
+      "bbox": [
+        54.4743,
+        18.5594,
+        54.4763,
+        18.5634
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-witawa",
+      "city": "gdynia",
+      "canonicalName": "CH Witawa",
+      "aliases": {
+        "pl": [
+          "Witawa"
+        ],
+        "en": [
+          "Witawa Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.5014,
+      "lon": 18.5083,
+      "bbox": [
+        54.5004,
+        18.5063,
+        54.5024,
+        18.5103
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-galeria-riviera",
+      "city": "gdynia",
+      "canonicalName": "Centrum Riviera",
+      "aliases": {
+        "pl": [
+          "Riviera",
+          "CH Riviera"
+        ],
+        "en": [
+          "Riviera Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.5044,
+      "lon": 18.5281,
+      "bbox": [
+        54.5034,
+        18.5261,
+        54.5054,
+        18.5301
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-akwarium",
+      "city": "gdynia",
+      "canonicalName": "Akwarium Gdyńskie",
+      "aliases": {
+        "pl": [
+          "Akwarium Gdyńskie MIR"
+        ],
+        "en": [
+          "Gdynia Aquarium"
+        ],
+        "ru": [
+          "Гдыньский аквариум"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5197,
+      "lon": 18.5517,
+      "bbox": [
+        54.5187,
+        18.5497,
+        54.5207,
+        18.5537
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1096413",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-experyment",
+      "city": "gdynia",
+      "canonicalName": "Centrum Nauki Experyment",
+      "aliases": {
+        "pl": [
+          "Experyment"
+        ],
+        "en": [
+          "Experyment Science Centre"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5103,
+      "lon": 18.5289,
+      "bbox": [
+        54.5093,
+        18.5269,
+        54.5113,
+        18.5309
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dar-pomorza",
+      "city": "gdynia",
+      "canonicalName": "Dar Pomorza",
+      "aliases": {
+        "pl": [
+          "Dar Pomorza"
+        ],
+        "en": [
+          "Dar Pomorza"
+        ],
+        "ru": [
+          "Дар Поморья"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5189,
+      "lon": 18.5544,
+      "bbox": [
+        54.5179,
+        18.5524,
+        54.5199,
+        18.5564
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1165085",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-muzeum-emigracji",
+      "city": "gdynia",
+      "canonicalName": "Muzeum Emigracji w Gdyni",
+      "aliases": {
+        "pl": [
+          "Muzeum Emigracji"
+        ],
+        "en": [
+          "Emigration Museum in Gdynia"
+        ],
+        "ru": [
+          "Музей эмиграции"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5297,
+      "lon": 18.5464,
+      "bbox": [
+        54.5287,
+        18.5444,
+        54.5307,
+        18.5484
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9360497",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-muzeum-marynarki-wojennej",
+      "city": "gdynia",
+      "canonicalName": "Muzeum Marynarki Wojennej",
+      "aliases": {
+        "pl": [
+          "Muzeum MW"
+        ],
+        "en": [
+          "Polish Naval Museum"
+        ],
+        "ru": [
+          "Музей Военно-морского флота Польши"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5186,
+      "lon": 18.5539,
+      "bbox": [
+        54.5176,
+        18.5519,
+        54.5196,
+        18.5559
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9347849",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-muzeum-miasta-gdyni",
+      "city": "gdynia",
+      "canonicalName": "Muzeum Miasta Gdyni",
+      "aliases": {
+        "pl": [
+          "Muzeum Miasta Gdyni"
+        ],
+        "en": [
+          "Gdynia City Museum"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5189,
+      "lon": 18.5467,
+      "bbox": [
+        54.5179,
+        18.5447,
+        54.5199,
+        18.5487
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-muzeum-motoryzacji",
+      "city": "gdynia",
+      "canonicalName": "Muzeum Motoryzacji",
+      "aliases": {
+        "pl": [
+          "Muzeum Motoryzacji"
+        ],
+        "en": [
+          "Automotive Museum"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5167,
+      "lon": 18.5197,
+      "bbox": [
+        54.5157,
+        18.5177,
+        54.5177,
+        18.5217
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-orp-blyskawica",
+      "city": "gdynia",
+      "canonicalName": "ORP Błyskawica",
+      "aliases": {
+        "pl": [
+          "Okręt Muzeum Błyskawica"
+        ],
+        "en": [
+          "ORP Błyskawica"
+        ],
+        "ru": [
+          "ОРП Блыскавица"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.5194,
+      "lon": 18.5539,
+      "bbox": [
+        54.5184,
+        18.5519,
+        54.5204,
+        18.5559
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q956413",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-bulwar-nadmorski",
+      "city": "gdynia",
+      "canonicalName": "Bulwar Nadmorski im. Feliksa Nowowiejskiego",
+      "aliases": {
+        "pl": [
+          "Bulwar Nadmorski"
+        ],
+        "en": [
+          "Seaside Boulevard"
+        ]
+      },
+      "category": "park",
+      "lat": 54.5117,
+      "lon": 18.5469,
+      "bbox": [
+        54.5067,
+        18.5439,
+        54.5167,
+        18.5499
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-kamienna-gora",
+      "city": "gdynia",
+      "canonicalName": "Kamienna Góra",
+      "aliases": {
+        "pl": [
+          "Kamienna Góra"
+        ],
+        "en": [
+          "Kamienna Góra Hill",
+          "Stone Mountain"
+        ]
+      },
+      "category": "park",
+      "lat": 54.5161,
+      "lon": 18.5422,
+      "bbox": [
+        54.5141,
+        18.5392,
+        54.5181,
+        18.5452
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-klif-orlowski",
+      "city": "gdynia",
+      "canonicalName": "Klif Orłowski",
+      "aliases": {
+        "pl": [
+          "Rezerwat Kępa Redłowska"
+        ],
+        "en": [
+          "Orłowo Cliff"
+        ]
+      },
+      "category": "park",
+      "lat": 54.48,
+      "lon": 18.555,
+      "bbox": [
+        54.478,
+        18.552,
+        54.482,
+        18.558
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-park-kolibki",
+      "city": "gdynia",
+      "canonicalName": "Park Kolibki",
+      "aliases": {
+        "pl": [
+          "Park Kolibki"
+        ],
+        "en": [
+          "Kolibki Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4653,
+      "lon": 18.5497,
+      "bbox": [
+        54.4633,
+        18.5467,
+        54.4673,
+        18.5527
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-park-rady-europy",
+      "city": "gdynia",
+      "canonicalName": "Park Rady Europy",
+      "aliases": {
+        "pl": [
+          "Park Rady Europy"
+        ],
+        "en": [
+          "Council of Europe Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.5175,
+      "lon": 18.5489,
+      "bbox": [
+        54.5165,
+        18.5469,
+        54.5185,
+        18.5509
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-plaza-babie-doly",
+      "city": "gdynia",
+      "canonicalName": "Plaża Babie Doły",
+      "aliases": {
+        "pl": [
+          "Plaża Babie Doły"
+        ],
+        "en": [
+          "Babie Doły Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.5983,
+      "lon": 18.5558,
+      "bbox": [
+        54.5973,
+        18.5538,
+        54.5993,
+        18.5578
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "gdy-plaza-srodmiescie",
+      "city": "gdynia",
+      "canonicalName": "Plaża Miejska Gdynia",
+      "aliases": {
+        "pl": [
+          "Plaża Śródmieście"
+        ],
+        "en": [
+          "Gdynia City Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.5181,
+      "lon": 18.5464,
+      "bbox": [
+        54.5171,
+        18.5434,
+        54.5191,
+        18.5494
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-plaza-orlowo",
+      "city": "gdynia",
+      "canonicalName": "Plaża Orłowo",
+      "aliases": {
+        "pl": [
+          "Plaża w Orłowie"
+        ],
+        "en": [
+          "Orłowo Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4853,
+      "lon": 18.5625,
+      "bbox": [
+        54.4833,
+        18.5595,
+        54.4873,
+        18.5655
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-rezerwat-kepa-redlowska",
+      "city": "gdynia",
+      "canonicalName": "Rezerwat Kępa Redłowska",
+      "aliases": {
+        "pl": [
+          "Rezerwat Kępa Redłowska"
+        ],
+        "en": [
+          "Kępa Redłowska Nature Reserve"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4869,
+      "lon": 18.5536,
+      "bbox": [
+        54.4839,
+        18.5486,
+        54.4899,
+        18.5586
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-wzgorze-donas",
+      "city": "gdynia",
+      "canonicalName": "Wzgórze Donas",
+      "aliases": {
+        "pl": [
+          "Wzgórze Donas"
+        ],
+        "en": [
+          "Donas Hill"
+        ]
+      },
+      "category": "park",
+      "lat": 54.535,
+      "lon": 18.4983,
+      "bbox": [
+        54.533,
+        18.4953,
+        54.537,
+        18.5013
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-plac-grunwaldzki",
+      "city": "gdynia",
+      "canonicalName": "Plac Grunwaldzki",
+      "aliases": {
+        "pl": [
+          "Plac Grunwaldzki"
+        ],
+        "en": [
+          "Grunwaldzki Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.5203,
+      "lon": 18.5542,
+      "bbox": [
+        54.5193,
+        18.5522,
+        54.5213,
+        18.5562
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-plac-kaszubski",
+      "city": "gdynia",
+      "canonicalName": "Plac Kaszubski",
+      "aliases": {
+        "pl": [
+          "Plac Kaszubski"
+        ],
+        "en": [
+          "Kashubian Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.5239,
+      "lon": 18.5444,
+      "bbox": [
+        54.5229,
+        18.5424,
+        54.5249,
+        18.5464
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-skwer-kosciuszki",
+      "city": "gdynia",
+      "canonicalName": "Skwer Kościuszki",
+      "aliases": {
+        "pl": [
+          "Skwer Kościuszki"
+        ],
+        "en": [
+          "Kościuszko Square"
+        ],
+        "ru": [
+          "Сквер Костюшко"
+        ]
+      },
+      "category": "square",
+      "lat": 54.5197,
+      "lon": 18.5481,
+      "bbox": [
+        54.5187,
+        18.5461,
+        54.5207,
+        18.5501
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11824089",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-stadion-narodowy-rugby",
+      "city": "gdynia",
+      "canonicalName": "Narodowy Stadion Rugby",
+      "aliases": {
+        "pl": [
+          "Stadion Rugby Gdynia"
+        ],
+        "en": [
+          "National Rugby Stadium"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.4992,
+      "lon": 18.5358,
+      "bbox": [
+        54.4982,
+        18.5338,
+        54.5002,
+        18.5378
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11826026"
+    },
+    {
+      "id": "gdy-stadion-miejski",
+      "city": "gdynia",
+      "canonicalName": "Stadion Miejski w Gdyni",
+      "aliases": {
+        "pl": [
+          "Stadion Arka Gdynia",
+          "Stadion Miejski"
+        ],
+        "en": [
+          "Gdynia Municipal Stadium",
+          "Arka Gdynia Stadium"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.4981,
+      "lon": 18.5344,
+      "bbox": [
+        54.4971,
+        18.5324,
+        54.4991,
+        18.5364
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11826075",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-teatr-miejski",
+      "city": "gdynia",
+      "canonicalName": "Teatr Miejski im. Witolda Gombrowicza",
+      "aliases": {
+        "pl": [
+          "Teatr Miejski"
+        ],
+        "en": [
+          "Gdynia City Theatre"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.5194,
+      "lon": 18.5394,
+      "bbox": [
+        54.5184,
+        18.5374,
+        54.5204,
+        18.5414
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-teatr-muzyczny",
+      "city": "gdynia",
+      "canonicalName": "Teatr Muzyczny im. Danuty Baduszkowej",
+      "aliases": {
+        "pl": [
+          "Teatr Muzyczny w Gdyni"
+        ],
+        "en": [
+          "Gdynia Musical Theatre"
+        ],
+        "ru": [
+          "Музыкальный театр"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.5194,
+      "lon": 18.5397,
+      "bbox": [
+        54.5184,
+        18.5377,
+        54.5204,
+        18.5417
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11816145",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-chylonia",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Chylonia",
+      "aliases": {
+        "pl": [
+          "Dworzec Chylonia"
+        ],
+        "en": [
+          "Gdynia Chylonia station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5589,
+      "lon": 18.5097,
+      "bbox": [
+        54.5579,
+        18.5077,
+        54.5599,
+        18.5117
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-cisowa",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Cisowa",
+      "aliases": {
+        "pl": [
+          "Dworzec Cisowa"
+        ],
+        "en": [
+          "Gdynia Cisowa station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5633,
+      "lon": 18.5,
+      "bbox": [
+        54.5623,
+        18.498,
+        54.5643,
+        18.502
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-grabowek",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Grabówek",
+      "aliases": {
+        "pl": [
+          "Dworzec Grabówek"
+        ],
+        "en": [
+          "Gdynia Grabówek station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5361,
+      "lon": 18.5478,
+      "bbox": [
+        54.5351,
+        18.5458,
+        54.5371,
+        18.5498
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-glowna",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Główna",
+      "aliases": {
+        "pl": [
+          "Dworzec Gdynia Główna"
+        ],
+        "en": [
+          "Gdynia Main Station"
+        ],
+        "ru": [
+          "Гдыня-Главная"
+        ],
+        "uk": [
+          "Ґдиня-Головна"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5183,
+      "lon": 18.53,
+      "bbox": [
+        54.5173,
+        18.528,
+        54.5193,
+        18.532
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2568814",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-karwiny",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Karwiny",
+      "aliases": {
+        "pl": [
+          "Dworzec Karwiny"
+        ],
+        "en": [
+          "Gdynia Karwiny station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4731,
+      "lon": 18.4831,
+      "bbox": [
+        54.4721,
+        18.4811,
+        54.4741,
+        18.4851
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11731098"
+    },
+    {
+      "id": "gdy-dworzec-leszczynki",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Leszczynki",
+      "aliases": {
+        "pl": [
+          "Dworzec Leszczynki"
+        ],
+        "en": [
+          "Gdynia Leszczynki station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5439,
+      "lon": 18.5536,
+      "bbox": [
+        54.5429,
+        18.5516,
+        54.5449,
+        18.5556
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-orlowo",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Orłowo",
+      "aliases": {
+        "pl": [
+          "Dworzec Orłowo"
+        ],
+        "en": [
+          "Gdynia Orłowo station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4778,
+      "lon": 18.5544,
+      "bbox": [
+        54.4768,
+        18.5524,
+        54.4788,
+        18.5564
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-redlowo",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Redłowo",
+      "aliases": {
+        "pl": [
+          "Dworzec Redłowo"
+        ],
+        "en": [
+          "Gdynia Redłowo station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4928,
+      "lon": 18.5403,
+      "bbox": [
+        54.4918,
+        18.5383,
+        54.4938,
+        18.5423
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-stocznia",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Stocznia",
+      "aliases": {
+        "pl": [
+          "Dworzec Stocznia"
+        ],
+        "en": [
+          "Gdynia Stocznia station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5272,
+      "lon": 18.5417,
+      "bbox": [
+        54.5262,
+        18.5397,
+        54.5282,
+        18.5437
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-dworzec-wielki-kack",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Wielki Kack",
+      "aliases": {
+        "pl": [
+          "Dworzec Wielki Kack"
+        ],
+        "en": [
+          "Gdynia Wielki Kack station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4619,
+      "lon": 18.4703,
+      "bbox": [
+        54.4609,
+        18.4683,
+        54.4629,
+        18.4723
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11731126"
+    },
+    {
+      "id": "gdy-dworzec-wzg-nmp",
+      "city": "gdynia",
+      "canonicalName": "Gdynia Wzgórze św. Maksymiliana",
+      "aliases": {
+        "pl": [
+          "Dworzec Wzgórze Maksymiliana"
+        ],
+        "en": [
+          "Gdynia Wzgórze św. Maksymiliana station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.5117,
+      "lon": 18.5422,
+      "bbox": [
+        54.5107,
+        18.5402,
+        54.5127,
+        18.5442
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-akademia-marynarki-wojennej",
+      "city": "gdynia",
+      "canonicalName": "Akademia Marynarki Wojennej",
+      "aliases": {
+        "pl": [
+          "AMW",
+          "Akademia Marynarki Wojennej im. Bohaterów Westerplatte"
+        ],
+        "en": [
+          "Polish Naval Academy"
+        ]
+      },
+      "category": "university",
+      "lat": 54.5461,
+      "lon": 18.5558,
+      "bbox": [
+        54.5441,
+        18.5528,
+        54.5481,
+        18.5588
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1334013",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-uniwersytet-morski",
+      "city": "gdynia",
+      "canonicalName": "Uniwersytet Morski w Gdyni",
+      "aliases": {
+        "pl": [
+          "UMG",
+          "Akademia Morska"
+        ],
+        "en": [
+          "Gdynia Maritime University"
+        ]
+      },
+      "category": "university",
+      "lat": 54.5217,
+      "lon": 18.5475,
+      "bbox": [
+        54.5207,
+        18.5455,
+        54.5227,
+        18.5495
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1432155",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "gdy-wsaib",
+      "city": "gdynia",
+      "canonicalName": "Wyższa Szkoła Administracji i Biznesu",
+      "aliases": {
+        "pl": [
+          "WSAiB"
+        ],
+        "en": [
+          "University of Business and Administration in Gdynia"
+        ]
+      },
+      "category": "university",
+      "lat": 54.5214,
+      "lon": 18.5383,
+      "bbox": [
+        54.5204,
+        18.5363,
+        54.5224,
+        18.5403
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q2497779"
+    }
+  ]
+}

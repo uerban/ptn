@@ -1,0 +1,13 @@
+/* Preserve the input nodes and their selection while choosing a single field. */
+.search-picker[data-single-field][data-active-field="from"] [data-search-field="to"],
+.search-picker[data-single-field][data-active-field="to"] [data-search-field="from"] {
+  display: none;
+}
+.search-picker[data-single-field][data-active-field] .search-picker-fields > [data-search-field] {
+  margin-block: 0;
+}
+
+/* Avoid input auto-zoom on phone browsers while retaining desktop density. */
+@media (max-width: 640px) {
+  .search-picker [role="searchbox"] { font-size: 16px; }
+}

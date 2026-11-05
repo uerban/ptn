@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.07163, "lon": 19.80018 },
+    "to": { "lat": 50.0677, "lon": 19.9467 },
+    "description": "airport-to-center: Balice Airport to Krakow Glowny (bus 208/292 or rail)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["BUS", "RAIL", "WALK"],
+  "maxLatencyMs": 3000
+}

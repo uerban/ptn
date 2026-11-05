@@ -1,0 +1,47 @@
+{
+  "data": [
+    {
+      "id": "s1",
+      "name": "Gedimino pr.",
+      "location": { "lat": 54.6872, "lon": 25.2797 },
+      "routes": [
+        { "id": "r1", "shortName": "1", "color": "0073AC", "textColor": "FFFFFF", "mode": "BUS" },
+        { "id": "r2", "shortName": "2", "color": "DC143C", "textColor": "FFFFFF", "mode": "BUS" }
+      ]
+    },
+    {
+      "id": "s2",
+      "name": "Lukiškių aikštė",
+      "location": { "lat": 54.6876, "lon": 25.2808 },
+      "routes": [
+        { "id": "r3", "shortName": "3G", "color": "008000", "textColor": "FFFFFF", "mode": "BUS" }
+      ]
+    },
+    {
+      "id": "s3",
+      "name": "Seimo rūmai",
+      "location": { "lat": 54.6865, "lon": 25.2785 },
+      "routes": [
+        { "id": "r4", "shortName": "6", "color": "16A34A", "textColor": "FFFFFF", "mode": "TRAM" }
+      ]
+    },
+    {
+      "id": "s4",
+      "name": "Vilniaus g.",
+      "location": { "lat": 54.6880, "lon": 25.2815 },
+      "routes": [
+        { "id": "r5", "shortName": "16", "color": "DC2626", "textColor": "FFFFFF", "mode": "TRAM" },
+        { "id": "r1", "shortName": "1", "color": "0073AC", "textColor": "FFFFFF", "mode": "BUS" }
+      ]
+    },
+    {
+      "id": "s5",
+      "name": "Katedra",
+      "location": { "lat": 54.6860, "lon": 25.2820 },
+      "routes": [
+        { "id": "r2", "shortName": "2", "color": "DC143C", "textColor": "FFFFFF", "mode": "BUS" },
+        { "id": "r5", "shortName": "16", "color": "DC2626", "textColor": "FFFFFF", "mode": "TRAM" }
+      ]
+    }
+  ]
+}

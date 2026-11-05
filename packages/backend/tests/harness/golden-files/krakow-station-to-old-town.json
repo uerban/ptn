@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.0677, "lon": 19.9467 },
+    "to": { "lat": 50.0616, "lon": 19.9373 },
+    "description": "station-to-old-town: Krakow Glowny to Rynek Glowny (Main Market Square)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["WALK", "TRAM", "BUS"],
+  "maxLatencyMs": 3000
+}

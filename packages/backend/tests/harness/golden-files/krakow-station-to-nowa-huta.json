@@ -1,0 +1,11 @@
+{
+  "query": {
+    "city": "krakow",
+    "from": { "lat": 50.0677, "lon": 19.9467 },
+    "to": { "lat": 50.0725, "lon": 20.0375 },
+    "description": "station-to-nowa-huta: Krakow Glowny to Nowa Huta via tram (4/10/22)"
+  },
+  "expectedMinItineraries": 1,
+  "expectedModes": ["TRAM", "BUS", "WALK"],
+  "maxLatencyMs": 3000
+}

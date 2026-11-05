@@ -1,0 +1,1022 @@
+{
+  "_meta": {
+    "generated": "2026-04-13",
+    "sourceVersion": "2026-04-13",
+    "entryCount": 37,
+    "needsReviewCount": 5,
+    "notes": "Sopot is a small spa town; fewer entries than Gdansk/Gdynia. Wikidata SPARQL endpoint was unreachable from this environment; wikidataId is populated only where confidence is high. nearestStopGroupId left null for all entries (follow-up task)."
+  },
+  "entries": [
+    {
+      "id": "sop-dworzec-pks",
+      "city": "sopot",
+      "canonicalName": "Dworzec Autobusowy Sopot",
+      "aliases": {
+        "pl": [
+          "Dworzec PKS Sopot"
+        ],
+        "en": [
+          "Sopot Bus Terminal"
+        ]
+      },
+      "category": "bus_terminal",
+      "lat": 54.4414,
+      "lon": 18.56,
+      "bbox": [
+        54.4404,
+        18.558,
+        54.4424,
+        18.562
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-aqua-park",
+      "city": "sopot",
+      "canonicalName": "Aquapark Sopot",
+      "aliases": {
+        "pl": [
+          "Aquapark w Sopocie"
+        ],
+        "en": [
+          "Sopot Aquapark"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.4619,
+      "lon": 18.5489,
+      "bbox": [
+        54.4609,
+        18.5469,
+        54.4629,
+        18.5509
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-opera-lesna",
+      "city": "sopot",
+      "canonicalName": "Opera Leśna",
+      "aliases": {
+        "pl": [
+          "Opera Leśna w Sopocie"
+        ],
+        "en": [
+          "Forest Opera"
+        ],
+        "ru": [
+          "Лесная опера"
+        ],
+        "uk": [
+          "Лісова опера"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.4456,
+      "lon": 18.5564,
+      "bbox": [
+        54.4446,
+        18.5544,
+        54.4466,
+        18.5584
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1258962",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-sopoteka",
+      "city": "sopot",
+      "canonicalName": "Sopoteka",
+      "aliases": {
+        "pl": [
+          "Sopoteka"
+        ],
+        "en": [
+          "Sopoteka Library"
+        ]
+      },
+      "category": "cultural_venue",
+      "lat": 54.4411,
+      "lon": 18.56,
+      "bbox": [
+        54.4401,
+        18.558,
+        54.4421,
+        18.562
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-wojewodzki-zespol-reumatologiczny",
+      "city": "sopot",
+      "canonicalName": "Wojewódzki Zespół Reumatologiczny",
+      "aliases": {
+        "pl": [
+          "Szpital Reumatologiczny Sopot"
+        ],
+        "en": [
+          "Regional Rheumatology Centre Sopot"
+        ]
+      },
+      "category": "hospital",
+      "lat": 54.44,
+      "lon": 18.5642,
+      "bbox": [
+        54.439,
+        18.5622,
+        54.441,
+        18.5662
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "sop-dom-zdrojowy",
+      "city": "sopot",
+      "canonicalName": "Dom Zdrojowy",
+      "aliases": {
+        "pl": [
+          "Dom Zdrojowy w Sopocie"
+        ],
+        "en": [
+          "Spa House"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4436,
+      "lon": 18.5708,
+      "bbox": [
+        54.4426,
+        18.5688,
+        54.4446,
+        18.5728
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-kosciol-gwiazda-morza",
+      "city": "sopot",
+      "canonicalName": "Kościół Gwiazdy Morza",
+      "aliases": {
+        "pl": [
+          "Kościół Gwiazdy Morza"
+        ],
+        "en": [
+          "Star of the Sea Church"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4392,
+      "lon": 18.56,
+      "bbox": [
+        54.4382,
+        18.558,
+        54.4402,
+        18.562
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11753036"
+    },
+    {
+      "id": "sop-kosciol-zbawiciela",
+      "city": "sopot",
+      "canonicalName": "Kościół Zbawiciela",
+      "aliases": {
+        "pl": [
+          "Kościół Zbawiciela w Sopocie"
+        ],
+        "en": [
+          "Church of the Saviour"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4431,
+      "lon": 18.5639,
+      "bbox": [
+        54.4421,
+        18.5619,
+        54.4441,
+        18.5659
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q11753078"
+    },
+    {
+      "id": "sop-kosciol-sw-jerzego",
+      "city": "sopot",
+      "canonicalName": "Kościół św. Jerzego",
+      "aliases": {
+        "pl": [
+          "Kościół św. Jerzego w Sopocie"
+        ],
+        "en": [
+          "Church of St. George"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4414,
+      "lon": 18.5594,
+      "bbox": [
+        54.4404,
+        18.5574,
+        54.4424,
+        18.5614
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-krzywy-domek",
+      "city": "sopot",
+      "canonicalName": "Krzywy Domek",
+      "aliases": {
+        "pl": [
+          "Krzywy Domek"
+        ],
+        "en": [
+          "Crooked House"
+        ],
+        "ru": [
+          "Кривой домик"
+        ],
+        "uk": [
+          "Кривий будиночок"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4414,
+      "lon": 18.565,
+      "bbox": [
+        54.4404,
+        18.563,
+        54.4424,
+        18.567
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1253940",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-latarnia-morska",
+      "city": "sopot",
+      "canonicalName": "Latarnia Morska Sopot",
+      "aliases": {
+        "pl": [
+          "Latarnia Morska w Sopocie"
+        ],
+        "en": [
+          "Sopot Lighthouse"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4428,
+      "lon": 18.5697,
+      "bbox": [
+        54.4418,
+        18.5677,
+        54.4438,
+        18.5717
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-molo",
+      "city": "sopot",
+      "canonicalName": "Molo w Sopocie",
+      "aliases": {
+        "pl": [
+          "Sopockie Molo"
+        ],
+        "en": [
+          "Sopot Pier"
+        ],
+        "ru": [
+          "Сопотский пирс"
+        ],
+        "uk": [
+          "Сопотський пірс"
+        ],
+        "lt": [
+          "Sopoto tiltas"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4453,
+      "lon": 18.57,
+      "bbox": [
+        54.4423,
+        18.568,
+        54.4483,
+        18.572
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q1256090",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-sanktuarium-matki-boskiej",
+      "city": "sopot",
+      "canonicalName": "Sanktuarium Matki Boskiej Fatimskiej",
+      "aliases": {
+        "pl": [
+          "Sanktuarium Fatimskie"
+        ],
+        "en": [
+          "Our Lady of Fatima Sanctuary"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4456,
+      "lon": 18.5436,
+      "bbox": [
+        54.4446,
+        18.5416,
+        54.4466,
+        18.5456
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "sop-grand-hotel",
+      "city": "sopot",
+      "canonicalName": "Sofitel Grand Sopot",
+      "aliases": {
+        "pl": [
+          "Grand Hotel"
+        ],
+        "en": [
+          "Grand Hotel Sopot",
+          "Sofitel Grand Sopot"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4436,
+      "lon": 18.5692,
+      "bbox": [
+        54.4426,
+        18.5672,
+        54.4446,
+        18.5712
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-monte-cassino",
+      "city": "sopot",
+      "canonicalName": "Ulica Bohaterów Monte Cassino",
+      "aliases": {
+        "pl": [
+          "Monciak",
+          "Monte Cassino"
+        ],
+        "en": [
+          "Monte Cassino Street"
+        ],
+        "ru": [
+          "Улица Героев Монте-Кассино"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4417,
+      "lon": 18.5636,
+      "bbox": [
+        54.4407,
+        18.56,
+        54.4427,
+        18.567
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11821022",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-urzad-miasta",
+      "city": "sopot",
+      "canonicalName": "Urząd Miasta Sopotu",
+      "aliases": {
+        "pl": [
+          "Ratusz Sopot"
+        ],
+        "en": [
+          "Sopot City Hall"
+        ]
+      },
+      "category": "landmark",
+      "lat": 54.4419,
+      "lon": 18.5622,
+      "bbox": [
+        54.4409,
+        18.5602,
+        54.4429,
+        18.5642
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-centrum-haffnera",
+      "city": "sopot",
+      "canonicalName": "Centrum Haffnera",
+      "aliases": {
+        "pl": [
+          "Haffner",
+          "CH Haffnera"
+        ],
+        "en": [
+          "Haffner Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.4431,
+      "lon": 18.57,
+      "bbox": [
+        54.4421,
+        18.568,
+        54.4441,
+        18.572
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q9174750"
+    },
+    {
+      "id": "sop-rezydent",
+      "city": "sopot",
+      "canonicalName": "Rezydent",
+      "aliases": {
+        "pl": [
+          "CH Rezydent"
+        ],
+        "en": [
+          "Rezydent Shopping Centre"
+        ]
+      },
+      "category": "mall",
+      "lat": 54.4414,
+      "lon": 18.565,
+      "bbox": [
+        54.4404,
+        18.563,
+        54.4424,
+        18.567
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-muzeum-sopotu",
+      "city": "sopot",
+      "canonicalName": "Muzeum Sopotu",
+      "aliases": {
+        "pl": [
+          "Muzeum Sopotu"
+        ],
+        "en": [
+          "Sopot Museum"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.4364,
+      "lon": 18.5717,
+      "bbox": [
+        54.4354,
+        18.5697,
+        54.4374,
+        18.5737
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q9360594",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-panstwowa-galeria-sztuki",
+      "city": "sopot",
+      "canonicalName": "Państwowa Galeria Sztuki w Sopocie",
+      "aliases": {
+        "pl": [
+          "PGS",
+          "Państwowa Galeria Sztuki"
+        ],
+        "en": [
+          "State Art Gallery in Sopot"
+        ]
+      },
+      "category": "museum",
+      "lat": 54.4417,
+      "lon": 18.5656,
+      "bbox": [
+        54.4407,
+        18.5636,
+        54.4427,
+        18.5676
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-park-poludniowy",
+      "city": "sopot",
+      "canonicalName": "Park Południowy",
+      "aliases": {
+        "pl": [
+          "Park Południowy w Sopocie"
+        ],
+        "en": [
+          "Southern Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4378,
+      "lon": 18.5697,
+      "bbox": [
+        54.4358,
+        18.5667,
+        54.4398,
+        18.5727
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-park-polnocny",
+      "city": "sopot",
+      "canonicalName": "Park Północny",
+      "aliases": {
+        "pl": [
+          "Park Północny w Sopocie"
+        ],
+        "en": [
+          "Northern Park"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4511,
+      "lon": 18.5722,
+      "bbox": [
+        54.4491,
+        18.5692,
+        54.4531,
+        18.5752
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-plaza",
+      "city": "sopot",
+      "canonicalName": "Plaża w Sopocie",
+      "aliases": {
+        "pl": [
+          "Sopocka Plaża"
+        ],
+        "en": [
+          "Sopot Beach"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4436,
+      "lon": 18.5672,
+      "bbox": [
+        54.4386,
+        18.5642,
+        54.4486,
+        18.5702
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-lysa-gora",
+      "city": "sopot",
+      "canonicalName": "Łysa Góra",
+      "aliases": {
+        "pl": [
+          "Łysa Góra"
+        ],
+        "en": [
+          "Łysa Góra Hill",
+          "Bald Mountain"
+        ]
+      },
+      "category": "park",
+      "lat": 54.4436,
+      "lon": 18.5406,
+      "bbox": [
+        54.4416,
+        18.5376,
+        54.4456,
+        18.5436
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-plac-konstytucji",
+      "city": "sopot",
+      "canonicalName": "Plac Konstytucji 3 Maja",
+      "aliases": {
+        "pl": [
+          "Plac Konstytucji"
+        ],
+        "en": [
+          "3rd of May Constitution Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.4417,
+      "lon": 18.5603,
+      "bbox": [
+        54.4407,
+        18.5583,
+        54.4427,
+        18.5623
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-plac-przyjaciol-sopotu",
+      "city": "sopot",
+      "canonicalName": "Plac Przyjaciół Sopotu",
+      "aliases": {
+        "pl": [
+          "Plac Przyjaciół Sopotu"
+        ],
+        "en": [
+          "Friends of Sopot Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.4417,
+      "lon": 18.5653,
+      "bbox": [
+        54.4407,
+        18.5633,
+        54.4427,
+        18.5673
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-plac-zdrojowy",
+      "city": "sopot",
+      "canonicalName": "Plac Zdrojowy",
+      "aliases": {
+        "pl": [
+          "Plac Zdrojowy w Sopocie"
+        ],
+        "en": [
+          "Spa Square"
+        ]
+      },
+      "category": "square",
+      "lat": 54.4431,
+      "lon": 18.5694,
+      "bbox": [
+        54.4421,
+        18.5674,
+        54.4441,
+        18.5714
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-ergo-arena",
+      "city": "sopot",
+      "canonicalName": "Ergo Arena",
+      "aliases": {
+        "pl": [
+          "Ergo Arena"
+        ],
+        "en": [
+          "Ergo Arena"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.4039,
+      "lon": 18.5719,
+      "bbox": [
+        54.4029,
+        18.5699,
+        54.4049,
+        18.5739
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false,
+      "wikidataId": "Q9263090"
+    },
+    {
+      "id": "sop-hipodrom",
+      "city": "sopot",
+      "canonicalName": "Hipodrom Sopot",
+      "aliases": {
+        "pl": [
+          "Hipodrom w Sopocie"
+        ],
+        "en": [
+          "Sopot Hippodrome"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.43,
+      "lon": 18.5731,
+      "bbox": [
+        54.428,
+        18.5701,
+        54.432,
+        18.5761
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q11750301",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-stadion-bltp",
+      "city": "sopot",
+      "canonicalName": "Stadion Leśny Sopot",
+      "aliases": {
+        "pl": [
+          "Stadion Leśny"
+        ],
+        "en": [
+          "Sopot Forest Stadium"
+        ]
+      },
+      "category": "stadium",
+      "lat": 54.4456,
+      "lon": 18.5536,
+      "bbox": [
+        54.4446,
+        18.5516,
+        54.4466,
+        18.5556
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true
+    },
+    {
+      "id": "sop-scena-kameralna",
+      "city": "sopot",
+      "canonicalName": "Scena Kameralna Teatru Wybrzeże",
+      "aliases": {
+        "pl": [
+          "Scena Kameralna"
+        ],
+        "en": [
+          "Wybrzeże Theatre Chamber Stage"
+        ]
+      },
+      "category": "theater",
+      "lat": 54.4419,
+      "lon": 18.5608,
+      "bbox": [
+        54.4409,
+        18.5588,
+        54.4429,
+        18.5628
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-dworzec-sopot",
+      "city": "sopot",
+      "canonicalName": "Sopot",
+      "aliases": {
+        "pl": [
+          "Dworzec Sopot",
+          "Sopot główny"
+        ],
+        "en": [
+          "Sopot railway station"
+        ],
+        "ru": [
+          "Сопот"
+        ],
+        "uk": [
+          "Сопот"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4414,
+      "lon": 18.5608,
+      "bbox": [
+        54.4404,
+        18.5588,
+        54.4424,
+        18.5628
+      ],
+      "nearestStopGroupId": null,
+      "wikidataId": "Q2568780",
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-dworzec-kamienny-potok",
+      "city": "sopot",
+      "canonicalName": "Sopot Kamienny Potok",
+      "aliases": {
+        "pl": [
+          "Dworzec Kamienny Potok"
+        ],
+        "en": [
+          "Sopot Kamienny Potok station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4589,
+      "lon": 18.5539,
+      "bbox": [
+        54.4579,
+        18.5519,
+        54.4599,
+        18.5559
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-dworzec-wyscigi",
+      "city": "sopot",
+      "canonicalName": "Sopot Wyścigi",
+      "aliases": {
+        "pl": [
+          "Dworzec Wyścigi"
+        ],
+        "en": [
+          "Sopot Wyścigi station"
+        ]
+      },
+      "category": "train_station",
+      "lat": 54.4303,
+      "lon": 18.5678,
+      "bbox": [
+        54.4293,
+        18.5658,
+        54.4313,
+        18.5698
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-sszp",
+      "city": "sopot",
+      "canonicalName": "Sopocka Szkoła Wyższa",
+      "aliases": {
+        "pl": [
+          "SSW"
+        ],
+        "en": [
+          "Sopot University of Applied Sciences"
+        ]
+      },
+      "category": "university",
+      "lat": 54.4414,
+      "lon": 18.5592,
+      "bbox": [
+        54.4404,
+        18.5572,
+        54.4424,
+        18.5612
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": true,
+      "wikidataId": "Q7561325"
+    },
+    {
+      "id": "sop-uniwersytet-gdanski-ekonomia",
+      "city": "sopot",
+      "canonicalName": "Wydział Ekonomiczny UG",
+      "aliases": {
+        "pl": [
+          "WE UG"
+        ],
+        "en": [
+          "Faculty of Economics, University of Gdańsk"
+        ]
+      },
+      "category": "university",
+      "lat": 54.4361,
+      "lon": 18.5672,
+      "bbox": [
+        54.4351,
+        18.5652,
+        54.4371,
+        18.5692
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    },
+    {
+      "id": "sop-uniwersytet-gdanski-wzr",
+      "city": "sopot",
+      "canonicalName": "Wydział Zarządzania UG",
+      "aliases": {
+        "pl": [
+          "WZR UG",
+          "Sopot Uniwersytet"
+        ],
+        "en": [
+          "Faculty of Management, University of Gdańsk"
+        ]
+      },
+      "category": "university",
+      "lat": 54.4378,
+      "lon": 18.565,
+      "bbox": [
+        54.4368,
+        18.563,
+        54.4388,
+        18.567
+      ],
+      "nearestStopGroupId": null,
+      "source": "curated",
+      "sourceVersion": "2026-04-13",
+      "needsNativeReview": false
+    }
+  ]
+}
