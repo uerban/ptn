@@ -65,5 +65,18 @@ the Linux x86_64 archive. The expanded matrix applies to subsequent releases;
 it does not change that tag or its source revision. For build and packaging
 instructions, see the [source README](https://github.com/uerban/ptn#installable-archive).
 Tags with a prerelease suffix, such as `v0.1.1-rc.1`, create a prerelease
-draft. Ordinary version tags create a regular release draft. Both wait for
-the same build and validation gates and require manual publication.
+draft. Ordinary version tags create a regular release draft. Both require manual publication.
+
+Build validation runs on pull requests and main; tags do not rebuild. The
+separate `draft-release.yml` workflow resolves the tag to its exact commit and
+reuses the five archives from a successful main validation run. Checksums and
+archive source metadata are checked before creating the draft.
+
+If no validation run exists, or all required artifacts exist but any have
+expired, draft creation dispatches validation for that exact source commit
+and waits. A failed build or missing required artifact fails immediately;
+a partial successful run is never automatically rebuilt. Rerun validation
+explicitly after fixing a partial run. Final archives are retained for 30 days.
+
+For an existing tag (including tags predating this workflow), manually run
+`draft-release.yml` on main with its `tag` input. This does not move the tag.

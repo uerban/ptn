@@ -1,0 +1,36 @@
+name: Draft release from validated artifacts
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write # Dispatch validation only when unbuilt or expired.
+
+concurrency:
+  group: release-draft-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      # Promotion logic comes from main, allowing existing tags to be promoted.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Reuse validated archives or wait for a required rebuild
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 scripts/prepare-release-draft.py "$RELEASE_TAG"
