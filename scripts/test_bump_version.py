@@ -7,7 +7,7 @@ import tempfile
 import tomllib
 import unittest
 
-spec = importlib.util.spec_from_file_location('bump', Path(__file__).with_name('bump-version.py'))
+spec = importlib.util.spec_from_file_location('bump', Path(__file__).with_name('version.py'))
 bump = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bump)
 
@@ -70,6 +70,32 @@ class BumpTests(unittest.TestCase):
                          {'crates/pt-wasm/Cargo.toml', 'crates/pt-serve/Cargo.toml',
                           'crates/pt-wasm/pkg-web/package.json', 'Cargo.lock'})
         self.assertEqual(json.loads(changes[bump.ROOT / 'crates/pt-wasm/pkg-web/package.json'])['version'], '0.1.2')
+
+    def test_node_package_can_be_bumped_individually(self):
+        manifests = bump.discover(bump.ROOT)
+        changes = bump.plan(bump.ROOT, manifests, '0.1.2', selected_packages=['@pt/frontend'])
+        self.assertEqual(set(changes), {bump.ROOT / 'packages/frontend/package.json'})
+        self.assertEqual(json.loads(next(iter(changes.values())))['version'], '0.1.2')
+
+    def test_wasm_package_selection_keeps_crate_paired(self):
+        changes = bump.plan(bump.ROOT, bump.discover(bump.ROOT), '0.1.2',
+                            selected_packages=['pt-wasm'])
+        self.assertEqual({str(p.relative_to(bump.ROOT)) for p in changes},
+                         {'crates/pt-wasm/Cargo.toml', 'crates/pt-wasm/pkg-web/package.json', 'Cargo.lock'})
+
+    def test_unknown_node_package_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Unknown packages'):
+            bump.plan(bump.ROOT, bump.discover(bump.ROOT), '0.1.2', selected_packages=['typo'])
+
+    def test_list_reports_actual_source_values(self):
+        manifests = bump.discover(bump.ROOT)
+        rows = bump.list_versions(bump.ROOT, manifests)
+        for kind, name, version, source in rows:
+            text = (bump.ROOT / source).read_text()
+            package = json.loads(text) if source.endswith('.json') else tomllib.loads(text)['package']
+            self.assertEqual((name, version), (package['name'], package['version']))
+        self.assertEqual({row[0] for row in rows}, {'crate', 'wasm', 'node'})
+        self.assertEqual(len(rows), len(manifests) - 1)  # Root Cargo manifest has no package.
 
     def test_unknown_crate_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Unknown workspace crates'):

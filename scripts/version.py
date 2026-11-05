@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize release versions without changing dependency or wire-format versions."""
+"""List and update source package versions across Rust, WASM, and Node."""
 import argparse
 import json
 from pathlib import Path
@@ -33,10 +33,11 @@ def replace_toml_version(text, section, version):
     return result
 
 
-def plan(root, manifests, version, selected_crates=None):
+def plan(root, manifests, version, selected_crates=None, selected_packages=None):
     """Validate all inputs and prepare every edit before writing any file."""
     validate_version(version)
-    if selected_crates:
+    if selected_crates or selected_packages:
+        selected_crates = selected_crates or []
         available = {}
         for relative in manifests:
             if relative.endswith('Cargo.toml'):
@@ -47,7 +48,17 @@ def plan(root, manifests, version, selected_crates=None):
         if unknown:
             raise ValueError(f'Unknown workspace crates: {", ".join(sorted(unknown))}')
         chosen = {available[name] for name in selected_crates}
-        if 'pt-wasm' in selected_crates:
+        packages = {json.loads((root / p).read_text())['name']: p
+                    for p in manifests if p.endswith('package.json')}
+        unknown_packages = set(selected_packages or []) - packages.keys()
+        if unknown_packages:
+            raise ValueError(f'Unknown packages: {", ".join(sorted(unknown_packages))}')
+        chosen.update(packages[name] for name in selected_packages or [])
+        if 'pt-wasm' in (selected_packages or []):
+            if 'pt-wasm' not in available:
+                raise ValueError('Missing pt-wasm crate manifest')
+            chosen.add(available['pt-wasm'])
+        if 'pt-wasm' in selected_crates or 'pt-wasm' in (selected_packages or []):
             chosen.add('crates/pt-wasm/pkg-web/package.json')
         manifests = [p for p in manifests if p in chosen]
     changes = {}
@@ -70,7 +81,7 @@ def plan(root, manifests, version, selected_crates=None):
             else:
                 crates[data['package']['name']] = data['package']['version']
                 if isinstance(data['package']['version'], dict):
-                    if selected_crates:
+                    if selected_crates or selected_packages:
                         raise ValueError(f'{relative} inherits its version; use a synchronized bump')
                     if not data['package']['version'].get('workspace'):
                         raise ValueError(f'Unsupported inherited version: {relative}')
@@ -98,23 +109,58 @@ def plan(root, manifests, version, selected_crates=None):
     return changes
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('version', help='Explicit release version, without v')
-    parser.add_argument('--crate', action='append', dest='crates', metavar='NAME',
-                        help='Bump only this Rust crate (repeatable); pt-wasm includes its JS manifest')
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('--dry-run', action='store_true', help='Show files that would change')
-    mode.add_argument('--check', action='store_true', help='Fail if versions differ from the requested version')
-    args = parser.parse_args()
+def discover(root):
     # Restrict discovery to tracked source manifests, excluding node_modules and releases.
-    files = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
-    manifests = sorted(p for p in files if p in ('Cargo.toml', 'package.json')
+    files = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
+    return sorted(p for p in files if p in ('Cargo.toml', 'package.json')
                        or re.fullmatch(r'crates/[^/]+/Cargo.toml', p)
                        or re.fullmatch(r'(?:packages|subprojects)/[^/]+/package.json', p)
                        or p == 'crates/pt-wasm/pkg-web/package.json')
+
+
+def list_versions(root, manifests):
+    workspace = tomllib.loads((root / 'Cargo.toml').read_text()).get('workspace', {}).get('package', {})
+    rows = []
+    for relative in manifests:
+        if relative.endswith('package.json'):
+            package = json.loads((root / relative).read_text())
+            kind = 'wasm' if relative.startswith('crates/pt-wasm/') else 'node'
+        else:
+            package = tomllib.loads((root / relative).read_text()).get('package')
+            if not package:
+                continue
+            kind = 'crate'
+        version = package['version']
+        if isinstance(version, dict):
+            version = workspace['version']
+        rows.append((kind, package['name'], version, relative))
+    return rows
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    commands.add_parser('list', help='List every source package and its current version')
+    update = commands.add_parser('bump', help='Set all versions, or just selected components')
+    update.add_argument('version', help='Explicit release version, without v')
+    update.add_argument('--crate', action='append', dest='crates', metavar='NAME',
+                        help='Rust crate to update (repeatable)')
+    update.add_argument('--package', action='append', dest='packages', metavar='NAME',
+                        help='Node or WASM package to update (repeatable)')
+    update.add_argument('--wasm', action='store_true', help='Update pt-wasm crate and JS package together')
+    mode = update.add_mutually_exclusive_group()
+    mode.add_argument('--dry-run', action='store_true', help='Show files that would change')
+    mode.add_argument('--check', action='store_true', help='Fail if selected versions differ')
+    args = parser.parse_args()
+    manifests = discover(ROOT)
     try:
-        changes = plan(ROOT, manifests, args.version, args.crates)
+        if args.command == 'list':
+            print(f'{"TYPE":<8} {"NAME":<24} {"VERSION":<18} SOURCE')
+            for kind, name, version, source in list_versions(ROOT, manifests):
+                print(f'{kind:<8} {name:<24} {version:<18} {source}')
+            return
+        crates = (args.crates or []) + (['pt-wasm'] if args.wasm else [])
+        changes = plan(ROOT, manifests, args.version, crates, args.packages)
     except (ValueError, KeyError, OSError) as error:
         parser.exit(2, f'{error}\n')
     for path, content in changes.items():
