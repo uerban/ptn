@@ -151,3 +151,9 @@ Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 GTFS can come directly from its publisher or from a pinned community preparation
 recipe. See [source-driven feed ingestion](docs/gtfs-sources.md). The refresh
 runtime is included in native archives and the Docker host image.
+
+## Host-defined cities
+
+Serve a [runtime city catalog](docs/runtime-cities.md) to configure cities,
+including cities absent from the prebuilt frontend. Schema 2 provides names,
+timezones, map centers and bounds without rebuilding the web archive.

@@ -1,4 +1,4 @@
-import {deploymentCityIds} from "./deployment.ts";
+import {deploymentCityConfigs} from "./deployment.ts";
 import type { RouteGroup } from "../services/routeGroups.ts";
 import type { PoiFetchMode, SelfHostedGeocoderConfig, TransportMode } from "@pt/shared";
 
@@ -87,7 +87,7 @@ export interface CityConfig {
   readonly sharedMobility?: readonly SharedMobilitySystem[];
 }
 
-export const CITIES: readonly CityConfig[] = [
+const BUILTIN_CITIES: readonly CityConfig[] = [
   // Existing cities retain their order (Vilnius is the default).
   {
     id: "vilnius",
@@ -172,14 +172,13 @@ export const CITIES: readonly CityConfig[] = [
   },
 ];
 
-const deploymentCities = deploymentCityIds(CITIES.map(city => city.id));
+// All consumers (including timezone and geocoder lookup) share the runtime catalog.
+const deploymentCities = deploymentCityConfigs(BUILTIN_CITIES);
+export const CITIES: readonly CityConfig[] = deploymentCities ?? BUILTIN_CITIES;
 
-/** Cities visible in pickers and findNearestCity — the `available:true` entries. */
+/** Cities enabled by the host, or source defaults when no host config exists. */
 export function getAvailableCities(): CityConfig[] {
-  if (deploymentCities) return deploymentCities.map(id => ({
-    ...CITIES.find(city => city.id === id)!, available: true,
-  }));
-  return CITIES.filter((c) => c.available);
+  return CITIES.filter(city => city.available);
 }
 
 /** Find nearest available city to a lat/lon coordinate. */
