@@ -51,6 +51,30 @@ class BumpTests(unittest.TestCase):
                              [p for p in after['package'] if 'source' in p])
             self.assertFalse(bump.plan(fixture, manifests, '0.2.0-rc.1'))
 
+    def test_crate_hotfix_leaves_other_versions_unchanged(self):
+        manifests = ['Cargo.toml', 'package.json', 'crates/pt-wasm/pkg-web/package.json']
+        manifests += [str(p.relative_to(bump.ROOT)) for p in (bump.ROOT / 'crates').glob('*/Cargo.toml')]
+        changes = bump.plan(bump.ROOT, manifests, '0.1.2', ['pt-serve'])
+        self.assertEqual({str(p.relative_to(bump.ROOT)) for p in changes},
+                         {'crates/pt-serve/Cargo.toml', 'Cargo.lock'})
+        before = tomllib.loads((bump.ROOT / 'Cargo.lock').read_text())['package']
+        after = tomllib.loads(changes[bump.ROOT / 'Cargo.lock'])['package']
+        self.assertEqual([p for p in before if p['name'] != 'pt-serve'],
+                         [p for p in after if p['name'] != 'pt-serve'])
+
+    def test_wasm_hotfix_includes_js_manifest_and_multiple_selection(self):
+        manifests = ['crates/pt-wasm/Cargo.toml', 'crates/pt-serve/Cargo.toml',
+                     'crates/pt-wasm/pkg-web/package.json', 'package.json']
+        changes = bump.plan(bump.ROOT, manifests, '0.1.2', ['pt-wasm', 'pt-serve'])
+        self.assertEqual({str(p.relative_to(bump.ROOT)) for p in changes},
+                         {'crates/pt-wasm/Cargo.toml', 'crates/pt-serve/Cargo.toml',
+                          'crates/pt-wasm/pkg-web/package.json', 'Cargo.lock'})
+        self.assertEqual(json.loads(changes[bump.ROOT / 'crates/pt-wasm/pkg-web/package.json'])['version'], '0.1.2')
+
+    def test_unknown_crate_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Unknown workspace crates'):
+            bump.plan(bump.ROOT, ['crates/pt-serve/Cargo.toml'], '0.1.2', ['pt-typo'])
+
     def test_missing_workspace_lock_entry_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

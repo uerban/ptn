@@ -96,3 +96,17 @@ pins, and binary/wire-format versions are unchanged. Rebuild WASM from the
 updated crate before packaging; editing its manifest does not rebuild binaries.
 Review and commit the version changes before validation, then tag that
 validated commit. The script does not create commits, tags, or releases.
+
+For a crate-specific hotfix, use:
+
+```sh
+python3 scripts/bump-version.py 0.1.2 --crate pt-serve
+python3 scripts/bump-version.py 0.1.2 --crate pt-wasm --dry-run
+```
+
+`--crate` can be repeated. Only selected crate manifests and their workspace
+lockfile entries change; selecting `pt-wasm` also updates its tracked JavaScript
+manifest. Other application and crate versions stay unchanged. `--check` checks
+only the selected scope. A subsequent synchronized bump sets everything to its
+explicit target version again. Version bumps do not publish standalone crates
+or create a release; build and validate the resulting commit as usual.

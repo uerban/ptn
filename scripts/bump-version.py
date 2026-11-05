@@ -33,9 +33,23 @@ def replace_toml_version(text, section, version):
     return result
 
 
-def plan(root, manifests, version):
+def plan(root, manifests, version, selected_crates=None):
     """Validate all inputs and prepare every edit before writing any file."""
     validate_version(version)
+    if selected_crates:
+        available = {}
+        for relative in manifests:
+            if relative.endswith('Cargo.toml'):
+                package = tomllib.loads((root / relative).read_text()).get('package')
+                if package:
+                    available[package['name']] = relative
+        unknown = set(selected_crates) - available.keys()
+        if unknown:
+            raise ValueError(f'Unknown workspace crates: {", ".join(sorted(unknown))}')
+        chosen = {available[name] for name in selected_crates}
+        if 'pt-wasm' in selected_crates:
+            chosen.add('crates/pt-wasm/pkg-web/package.json')
+        manifests = [p for p in manifests if p in chosen]
     changes = {}
     crates = {}
     for relative in manifests:
@@ -56,6 +70,8 @@ def plan(root, manifests, version):
             else:
                 crates[data['package']['name']] = data['package']['version']
                 if isinstance(data['package']['version'], dict):
+                    if selected_crates:
+                        raise ValueError(f'{relative} inherits its version; use a synchronized bump')
                     if not data['package']['version'].get('workspace'):
                         raise ValueError(f'Unsupported inherited version: {relative}')
                     continue
@@ -85,6 +101,8 @@ def plan(root, manifests, version):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('version', help='Explicit release version, without v')
+    parser.add_argument('--crate', action='append', dest='crates', metavar='NAME',
+                        help='Bump only this Rust crate (repeatable); pt-wasm includes its JS manifest')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--dry-run', action='store_true', help='Show files that would change')
     mode.add_argument('--check', action='store_true', help='Fail if versions differ from the requested version')
@@ -96,7 +114,7 @@ def main():
                        or re.fullmatch(r'(?:packages|subprojects)/[^/]+/package.json', p)
                        or p == 'crates/pt-wasm/pkg-web/package.json')
     try:
-        changes = plan(ROOT, manifests, args.version)
+        changes = plan(ROOT, manifests, args.version, args.crates)
     except (ValueError, KeyError, OSError) as error:
         parser.exit(2, f'{error}\n')
     for path, content in changes.items():
@@ -104,7 +122,7 @@ def main():
         if not args.dry_run and not args.check:
             path.write_text(content)
     if args.check and changes:
-        parser.exit(1, 'Release versions are not synchronized.\n')
+        parser.exit(1, 'Selected release versions do not match.\n')
     print(f'{args.version}: {len(changes)} file(s) ' + ('need updating' if args.dry_run or args.check else 'updated'))
 
 
