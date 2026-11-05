@@ -124,3 +124,24 @@ Use names shown by `list`. Select the root Node package with `--package ptn`.
 `--package` and `--crate` are repeatable and can be combined. WASM's crate
 and JavaScript manifest stay paired, including when selected with
 `--package pt-wasm`. Listing reads source manifests rather than built archives.
+
+## Release notes
+
+Use the [release-notes template](templates/release-notes.md) for both functional
+releases and component hotfixes. Copy it to a temporary file, fill its
+placeholders from the tagged source, compare with the previous release, and
+check the successful validation run and attached assets. Include actual
+component versions for hotfixes; they can differ from the release tag. Remove
+unused sections and template comments before publishing.
+
+The draft workflow adds basic provenance notes automatically. Replace those
+notes with the reviewed release message before publication:
+
+```sh
+cp docs/templates/release-notes.md /tmp/ptn-release-notes.md
+# Edit /tmp/ptn-release-notes.md and replace all placeholders.
+gh release edit vX.Y.Z --repo uerban/ptn --notes-file /tmp/ptn-release-notes.md
+```
+
+This updates the existing draft. Publish it separately after the release notes
+and assets are ready.
