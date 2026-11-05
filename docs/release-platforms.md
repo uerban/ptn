@@ -80,3 +80,19 @@ explicitly after fixing a partial run. Final archives are retained for 30 days.
 
 For an existing tag (including tags predating this workflow), manually run
 `draft-release.yml` on main with its `tag` input. This does not move the tag.
+
+## Bumping release versions
+
+Run `pnpm version:bump 0.1.2` (or `python3 scripts/bump-version.py 0.1.2`)
+before building a new release. This sets the root and workspace JavaScript
+packages, every Rust crate, the tracked WASM package manifest, and workspace
+entries in `Cargo.lock` to the same explicit version. Prereleases such as
+`0.2.0-rc.1` are supported. Use `--dry-run` to preview edits or `--check` to
+fail if the manifests differ from the requested version.
+
+The pnpm lockfile uses workspace links and does not store these packages' own
+versions, so it needs no version-only update. Dependency versions, toolchain
+pins, and binary/wire-format versions are unchanged. Rebuild WASM from the
+updated crate before packaging; editing its manifest does not rebuild binaries.
+Review and commit the version changes before validation, then tag that
+validated commit. The script does not create commits, tags, or releases.
