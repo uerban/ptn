@@ -27,12 +27,16 @@ impl HttpsRepository {
         if !base.path().ends_with('/') {
             base.set_path(&format!("{}/", base.path()));
         }
-        let agent = ureq::AgentBuilder::new()
+        let builder = ureq::AgentBuilder::new()
             .redirects(0)
             .timeout_connect(Duration::from_secs(15))
             .timeout_read(Duration::from_secs(60))
-            .timeout(Duration::from_secs(600))
-            .build();
+            .timeout(Duration::from_secs(600));
+        #[cfg(all(target_arch = "arm", target_env = "musl"))]
+        let builder = builder.tls_connector(std::sync::Arc::new(
+            ureq::native_tls::TlsConnector::new().map_err(io::Error::other)?,
+        ));
+        let agent = builder.build();
         Ok(Self { base, agent })
     }
 }

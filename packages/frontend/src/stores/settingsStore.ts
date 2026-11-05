@@ -4,6 +4,7 @@ import { LOOSE_POI_CATEGORIES, sanitizePoiCategories, type LoosePoiCategory } fr
 import { persist } from "zustand/middleware";
 import type { TransportMode } from "@pt/shared";
 import {
+  DEFAULT_URBAN_LOOKAHEAD_HOURS,
   DEFAULT_WALK_SPEED_MPS,
   DEFAULT_MAX_WALK_SECS,
 } from "@pt/shared/constants";
@@ -391,7 +392,7 @@ export const useSettingsStore = create<SettingsState>()(
       departuresPerLine: 3,
       maxPopupLines: 4,
       urbanMode: true,
-      urbanLookaheadHours: 2,
+      urbanLookaheadHours: DEFAULT_URBAN_LOOKAHEAD_HOURS,
       scheduleMode: false,
       accessibilityScheme: "none",
       highContrastEnabled: false,

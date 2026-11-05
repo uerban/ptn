@@ -77,7 +77,13 @@ The ordinary PWA build does not need the opt-in arrive-by package.
 
 ## Installable archive
 
-The initial release target is Linux x86_64. On an x86_64 Linux build host,
+The release matrix covers Linux x86_64, ARMv6 hard-float (Raspberry Pi 1),
+AArch64 (64-bit Raspberry Pi 3+), and macOS Apple Silicon and Intel. All Linux
+archives use statically linked musl binaries. See
+[release platforms](docs/release-platforms.md) for archive names, validation
+coverage, and Raspberry Pi limits. `v0.1.0` ships Linux x86_64 only.
+
+On an x86_64 Linux build host,
 install `musl-tools` and `pkg-config` (Debian/Ubuntu package names), then build
 the static binaries from the same source revision as the PWA:
 
@@ -95,6 +101,14 @@ archive includes six matching native tools, the PWA, licenses, a standalone
 local OSM builder, and native hosting instructions. A release host needs no
 Rust compiler or source checkout. Node and osmium-tool are needed only when
 building OSM data locally; downloaded signed catalogs use `pt-artifacts`.
+
+On macOS, build the same packages with `--target aarch64-apple-darwin` or
+`--target x86_64-apple-darwin` and package with `--platform darwin-arm64` or
+`--platform darwin-x86_64`, respectively. Set `MACOSX_DEPLOYMENT_TARGET=13.0`
+for the build. Cross-compiling Linux tools also requires a C compiler for the
+chosen musl target; the release workflow installs pinned toolchains with
+`scripts/install-musl-toolchain.sh`. Merely installing a Rust target does not
+provide its C compiler.
 
 For a containerized binary build instead, from the source root:
 

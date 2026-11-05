@@ -71,7 +71,7 @@ export const ZOOM_CARDS_MIN = 15;
 export const VIEWPORT_BUFFER = 0.5;
 
 /** Urban mode: default lookahead window in hours */
-export const DEFAULT_URBAN_LOOKAHEAD_HOURS = 2;
+export const DEFAULT_URBAN_LOOKAHEAD_HOURS = 1;
 
 /** Urban mode: how often to refresh active routes (ms) */
 export const URBAN_REFRESH_INTERVAL_MS = 300_000;

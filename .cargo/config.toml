@@ -1,0 +1,4 @@
+[target.arm-unknown-linux-musleabihf]
+# Rust suppresses GCC's default libraries. OpenSSL's static libatomic needs
+# __sync_synchronize from libgcc on Armv6; append it after native libraries.
+rustflags = ["-C", "link-arg=-lgcc"]

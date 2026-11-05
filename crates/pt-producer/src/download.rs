@@ -26,11 +26,19 @@ pub fn fetch(url_or_csv: &str, out_dir: &Path) -> Result<Vec<FeedRecord>> {
     if urls.is_empty() {
         return Err(Error::Http("empty url list".into()));
     }
+    let builder = ureq::AgentBuilder::new();
+    #[cfg(all(target_arch = "arm", target_env = "musl"))]
+    let builder = builder.tls_connector(std::sync::Arc::new(
+        ureq::native_tls::TlsConnector::new()
+            .map_err(|error| Error::Http(format!("initialize TLS: {error}")))?,
+    ));
+    let agent = builder.build();
     let mut out = Vec::with_capacity(urls.len());
     for (i, url) in urls.iter().enumerate() {
         let dest = out_dir.join(format!("feed-{i}.zip"));
         eprintln!("[producer] downloading {url} → {}", dest.display());
-        let response = ureq::get(url)
+        let response = agent
+            .get(url)
             .timeout(std::time::Duration::from_secs(300))
             .call()
             .map_err(|e| Error::Http(format!("GET {url}: {e}")))?;
