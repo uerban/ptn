@@ -8,6 +8,7 @@ cargo run -p pt-artifacts --locked --bin pt-pack-inspect -- \
   --generation /path/to/transit/generations/GENERATION_ID
 ```
 
+Add `--native` to also validate native binaries and decode schedule tiles.
 Use `--without-geometry` to leave out SHPB and legacy shapes JSON. The selection
 keeps the original `packId`; it does not rewrite the publisher's `pack.json`.
 Omitted geometry need not exist locally. Selected geometry must match its
@@ -27,9 +28,9 @@ Existing pack manifests identify the tile manifest but do not hash these bodies
 individually; the report records their local hashes for a later export contract.
 It ignores unrelated generation directories such as extracted source feeds.
 
-This command is an inventory tool, not a native-format validator, authenticated
-publication or self-host installer. An inventory hash does not authenticate its
-source. In particular, the tile-body hashes and generation metadata require
+By default this command inventories hashes; `--native` adds the checks described
+below. It is not an authenticated publication or self-host installer. An
+inventory hash does not authenticate its source. In particular, the tile-body hashes and generation metadata require
 binding into an authenticated publication before remote installation can trust
 them. It does not claim that the current server can load a partial generation
 with shapes omitted; explicit runtime component selection is subsequent work.
@@ -66,15 +67,16 @@ Export streams and rehashes each copied file, rejects changed bytes, and refuses
 to reuse an existing output. Normal failures remove the new output. A crash can
 leave staging data; the descriptor is written last as a completion marker.
 Keep both source and staging directories private and immutable during export;
-never serve the staging directory while the command is running. This command
-neither promotes a public channel nor performs native-format validation. Ops
-must validate and promote a completed tree before exposing it.
+never serve the staging directory while the command is running. The CLI performs
+native validation before signing, but does not promote a public channel. Ops must validate and promote a completed tree before exposing it.
+The lower-level library export function only copies and hashes an already
+accepted generation; callers must run native validation first.
 
 ## Offline refresh catalog
 
 `pt-pack-catalog` prepares a signed transit head from one or two existing
 exports. It authenticates each descriptor with configured public keys and
-rechecks the exported files before writing a new offline directory:
+rechecks hashes and native formats before writing a new offline directory:
 
 ```sh
 cargo run -p pt-artifacts --locked --bin pt-pack-catalog -- \
@@ -85,9 +87,8 @@ cargo run -p pt-artifacts --locked --bin pt-pack-catalog -- \
 ```
 
 The caller allocates a strictly increasing sequence from its publication ledger.
-This command does not read or switch a live head, allocate sequences, or perform
-native-format validation. Both exports must retain the same pack and generation
-IDs; duplicate geometry choices are rejected. The output is `latest.json` with
+This command does not read or switch a live head or allocate sequences. Both
+exports must retain the same pack and generation IDs; duplicate geometry choices are rejected. The output is `latest.json` with
 its raw detached `latest.json.sig`. Keep the output offline until validation and
 atomic promotion are implemented.
 
@@ -102,5 +103,28 @@ not continued use of installed data.
 
 The library's `verify_selection` checks the selection against an already
 verified catalog and authenticates its signature. It does not download files,
-validate native binary formats, activate a generation, or select server runtime
-components. Those steps remain necessary before builder-free hosting works.
+validate native binary formats itself, activate a generation, or select server
+runtime components. Those steps remain necessary before builder-free hosting works.
+
+## Native validation scope
+
+The export and catalog CLIs run the same native validation exposed by
+`pt-pack-inspect --native`. It validates PTB structure and generation metadata,
+including publication identity, hash/size, feed anchor, transfer consistency,
+creation-time skew and the timezone offset at the feed anchor. It decodes PTFT,
+recomputes trip/stop namespace hashes with the shared serving helper, parses
+DPIX and SHPB, checks DPIX stop counts and reference bounds, and checks the
+streamed shapes JSON hash/size when advertised. Omitting geometry skips all
+shape reads without changing publisher metadata.
+
+Selected binary files use read-only memory maps; the caller must keep the
+source immutable during validation. Schedule tiles are decoded one at a time
+with a 64 MiB output ceiling, checked for city/generation/version/tile-size
+identity and parsed with the shared trip-membership decoder, including parallel
+array lengths. Remaining JSON sidecars receive syntax checks with the existing
+16 MiB metadata ceiling.
+
+These checks do not build a routing index, establish complete frontend JSON
+schema validity, or exercise routing/TTS behavior. They do not authenticate
+input by themselves. Authenticated coherent installation and server acceptance
+are still required before a public head can be promoted.

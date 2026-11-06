@@ -323,7 +323,7 @@ pub(crate) fn file_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
-fn metadata(root: &Path, relative: &str) -> io::Result<Vec<u8>> {
+pub(crate) fn metadata(root: &Path, relative: &str) -> io::Result<Vec<u8>> {
     let file = File::open(file_path(root, relative)?)?;
     let mut bytes = Vec::new();
     file.take(MAX_METADATA_BYTES + 1).read_to_end(&mut bytes)?;

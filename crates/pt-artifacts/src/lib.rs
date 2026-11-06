@@ -9,4 +9,5 @@ pub mod store;
 pub mod transit;
 pub mod transit_catalog;
 pub mod transit_export;
+pub mod transit_native;
 pub mod transport;

@@ -26,6 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, byte) in bytes.iter_mut().enumerate() {
         *byte = u8::from_str_radix(&seed[i * 2..i * 2 + 2], 16)?;
     }
+    pt_artifacts::transit_native::validate(
+        &args.generation,
+        !args.without_geometry,
+        std::time::SystemTime::now(),
+    )?;
     let id = pt_artifacts::transit_export::export(
         &args.generation,
         &args.output,

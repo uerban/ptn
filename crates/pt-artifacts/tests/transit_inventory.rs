@@ -56,6 +56,31 @@ impl Fixture {
         fixture
     }
 
+    fn native() -> Self {
+        let mut fixture = Self::new();
+        let bytes = include_bytes!("../../../packages/shared/src/ptb/__fixtures__/tiny.ptb");
+        fixture.replace_bundle(bytes);
+        fixture.pack.city_tz_iana = Some("Europe/Vilnius".into());
+        fixture.generation.city_tz_iana = Some("Europe/Vilnius".into());
+        let reader = pt_core::Reader::from_bytes(bytes.to_vec()).unwrap();
+        fixture.pack.feed_start_date = reader.feed_start_date();
+        fixture.generation.feed_start_date = reader.feed_start_date();
+        fixture.save();
+        fixture
+    }
+
+    fn replace_bundle(&mut self, bytes: &[u8]) {
+        fs::write(self.path().join("bundle.ptb"), bytes).unwrap();
+        self.pack.bundle_id = digest(bytes);
+        self.pack.generation_id =
+            publication_id(&self.pack.bundle_id, &self.pack.publication_inputs_sha256);
+        self.generation.bundle_sha256 = self.pack.bundle_id.clone();
+        self.generation.generation_id = self.pack.generation_id.clone();
+        self.generation.bundle_size_bytes = bytes.len() as u64;
+        self.pack.artifacts[0].sha256 = digest(bytes);
+        self.pack.artifacts[0].size_bytes = bytes.len() as u64;
+    }
+
     fn path(&self) -> &Path {
         self.root.path()
     }
@@ -384,9 +409,12 @@ fn catalog_cli_checks_both_exports_before_preparing_a_head() {
     use ed25519_dalek::SigningKey;
     use pt_artifacts::{transit_catalog, transit_export};
     use std::process::Command;
-    let mut fixture = Fixture::new();
-    fixture.artifact("shapes-bin", "shapes.bin", b"optional shapes");
-    fixture.tiles(true);
+    let mut fixture = Fixture::native();
+    let reader =
+        pt_core::Reader::from_bytes(fs::read(fixture.path().join("bundle.ptb")).unwrap()).unwrap();
+    let (trips, stops) = pt_shared::validate::namespace::bundle_namespace_shas(&reader).unwrap();
+    let shapes = pt_shared::sidecar::encode_shapes_bin(&[], &trips, &stops).unwrap();
+    fixture.artifact("shapes-bin", "shapes.bin", &shapes);
     fixture.save();
     let parent = tempfile::tempdir().unwrap();
     let key = SigningKey::from_bytes(&[17; 32]);
@@ -457,4 +485,193 @@ fn catalog_cli_checks_both_exports_before_preparing_a_head() {
     let failed = parent.path().join("failed-head");
     assert!(!run(&failed).status.success());
     assert!(!failed.exists());
+}
+
+fn validate_native(
+    fixture: &Fixture,
+    geometry: bool,
+) -> std::io::Result<pt_artifacts::transit::TransitInventory> {
+    pt_artifacts::transit_native::validate(fixture.path(), geometry, std::time::SystemTime::now())
+}
+
+#[test]
+fn native_validation_rejects_hash_correct_invalid_ptb_metadata_and_timezone() {
+    let mut fixture = Fixture::native();
+    validate_native(&fixture, false).unwrap();
+    fixture.pack.city_tz_iana = Some("Etc/UTC".into());
+    fixture.generation.city_tz_iana = Some("Etc/UTC".into());
+    fixture.save();
+    assert!(validate_native(&fixture, false)
+        .unwrap_err()
+        .to_string()
+        .contains("timezone"));
+    fixture.pack.city_tz_iana = Some("Europe/Vilnius".into());
+    fixture.generation.city_tz_iana = Some("Europe/Vilnius".into());
+    fixture.pack.feed_start_date = 20261106;
+    fixture.generation.feed_start_date = 20261106;
+    fixture.save();
+    assert!(validate_native(&fixture, false).is_err());
+    fixture.replace_bundle(b"hash-correct but not PTB");
+    fixture.save();
+    inspect(fixture.path(), false).unwrap();
+    assert!(validate_native(&fixture, false)
+        .unwrap_err()
+        .to_string()
+        .contains("PTB structure"));
+}
+
+#[test]
+fn native_validation_checks_transfers_departures_and_sidecar_namespace() {
+    use pt_shared::{sidecar, validate::namespace::bundle_namespace_shas};
+    let mut fixture = Fixture::native();
+    let reader =
+        pt_core::Reader::from_bytes(fs::read(fixture.path().join("bundle.ptb")).unwrap()).unwrap();
+    let (trips, stops) = bundle_namespace_shas(&reader).unwrap();
+    let valid =
+        sidecar::encode_departures_idx(&vec![0; reader.num_stops() + 1], &[], &trips, &stops)
+            .unwrap();
+    fixture.artifact("departures-idx", "departures-idx.bin", &valid);
+    fixture.generation.departures_idx_sha256 = Some(digest(&valid));
+    fixture.artifact(
+        "pedestrian-transfers-ptft",
+        "transfers.bin",
+        b"PTFT\x01\x00",
+    );
+    fixture.generation.has_transfers = true;
+    fixture.generation.transfers_sha256 = Some(digest(b"PTFT\x01\x00"));
+    fixture.generation.transfers_size_bytes = Some(6);
+    fixture.save();
+    validate_native(&fixture, false).unwrap();
+    let foreign =
+        sidecar::encode_departures_idx(&vec![0; reader.num_stops() + 1], &[], &[99; 32], &stops)
+            .unwrap();
+    fs::write(fixture.path().join("departures-idx.bin"), &foreign).unwrap();
+    fixture.pack.artifacts[1].sha256 = digest(&foreign);
+    fixture.generation.departures_idx_sha256 = Some(digest(&foreign));
+    fixture.save();
+    inspect(fixture.path(), false).unwrap();
+    assert!(validate_native(&fixture, false).is_err());
+    fs::write(fixture.path().join("departures-idx.bin"), &valid).unwrap();
+    fixture.pack.artifacts[1].sha256 = digest(&valid);
+    fixture.generation.departures_idx_sha256 = Some(digest(&valid));
+    fs::write(fixture.path().join("transfers.bin"), b"broken").unwrap();
+    fixture.pack.artifacts[2].sha256 = digest(b"broken");
+    fixture.generation.transfers_sha256 = Some(digest(b"broken"));
+    fixture.save();
+    inspect(fixture.path(), false).unwrap();
+    assert!(validate_native(&fixture, false)
+        .unwrap_err()
+        .to_string()
+        .contains("PTFT structure"));
+}
+
+#[test]
+fn native_geometry_validation_checks_generated_body_without_reading_omitted_shapes() {
+    use pt_shared::{sidecar, validate::namespace::bundle_namespace_shas};
+    let mut fixture = Fixture::native();
+    let reader =
+        pt_core::Reader::from_bytes(fs::read(fixture.path().join("bundle.ptb")).unwrap()).unwrap();
+    let (trips, stops) = bundle_namespace_shas(&reader).unwrap();
+    let shapes = sidecar::encode_shapes_bin(&[], &trips, &stops).unwrap();
+    fixture.artifact("shapes-bin", "shapes.bin", &shapes);
+    fixture.generation.shapes_bin_sha256 = Some(digest(&shapes));
+    fixture.save();
+    let full = validate_native(&fixture, true).unwrap();
+    fixture.generation.shapes_json_sha256 = Some(digest(b"wrong generated JSON"));
+    fixture.save();
+    assert!(validate_native(&fixture, true)
+        .unwrap_err()
+        .to_string()
+        .contains("shapes JSON"));
+    fs::remove_file(fixture.path().join("shapes.bin")).unwrap();
+    assert_eq!(
+        validate_native(&fixture, false).unwrap().pack_id,
+        full.pack_id
+    );
+}
+
+#[test]
+fn native_tile_validation_decodes_identity_and_parallel_arrays() {
+    use std::io::Write;
+    let mut fixture = Fixture::native();
+    let tile = fixture.tiles(false);
+    let json = json!({"v":1,"bundleHash":fixture.pack.generation_id,"cityId":"fixture","tileSize":6000,
+        "stringTable":["trip"],"trips":[{"tripIdIx":0}],"stops":{"stop":{"tripIxs":[0],"departureSecs":[1]}}});
+    let write_tile = |json: &serde_json::Value| {
+        let mut compressed = Vec::new();
+        {
+            let mut writer = brotli::CompressorWriter::new(&mut compressed, 4096, 3, 22);
+            writer
+                .write_all(&serde_json::to_vec(json).unwrap())
+                .unwrap();
+        }
+        fs::write(fixture.path().join(&tile), compressed).unwrap();
+    };
+    write_tile(&json);
+    validate_native(&fixture, false).unwrap();
+    let mut invalid = json.clone();
+    invalid["bundleHash"] = json!(digest(b"other generation"));
+    write_tile(&invalid);
+    assert!(validate_native(&fixture, false)
+        .unwrap_err()
+        .to_string()
+        .contains("tile identity"));
+    let mut invalid = json;
+    invalid["stops"]["stop"]["departureSecs"] = json!([]);
+    write_tile(&invalid);
+    assert!(validate_native(&fixture, false).is_err());
+}
+
+#[test]
+fn native_departures_validation_rejects_counts_and_out_of_range_references() {
+    use pt_shared::{sidecar, validate::namespace::bundle_namespace_shas};
+    for case in 0..3 {
+        let mut fixture = Fixture::native();
+        let reader =
+            pt_core::Reader::from_bytes(fs::read(fixture.path().join("bundle.ptb")).unwrap())
+                .unwrap();
+        let (trips, stops) = bundle_namespace_shas(&reader).unwrap();
+        let mut offsets = vec![0; reader.num_stops() + 1];
+        let entries = match case {
+            0 => {
+                offsets.push(0);
+                vec![]
+            }
+            1 => {
+                offsets[reader.num_stops()] = 1;
+                vec![reader.num_trips() as u32, 0]
+            }
+            _ => {
+                offsets[reader.num_stops()] = 1;
+                vec![0, reader.num_stop_times() as u32]
+            }
+        };
+        let bytes = sidecar::encode_departures_idx(&offsets, &entries, &trips, &stops).unwrap();
+        fixture.artifact("departures-idx", "departures-idx.bin", &bytes);
+        fixture.generation.departures_idx_sha256 = Some(digest(&bytes));
+        fixture.save();
+        inspect(fixture.path(), false).unwrap();
+        assert!(validate_native(&fixture, false).is_err());
+    }
+}
+
+#[test]
+fn export_cli_rejects_hash_correct_non_native_bundle_before_signing() {
+    let fixture = Fixture::new();
+    let parent = tempfile::tempdir().unwrap();
+    let seed = parent.path().join("seed");
+    fs::write(&seed, "11".repeat(32)).unwrap();
+    let output = parent.path().join("export");
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_pt-pack-export"))
+        .arg("--generation")
+        .arg(fixture.path())
+        .arg("--output")
+        .arg(&output)
+        .arg("--signing-key")
+        .arg(&seed)
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("PTB structure"));
+    assert!(!output.exists());
 }

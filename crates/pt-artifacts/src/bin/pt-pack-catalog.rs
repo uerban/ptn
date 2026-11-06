@@ -94,8 +94,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let signature = bounded(&root.join("selection.json.sig"), 64)?;
         let inventory = transit_export::verify(&bytes, &signature, &keys, &catalog.city)?;
         // Reinspect exported files as well as signatures. No builders or extras.
-        let actual =
-            pt_artifacts::transit::inspect(&root.join("files"), inventory.geometry_selected)?;
+        let actual = pt_artifacts::transit_native::validate(
+            &root.join("files"),
+            inventory.geometry_selected,
+            SystemTime::now(),
+        )?;
         if serde_json::to_value(&actual)? != serde_json::to_value(&inventory)? {
             return Err("export files no longer match signed selection".into());
         }
