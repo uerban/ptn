@@ -275,14 +275,13 @@ pub struct ServerConfig {
     )]
     pub rt_tile_response_cache_max_entries: u64,
 
-    /// TTL (milliseconds) for the rt-tile response cache, default 10_000
-    /// (matches Node's hardcoded `RT_TILE_TTL_MS`, `rtTile.ts:51` — a
-    /// route-local const, not a shared cross-language export, so this is a
-    /// hand-matched default with no build.rs pinning).
+    /// TTL (milliseconds) for the rt-tile response cache, default 5_000
+    /// (matches Node's `RT_TILE_TTL_MS`, derived from the shared RT cache
+    /// duration; this Rust default is hand-matched with no build.rs pinning).
     #[arg(
         long,
         env = "PT_SERVE_RT_TILE_RESPONSE_CACHE_TTL_MS",
-        default_value_t = 10_000
+        default_value_t = 5_000
     )]
     pub rt_tile_response_cache_ttl_ms: u64,
 

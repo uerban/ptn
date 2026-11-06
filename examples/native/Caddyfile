@@ -7,7 +7,7 @@
 
 {$PTN_SITE:http://localhost:8080} {
 	encode gzip
-	header Cache-Control "no-cache"
+	header ?Cache-Control "no-cache"
 
 	@aux path_regexp aux ^/api/vilnius/(health|ready|version)$
 	handle @aux {

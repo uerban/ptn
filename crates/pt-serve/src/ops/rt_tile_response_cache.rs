@@ -1,7 +1,7 @@
 //! Wall-clock TTL + entry-count LRU cache over full rt-tile JSON response
 //! bodies. Port of Node's `TtlLru` (`packages/backend/src/util/ttlLru.ts`),
 //! as used by `packages/backend/src/routes/rtTile.ts:51-68`
-//! (`maxSize: 4096, ttlMs: 10_000`).
+//! (`maxSize: 4096`, five-second default TTL).
 //!
 //! Deliberately NOT epoch-gated like [`crate::ops::tile_cache::TileCache`]
 //! or [`crate::ops::rt_tile_membership_cache::TripMembershipCache`]: the

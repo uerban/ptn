@@ -45,7 +45,7 @@ use std::sync::Arc;
 /// Duplicated across the language boundary; the value is short enough that a
 /// drift is a caching nuisance rather than a correctness bug, but keep them
 /// equal so the two planes cache identically during the cutover.
-const RT_CACHE_CONTROL: &str = "public, max-age=5, s-maxage=5";
+pub(super) const RT_CACHE_CONTROL: &str = "public, max-age=5, s-maxage=5";
 
 /// Node's guard: non-empty, at most 100 chars, `/^[\w:._-]+$/`. `\w` in
 /// JavaScript without the `u` flag is exactly `[A-Za-z0-9_]`, so this is an

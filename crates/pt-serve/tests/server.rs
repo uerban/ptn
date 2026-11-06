@@ -1342,7 +1342,7 @@ fn transfers_fetch_bytes_equal_artifact() {
 /// `GET /api/<city>/color-config` on a generation WITH `color-config.json`:
 ///   - 200 OK
 ///   - Content-Type: application/json
-///   - Cache-Control: public, max-age=3600
+///   - Cache-Control: public, max-age=86400
 ///   - X-API-Version: 1
 ///   - no ETag (backend spec)
 ///
@@ -1362,8 +1362,8 @@ fn color_config_200_headers_and_counter() {
     );
     assert_eq!(
         header(&headers, "cache-control"),
-        Some("public, max-age=3600".into()),
-        "Cache-Control must be public, max-age=3600"
+        Some("public, max-age=86400".into()),
+        "Cache-Control must be public, max-age=86400"
     );
     assert_eq!(
         header(&headers, "x-api-version"),

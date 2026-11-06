@@ -71,7 +71,7 @@ fn color_config_200_serves_verbatim() {
         } => {
             assert_eq!(status, 200);
             assert_eq!(content_type, "application/json");
-            assert_eq!(cache_control, "public, max-age=3600");
+            assert_eq!(cache_control, "public, max-age=86400");
             assert!(etag.is_none(), "color-config has no ETag (matches backend)");
             assert!(!gzipped);
         }
