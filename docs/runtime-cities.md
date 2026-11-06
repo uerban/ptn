@@ -119,13 +119,10 @@ additional schedule tiles and policy-permitted places can be warmed using
 Live updates and server-only place search still need a connection. A package
 does not promise every map, address or schedule detail is installed.
 
-## Migration
+## Deployment requirements
 
-Existing releases need one frontend upgrade for discovery. Production always
-attempts backend discovery, including when a legacy inline schema-1 ID allowlist
-or schema-2 definition is present. Those lists become exposure policies over the
-backend definitions. Only an explicit 404 from `/api/cities` permits legacy inline
-metadata fallback for an old host. New deployments must publish the backend
-catalog and a separate exposure policy. The catalog, readiness and routing-bundle
-endpoints bypass service-worker response caching; their loaders own validation
-and offline fallback. Development builds may use presets without a discovery endpoint.
+Production deployments must publish the backend catalog at `/api/cities` and a
+separate frontend exposure policy. The frontend discovers city definitions from
+the backend catalog. The catalog, readiness and routing-bundle endpoints bypass
+service-worker response caching; their loaders own validation and offline
+fallback. Development builds may use presets without a discovery endpoint.
