@@ -39,11 +39,11 @@
   "devDependencies": {
     "@types/culori": "^4.0.1",
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "fast-check": "^3",
     "tsx": "^4.23.12",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
     "yaml": "^2.8.3"
   }
 }
