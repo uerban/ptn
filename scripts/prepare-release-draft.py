@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import tarfile
+import tempfile
 import time
 
 PLATFORMS = ('linux-x86_64', 'linux-armv6-rpi1', 'linux-aarch64-rpi3', 'darwin-arm64', 'darwin-x86_64')
@@ -22,12 +23,74 @@ def api(path):
     return json.loads(gh('api', path))
 
 
-def artifact_state(artifacts):
+def artifact_state(artifacts, required=REQUIRED):
     by_name = {a['name']: a for a in artifacts}
-    missing = REQUIRED - by_name.keys()
+    missing = required - by_name.keys()
     if missing:
         raise RuntimeError(f'Missing required artifacts: {", ".join(sorted(missing))}; refusing automatic rebuild')
-    return 'expired' if any(by_name[n]['expired'] for n in REQUIRED) else 'ready'
+    return 'expired' if any(by_name[n]['expired'] for n in required) else 'ready'
+
+
+REGRESSION_CHECKS = {'identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart'}
+
+
+def validate_regression_proof(proof, revision, run_id):
+    checks = proof.get('checks', {})
+    if (proof.get('schemaVersion') != 1 or proof.get('revision') != revision
+            or proof.get('passed') is not True or proof.get('sourceDirty') is not False
+            or proof.get('runId') != str(run_id) or proof.get('runner') != 'Linux'
+            or set(checks) != REGRESSION_CHECKS
+            or any(value != 'success' for value in checks.values())):
+        raise RuntimeError('Regression evidence is incomplete, failed or for another source revision')
+
+
+def eligible_run(run, revision, title, allow_main_push=False):
+    return (run['event'] == 'workflow_dispatch' and run['head_branch'] == 'main'
+            and run['display_title'] == f'{title} {revision}') or (
+                allow_main_push and run['event'] == 'push' and run['head_branch'] == 'main'
+                and run['head_sha'] == revision)
+
+
+def ensure_validation(repo, revision, filename, title, required, check_only, allow_main_push=False):
+    workflow = f'repos/{repo}/actions/workflows/{filename}'
+    pages = json.loads(gh('api', '--paginate', '--slurp', f'{workflow}/runs?per_page=100'))
+    runs = [run for page in pages for run in page['workflow_runs']]
+    candidates = [run for run in runs if eligible_run(run, revision, title, allow_main_push)]
+    run = max(candidates, key=lambda item: item['id']) if candidates else None
+    if run:
+        if run['status'] != 'completed':
+            gh('run', 'watch', str(run['id']), '--repo', repo, '--exit-status', '--interval', '20')
+            run = api(f'repos/{repo}/actions/runs/{run["id"]}')
+        if run['conclusion'] != 'success':
+            raise RuntimeError(f'{title} run {run["id"]} failed: {run["conclusion"]}')
+        artifacts = api(f'repos/{repo}/actions/runs/{run["id"]}/artifacts?per_page=100')['artifacts']
+        state = artifact_state(artifacts, required)
+    else:
+        state = 'unbuilt'
+    if state == 'ready':
+        return run
+    if check_only:
+        raise RuntimeError(f'{title} required for {revision}: {state}')
+    previous_ids = {item['id'] for item in runs}
+    gh('workflow', 'run', filename, '--repo', repo, '--ref', 'main', '-f', f'revision={revision}')
+    for _ in range(60):
+        recent = api(f'{workflow}/runs?event=workflow_dispatch&branch=main&per_page=100')['workflow_runs']
+        matches = [item for item in recent if item['id'] not in previous_ids
+                   and eligible_run(item, revision, title)]
+        if matches:
+            run = min(matches, key=lambda item: item['id'])
+            break
+        time.sleep(5)
+    else:
+        raise RuntimeError(f'Dispatched {title} did not appear within five minutes')
+    gh('run', 'watch', str(run['id']), '--repo', repo, '--exit-status', '--interval', '20')
+    run = api(f'repos/{repo}/actions/runs/{run["id"]}')
+    if run['conclusion'] != 'success':
+        raise RuntimeError(f'{title} failed: {run["conclusion"]}')
+    artifacts = api(f'repos/{repo}/actions/runs/{run["id"]}/artifacts?per_page=100')['artifacts']
+    if artifact_state(artifacts, required) != 'ready':
+        raise RuntimeError(f'{title} artifacts are expired')
+    return run
 
 
 def main():
@@ -39,47 +102,17 @@ def main():
         raise RuntimeError('Expected a version tag such as v0.1.1')
     repo = os.environ['GH_REPO']
     revision = api(f'repos/{repo}/commits/{args.tag}')['sha']
-    workflow = f'repos/{repo}/actions/workflows/release.yml'
-    runs = json.loads(gh('api', '--paginate', '--slurp', f'{workflow}/runs?per_page=100'))
-    candidates = [r for page in runs for r in page['workflow_runs']
-                  if (r['head_sha'] == revision and r['event'] == 'push' and r['head_branch'] == 'main')
-                  or (r['event'] == 'workflow_dispatch' and r['head_branch'] == 'main'
-                      and r['display_title'] == f'Release validation {revision}')]
-    run = max(candidates, key=lambda r: r['id']) if candidates else None
-    if run:
-        if run['status'] != 'completed':
-            gh('run', 'watch', str(run['id']), '--repo', repo, '--exit-status', '--interval', '20')
-            run = api(f'repos/{repo}/actions/runs/{run["id"]}')
-        if run['conclusion'] != 'success':
-            raise RuntimeError(f'Validation run {run["id"]} failed: {run["conclusion"]}')
-        artifacts = api(f'repos/{repo}/actions/runs/{run["id"]}/artifacts?per_page=100')['artifacts']
-        state = artifact_state(artifacts)
-    else:
-        state = 'unbuilt'
-    print(f'{args.tag}: {revision}, artifacts {state}', flush=True)
+    gate = ensure_validation(repo, revision, 'regression.yml', 'Regression gates',
+                             {'regression-proof'}, args.check_only)
+    with tempfile.TemporaryDirectory(prefix='ptn-regression-proof-') as directory:
+        gh('run', 'download', str(gate['id']), '--repo', repo, '--name', 'regression-proof', '--dir', directory)
+        proof = json.loads((Path(directory) / 'regression.json').read_text())
+        validate_regression_proof(proof, revision, gate['id'])
+    run = ensure_validation(repo, revision, 'release.yml', 'Release validation', REQUIRED,
+                            args.check_only, allow_main_push=True)
+    print(f'{args.tag}: exact-commit regression gate and release artifacts ready', flush=True)
     if args.check_only:
         return
-    if state != 'ready':
-        previous_ids = {r['id'] for page in runs for r in page['workflow_runs']}
-        gh('workflow', 'run', 'release.yml', '--repo', repo, '--ref', 'main', '-f', f'revision={revision}')
-        # Dispatch has no run ID response. The release workflow serializes drafts.
-        for _ in range(60):
-            recent = api(f'{workflow}/runs?event=workflow_dispatch&branch=main&per_page=100')['workflow_runs']
-            matches = [r for r in recent if r['id'] not in previous_ids
-                       and r['display_title'] == f'Release validation {revision}']
-            if matches:
-                run = min(matches, key=lambda r: r['id'])
-                break
-            time.sleep(5)
-        else:
-            raise RuntimeError('Dispatched build did not appear within five minutes')
-        subprocess.run(['gh', 'run', 'watch', str(run['id']), '--repo', repo, '--exit-status', '--interval', '20'], check=True)
-        run = api(f'repos/{repo}/actions/runs/{run["id"]}')
-        if run['conclusion'] != 'success':
-            raise RuntimeError(f'Rebuild failed: {run["conclusion"]}')
-        artifacts = api(f'repos/{repo}/actions/runs/{run["id"]}/artifacts?per_page=100')['artifacts']
-        if artifact_state(artifacts) != 'ready':
-            raise RuntimeError('Rebuild artifacts are expired')
     dest = Path('release-draft')
     dest.mkdir(exist_ok=False)
     for name in sorted(REQUIRED):
@@ -96,7 +129,7 @@ def main():
             meta = json.load(bundle.extractfile(f'ptn-{platform}/release.json'))
         if meta['revision'] != revision or meta['sourceDirty'] or meta['platform'] != platform:
             raise RuntimeError(f'Archive source mismatch: {name}')
-    notes = (f'Validated archives from {run["html_url"]}\n\nSource commit: {revision}\n\n'
+    notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\nSource commit: {revision}\n\n'
              'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
              'ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
     flags = ['--prerelease'] if '-' in args.tag else []

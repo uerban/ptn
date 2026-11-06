@@ -1,11 +1,8 @@
-name: Build and validate installable release
+name: Release candidate validation
 
 run-name: Release validation ${{ inputs.revision || github.sha }}
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       revision:
@@ -18,7 +15,7 @@ permissions:
 
 concurrency:
   group: release-validation-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: false
 
 env:
   RELEASE_REVISION: ${{ inputs.revision || github.sha }}
@@ -53,7 +50,7 @@ jobs:
       - name: Build and test source
         run: |
           pnpm install --frozen-lockfile
-          node --test scripts/hosting-navigation.test.mjs
+          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'
           cargo build --release --locked --workspace
           cargo test --workspace --locked

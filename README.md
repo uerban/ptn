@@ -147,6 +147,9 @@ pnpm test
 pnpm typecheck
 ```
 
+Routine CI skips source builds for prose-only changes. Performance/memory gates
+run on demand and are required for releases; see [CI and release gates](docs/ci.md).
+
 ## License
 
 Unless a file or crate states otherwise, PTN is AGPL-3.0-or-later. The engine

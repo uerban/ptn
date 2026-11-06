@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write
-  actions: write # Dispatch validation only when unbuilt or expired.
+  actions: write # Dispatch required gates only when unbuilt or expired.
 
 concurrency:
   group: release-draft-${{ inputs.tag || github.ref_name }}
@@ -21,14 +21,14 @@ concurrency:
 jobs:
   draft:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       # Promotion logic comes from main, allowing existing tags to be promoted.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           persist-credentials: false
-      - name: Reuse validated archives or wait for a required rebuild
+      - name: Require exact-commit regression evidence and validated archives
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

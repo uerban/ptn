@@ -218,6 +218,19 @@ function makeDepartures(now: Date = new Date()) {
 
 /** Set up API route interception before navigation. Call this before page.goto(). */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
+  // These specs start inside a selected city. Model discovery and the saved
+  // selection explicitly; production no longer chooses a default city.
+  await page.route("**/api/cities", route => route.fulfill({json: {
+    schemaVersion: 2, cities: [{id: "vilnius", name: "Vilnius", tz: "Europe/Vilnius",
+      center: {lat: 54.6872, lon: 25.2797},
+      bbox: {minLat: 54.6, minLon: 25.1, maxLat: 54.8, maxLon: 25.5}}],
+  }}));
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("ptn-city")) {
+      localStorage.setItem("ptn-city", JSON.stringify({state: {activeCity: {id: "vilnius"}}, version: 0}));
+    }
+  });
+
   // Optional self-hosted geocoder config (M9). The fixtures model a deployment
   // with NO server-side geocoder, so this static asset is ABSENT — which in
   // production (nginx / static hosting) returns a definitive 404. Stub that 404
