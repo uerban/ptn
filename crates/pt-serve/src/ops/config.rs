@@ -84,10 +84,23 @@ pub struct ServerConfig {
     #[arg(long, env = "PT_SERVE_PER_WORKER_OVERHEAD_BYTES")]
     pub per_worker_overhead_bytes: u64,
 
-    /// Producer-managed data root: holds `current.json`, `last-good.json`, and
-    /// `generations/<id>/{generation.json,bundle.ptb,transfers.bin}`. REQUIRED.
+    /// Writable runtime root. In producer mode it also holds current/last-good
+    /// pointers and generations. Installed transit uses transit-store-root for data.
     #[arg(long, env = "PT_SERVE_DATA_ROOT")]
     pub data_root: PathBuf,
+
+    /// Installer root containing transit/state and immutable transit releases.
+    /// When set, data-root holds runtime state only; producer pointers are ignored.
+    #[arg(
+        long,
+        env = "PT_SERVE_TRANSIT_STORE_ROOT",
+        conflicts_with = "force_current"
+    )]
+    pub transit_store_root: Option<PathBuf>,
+
+    /// Trusted transit publisher public keys, as lowercase 32-byte hex. Repeat for rotation.
+    #[arg(long, env = "PT_SERVE_TRANSIT_TRUSTED_KEY", value_delimiter = ',')]
+    pub transit_trusted_key: Vec<String>,
 
     /// Where the PidfileGuard takes its kernel-released advisory lock.
     #[arg(long, env = "PT_SERVE_PIDFILE_PATH")]
@@ -388,6 +401,8 @@ pub fn pattern_mode_token(m: pt_core::PatternMode) -> &'static str {
 /// is the operator-facing tag they'll see in the error log.
 #[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error("invalid installed transit configuration: {0}")]
+    TransitConfig(String),
     #[error("worker_pool_size must be >= 1 (got 0)")]
     WorkerPoolSizeZero,
     #[error("loopback_worker_count must be >= 1 (got 0)")]
@@ -428,6 +443,8 @@ impl ServerConfig {
     /// `EROFS` where stat says "writable bits set" but the kernel will
     /// refuse the write.
     pub fn validate(&mut self) -> Result<(), ConfigError> {
+        crate::bundle::installed::validate_config(self)
+            .map_err(|e| ConfigError::TransitConfig(e.to_string()))?;
         if self.worker_pool_size == 0 {
             return Err(ConfigError::WorkerPoolSizeZero);
         }
@@ -726,6 +743,23 @@ mod tests {
             Err(ConfigError::RtPollIntervalMsZero) => {}
             other => panic!("expected RtPollIntervalMsZero, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn installed_source_requires_keys_and_rejects_producer_recovery() {
+        use clap::Parser;
+        let mut args = base_args();
+        args.extend(["--transit-store-root".into(), "/tmp/transit".into()]);
+        let mut config = ServerConfig::try_parse_from(&args).unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::TransitConfig(_))
+        ));
+        args.extend(["--transit-trusted-key".into(), "ab".repeat(32)]);
+        let config = ServerConfig::try_parse_from(&args).unwrap();
+        assert!(crate::bundle::installed::validate_config(&config).is_ok());
+        args.extend(["--force-current".into(), "a".repeat(64)]);
+        assert!(ServerConfig::try_parse_from(&args).is_err());
     }
 
     #[test]

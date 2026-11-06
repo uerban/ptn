@@ -1,8 +1,8 @@
 # Installing transit selections
 
 `pt-transit` installs signed prebuilt transit data without feed downloads,
-Java, Node, producer execution or OSM extras. This is the installer layer;
-server startup/reload integration is separate work.
+Java, Node, producer execution or OSM extras. `pt-serve` can consume installed
+selections directly.
 
 ```sh
 cargo run -p pt-artifacts --locked --bin pt-transit -- \
@@ -53,20 +53,49 @@ pt-transit --root /srv/pt-data --city CITY status
 pt-transit --root /srv/pt-data --city CITY --trusted-key PUBLIC_KEY_HEX verify
 ```
 
-`verify` prints the selected immutable `files/` directory after validation. This
-is not yet a `pt-serve` data root: installer activation does not write producer
-pointers or reload a running server. Reading installer activation records from
-`pt-serve` is still pending.
+`verify` prints the selected immutable `files/` directory after validation.
+It does not write producer pointers. Start the server with an explicit installer
+root and independently configured publisher keys:
 
-For an existing producer data root, `pt-serve --without-geometry` (or
-`PT_SERVE_WITHOUT_GEOMETRY=true`) disables shapes loading at startup and on reload.
-It skips opening `shapes.bin`, suppresses geometry bodies and their advertised
-hashes, and leaves publisher metadata and pack identity unchanged. Other selected
-transit artifacts still undergo their normal validation. Geometry is enabled by
-default. Pair this with `--page-warm-mode off` when speculative page-in is
-undesirable on a constrained host. These runtime flags do not install packs or
-change the installer selection; the installed-source adapter must bind runtime
-geometry to the activated selection before that mode can be used.
+```sh
+pt-serve --transit-store-root /srv/pt-data --transit-trusted-key PUBLIC_KEY_HEX \
+  --city-slug CITY --data-root /srv/pt-runtime --pidfile-path /srv/pt-runtime/serve.pid \
+  --max-rss-bytes "$RSS_BUDGET_BYTES" \
+  --process-fixed-overhead-bytes "$FIXED_OVERHEAD_BYTES" \
+  --per-worker-overhead-bytes "$WORKER_OVERHEAD_BYTES" --page-warm-mode off
+```
+
+Create `/srv/pt-runtime` first and supply measured memory-budget values for the
+host. It is a writable runtime directory, separate from the installer tree.
+`PT_SERVE_TRANSIT_STORE_ROOT` and comma-separated `PT_SERVE_TRANSIT_TRUSTED_KEY`
+are the corresponding environment settings. Repeat `--transit-trusted-key` for
+rotation. The server requires trusted keys in installed mode and rejects
+`--force-current`; use the installer's explicit rollback command instead.
+
+Startup authenticates the current selection, compares every selected file to
+its signed inventory, validates native data, and builds the routing index before
+serving. This works offline and takes no installer lock. The server does not
+clean staging, write installer state, read producer pointers, or advertise itself
+to a producer in this mode. Legacy generation-local address-search data is not
+loaded; OSM extras retain their independent configuration.
+
+The reload watcher follows the installer activation file. SIGHUP also triggers
+a check. Switching full/minimal variants reloads even when pack and generation
+IDs match. Pin or checkpoint-only changes validate and become no-ops. A failed
+update leaves the running generation in place. Invalid current data at startup
+fails closed; repair it or run `pt-transit rollback` explicitly. There is no
+implicit previous-selection fallback. Keep all installed releases immutable and
+retained while serving, including generations held by in-flight requests.
+
+A geometry-free installed selection always disables shapes loading, regardless
+of the server's default. `pt-serve --without-geometry` (or
+`PT_SERVE_WITHOUT_GEOMETRY=true`) can additionally suppress geometry in a full
+selection. In that case the full signed selection still validates, including its
+selected shapes; choose a minimal install to avoid those downloads and reads.
+The runtime flag also works with producer data roots. It suppresses geometry
+bodies and advertised hashes without rewriting publisher metadata or pack
+identity. `--page-warm-mode off` separately avoids speculative page-in. These
+flags do not change the installer selection.
 
 To pause updates, use `pin`; use `unpin` to enable them again. `rollback` validates
 and switches to the previous installed selection, preserves the highest accepted

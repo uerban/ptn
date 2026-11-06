@@ -27,6 +27,8 @@ use std::sync::{Arc, OnceLock};
 /// `Index`/`Transfers` are heavy but only live ONCE per generation — workers
 /// share a single `Arc<Generation>` via [`arc_swap::ArcSwap::load_full`]).
 pub struct Generation {
+    /// Authenticated installed selection identity, distinct from pack/generation ID.
+    pub transit_selection: Option<String>,
     /// Optional transfers artifact mmap. `None` when pt-serve was started without
     /// `--transfers`; the GET endpoint returns 404 in that case.
     transfers_mmap: Option<Arc<memmap2::Mmap>>,
@@ -893,6 +895,7 @@ impl Generation {
         // order, so the `/stops/nearby` response order matches.
         let spatial_grid = crate::app::stops::build_spatial_grid(&parts.reader);
         let mut gen = Self {
+            transit_selection: None,
             transfers_mmap: parts.transfers_mmap,
             bundle_mmap: parts.bundle_mmap,
             reader: parts.reader,

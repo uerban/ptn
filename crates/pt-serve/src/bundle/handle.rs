@@ -167,6 +167,22 @@ pub fn build_generation_with_geometry(
     log_format: Option<LogFormat>,
     geometry_enabled: bool,
 ) -> Result<Generation, ValidationError> {
+    build_generation_with_policy(
+        inputs,
+        page_warm_enabled,
+        log_format,
+        geometry_enabled,
+        true,
+    )
+}
+
+pub(crate) fn build_generation_with_policy(
+    inputs: BuildInputs<'_>,
+    page_warm_enabled: bool,
+    log_format: Option<LogFormat>,
+    geometry_enabled: bool,
+    legacy_extras_enabled: bool,
+) -> Result<Generation, ValidationError> {
     let mut phases = PhaseLog::new(log_format);
 
     // ---- Step 4: mmap bundle ----
@@ -534,11 +550,15 @@ pub fn build_generation_with_geometry(
         )],
     );
 
-    let address_search = crate::bundle::generation::load_address_search_artifact(
-        gen_dir,
-        inputs.expected_city,
-        &inputs.manifest.generation_id,
-    )?;
+    let address_search = if legacy_extras_enabled {
+        crate::bundle::generation::load_address_search_artifact(
+            gen_dir,
+            inputs.expected_city,
+            &inputs.manifest.generation_id,
+        )?
+    } else {
+        None
+    };
     phases.done(
         "address_search",
         &[(

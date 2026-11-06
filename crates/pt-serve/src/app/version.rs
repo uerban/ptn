@@ -352,6 +352,8 @@ mod tests {
             loopback_listen_addr: "127.0.0.1:0".into(),
             loopback_worker_count: 2,
             max_retained_generations: 10,
+            transit_store_root: None,
+            transit_trusted_key: Vec::new(),
             without_geometry: false,
             page_warm_mode: crate::ops::PageWarmMode::WillNeed,
             log_format: LogFormat::Text,

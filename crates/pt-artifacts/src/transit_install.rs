@@ -133,30 +133,7 @@ impl TransitStore {
     }
     pub fn status(&self, city: &str) -> io::Result<Option<Activation>> {
         let path = self.state_path(city)?;
-        let file = match File::open(path) {
-            Ok(file) => file,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        let mut bytes = Vec::new();
-        file.take(64 * 1024 + 1).read_to_end(&mut bytes)?;
-        if bytes.len() > 64 * 1024 {
-            return Err(invalid("transit activation exceeds limit"));
-        }
-        let state: Activation = serde_json::from_slice(&bytes).map_err(invalid)?;
-        if state.schema_version != 1
-            || state.revision == 0
-            || !valid_release(&state.current)
-            || state
-                .previous
-                .as_ref()
-                .is_some_and(|p| !valid_release(p) || p == &state.current)
-            || state.checkpoint.sequence == 0
-            || !valid_digest(&state.checkpoint.sha256)
-        {
-            return Err(invalid("invalid transit activation"));
-        }
-        Ok(Some(state))
+        read_activation(&path)
     }
     pub fn set_pinned(&self, city: &str, pinned: bool) -> io::Result<()> {
         let mut state = self
@@ -180,31 +157,7 @@ impl TransitStore {
         now: SystemTime,
     ) -> io::Result<()> {
         let files = self.release_path(city, release)?;
-        let root = files.parent().expect("release root");
-        let repository = crate::install::LocalRepository(root.into());
-        let bytes = metadata(
-            &repository,
-            "selection.json",
-            transit_export::MAX_DESCRIPTOR_BYTES as u64,
-        )?;
-        let sig = metadata(&repository, "selection.json.sig", 64)?;
-        if digest(&bytes) != release.selection {
-            return Err(invalid("installed selection hash mismatch"));
-        }
-        let inventory = transit_export::verify(&bytes, &sig, keys, city)?;
-        if inventory.pack_id != release.pack_id
-            || inventory.generation_id != release.generation_id
-            || inventory.geometry_selected != release.geometry_selected
-        {
-            return Err(invalid("installed selection identity mismatch"));
-        }
-        let actual = transit_native::validate(&files, release.geometry_selected, now)?;
-        if serde_json::to_value(&actual).map_err(invalid)?
-            != serde_json::to_value(&inventory).map_err(invalid)?
-        {
-            return Err(invalid("installed files do not match selection"));
-        }
-        Ok(())
+        validate_release_files(&files, city, release, keys, now)
     }
     /// Validate the local current selection without contacting a source. Head
     /// expiry never prevents offline use or a deliberate local rollback.
@@ -375,4 +328,100 @@ impl TransitStore {
         atomic_json(&self.state_path(city)?, &state)?;
         Ok(true)
     }
+}
+
+/// Immutable installed selection resolved from one atomic activation snapshot.
+/// This reader acquires no writer lock, creates nothing and performs no cleanup.
+pub struct InstalledSelection {
+    pub activation: Activation,
+    pub files: PathBuf,
+}
+
+/// Activation path shared by read-only consumers and their reload watcher.
+pub fn activation_path(root: &Path, city: &str) -> io::Result<PathBuf> {
+    Ok(root
+        .join("transit/state")
+        .join(format!("transit-{}.json", city_slug(city)?)))
+}
+
+fn read_activation(path: &Path) -> io::Result<Option<Activation>> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    let mut bytes = Vec::new();
+    file.take(64 * 1024 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > 64 * 1024 {
+        return Err(invalid("transit activation exceeds limit"));
+    }
+    let state: Activation = serde_json::from_slice(&bytes).map_err(invalid)?;
+    if state.schema_version != 1
+        || state.revision == 0
+        || !valid_release(&state.current)
+        || state
+            .previous
+            .as_ref()
+            .is_some_and(|p| !valid_release(p) || p == &state.current)
+        || state.checkpoint.sequence == 0
+        || !valid_digest(&state.checkpoint.sha256)
+    {
+        return Err(invalid("invalid transit activation"));
+    }
+    Ok(Some(state))
+}
+
+fn validate_release_files(
+    files: &Path,
+    city: &str,
+    release: &Release,
+    keys: &[[u8; 32]],
+    now: SystemTime,
+) -> io::Result<()> {
+    let root = files.parent().expect("release root");
+    let repository = crate::install::LocalRepository(root.into());
+    let bytes = metadata(
+        &repository,
+        "selection.json",
+        transit_export::MAX_DESCRIPTOR_BYTES as u64,
+    )?;
+    let sig = metadata(&repository, "selection.json.sig", 64)?;
+    if digest(&bytes) != release.selection {
+        return Err(invalid("installed selection hash mismatch"));
+    }
+    let inventory = transit_export::verify(&bytes, &sig, keys, city)?;
+    if inventory.pack_id != release.pack_id
+        || inventory.generation_id != release.generation_id
+        || inventory.geometry_selected != release.geometry_selected
+    {
+        return Err(invalid("installed selection identity mismatch"));
+    }
+    let actual = transit_native::validate(files, release.geometry_selected, now)?;
+    if serde_json::to_value(&actual).map_err(invalid)?
+        != serde_json::to_value(&inventory).map_err(invalid)?
+    {
+        return Err(invalid("installed files do not match selection"));
+    }
+    Ok(())
+}
+
+/// Authenticate and native-validate the current installed selection offline.
+/// The installer owns the tree and must retain immutable releases while serving.
+/// Expired discovery heads do not prevent using an installed selection.
+pub fn read_current(
+    root: &Path,
+    city: &str,
+    keys: &[[u8; 32]],
+    now: SystemTime,
+) -> io::Result<InstalledSelection> {
+    let activation = read_activation(&activation_path(root, city)?)?
+        .ok_or_else(|| invalid("transit city is not installed"))?;
+    let files = root
+        .join("transit/cities")
+        .join(city)
+        .join("releases")
+        .join(&activation.current.selection)
+        .join("files");
+    validate_release_files(&files, city, &activation.current, keys, now)?;
+    Ok(InstalledSelection { activation, files })
 }

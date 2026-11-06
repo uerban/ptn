@@ -319,7 +319,41 @@ impl ReloadRunner {
         }
     }
 
+    /// Path watched for adoption; installed mode never polls producer pointers.
+    pub fn installed_activation_path(&self) -> Option<std::path::PathBuf> {
+        self.config.transit_store_root.as_ref().and_then(|root| {
+            pt_artifacts::transit_install::activation_path(root, &self.config.city_slug).ok()
+        })
+    }
+
+    fn run_installed(&self) -> Result<InnerOutcome, ValidationError> {
+        let selection = crate::bundle::installed::resolve(&self.config, self.clock.as_ref())?;
+        if self.gen_handle.load().transit_selection.as_deref()
+            == Some(selection.activation.current.selection.as_str())
+        {
+            return Ok(InnerOutcome::Noop);
+        }
+        let epoch = self.next_epoch.fetch_add(1, Ordering::SeqCst);
+        let generation = crate::bundle::installed::build(
+            &self.config,
+            &selection,
+            self.clock.as_ref(),
+            &self.metrics,
+            false,
+            epoch,
+        )?;
+        if let Some(barrier) = self.test_barrier.as_ref() {
+            barrier.park();
+        }
+        let generation_id = generation.generation_id.clone();
+        self.gen_handle.store(Arc::new(generation));
+        Ok(InnerOutcome::Adopted { generation_id })
+    }
+
     fn run_one_inner(&self) -> Result<InnerOutcome, ValidationError> {
+        if self.config.transit_store_root.is_some() {
+            return self.run_installed();
+        }
         // ---- 1. read current.json ----
         let ptr = read_pointer_manifest(&self.config.data_root.join("current.json"))?;
         // ---- 2. no-op classification: re-read target generation.json

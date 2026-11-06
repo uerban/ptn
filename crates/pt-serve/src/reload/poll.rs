@@ -59,7 +59,9 @@ use std::time::Duration;
 /// (it overflows ~year 2554), so the `u128 → u64` cast is lossless for any
 /// realistic date while keeping the `AtomicU64` storage the poll loop wants.
 pub fn poll_tick(runner: &ReloadRunner, data_root: &Path, last_mtime: &AtomicU64) {
-    let cur = data_root.join("current.json");
+    let cur = runner
+        .installed_activation_path()
+        .unwrap_or_else(|| data_root.join("current.json"));
     let mtime = std::fs::metadata(&cur)
         .and_then(|m| m.modified())
         .ok()

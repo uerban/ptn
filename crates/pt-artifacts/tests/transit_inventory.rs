@@ -1224,3 +1224,14 @@ fn transit_restart_reuses_complete_unactivated_release_and_cleans_partial_stagin
             .geometry_selected
     );
 }
+
+#[test]
+fn read_only_transit_discovery_never_creates_or_cleans_a_store() {
+    let root = tempfile::tempdir().unwrap();
+    let now = std::time::SystemTime::now();
+    assert!(pt_artifacts::transit_install::read_current(root.path(), "fixture", &[], now).is_err());
+    assert!(
+        pt_artifacts::transit_install::read_current(root.path(), "../fixture", &[], now).is_err()
+    );
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+}

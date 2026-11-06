@@ -5,6 +5,7 @@
 //! path with last-good fallback.
 pub mod generation;
 pub mod handle;
+pub mod installed;
 pub mod integrity;
 pub mod loader;
 
