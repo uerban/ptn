@@ -142,6 +142,9 @@ pub fn run_republish_many(
         producer_lock::ProducerLockError::Io(e) => Error::Io(e),
     })?;
 
+    // Stable deployment binding is load-bearing and must fail before any
+    // generation/archive changes. Legacy stat diagnostics remain best-effort.
+    pt_shared::data_root_identity::verify_configured(data_root)?;
     // Sentinel: keep the producer-side view of the data root mount fresh.
     // Best-effort (matches periodic-refresh).
     if let Err(e) = sentinel::write_producer_sentinel(data_root) {

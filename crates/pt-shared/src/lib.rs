@@ -16,6 +16,8 @@
 pub mod artifact_lease;
 pub mod clock;
 #[cfg(feature = "durable-fsync")]
+pub mod data_root_identity;
+#[cfg(feature = "durable-fsync")]
 pub mod fsync;
 pub mod js_json;
 pub mod manifest;
