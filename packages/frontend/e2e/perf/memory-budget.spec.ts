@@ -27,6 +27,7 @@ test.describe("@perf memory budgets", () => {
         const source = map.getSource("stops-source");
         return source != null && (map.querySourceFeatures?.("stops-source") ?? []).length > 0;
       },
+      undefined,
       { timeout: 20_000, polling: 300 },
     );
     // Short settle window to let GC run after the init burst — the anchor

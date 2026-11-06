@@ -1,0 +1,101 @@
+name: Security scans
+on:
+  workflow_call:
+    inputs:
+      audit-dependencies:
+        description: Audit lockfiles; false is a deliberate unchanged-dependency skip
+        required: true
+        type: boolean
+  schedule:
+    - cron: '15 7 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  secrets:
+    name: Scan tree and commit history
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_IMAGE: docker.io/zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare pinned redacting scanner
+        run: |
+          cat > "$RUNNER_TEMP/gitleaks" <<'SCANNER'
+          #!/usr/bin/env bash
+          exec docker run --rm -w "$PWD" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE:ro" -v "$RUNNER_TEMP:$RUNNER_TEMP:ro" \
+            "$GITLEAKS_IMAGE" "$@"
+          SCANNER
+          chmod +x "$RUNNER_TEMP/gitleaks"
+      - name: Verify narrowly scoped exceptions
+        run: GITLEAKS_BIN="$RUNNER_TEMP/gitleaks" python3 scripts/check-secret-policy.py
+      - name: Scan current tree and incoming commits
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          "$RUNNER_TEMP/gitleaks" dir . --config "$GITHUB_WORKSPACE/.gitleaks.toml" --redact=100 --no-banner
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) from="$PR_BASE" ;;
+            push) from="$PUSH_BEFORE" ;;
+            *) from="" ;;
+          esac
+          if [ -n "$from" ] && [ "$from" != 0000000000000000000000000000000000000000 ]; then
+            [[ "$from" =~ ^[0-9a-f]{40}$ ]]
+            range="$from..$GITHUB_SHA"
+          else
+            range="--all"
+          fi
+          "$RUNNER_TEMP/gitleaks" git . --config "$GITHUB_WORKSPACE/.gitleaks.toml" --log-opts="$range" --redact=100 --no-banner
+  dependencies:
+    name: Audit dependencies
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || inputs.audit-dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          wasm-pack: 'false'
+          cargo-audit: 'true'
+          cache-profile: security-audit-0.22.1
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+      - name: Audit production npm dependencies at high severity
+        run: pnpm audit --prod --audit-level=high
+      - name: Audit Rust workspace against RustSec
+        run: cargo audit --file Cargo.lock
+      - name: Report full dependency-tree advisories
+        if: always()
+        run: python3 scripts/report-dependency-advisories.py --report "$RUNNER_TEMP/dependency-advisories.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: dependency-advisories
+          retention-days: 14
+          path: ${{ runner.temp }}/dependency-advisories.json
+          if-no-files-found: ignore
+  result:
+    name: Security
+    needs: [secrets, dependencies]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          SECRET_RESULT: ${{ needs.secrets.result }}
+          DEPENDENCY_RESULT: ${{ needs.dependencies.result }}
+          AUDIT_REQUIRED: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || inputs.audit-dependencies }}
+        run: |
+          test "$SECRET_RESULT" = success
+          if [ "$AUDIT_REQUIRED" = true ]; then
+            test "$DEPENDENCY_RESULT" = success
+          else
+            test "$DEPENDENCY_RESULT" = skipped
+          fi

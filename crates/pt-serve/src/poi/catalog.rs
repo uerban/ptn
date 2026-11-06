@@ -18,9 +18,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-/// Static RSS reservation and startup validation both cap all strict
-/// corpora at five. Identities and tiling values come from manifest.json.
-pub use pt_shared::poi_manifest_wire::MAX_POI_CITY_SLOTS;
 const MIN_POI_TILE_EDGE_KM: f64 = 3.0;
 const MAX_POI_TILE_EDGE_KM: f64 = 200.0;
 const MAX_TILE_COORD_ABS: i64 = 999_999;
@@ -325,6 +322,14 @@ pub fn read_city_entries_from(
     dir: &Path,
     record: &PoiManifestBundle,
 ) -> Result<Vec<PoiEntry>, PoiBundleLoadError> {
+    read_city_entries_with_size(config, dir, record).map(|(entries, _)| entries)
+}
+
+fn read_city_entries_with_size(
+    config: &ServerConfig,
+    dir: &Path,
+    record: &PoiManifestBundle,
+) -> Result<(Vec<PoiEntry>, u64), PoiBundleLoadError> {
     validate_strict_record(config, record)?;
     let path = dir.join(&record.filename);
     let max_bytes = config.poi_bundle_max_decoded_bytes;
@@ -410,7 +415,7 @@ pub fn read_city_entries_from(
             path.display()
         )));
     }
-    Ok(bundle.entries)
+    Ok((bundle.entries, json_bytes.len() as u64))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -589,8 +594,8 @@ impl<'a> PoiCityMetricClass<'a> {
 }
 
 /// Classify a request for metrics without ever returning attacker-owned text.
-/// Only the first five valid strict records can produce city labels, matching
-/// the startup manifest ceiling; everything else collapses to `unknown`.
+/// Only validated manifest-backed IDs can produce labels; request text never
+/// creates a metric label. Manifest byte limits bound the configured inventory.
 pub fn classify_poi_city_for_metrics<'a>(
     manifest: &'a PoiManifest,
     requested_city_id: &str,
@@ -602,14 +607,9 @@ pub fn classify_poi_city_for_metrics<'a>(
         return PoiCityMetricClass::Unknown;
     };
 
-    let mut strict_count = 0u64;
     for record in &manifest.bundles {
         if !city_id_valid(&record.city_id) || record.filename != format!("{}.br", record.city_id) {
             continue;
-        }
-        strict_count += 1;
-        if strict_count > MAX_POI_CITY_SLOTS {
-            break;
         }
         if std::ptr::eq(record, requested) {
             return PoiCityMetricClass::Known(record.city_id.as_str());
@@ -884,11 +884,6 @@ pub fn validate_poi_configuration(
                 record.city_id
             )));
         }
-        if seen.len() as u64 > MAX_POI_CITY_SLOTS {
-            return Err(PoiBundleLoadError::Config(format!(
-                "manifest has more than {MAX_POI_CITY_SLOTS} strict POI cities"
-            )));
-        }
         validate_strict_record(config, record)?;
         let Some(contract) = active_tiling_contract(
             manifest.schema_version,
@@ -912,8 +907,19 @@ pub fn validate_poi_configuration(
         active.push((record, contract));
     }
 
+    let mut decoded_charge = 0u64;
     for (record, contract) in active {
-        let entries = read_city_entries(config, record)?;
+        let (entries, decoded_bytes) = read_city_entries_with_size(config, &pinned_dir, record)?;
+        decoded_charge = decoded_charge.saturating_add(
+            decoded_bytes
+                .saturating_mul(crate::ops::rss_guard::POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED),
+        );
+        if decoded_charge > config.poi_city_entries_cache_max_bytes {
+            return Err(PoiBundleLoadError::Config(format!(
+                "decoded POI cache needs at least {decoded_charge} charged bytes but its configured budget is {}",
+                config.poi_city_entries_cache_max_bytes
+            )));
+        }
         validate_tiling(&record.city_id, &contract, &entries)?;
         let charge = required_tile_cache_bytes(record, &contract, &entries);
         // Fail closed only on the condition that is decisive rather than
@@ -1115,15 +1121,99 @@ mod tests {
         assert_eq!(retained.manifest.bundles.len(), 1);
     }
 
+    #[test]
+    fn decoded_corpus_admission_is_operator_budgeted() {
+        let dir = TempDir::new().unwrap();
+        publish(dir.path(), &[entry("a", 54.6, 25.2)], 12.0);
+        let mut cfg = config(dir.path());
+        cfg.poi_city_entries_cache_max_bytes = 1;
+        let error = validate_poi_configuration(&cfg).unwrap_err().to_string();
+        assert!(error.contains("decoded POI cache"));
+        cfg.poi_city_entries_cache_max_bytes = cfg.poi_bundle_max_decoded_bytes * 2;
+        assert!(validate_poi_configuration(&cfg).unwrap().is_some());
+    }
+
+    #[test]
+    fn more_than_sixteen_active_corpora_work_when_the_byte_budget_fits() {
+        let dir = TempDir::new().unwrap();
+        let mut records = Vec::new();
+        for index in 0..20 {
+            let fixture = TempDir::new().unwrap();
+            let mut record = publish(fixture.path(), &[entry("a", 54.6, 25.2)], 12.0);
+            let compressed = std::fs::read(fixture.path().join("vilnius.br")).unwrap();
+            let mut decoded = Vec::new();
+            brotli::BrotliDecompress(&mut compressed.as_slice(), &mut decoded).unwrap();
+            let mut body: Value = serde_json::from_slice(&decoded).unwrap();
+            let city = format!("city{index}");
+            body["meta"]["cityId"] = json!(city);
+            let bytes = serde_json::to_vec(&body).unwrap();
+            let mut compressed = Vec::new();
+            brotli::BrotliCompress(&mut bytes.as_slice(), &mut compressed, &Default::default())
+                .unwrap();
+            let filename = format!("{city}.br");
+            std::fs::write(dir.path().join(&filename), &compressed).unwrap();
+            record["cityId"] = json!(city);
+            record["filename"] = json!(filename);
+            record["sizeBytes"] = json!(compressed.len());
+            record["sha256"] = json!(format!("{:x}", Sha256::digest(&compressed)));
+            records.push(record);
+        }
+        std::fs::write(
+            dir.path().join("manifest.json"),
+            serde_json::to_vec(&json!({"schemaVersion": 1, "bundles": records})).unwrap(),
+        )
+        .unwrap();
+        let mut cfg = config(dir.path());
+        cfg.poi_city_entries_cache_max_bytes = 1;
+        assert!(validate_poi_configuration(&cfg)
+            .unwrap_err()
+            .to_string()
+            .contains("decoded POI cache"));
+        // Tiny corpora fit a small byte budget, regardless of their count.
+        cfg.poi_city_entries_cache_max_bytes = 64 * 1024;
+        assert_eq!(
+            validate_poi_configuration(&cfg)
+                .unwrap()
+                .unwrap()
+                .cities
+                .len(),
+            20
+        );
+    }
+
+    #[test]
+    fn accepts_the_ten_corpora_needed_by_eight_deployment_cities() {
+        let dir = TempDir::new().unwrap();
+        let cities = [
+            "vilnius", "gdansk", "gdynia", "sopot", "tbilisi", "krakow", "oslo", "riga", "tallinn",
+            "warsaw",
+        ];
+        let bundles: Vec<Value> = cities
+            .iter()
+            .map(|city| {
+                json!({
+                    "cityId": city, "filename": format!("{city}.br"),
+                    "sizeBytes": 1, "sha256": "0".repeat(64)
+                })
+            })
+            .collect();
+        std::fs::write(
+            dir.path().join("manifest.json"),
+            serde_json::to_vec(&json!({"schemaVersion": 1, "bundles": bundles})).unwrap(),
+        )
+        .unwrap();
+        let ready = validate_poi_configuration(&config(dir.path()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(ready.cities.len(), 10);
+        assert_eq!(
+            classify_poi_city_for_metrics(&ready.manifest, "warsaw").label(),
+            "warsaw"
+        );
+    }
+
+    // Only validated manifest IDs may create metric labels.
     #[cfg(unix)]
-    /// `classify_poi_city_for_metrics` is the ONLY thing keeping the
-    /// `pt_serve_poi_tile_requests_total{poi_city}` label set bounded, and
-    /// `poi_city` originates in the request URL. The classifier is correct
-    /// today — it returns Known only on `std::ptr::eq` against a strict
-    /// manifest record, after a `city_id_valid` gate and a MAX_POI_CITY_SLOTS
-    /// break — but nothing asserted it, so a future edit to that pointer
-    /// comparison could silently unbound a Prometheus label map from untrusted
-    /// input.
     #[test]
     fn metric_city_label_never_echoes_untrusted_input() {
         let root = TempDir::new().expect("temp dir");
@@ -1564,34 +1654,6 @@ mod tests {
         cfg.poi_tile_cache_max_entries = 4;
         let error = captured_preflight_error(cfg);
         assert!(error.contains("configured corpora expose"));
-
-        let too_many = TempDir::new().expect("temp dir");
-        let records: Vec<Value> = (0..6)
-            .map(|index| {
-                json!({
-                    "cityId": format!("city{index}"),
-                    "filename": format!("city{index}.br"),
-                    "sizeBytes": 1,
-                    "sha256": "0".repeat(64),
-                    "poiTile": {
-                        "edgeKm": 12,
-                        "anchor": {"minLat": 54.58, "minLon": 25.08, "refLat": 54.68},
-                        "tilingPolicy": "k-anon-floor",
-                        "kAnonWaived": false,
-                        "tileBounds": {"minX": 0, "maxX": 0, "minY": 0, "maxY": 0},
-                        "deliveryActive": false
-                    }
-                })
-            })
-            .collect();
-        std::fs::write(
-            too_many.path().join("manifest.json"),
-            serde_json::to_vec(&json!({"schemaVersion": 1, "bundles": records}))
-                .expect("manifest serializes"),
-        )
-        .expect("manifest writes");
-        let error = captured_preflight_error(config(too_many.path()));
-        assert!(error.contains("more than 5 strict POI cities"));
 
         let invalid_inactive = TempDir::new().expect("temp dir");
         std::fs::write(

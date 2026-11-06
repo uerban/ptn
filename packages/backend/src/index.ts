@@ -418,6 +418,8 @@ async function main() {
   const poiTileRoute = createPoiTileHandler({
     ...createBundleFileLoader({
       bundleDir: POI_BUNDLE_DIR,
+      ...(process.env.POI_BUNDLE_MAX_DECODED_BYTES !== undefined ? {maxDecodedBytes: Number(process.env.POI_BUNDLE_MAX_DECODED_BYTES)} : {}),
+      ...(process.env.POI_CITY_ENTRIES_CACHE_MAX_BYTES !== undefined ? {entriesCacheMaxBytes: Number(process.env.POI_CITY_ENTRIES_CACHE_MAX_BYTES)} : {}),
     }),
     onRequest: (status, poiCity) =>
       metricsRegistry.poiTileRequests.labels(String(status), poiCity).inc(),

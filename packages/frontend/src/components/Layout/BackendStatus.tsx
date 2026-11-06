@@ -18,9 +18,9 @@ const STALE_FEED_THRESHOLD_BY_CITY: Record<string, number> = {};
  * correctly rather than telling the rider that data "will appear shortly"
  * while the map sits empty.
  *
- * A backend that ANSWERS with a non-2xx (pt-serve's ~15 s self-reload window
- * returns 503) is a different state — it is up and warming, so it keeps the
- * startup copy no matter how long it lasts.
+ * pt-serve's ~15 s self-reload window returns 503 and keeps the startup
+ * copy. Gateway failures (502/504) mean the proxy cannot reach the reader;
+ * they count toward an outage just like a failed network request.
  */
 const OUTAGE_AFTER_CONSECUTIVE_FAILURES = 2;
 
@@ -45,6 +45,15 @@ export function BackendStatus() {
   useEffect(() => {
     let cancelled = false;
     const healthUrl = `/api/${cityId}/health/ready`;
+    setProbe({ state: "ok", consecutiveUnreachable: 0 });
+    setFeedAgeSeconds(null);
+
+    function unreachable() {
+      setProbe((prev) => ({
+        state: "unreachable",
+        consecutiveUnreachable: prev.consecutiveUnreachable + 1,
+      }));
+    }
 
     async function checkHealth() {
       try {
@@ -55,7 +64,11 @@ export function BackendStatus() {
         const res = await fetch(healthUrl, { cache: "no-store" });
         if (cancelled) return;
         if (!res.ok) {
-          setProbe({ state: "not-ready", consecutiveUnreachable: 0 });
+          if (res.status === 503) {
+            setProbe({ state: "not-ready", consecutiveUnreachable: 0 });
+          } else {
+            unreachable();
+          }
           return;
         }
         setProbe({ state: "ok", consecutiveUnreachable: 0 });
@@ -72,10 +85,7 @@ export function BackendStatus() {
       } catch (err) {
         console.warn("Health check failed:", err);
         if (!cancelled) {
-          setProbe((prev) => ({
-            state: "unreachable",
-            consecutiveUnreachable: prev.consecutiveUnreachable + 1,
-          }));
+          unreachable();
         }
       }
     }

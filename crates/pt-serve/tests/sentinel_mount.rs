@@ -88,6 +88,7 @@ fn stat_dev_ino(p: &Path) -> (u64, u64) {
 fn pt_serve_command(data_root: &Path, pidfile_path: &Path) -> Command {
     let bin = env!("CARGO_BIN_EXE_pt-serve");
     let mut cmd = Command::new(bin);
+    cmd.env_remove(pt_shared::data_root_identity::ENV);
     cmd.args([
         "--listen-addr",
         "127.0.0.1:0",
@@ -154,6 +155,96 @@ fn spawn_and_collect_exit(
             Err(e) => panic!("pt-serve try_wait error: {e}"),
         }
     }
+}
+
+fn assert_listens(mut cmd: Command) {
+    use std::io::BufRead as _;
+    let mut child = cmd.spawn().expect("spawn pt-serve");
+    let stdout = child.stdout.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        for line in std::io::BufReader::new(stdout).lines() {
+            match line {
+                Ok(line) if line.starts_with("pt-serve listening on ") => {
+                    let _ = tx.send(());
+                    return;
+                }
+                Ok(_) => {}
+                Err(_) => return,
+            }
+        }
+    });
+    let listened = rx.recv_timeout(Duration::from_secs(10)).is_ok();
+    let _ = child.kill();
+    let _ = child.wait();
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
+    assert!(listened, "bound root did not start: {stderr}");
+}
+
+#[test]
+fn stable_identity_starts_after_restore_and_repeated_restart_without_producer() {
+    let (source, id) = seed_data_root();
+    let identity = "test-deployment:vilnius";
+    pt_shared::data_root_identity::bind(source.path(), identity, Some(&id)).unwrap();
+    // Model restoration/remount: all accepted bytes move to a different inode.
+    let restored = tempfile::tempdir().unwrap();
+    let generation = restored.path().join("generations").join(&id);
+    std::fs::create_dir_all(&generation).unwrap();
+    for name in ["bundle.ptb", "generation.json"] {
+        std::fs::copy(
+            source.path().join("generations").join(&id).join(name),
+            generation.join(name),
+        )
+        .unwrap();
+    }
+    for name in ["current.json", pt_shared::data_root_identity::FILENAME] {
+        std::fs::copy(source.path().join(name), restored.path().join(name)).unwrap();
+    }
+    let (dev, ino) = stat_dev_ino(source.path());
+    let legacy = format!(
+        "schemaVersion=1\ndeviceInode={}:{}\n",
+        dev.wrapping_add(7777),
+        ino.wrapping_add(999_999)
+    );
+    std::fs::write(restored.path().join(".producer-data-root-id"), &legacy).unwrap();
+    let pointer = std::fs::read(restored.path().join("current.json")).unwrap();
+    for _ in 0..2 {
+        let mut cmd = pt_serve_command(restored.path(), &restored.path().join("pt-serve.pid"));
+        cmd.env(pt_shared::data_root_identity::ENV, identity);
+        assert_listens(cmd);
+    }
+    assert_eq!(
+        std::fs::read(restored.path().join("current.json")).unwrap(),
+        pointer
+    );
+    assert_eq!(
+        std::fs::read_to_string(restored.path().join(".producer-data-root-id")).unwrap(),
+        legacy
+    );
+}
+
+#[test]
+fn wrong_stable_identity_exits_before_binding_or_advertising_version() {
+    let (data_root, id) = seed_data_root();
+    pt_shared::data_root_identity::bind(data_root.path(), "other-deployment:vilnius", Some(&id))
+        .unwrap();
+    let mut cmd = pt_serve_command(data_root.path(), &data_root.path().join("pt-serve.pid"));
+    cmd.env(
+        pt_shared::data_root_identity::ENV,
+        "expected-deployment:vilnius",
+    );
+    let (status, stdout, stderr) = spawn_and_collect_exit(cmd, Duration::from_secs(10));
+    assert!(!status.success());
+    assert!(stderr.contains("data-root identity mismatch"), "{stderr}");
+    assert!(stderr.contains("sentinel_verify_failed"), "{stderr}");
+    assert!(!stdout.contains("pt-serve listening on"));
+    assert!(!data_root.path().join("pt-serve.version").exists());
 }
 
 // ----------------------------------------------------------------------------

@@ -3,6 +3,9 @@ import type { TileAnchor } from "./tileKey.js";
 /** The only POI `manifest.json` schemaVersion; readers reject every other value. */
 export const POI_MANIFEST_SCHEMA_VERSION = 1;
 
+/** Operator-tunable decoded POI cache memory budget; not a corpus-count ceiling. */
+export const DEFAULT_POI_CITY_ENTRIES_CACHE_MAX_BYTES = 10 * 1024 * 1024;
+
 export interface PoiTileBounds {
   minX: number;
   maxX: number;

@@ -15,6 +15,14 @@ General hosting examples live in [examples/native](examples/native/README.md)
 and [docker](docker/README.md). Private deployment configuration and published
 city data live separately.
 
+## Public demo
+
+Try PTN at [ptn.uerban.org](https://ptn.uerban.org).
+
+This public deployment primarily demonstrates PTN and is open for everyday use.
+Uerban aims to support as many users as its available infrastructure and
+resources allow.
+
 ## Layout
 
 | Path | What |
@@ -138,6 +146,9 @@ cargo test --workspace
 pnpm test
 pnpm typecheck
 ```
+
+Routine CI skips source builds for prose-only changes. Performance/memory gates
+run on demand and are required for releases; see [CI and release gates](docs/ci.md).
 
 ## License
 

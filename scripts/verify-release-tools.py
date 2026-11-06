@@ -2,6 +2,7 @@
 """Execute packaged tools natively or with a supplied QEMU user-mode runner."""
 import argparse
 import hashlib
+import importlib.util
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -72,24 +73,7 @@ basicConstraints = critical,CA:TRUE
     print("PASS: ARMv6 artifact, transit and GTFS clients completed trusted local TLS requests")
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundle", type=Path, required=True)
-    parser.add_argument("--runner", default="")
-    parser.add_argument("--revision", required=True)
-    args = parser.parse_args()
-    runner = shlex.split(args.runner)
-    bundle = args.bundle.resolve()
-    archive = bundle.with_suffix(".tar.gz")
-    expected, filename = archive.with_suffix(".gz.sha256").read_text().split()
-    assert filename == archive.name
-    assert hashlib.sha256(archive.read_bytes()).hexdigest() == expected
-    metadata = json.loads((bundle / "release.json").read_text())
-    assert metadata["revision"] == args.revision and metadata["sourceDirty"] is False
-    for line in (bundle / "SHA256SUMS").read_text().splitlines():
-        expected, name = line.split("  ", 1)
-        assert hashlib.sha256((bundle / name).read_bytes()).hexdigest() == expected, name
-    binaries = bundle / "bin"
+def verify_tools(runner, binaries, target):
     for name in ("pt-serve", "pt-producer", "pt-build-transfers", "pt-artifacts", "pt-artifact-publish", "pt-transit", "pt-pack-inspect",
                  "pt-pack-export", "pt-pack-catalog", "pt-pack-publish", "pt-pack-discovery"):
         result = subprocess.run(runner + [str(binaries / name), "--help"],
@@ -109,9 +93,46 @@ def main():
         stats = json.loads(result.stdout)
         assert stats["nodes"] == 2 and stats["edges"] == 1, stats
         assert graph.read_bytes()[:4] == b"PTWG"
-        if metadata["rustTarget"] == "arm-unknown-linux-musleabihf":
+        if target == "arm-unknown-linux-musleabihf":
             verify_native_tls(runner, binaries, work)
-    print("PASS: all twelve packaged native tools execute; walking graph fixture built")
+    print("PASS: all twelve native tools execute; walking graph fixture built")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--bundle", type=Path)
+    source.add_argument("--bin-dir", type=Path, help="Check compiled tools without creating a release archive")
+    parser.add_argument("--platform", help="Required with --bin-dir; an existing release platform name")
+    parser.add_argument("--runner", default="")
+    parser.add_argument("--revision", help="Required with --bundle")
+    args = parser.parse_args()
+    runner = shlex.split(args.runner)
+    if args.bin_dir:
+        spec = importlib.util.spec_from_file_location("packaging", Path(__file__).with_name("package-release.py"))
+        packaging = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(packaging)
+        if args.platform not in packaging.PLATFORMS:
+            parser.error("--bin-dir requires a supported --platform")
+        binaries = args.bin_dir.resolve()
+        for name in packaging.BINARIES:
+            packaging.verify_binary(binaries / name, args.platform)
+        target = packaging.PLATFORMS[args.platform][0]
+    else:
+        if not args.revision:
+            parser.error("--bundle requires --revision")
+        bundle = args.bundle.resolve()
+        archive = bundle.with_suffix(".tar.gz")
+        expected, filename = archive.with_suffix(".gz.sha256").read_text().split()
+        assert filename == archive.name
+        assert hashlib.sha256(archive.read_bytes()).hexdigest() == expected
+        metadata = json.loads((bundle / "release.json").read_text())
+        assert metadata["revision"] == args.revision and metadata["sourceDirty"] is False
+        for line in (bundle / "SHA256SUMS").read_text().splitlines():
+            expected, name = line.split("  ", 1)
+            assert hashlib.sha256((bundle / name).read_bytes()).hexdigest() == expected, name
+        binaries, target = bundle / "bin", metadata["rustTarget"]
+    verify_tools(runner, binaries, target)
 
 
 if __name__ == "__main__":

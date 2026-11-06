@@ -41,6 +41,24 @@ hidden behavior based on a compiled city ID. GBFS requests still require the
 user's explicit opt-in. POI mode accepts `eager-bundle`, `lazy-tile` and
 `server-side`; `poiCityIds` describes constituent artifact areas.
 
+## POI corpora
+
+City discovery does not create POI data. A deployment must build, validate and
+install each advertised corpus separately. Native validation accepts a corpus
+whose ID matches its configured deployment city; Tricity retains its explicit
+Gdańsk/Gdynia/Sopot mapping. Unknown cities do not inherit another city's data.
+
+There is no corpus-count ceiling. Manifest and artifact byte limits still apply.
+Decoded bytes for active tiled corpora, charged with a conservative memory
+overhead factor, must fit the operator's configured budget
+(`--poi-city-entries-cache-max-bytes`, or
+`PT_SERVE_POI_CITY_ENTRIES_CACHE_MAX_BYTES` for the native server; the Node server
+uses `POI_CITY_ENTRIES_CACHE_MAX_BYTES`). Whole-city eager corpora do not require
+retained server-side decoded entries. The RSS guard reserves that budget plus
+bounded metadata and in-flight decode/reference headroom. Namespace replacement
+drops old cached ownership; invalid or over-budget updates retain the prior release.
+New artifacts still require a compatible published native release and signed validation.
+
 ## Frontend exposure policy
 
 The host's `/deployment-config.js` loads before the app. To show every city:
@@ -101,13 +119,10 @@ additional schedule tiles and policy-permitted places can be warmed using
 Live updates and server-only place search still need a connection. A package
 does not promise every map, address or schedule detail is installed.
 
-## Migration
+## Deployment requirements
 
-Existing releases need one frontend upgrade for discovery. Production always
-attempts backend discovery, including when a legacy inline schema-1 ID allowlist
-or schema-2 definition is present. Those lists become exposure policies over the
-backend definitions. Only an explicit 404 from `/api/cities` permits legacy inline
-metadata fallback for an old host. New deployments must publish the backend
-catalog and a separate exposure policy. The catalog, readiness and routing-bundle
-endpoints bypass service-worker response caching; their loaders own validation
-and offline fallback. Development builds may use presets without a discovery endpoint.
+Production deployments must publish the backend catalog at `/api/cities` and a
+separate frontend exposure policy. The frontend discovers city definitions from
+the backend catalog. The catalog, readiness and routing-bundle endpoints bypass
+service-worker response caching; their loaders own validation and offline
+fallback. Development builds may use presets without a discovery endpoint.

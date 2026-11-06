@@ -1,0 +1,98 @@
+name: Set up cached build dependencies
+description: Pin Node, restore pnpm and Rust dependencies, and cache exact build tools.
+inputs:
+  working-directory:
+    description: Source workspace relative to github.workspace
+    default: .
+  node:
+    description: Set up Node and the pnpm content store
+    default: 'true'
+  rust:
+    description: Set up the repository Rust toolchain and dependency cache
+    default: 'true'
+  wasm-pack:
+    description: Install exact wasm-pack 0.15.0
+    default: 'true'
+  cargo-audit:
+    description: Install exact cargo-audit 0.22.1
+    default: 'false'
+  cache-profile:
+    description: Separate incompatible build profiles and targets
+    default: source
+  save-cache:
+    description: Permit writes only from a trusted main source run
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      if: inputs.node == 'true'
+      with:
+        node-version: '22.22.0'
+    - name: Locate pinned pnpm store
+      if: inputs.node == 'true'
+      id: pnpm
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        corepack enable
+        echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        echo "version=$(node -p 'require("./package.json").packageManager')" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      if: inputs.node == 'true' && inputs.save-cache != 'true'
+      with:
+        path: ${{ steps.pnpm.outputs.store }}
+        key: pnpm-${{ runner.os }}-${{ runner.arch }}-node22.22.0-${{ steps.pnpm.outputs.version }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', inputs.working-directory)) }}
+    - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      if: inputs.node == 'true' && inputs.save-cache == 'true'
+      with:
+        path: ${{ steps.pnpm.outputs.store }}
+        key: pnpm-${{ runner.os }}-${{ runner.arch }}-node22.22.0-${{ steps.pnpm.outputs.version }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', inputs.working-directory)) }}
+    - name: Select repository Rust toolchain
+      if: inputs.rust == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: rustup show
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      if: inputs.rust == 'true'
+      with:
+        workspaces: ${{ inputs.working-directory }} -> target
+        shared-key: ptn-${{ inputs.cache-profile }}
+        cache-bin: 'false'
+        save-if: ${{ inputs.save-cache == 'true' }}
+    - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      if: (inputs.wasm-pack == 'true' || inputs.cargo-audit == 'true') && inputs.save-cache != 'true'
+      with:
+        path: |
+          ~/.cargo/bin/wasm-pack
+          ~/.cargo/bin/cargo-audit
+          ~/.cache/.wasm-pack
+        key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/rust-toolchain.toml', inputs.working-directory)) }}-wasm0.15.0-${{ inputs.wasm-pack }}-audit0.22.1-${{ inputs.cargo-audit }}
+    - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      if: (inputs.wasm-pack == 'true' || inputs.cargo-audit == 'true') && inputs.save-cache == 'true'
+      with:
+        path: |
+          ~/.cargo/bin/wasm-pack
+          ~/.cargo/bin/cargo-audit
+          ~/.cache/.wasm-pack
+        key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/rust-toolchain.toml', inputs.working-directory)) }}-wasm0.15.0-${{ inputs.wasm-pack }}-audit0.22.1-${{ inputs.cargo-audit }}
+    - name: Install and verify pinned build tools
+      if: inputs.wasm-pack == 'true' || inputs.cargo-audit == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        WASM_PACK: ${{ inputs.wasm-pack }}
+        CARGO_AUDIT: ${{ inputs.cargo-audit }}
+      run: |
+        if [ "$WASM_PACK" = true ]; then
+          if ! command -v wasm-pack >/dev/null || [ "$(wasm-pack --version | awk '{print $NF}')" != 0.15.0 ]; then
+            cargo install wasm-pack --version '=0.15.0' --locked --force
+          fi
+          test "$(wasm-pack --version | awk '{print $NF}')" = 0.15.0
+        fi
+        if [ "$CARGO_AUDIT" = true ]; then
+          if ! command -v cargo-audit >/dev/null || [ "$(cargo-audit --version | awk '{print $NF}')" != 0.22.1 ]; then
+            cargo install cargo-audit --version '=0.22.1' --locked --force
+          fi
+          test "$(cargo-audit --version | awk '{print $NF}')" = 0.22.1
+        fi

@@ -39,6 +39,8 @@ pub const DEFAULT_POI_BUNDLE_MAX_DECODED_BYTES: u64 = 1024 * 1024;
 /// Charged-byte ceiling for cached POI tile responses. This replaces the
 /// previous RSS-only assumption of 256 responses averaging 8 KiB while
 /// preserving the same 2 MiB default reservation.
+pub const DEFAULT_POI_CITY_ENTRIES_CACHE_MAX_BYTES: u64 = 10 * 1024 * 1024;
+
 pub const DEFAULT_POI_TILE_CACHE_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 /// CLI + env-driven operator config. Constructed via [`ServerConfig::parse`]
@@ -308,6 +310,10 @@ pub struct ServerConfig {
         default_value_t = DEFAULT_POI_BUNDLE_MAX_DECODED_BYTES
     )]
     pub poi_bundle_max_decoded_bytes: u64,
+
+    /// Operator budget for decoded POI entries. No city-count ceiling is used.
+    #[arg(long, env = "PT_SERVE_POI_CITY_ENTRIES_CACHE_MAX_BYTES", default_value_t = DEFAULT_POI_CITY_ENTRIES_CACHE_MAX_BYTES)]
+    pub poi_city_entries_cache_max_bytes: u64,
 
     /// Entry-count budget for the poi-tile response cache
     /// (`ops/poi_tile_cache.rs`), default 256 (matches Node's hardcoded

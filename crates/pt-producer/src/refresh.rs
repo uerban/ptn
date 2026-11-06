@@ -296,9 +296,9 @@ pub fn publish_one_tick(
         std::thread::sleep(std::time::Duration::from_secs(2));
     }
 
-    // Stage B: record the producer-side view of the data root's device:inode so pt-serve can detect
-    // a mismatched mount at startup. Best-effort — a failure here is a warning, not a publish abort
-    // (sentinel is operability-only; not load-bearing for the publish protocol itself).
+    // Stable binding is load-bearing: reject a different deployment's root
+    // before publishing. The legacy stat diagnostic remains best-effort.
+    pt_shared::data_root_identity::verify_configured(data_root)?;
     if let Err(e) = sentinel::write_producer_sentinel(data_root) {
         eprintln!("[producer] sentinel write failed (non-fatal): {e}");
     }
@@ -3590,7 +3590,6 @@ mod tests {
     #[test]
     fn color_artifact_builder_defaults_to_node_and_accepts_only_documented_values() {
         use std::ffi::OsStr;
-
 
         assert_eq!(
             parse_color_artifact_builder(None).unwrap(),

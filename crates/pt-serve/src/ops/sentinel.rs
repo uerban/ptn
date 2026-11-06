@@ -1,5 +1,10 @@
 //! Producer↔server data-root mount sentinel (verifier side).
 //!
+//! Configured stable identities are verified first by
+//! `pt_shared::data_root_identity`. They survive reboots and restored inodes.
+//! The device/inode format and policies below apply ONLY to unbound legacy
+//! configurations. Never use persisted device numbers as durable identity.
+//!
 //! Mirror of `crates/pt-producer/src/sentinel.rs` — that file WRITES the sentinel at producer
 //! startup; this file READS and VERIFIES it at pt-serve startup. The check fails closed: a mismatch
 //! between the recorded device:inode and the stat we observe means producer and server have
@@ -48,6 +53,8 @@ pub const SENTINEL_FILENAME: &str = ".producer-data-root-id";
 /// no error path expects the caller to recover.
 #[derive(Debug, Error)]
 pub enum SentinelError {
+    #[error("data-root identity verification failed: {0}")]
+    Identity(#[source] std::io::Error),
     /// Could not stat the data root itself. Usually `ENOENT` — the path
     /// doesn't exist or isn't accessible to this process.
     #[error("sentinel: failed to stat data root {path:?}: {source}")]
@@ -94,6 +101,12 @@ pub enum SentinelError {
 /// - The sentinel is present but malformed.
 /// - The recorded device:inode doesn't match.
 pub fn verify_producer_sentinel(data_root: &Path) -> Result<(), SentinelError> {
+    if pt_shared::data_root_identity::verify_configured(data_root)
+        .map_err(SentinelError::Identity)?
+    {
+        // Device/inode is a legacy mount diagnostic, not a durable identity.
+        return Ok(());
+    }
     let sentinel_path = data_root.join(SENTINEL_FILENAME);
     let bytes = match std::fs::read(&sentinel_path) {
         Ok(b) => b,

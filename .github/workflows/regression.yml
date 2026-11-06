@@ -1,0 +1,146 @@
+name: Regression gates
+run-name: Regression gates ${{ inputs.revision || github.event.pull_request.head.sha || github.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact 40-character source commit (defaults to workflow commit)
+        required: false
+        type: string
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+permissions:
+  contents: read
+concurrency:
+  group: regressions-${{ inputs.revision || github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+jobs:
+  regressions:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ci:regression')
+    name: Performance, memory and binding parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: source
+    env:
+      GATE_TOOLS: ${{ github.workspace }}/gate-tools
+      SOURCE_REVISION: ${{ inputs.revision || github.event.pull_request.head.sha || github.sha }}
+      CARGO_PROFILE_RELEASE_PANIC: abort
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.SOURCE_REVISION }}
+          path: source
+          persist-credentials: false
+      - name: Pin the measured source revision
+        id: identity
+        run: |
+          [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          mkdir -p evidence
+      - uses: ./gate-tools/.github/actions/setup-build
+        with:
+          working-directory: source
+          cache-profile: regression-size-optimized
+          save-cache: ${{ github.ref == 'refs/heads/main' && (inputs.revision == '' || inputs.revision == github.sha) }}
+      - name: Build browser bindings and native reference
+        id: build
+        run: |
+          cd crates/pt-wasm
+          wasm-pack build --release --target web --out-dir pkg-web
+          wasm-pack build --release --target nodejs --out-dir pkg-node
+          cd ../..
+          pnpm install --frozen-lockfile
+          cargo build --release --locked -p pt-core-emit
+          pnpm --filter @pt/shared build
+          pnpm --filter @pt/frontend build
+      - name: WASM import and compressed-size budgets
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: wasm
+        run: node "$GATE_TOOLS/scripts/check-wasm-budgets.mjs" crates/pt-wasm/pkg-web/pt_wasm_bg.wasm evidence/wasm.json
+      - name: Native and WASM routing goldens and binding parity
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: parity
+        run: |
+          set -o pipefail
+          cargo test --locked -p pt-core --test raptor_behavior
+          node crates/pt-wasm/tests/plan_golden.mjs | tee evidence/wasm-goldens.log
+          node crates/pt-wasm/tests/three_way.mjs | tee evidence/binding-parity.log
+          grep -E 'pt-wasm-three-way: [1-9][0-9]* tuples compared, 0 mismatch' evidence/binding-parity.log
+          pnpm --filter @pt/backend exec tsx ../shared/scripts/assert-ptb-cross-parity.ts ../../crates/pt-core/tests/tiny.projection.json ../../crates/pt-core/tests/canary.projection.json ../../crates/pt-core/tests/tiny-service-pool.projection.json ../../crates/pt-core/tests/tiny-v1.projection.json ../../crates/pt-core/tests/overnight-i32.projection.json
+      - name: Native RSS admission safeguards
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: rss
+        run: cargo test --locked -p pt-serve --test rss_guard --test rss_guard_process --test generation_load_phases
+      - name: Index-build p99 budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: index
+        run: |
+          pnpm --filter @pt/frontend bench:check
+          cd packages/frontend
+          node "$GATE_TOOLS/packages/frontend/scripts/check-bench-budgets.mjs"
+      - name: Browser bundle-size budgets
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        id: bundle
+        run: pnpm --filter @pt/frontend size:check
+      - name: Install Chromium
+        id: browser
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm --filter @pt/frontend exec playwright install --with-deps chromium
+      - name: Build browser measurement hooks
+        id: measurement
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          VITE_E2E: "1"
+        run: pnpm --filter @pt/frontend build
+      - name: Browser JS heap budget
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' && steps.measurement.outcome == 'success' }}
+        id: heap
+        env:
+          E2E_PREVIEW: "1"
+          CI: "true"
+        run: |
+          pnpm --filter @pt/frontend exec playwright test --project=perf e2e/perf/memory-budget.spec.ts --retries=0 --reporter=json > evidence/browser-memory.json
+          node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-memory.json 'JS heap stays under budget'
+          cp packages/frontend/test-results/perf-metrics/heap.json evidence/heap.json
+      - name: WASM cold-start p95 budgets
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' && steps.measurement.outcome == 'success' }}
+        id: coldstart
+        env:
+          E2E_PREVIEW: "1"
+          CI: "true"
+          PTN_PERF_EVIDENCE_DIR: ${{ github.workspace }}/source/evidence
+        run: |
+          pnpm --filter @pt/frontend exec playwright test --project=pr-chromium --project=pr-chromium-throttled e2e/core/wasm-engine-coldstart.spec.ts --retries=0 --reporter=json > evidence/browser-coldstart.json
+          node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-coldstart.json 'fast profile' 'real CDP CPU throttle'
+      - name: Record exact revision and gate outcomes
+        if: always()
+        env:
+          STEP_RESULTS: ${{ toJSON(steps) }}
+        run: python3 "$GATE_TOOLS/scripts/record-regression-evidence.py"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: regression-proof
+          retention-days: 30
+          if-no-files-found: error
+          path: source/evidence/regression.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: regression-evidence
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            source/evidence/
+            source/packages/frontend/tests/benchmarks/.results.json
+            source/packages/frontend/test-results/

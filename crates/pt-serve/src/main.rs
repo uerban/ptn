@@ -157,22 +157,22 @@ fn main() {
         }
     };
 
-    // Stage B: verify the producer-side data-root sentinel BEFORE the loader touches
-    // `current.json`. A mismatch means the producer and pt-serve see different mounts (k8s PVC
-    // misconfig) — fail closed with the recorded vs observed device:inode in stderr so the
-    // operator's runbook can pinpoint the mount.
+    // Verify the independently configured stable data-root identity BEFORE
+    // loading current.json. Unbound legacy configurations retain their old
+    // device/inode diagnostic; configured roots survive remounts and restores.
     //
     // Done AFTER pidfile acquire (so "another pt-serve already running"
     // wins the diagnostic) and BEFORE load_initial_generation (so a wrong-
     // mount data root produces a clear error rather than a confusing
     // "stale generation" surface).
     //
-    // A missing sentinel is treated as OK — the producer hasn't run yet,
-    // and a brand-new deployment must still boot from current.json to
-    // serve the first publish.
+    // Only unconfigured legacy roots may omit their old stat sentinel.
+    // Configured producer roots must be bound; installed selections use their
+    // independent authenticated activation and do not bind a producer root.
     if config.transit_store_root.is_none() {
         if let Err(e) = verify_producer_sentinel(&config.data_root) {
             let reason = match &e {
+                SentinelError::Identity(_) => "data_root_identity",
                 SentinelError::StatDataRoot { .. } => "stat_data_root",
                 SentinelError::ReadFile { .. } => "read_file",
                 SentinelError::Malformed { .. } => "malformed",

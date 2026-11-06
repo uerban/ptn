@@ -24,12 +24,13 @@ def free_port():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-config", type=Path, required=True)
-    parser.add_argument("--probe", type=Path, required=True)
+    parser.add_argument("--probe", type=Path, help="Optional probe; otherwise derive it from the initialized container feed")
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--compose", default="docker compose")
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
+    probe_path = args.probe.resolve() if args.probe else evidence / "probe.json"
     source = json.loads(args.source_config.read_text())
     if source["artifactSource"]["kind"] != "local":
         parser.error("the reference lifecycle test requires a local signed catalog")
@@ -72,7 +73,7 @@ def main():
         try:
             with log_path.open("w") as log:
                 subprocess.run(["node", str(ROOT / "scripts/verify-hosting.mjs"), url,
-                    str(args.probe.resolve()), str(evidence / name)], cwd=ROOT,
+                    str(probe_path), str(evidence / name)], cwd=ROOT,
                     env={**os.environ, "PTN_TEST_LOCAL_CA": "1" if local_ca else "0"},
                     stdout=log, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError:
@@ -86,6 +87,11 @@ def main():
         run(["up", "-d"], "up")
         http = f"http://localhost:{http_port}"
         generation = ready(http)
+        if not args.probe:
+            with probe_path.open("w") as output:
+                subprocess.run(command + ["exec", "-T", "transit", "python3", "-", "/var/lib/ptn/vilnius.zip"],
+                    cwd=ROOT, env=environment, text=True, check=True, stdout=output,
+                    input=(ROOT / "scripts/hosting-probe.py").read_text())
         browser(http, "browser-http")
         fixture = (ROOT / "scripts/hosting_fixture.py").read_text()
         run(["exec", "-T", "transit", "python3", "-"], "changed-feed",
