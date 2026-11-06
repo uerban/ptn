@@ -7,8 +7,6 @@ use std::marker::PhantomData;
 
 /// The only POI `manifest.json` schemaVersion; readers reject every other value.
 pub const POI_MANIFEST_SCHEMA_VERSION: u64 = 1;
-/// Startup validation and fixed serving-memory reservation share this limit.
-pub const MAX_POI_CITY_SLOTS: u64 = 5;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PoiManifest {

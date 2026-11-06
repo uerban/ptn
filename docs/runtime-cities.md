@@ -41,6 +41,24 @@ hidden behavior based on a compiled city ID. GBFS requests still require the
 user's explicit opt-in. POI mode accepts `eager-bundle`, `lazy-tile` and
 `server-side`; `poiCityIds` describes constituent artifact areas.
 
+## POI corpora
+
+City discovery does not create POI data. A deployment must build, validate and
+install each advertised corpus separately. Native validation accepts a corpus
+whose ID matches its configured deployment city; Tricity retains its explicit
+Gdańsk/Gdynia/Sopot mapping. Unknown cities do not inherit another city's data.
+
+There is no corpus-count ceiling. Manifest and artifact byte limits still apply.
+Decoded bytes for active tiled corpora, charged with a conservative memory
+overhead factor, must fit the operator's configured budget
+(`--poi-city-entries-cache-max-bytes`, or
+`PT_SERVE_POI_CITY_ENTRIES_CACHE_MAX_BYTES` for the native server; the Node server
+uses `POI_CITY_ENTRIES_CACHE_MAX_BYTES`). Whole-city eager corpora do not require
+retained server-side decoded entries. The RSS guard reserves that budget plus
+bounded metadata and in-flight decode/reference headroom. Namespace replacement
+drops old cached ownership; invalid or over-budget updates retain the prior release.
+New artifacts still require a compatible published native release and signed validation.
+
 ## Frontend exposure policy
 
 The host's `/deployment-config.js` loads before the app. To show every city:

@@ -16,7 +16,7 @@
 //!            + schedule_tile_cache_max_bytes
 //!            + rt_tile_membership_cache_max_entries * RT_TILE_MEMBERSHIP_ENTRY_BYTES_ASSUMED
 //!            + rt_tile_response_cache_max_entries * RT_TILE_RESPONSE_ENTRY_BYTES_ASSUMED
-//!            + poi_bundle_max_decoded_bytes * MAX_POI_CITY_SLOTS * POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED
+//!            + configured decoded POI budget + bounded metadata/request transients
 //!            + poi_tile_cache_max_bytes
 //!            + configured_poi_brotli_concurrency * poi_brotli_scratch_bytes_per_build
 //!            + (rt_urls nonempty) * (RT_POLLER_PROCESS_FIXED_BYTES
@@ -55,11 +55,10 @@
 //! caches as "dark (no nginx flip)". Both axes are now flipped for every
 //! city; the reservations are unchanged, which is the point above.
 //!
-//! The decoded POI entry cache has five fixed city slots, but city count does
-//! not bound bytes. Each bundle read is capped by
-//! `poi_bundle_max_decoded_bytes`; the estimator reserves that cap for every
-//! profile, multiplied by a conservative factor for `PoiEntry`, `String`,
-//! alias-map, and allocator overhead over the source JSON bytes.
+//! Decoded POI memory is operator-budgeted. Preflight checks the active working
+//! set against that budget, and namespace replacement drops old cache ownership.
+//! Metadata and in-flight old/new references are reserved separately using the
+//! per-bundle byte cap and the HTTP worker bound.
 //!
 //! POI response caching is byte-bounded. The estimator reserves the exact
 //! configured charged-byte ceiling rather than multiplying an entry count by
@@ -102,7 +101,6 @@
 
 use crate::ops::poi_tile_cache::POI_TILE_BUILD_CONCURRENCY;
 use crate::ops::ServerConfig;
-use crate::poi::catalog::MAX_POI_CITY_SLOTS;
 
 /// The hard-coded multiplier on the (payload + transfers) term. See the
 /// module-level docs for rationale; the bracketing test pins this to
@@ -198,10 +196,6 @@ pub const RT_POLLER_ASSUMED_MAX_ENTRIES_PER_FEED: u64 = 4096;
 /// the one that governs.
 pub const POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED: u64 = 2;
 
-/// Process-lifetime decoded-entry slots. Startup rejects manifests with more
-/// active strict corpora, keeping the static reservation and loader bound equal.
-pub const POI_CITY_ENTRIES_CACHE_SLOTS: u64 = MAX_POI_CITY_SLOTS;
-
 /// Conservative fixed working set for one quality-11 Brotli encoder at the
 /// route's fixed default lgwin=22. The additional variable input/output
 /// buffers are charged separately from `poi_bundle_max_decoded_bytes`.
@@ -255,9 +249,15 @@ fn poi_city_entries_cache_term(cfg: &ServerConfig) -> u64 {
     if cfg.poi_bundle_dir.is_none() {
         return 0;
     }
-    cfg.poi_bundle_max_decoded_bytes
-        .saturating_mul(POI_CITY_ENTRIES_CACHE_SLOTS)
-        .saturating_mul(POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED)
+    cfg.poi_city_entries_cache_max_bytes.saturating_add(
+        cfg.poi_bundle_max_decoded_bytes.saturating_mul(
+            4u64.saturating_add(
+                total_http_worker_count(cfg)
+                    .saturating_add(1)
+                    .saturating_mul(POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED),
+            ),
+        ),
+    )
 }
 
 /// Feeds the poller will actually run, parsed exactly as `RtPoller` parses
@@ -367,7 +367,7 @@ pub struct RssBreakdown {
     pub rt_tile_membership_cache_term_bytes: u64,
     pub rt_tile_response_cache_term_bytes: u64,
     pub poi_bundle_max_decoded_bytes: u64,
-    pub poi_city_entries_cache_slots: u64,
+    pub poi_city_entries_cache_max_bytes: u64,
     pub poi_city_entries_rss_factor: u64,
     pub poi_city_entries_cache_term_bytes: u64,
     pub poi_tile_cache_max_bytes: u64,
@@ -387,7 +387,7 @@ impl RssBreakdown {
     /// dragging serde derives over a struct only used in stderr logs.
     pub fn to_json(&self) -> String {
         format!(
-            "{{\"payloadBytes\":{},\"transfersBytes\":{},\"payloadFactor\":{},\"payloadTermBytes\":{},\"processFixedOverheadBytes\":{},\"workerPoolSize\":{},\"auxiliaryWorkerCount\":{},\"loopbackWorkerCount\":{},\"totalWorkerCount\":{},\"perWorkerOverheadBytes\":{},\"workersTermBytes\":{},\"scheduleTileCacheMaxBytes\":{},\"rtTileMembershipCacheTermBytes\":{},\"rtTileResponseCacheTermBytes\":{},\"poiBundleMaxDecodedBytes\":{},\"poiCityEntriesCacheSlots\":{},\"poiCityEntriesRssFactor\":{},\"poiCityEntriesCacheTermBytes\":{},\"poiTileCacheMaxBytes\":{},\"poiTileCacheTermBytes\":{},\"poiBrotliBuildConcurrency\":{},\"poiBrotliScratchBytesPerBuild\":{},\"poiBrotliScratchTermBytes\":{},\"rtPollerFeedCount\":{},\"rtPollerProcessFixedBytes\":{},\"rtPollerAssumedMaxEntriesPerFeed\":{},\"rtPollerSnapshotEntryBytes\":{},\"rtPollerTermBytes\":{}}}",
+            "{{\"payloadBytes\":{},\"transfersBytes\":{},\"payloadFactor\":{},\"payloadTermBytes\":{},\"processFixedOverheadBytes\":{},\"workerPoolSize\":{},\"auxiliaryWorkerCount\":{},\"loopbackWorkerCount\":{},\"totalWorkerCount\":{},\"perWorkerOverheadBytes\":{},\"workersTermBytes\":{},\"scheduleTileCacheMaxBytes\":{},\"rtTileMembershipCacheTermBytes\":{},\"rtTileResponseCacheTermBytes\":{},\"poiBundleMaxDecodedBytes\":{},\"poiCityEntriesCacheMaxBytes\":{},\"poiCityEntriesRssFactor\":{},\"poiCityEntriesCacheTermBytes\":{},\"poiTileCacheMaxBytes\":{},\"poiTileCacheTermBytes\":{},\"poiBrotliBuildConcurrency\":{},\"poiBrotliScratchBytesPerBuild\":{},\"poiBrotliScratchTermBytes\":{},\"rtPollerFeedCount\":{},\"rtPollerProcessFixedBytes\":{},\"rtPollerAssumedMaxEntriesPerFeed\":{},\"rtPollerSnapshotEntryBytes\":{},\"rtPollerTermBytes\":{}}}",
             self.payload_bytes,
             self.transfers_bytes,
             self.payload_factor,
@@ -403,7 +403,7 @@ impl RssBreakdown {
             self.rt_tile_membership_cache_term_bytes,
             self.rt_tile_response_cache_term_bytes,
             self.poi_bundle_max_decoded_bytes,
-            self.poi_city_entries_cache_slots,
+            self.poi_city_entries_cache_max_bytes,
             self.poi_city_entries_rss_factor,
             self.poi_city_entries_cache_term_bytes,
             self.poi_tile_cache_max_bytes,
@@ -460,7 +460,7 @@ pub fn enforce(cfg: &ServerConfig, payload: u64, transfers: u64) -> RssDecision 
                 .rt_tile_response_cache_max_entries
                 .saturating_mul(RT_TILE_RESPONSE_ENTRY_BYTES_ASSUMED),
             poi_bundle_max_decoded_bytes: cfg.poi_bundle_max_decoded_bytes,
-            poi_city_entries_cache_slots: POI_CITY_ENTRIES_CACHE_SLOTS,
+            poi_city_entries_cache_max_bytes: cfg.poi_city_entries_cache_max_bytes,
             poi_city_entries_rss_factor: POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED,
             poi_city_entries_cache_term_bytes: poi_city_entries_cache_term(cfg),
             poi_tile_cache_max_bytes: cfg.poi_tile_cache_max_bytes,
@@ -518,6 +518,7 @@ mod tests {
             poi_bundle_dir: None,
             poi_lease_root: None,
             poi_bundle_max_decoded_bytes: 1024 * 1024,
+            poi_city_entries_cache_max_bytes: 10 * 1024 * 1024,
             poi_tile_cache_max_entries: 256,
             poi_tile_cache_max_bytes: 2 * 1024 * 1024,
             validated_poi_manifest: None,
@@ -715,11 +716,19 @@ mod tests {
         // each is gated on `poi_bundle_dir`. Before that gating the latter two
         // were charged even to POI-disabled processes.
         let want = per_build * POI_TILE_BUILD_CONCURRENCY as u64
-            + c.poi_bundle_max_decoded_bytes
-                * POI_CITY_ENTRIES_CACHE_SLOTS
-                * POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED
+            + poi_city_entries_cache_term(&c)
             + c.poi_tile_cache_max_bytes;
         assert_eq!(enabled - disabled, want);
+    }
+
+    #[test]
+    fn configured_decoded_budget_is_reserved_byte_for_byte() {
+        let mut config = cfg();
+        config.poi_bundle_dir = Some(PathBuf::from("/tmp/poi"));
+        config.poi_city_entries_cache_max_bytes = 0;
+        let before = estimate_rss(&config, 0, 0);
+        config.poi_city_entries_cache_max_bytes = 12345;
+        assert_eq!(estimate_rss(&config, 0, 0) - before, 12345);
     }
 
     #[test]
@@ -737,7 +746,7 @@ mod tests {
             1024 * POI_BROTLI_TRANSIENT_BUFFER_FACTOR * POI_TILE_BUILD_CONCURRENCY as u64;
         assert_eq!(
             with_cache - without_cache - brotli_delta,
-            1024 * POI_CITY_ENTRIES_CACHE_SLOTS * POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED
+            1024 * (4 + (total_http_worker_count(&c) + 1) * POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED)
         );
     }
 
@@ -835,8 +844,8 @@ mod tests {
                     c.poi_bundle_max_decoded_bytes
                 );
                 assert_eq!(
-                    breakdown.poi_city_entries_cache_slots,
-                    POI_CITY_ENTRIES_CACHE_SLOTS
+                    breakdown.poi_city_entries_cache_max_bytes,
+                    c.poi_city_entries_cache_max_bytes
                 );
                 assert_eq!(
                     breakdown.poi_city_entries_rss_factor,
@@ -844,9 +853,7 @@ mod tests {
                 );
                 assert_eq!(
                     breakdown.poi_city_entries_cache_term_bytes,
-                    c.poi_bundle_max_decoded_bytes
-                        * POI_CITY_ENTRIES_CACHE_SLOTS
-                        * POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED
+                    poi_city_entries_cache_term(&c)
                 );
                 assert_eq!(
                     breakdown.poi_tile_cache_term_bytes,
@@ -885,7 +892,7 @@ mod tests {
                     "rtTileMembershipCacheTermBytes",
                     "rtTileResponseCacheTermBytes",
                     "poiBundleMaxDecodedBytes",
-                    "poiCityEntriesCacheSlots",
+                    "poiCityEntriesCacheMaxBytes",
                     "poiCityEntriesRssFactor",
                     "poiCityEntriesCacheTermBytes",
                     "poiTileCacheMaxBytes",

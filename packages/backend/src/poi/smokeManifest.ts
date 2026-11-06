@@ -12,8 +12,8 @@ import {
   type PoiManifest,
 } from "@pt/shared";
 
-const MAX_POI_CITY_SLOTS = 5;
-const MAX_BUNDLE_BYTES = 1024 * 1024;
+const MAX_BUNDLE_BYTES = Number(process.env.POI_BUNDLE_MAX_DECODED_BYTES ?? 1024 * 1024);
+if (!Number.isSafeInteger(MAX_BUNDLE_BYTES) || MAX_BUNDLE_BYTES <= 0) throw new Error("invalid POI byte cap");
 const MAX_RESPONSE_CACHE_ENTRIES = 256;
 const CITY_ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 
@@ -31,7 +31,9 @@ if (!dir) {
 const manifestPath = join(dir, "manifest.json");
 if (!existsSync(manifestPath)) fail("manifest.json is missing");
 
-const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as PoiManifest;
+const manifestBytes = readFileSync(manifestPath);
+if (manifestBytes.length > MAX_BUNDLE_BYTES) fail("POI manifest exceeds byte cap");
+const manifest = JSON.parse(manifestBytes.toString("utf8")) as PoiManifest;
 if (
   manifest.schemaVersion !== POI_MANIFEST_SCHEMA_VERSION ||
   !Array.isArray(manifest.bundles)
@@ -66,9 +68,6 @@ for (const bundle of manifest.bundles) {
       fail(`duplicate strict manifest record for ${bundle.cityId}`);
     }
     strictCities.add(bundle.cityId);
-    if (strictCities.size > MAX_POI_CITY_SLOTS) {
-      fail(`manifest has more than ${MAX_POI_CITY_SLOTS} strict POI cities`);
-    }
   }
 
   const artifactPath = join(dir, bundle.filename);
@@ -199,8 +198,8 @@ for (const bundle of manifest.bundles) {
   }
 }
 
-if (activeStrictCount === 0) {
-  fail("manifest contains no active strict POI tile corpus");
+if (strictCities.size === 0) {
+  fail("manifest contains no strict POI corpus");
 }
 
 const skips = existsSync(join(dir, "poi-sub-k-skips.json"))

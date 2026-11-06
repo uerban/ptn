@@ -19,12 +19,10 @@ fn invalid(message: impl ToString) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message.to_string())
 }
 
-pub fn corpus_ids(city: &str) -> &[&str] {
+pub fn corpus_ids(city: &str) -> Vec<&str> {
     match city {
-        "tricity" => &["gdansk", "gdynia", "sopot"],
-        "vilnius" => &["vilnius"],
-        "tbilisi" => &["tbilisi"],
-        _ => &[],
+        "tricity" => vec!["gdansk", "gdynia", "sopot"],
+        _ => vec![city],
     }
 }
 
@@ -268,28 +266,37 @@ mod tests {
     fn poi_archive_checks_inventory_city_and_rejects_links() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("corpus.tar");
-        let bundle = br#"{"meta":{"cityId":"vilnius","tier":"loose","entryCount":0},"entries":[]}"#;
-        let mut compressed = Vec::new();
-        {
-            let mut writer = brotli::CompressorWriter::new(&mut compressed, 4096, 4, 22);
-            writer.write_all(bundle).unwrap();
+        for city in ["vilnius", "riga", "warsaw", "custom-city"] {
+            let bundle = serde_json::to_vec(&serde_json::json!({"meta":{"cityId":city,"tier":"loose","entryCount":0},"entries":[]})).unwrap();
+            let filename = format!("{city}.loose.br");
+            let mut compressed = Vec::new();
+            {
+                let mut writer = brotli::CompressorWriter::new(&mut compressed, 4096, 4, 22);
+                writer.write_all(&bundle).unwrap();
+            }
+            let manifest = serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"bundles":[{"cityId":city,"filename":filename,"sizeBytes":compressed.len(),"sha256":digest(&compressed)}]})).unwrap();
+            let mut archive = tar::Builder::new(File::create(&path).unwrap());
+            for (name, bytes) in [
+                ("manifest.json", &manifest),
+                (filename.as_str(), &compressed),
+            ] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(bytes.len() as u64);
+                header.set_mode(0o644);
+                header.set_cksum();
+                archive.append_data(&mut header, name, &bytes[..]).unwrap();
+            }
+            archive.finish().unwrap();
+            drop(archive);
+            poi(city, &path, &dir.path().join(format!("valid-{city}"))).unwrap();
+            let error = poi(
+                "wrong-city",
+                &path,
+                &dir.path().join(format!("wrong-{city}")),
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("inventory or city mismatch"));
         }
-        let manifest = serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"bundles":[{"cityId":"vilnius","filename":"vilnius.loose.br","sizeBytes":compressed.len(),"sha256":digest(&compressed)}]})).unwrap();
-        let mut archive = tar::Builder::new(File::create(&path).unwrap());
-        for (name, bytes) in [
-            ("manifest.json", &manifest),
-            ("vilnius.loose.br", &compressed),
-        ] {
-            let mut header = tar::Header::new_gnu();
-            header.set_size(bytes.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            archive.append_data(&mut header, name, &bytes[..]).unwrap();
-        }
-        archive.finish().unwrap();
-        drop(archive);
-        poi("vilnius", &path, &dir.path().join("valid")).unwrap();
-        assert!(poi("tbilisi", &path, &dir.path().join("wrong-city")).is_err());
         let mut archive = tar::Builder::new(File::create(&path).unwrap());
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Symlink);

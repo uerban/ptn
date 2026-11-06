@@ -474,6 +474,16 @@ async function publishCity(
 }
 
 describe("createBundleFileLoader", () => {
+  it("admits active corpora by operator byte budget", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "poi-memory-budget-"));
+    await publishCity(dir);
+    await expect(createBundleFileLoader({bundleDir: dir, entriesCacheMaxBytes: 1}).preflight?.())
+      .rejects.toThrow("decoded POI cache exceeds configured byte budget");
+    await expect(createBundleFileLoader({bundleDir: dir, entriesCacheMaxBytes: 2 * 1024 * 1024}).preflight?.())
+      .resolves.toBe(true);
+    await rm(dir, {recursive: true, force: true});
+  });
+
   it("validates before bind without retaining decoded entries", async () => {
     const dir = await mkdtemp(join(tmpdir(), "poi-validation-only-"));
     await publishCity(dir);
@@ -563,9 +573,20 @@ describe("createBundleFileLoader", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("caps all strict manifest cities, including inactive records", async () => {
+  it("accepts ten deployment corpora with per-city delivery inactive", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "poi-eight-cities-"));
+    const ids = ["vilnius", "gdansk", "gdynia", "sopot", "tbilisi", "krakow", "oslo", "riga", "tallinn", "warsaw"];
+    const bundles = ids.map(cityId => ({cityId, filename: `${cityId}.br`, sizeBytes: 1, sha256: "0".repeat(64)}));
+    await writeFile(join(dir, "manifest.json"), JSON.stringify({schemaVersion: 1, bundles}));
+    const loader = createBundleFileLoader({bundleDir: dir});
+    await loader.preflight?.();
+    expect(await loader.resolveCityTiling("warsaw")).toEqual({status: "inactive"});
+    await rm(dir, {recursive: true, force: true});
+  });
+
+  it("accepts larger inactive inventories without an artificial count cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "poi-city-cap-"));
-    const bundles = Array.from({ length: 6 }, (_, index): PoiManifestBundle => ({
+    const bundles = Array.from({ length: 40 }, (_, index): PoiManifestBundle => ({
       cityId: `city${index}`,
       filename: `city${index}.br`,
       sizeBytes: 1,
@@ -583,9 +604,7 @@ describe("createBundleFileLoader", () => {
       join(dir, "manifest.json"),
       JSON.stringify({ schemaVersion: 1, bundles }),
     );
-    await expect(
-      createBundleFileLoader({ bundleDir: dir }).preflight?.(),
-    ).rejects.toThrow("more than 5 strict POI cities");
+    await expect(createBundleFileLoader({ bundleDir: dir }).preflight?.()).resolves.toBe(true);
     await rm(dir, { recursive: true, force: true });
   });
 

@@ -46,9 +46,12 @@ fn rss_guard_pins_2x_factor_exactly() {
     // for it. Mirror that gating here, or this bracket drifts from the real
     // estimate the moment the test config leaves POI unconfigured.
     let poi_overhead = if cfg.poi_bundle_dir.is_some() {
-        cfg.poi_bundle_max_decoded_bytes
-            * pt_serve::ops::rss_guard::POI_CITY_ENTRIES_CACHE_SLOTS
-            * pt_serve::ops::rss_guard::POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED
+        cfg.poi_city_entries_cache_max_bytes
+            + cfg.poi_bundle_max_decoded_bytes
+                * (4 + ((cfg.worker_pool_size + cfg.loopback_worker_count) as u64
+                    + pt_serve::ops::rss_guard::AUXILIARY_WORKER_COUNT
+                    + 1)
+                    * pt_serve::ops::rss_guard::POI_CITY_ENTRIES_RSS_FACTOR_ASSUMED)
             + cfg.poi_tile_cache_max_bytes
             + (pt_serve::ops::rss_guard::POI_BROTLI_ENCODER_WORKING_SET_BYTES
                 + cfg.poi_bundle_max_decoded_bytes
@@ -237,7 +240,7 @@ fn enforce_reject_carries_full_breakdown() {
                 "rtTileMembershipCacheTermBytes",
                 "rtTileResponseCacheTermBytes",
                 "poiBundleMaxDecodedBytes",
-                "poiCityEntriesCacheSlots",
+                "poiCityEntriesCacheMaxBytes",
                 "poiCityEntriesRssFactor",
                 "poiCityEntriesCacheTermBytes",
                 "poiTileCacheMaxBytes",
