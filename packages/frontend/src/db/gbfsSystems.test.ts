@@ -32,7 +32,7 @@ describe("gbfsSystems table", () => {
   it("opens with gbfsSystems present", async () => {
     const { db } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(1);
+    expect(db.verno).toBe(2);
     expect(db.gbfsSystems).toBeDefined();
     expect(await db.gbfsSystems.count()).toBe(0);
   });

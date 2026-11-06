@@ -1,10 +1,6 @@
-const POI_CITY_MAPPING: Record<string, string[]> = {
-  // No "sopot": the Gdańsk (to 54.45°N) and Gdynia (from 54.45°N) corpora
-  // already cover all of Sopot. Its separate build is still checked against
-  // the k floor, but the client avoids downloading overlapping corpora.
-  tricity: ["gdansk", "gdynia"],
-};
+import {CITIES} from "../config/cities.ts";
 
+/** Multi-area artifact IDs are declarative metadata, shared by presets and hosts. */
 export function poiCityIds(frontendCityId: string): string[] {
-  return POI_CITY_MAPPING[frontendCityId] ?? [frontendCityId];
+  return [...(CITIES.find(city => city.id === frontendCityId)?.poiCityIds ?? [frontendCityId])];
 }

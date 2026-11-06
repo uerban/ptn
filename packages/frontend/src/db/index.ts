@@ -473,7 +473,18 @@ export interface GbfsSystemRow {
 
 // ── Database ────────────────────────────────────────────────────────────────
 
+export interface OfflineCityRecord {
+  cityId: string;
+  city: import("../config/cities.ts").CityConfig;
+  preparedAt: number;
+  sizeBytes: number;
+  tables: Record<string, object[]>;
+}
+export interface OfflineTransferRecord { hash: string; bytes: Uint8Array }
+
 interface PtnTables {
+  offlineCities: EntityTable<OfflineCityRecord, "cityId">;
+  offlineTransfers: EntityTable<OfflineTransferRecord, "hash">;
   stops: EntityTable<StopRecord, "id">;
   usageStats: EntityTable<UsageStatRecord, "stopId">;
   gtfsRoutes: EntityTable<GtfsRouteRecord, "id">;
@@ -534,12 +545,16 @@ export const TABLE_KIND = {
   scheduleTileCache: "server-derived",
   gbfsSystems: "server-derived",
   addressSearchArtifacts: "server-derived",
+  offlineCities: "server-derived",
+  offlineTransfers: "server-derived",
 } as const satisfies Record<PtnTableName, TableKind>;
 
 const db = new Dexie("ptn") as Dexie & PtnTables;
 
 /** The complete Dexie schema: table → primary key and indexes. */
 export const STORES = {
+  offlineCities: "cityId",
+  offlineTransfers: "hash",
   stops: "id, lastSeen",
   usageStats: "stopId, lastTapped",
   gtfsRoutes: "id",
@@ -570,8 +585,11 @@ export const STORES = {
 migrationCoordinator.reserve({
   id: "ptn",
   version: 1,
-  stores: STORES,
+  stores: Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers"].includes(name))),
 });
+
+migrationCoordinator.reserve({id: "offline-city-packages", version: 2,
+  stores: {offlineCities: "cityId", offlineTransfers: "hash"}});
 
 for (const decl of migrationCoordinator.declaredMigrations()) {
   const v = db.version(decl.version).stores(decl.stores);

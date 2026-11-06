@@ -81,6 +81,10 @@ try {
   }
   const params = new URLSearchParams({fromStopId: probe.fromStopId, toStopId: probe.toStopId});
   await navigate(page, `${baseURL}/search?${params}`);
+  // Fresh installs require an explicit city choice before transit initialization.
+  const chooseCity = page.getByRole("button", {name: "Vilnius", exact: true}).first();
+  await chooseCity.waitFor({timeout: 30_000});
+  await chooseCity.click();
   await page.locator("[data-testid='itinerary-card']").first().waitFor({timeout: 120_000});
   await page.waitForFunction(() => globalThis.__PTN_HOST_CHECK__.transitResults > 0);
   assert(page.workers().some(worker => /ptRouter\.worker/.test(worker.url())), "no on-device router worker");

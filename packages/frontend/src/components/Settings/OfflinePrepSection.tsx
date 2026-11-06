@@ -1,3 +1,4 @@
+import {DeviceCitiesSection} from "./DeviceCitiesSection.tsx";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation, loadLocale, loadPrivacyNamespace } from "../../i18n/index.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
@@ -88,6 +89,7 @@ export function OfflinePrepSection() {
 
   return (
     <section aria-labelledby="settings-offline-prep-heading">
+      <DeviceCitiesSection />
       <h2
         id="settings-offline-prep-heading"
         className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
@@ -128,7 +130,7 @@ export function OfflinePrepSection() {
             {result.cancelled
               ? t("settings.offline_prep_cancelled", "Stopped.")
               : result.ok
-                ? t("settings.offline_prep_ready", "Ready for offline.")
+                ? t("settings.offline_prep_additional_ready", "Additional offline data downloaded.")
                 : t(
                     "settings.offline_prep_partial",
                     "Partly ready — some data could not be downloaded.",

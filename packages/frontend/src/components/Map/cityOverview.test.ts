@@ -30,3 +30,12 @@ describe("city overview", () => {
     expect(IS_STOP).toEqual(["!=", ["get", "kind"], "city"]);
   });
 });
+
+test("marker sizes grow gently with coverage and stay bounded", async () => {
+  const {cityMarkerRadius} = await import("./cityOverview.ts");
+  const small = cityMarkerRadius({...cities[0], bbox: {minLat: 54.6, maxLat: 54.7, minLon: 25.2, maxLon: 25.3}});
+  const big = cityMarkerRadius({...cities[0], bbox: {minLat: 54, maxLat: 55, minLon: 25, maxLon: 26}});
+  expect(big).toBeGreaterThan(small);
+  expect(small).toBeGreaterThanOrEqual(6);
+  expect(big).toBeLessThanOrEqual(16);
+});

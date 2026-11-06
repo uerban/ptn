@@ -21,12 +21,17 @@
 		}
 		reverse_proxy {$PTN_MAIN:127.0.0.1:9000}
 	}
+	handle /api/cities {
+		rewrite * /cities.json
+		root * {$PTN_ARTIFACT_PUBLIC}/../../public-config
+		file_server
+	}
 	handle /api/* {
 		respond 404
 	}
 	handle /deployment-config.js {
 		header Content-Type application/javascript
-		respond "globalThis.__PTN_DEPLOYMENT__={\"schemaVersion\":1,\"cities\":[\"vilnius\"]};" 200
+		respond "globalThis.__PTN_DEPLOYMENT__={\"cities\":\"all\"};" 200
 	}
 	@osm path_regexp osm ^/osm/(current/vilnius\.json|releases/[0-9a-f]{64}/(manifest\.json|walk-graph\.ptwg\.br))$
 	handle @osm {

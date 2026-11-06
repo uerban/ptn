@@ -1,3 +1,4 @@
+import {restoreDeviceCity, hasLiveDeviceCity} from "../services/deviceCities.ts";
 import { create } from "zustand";
 import { syncGtfsData, needsSync, clearGtfsData } from "../services/gtfsSync.ts";
 import { buildRaptorIndex, type RaptorIndex } from "../services/raptorIndex.ts";
@@ -379,6 +380,14 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
       }
       if (gen !== initGeneration) return;
 
+      if (navigator.onLine === false && (await restoreDeviceCity(cityId, signal) || await hasLiveDeviceCity(cityId))) {
+        const index = await buildRaptorIndex({signal});
+        const stopNames = await buildStopNames();
+        if (gen !== initGeneration) return;
+        set({raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false, error: null});
+        startPtRouterBuild(cityId);
+        return;
+      }
       const needs = recovered || await needsSync(cityId, GTFS_CLIENT_REFRESH_INTERVAL_MS);
       if (gen !== initGeneration) return;
       if (needs) {
@@ -413,6 +422,17 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
       performance.measure("ptn:gtfs-init", "ptn:gtfs-init-start", "ptn:gtfs-init-end");
     } catch (err) {
       if (gen !== initGeneration) return;
+      // A failed online fetch may still use an explicitly downloaded package.
+      if (await restoreDeviceCity(cityId, signal).catch(() => false) || await hasLiveDeviceCity(cityId).catch(() => false)) {
+        try {
+          const index = await buildRaptorIndex({signal});
+          const stopNames = await buildStopNames();
+          if (gen !== initGeneration) return;
+          set({raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false, error: null});
+          startPtRouterBuild(cityId);
+          return;
+        } catch { /* Surface the original connection/data failure below. */ }
+      }
       set({ error: String(err), syncing: false });
     }
   },

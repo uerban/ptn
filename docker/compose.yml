@@ -21,6 +21,7 @@ services:
       - ${PTN_OSM_REPOSITORY}:/osm-repository:ro
     restart: unless-stopped
   web:
+    command: [caddy, run, --config, /var/lib/ptn/public-config/Caddyfile, --adapter, caddyfile]
     image: docker.io/library/caddy:2.11.7-alpine
     environment:
       PTN_SITE: ${PTN_SITE:-http://localhost:8080}

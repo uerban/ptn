@@ -26,7 +26,6 @@ import { BikeShareStationSheet } from "../components/Map/BikeShareStationSheet.t
 import { useBikeShareStore } from "../stores/bikeShareStore.ts";
 import { useMapTapStore } from "../stores/mapTapStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { findNearestCity } from "../config/cities.ts";
 import { useFavoritesStore } from "../stores/favoritesStore.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { useRtStore } from "../stores/rtStore.ts";
@@ -437,17 +436,6 @@ export function HomePage() {
   useEffect(() => {
     useFavoritesStore.getState().migrateLegacyFavorites(activeCity.id);
   }, [activeCity.id]);
-
-  // Auto-detect nearest city on first visit
-  useEffect(() => {
-    const persisted = localStorage.getItem("ptn-city");
-    if (persisted) return;
-    if (!geoPosition) return;
-    const nearest = findNearestCity(geoPosition.lat, geoPosition.lon);
-    if (nearest.id !== activeCity.id) {
-      useCityStore.getState().setActiveCity(nearest);
-    }
-  }, [geoPosition, activeCity.id]);
 
   // GTFS data lifecycle (reset-on-switch vs defer-on-initial-load).
   const cityId = useCityStore((s) => s.activeCity.id);

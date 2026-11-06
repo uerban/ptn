@@ -90,7 +90,7 @@ describe("ScheduleHome", () => {
     expect(screen.getByTestId("plan-trip-btn")).toBeTruthy();
   });
 
-  it("auto-switches to Tricity when the user's location is in Gdańsk on first visit", async () => {
+  it("keeps the chosen city when a later location fix is in another city", async () => {
     // Gdańsk main station coordinates — inside the tricity bbox
     geoState.location = { lat: 54.3557, lon: 18.6442 };
     const { ScheduleHome } = await import("../../src/pages/ScheduleHome.tsx");
@@ -99,10 +99,8 @@ describe("ScheduleHome", () => {
         <ScheduleHome />
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(setActiveCityMock).toHaveBeenCalled();
-    });
-    expect(setActiveCityMock.mock.calls[0][0].id).toBe("tricity");
+    await waitFor(() => expect(screen.getByText("Vilnius")).toBeTruthy());
+    expect(setActiveCityMock).not.toHaveBeenCalled();
   });
 
   it("does not auto-switch when ptn-city is already persisted", async () => {

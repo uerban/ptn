@@ -31,10 +31,12 @@ describe("ptn database", () => {
 });
 
 describe("schema declaration", () => {
-  it("declares exactly one Dexie version, 1, with the full store map and no upgrade", () => {
+  it("adds downloaded-city storage in version 2 without changing the version-1 schema", () => {
     const decls = migrationCoordinator.declaredMigrations();
-    expect(decls).toHaveLength(1);
-    expect(decls[0]).toMatchObject({ id: "ptn", version: 1, stores: STORES });
+    expect(decls).toHaveLength(2);
+    const {offlineCities, offlineTransfers, ...originalStores} = STORES;
+    expect(decls[0]).toMatchObject({id: "ptn", version: 1, stores: originalStores});
+    expect(decls[1]).toMatchObject({id: "offline-city-packages", version: 2, stores: {offlineCities, offlineTransfers}});
     expect(decls[0].upgrade).toBeUndefined();
   });
 

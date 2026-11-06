@@ -56,12 +56,54 @@ export function deploymentCityIds(knownCities: readonly string[]): string[] | nu
   return ids;
 }
 
+function runtimeOptionalMetadata(city: Record<string, unknown>): Partial<import("./cities.ts").CityConfig> {
+  const result: Record<string, unknown> = {};
+  const modes = ["BUS", "TRAM", "TROLLEYBUS", "METRO", "RAIL", "FERRY", "CABLE_TRAM", "AERIAL", "OTHER", "FUNICULAR", "WALK", "BIKE", "BIKE_SHARE", "SCOOTER", "CAR"];
+  const rows = (field: string): Record<string, unknown>[] => {
+    const value = city[field];
+    if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object")) throw new Error(`Invalid city ${field}`);
+    return value as Record<string, unknown>[];
+  };
+  const text = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+  const https = (value: unknown): boolean => {
+    try { return text(value) && new URL(value).protocol === "https:"; } catch { return false; }
+  };
+  if (city.poiCityIds !== undefined) {
+    if (!Array.isArray(city.poiCityIds) || !city.poiCityIds.length || city.poiCityIds.some(id => typeof id !== "string" || !/^[a-z][a-z0-9-]*$/.test(id))) throw new Error("Invalid city POI areas");
+    result.poiCityIds = [...city.poiCityIds];
+  }
+  if (city.transitSources !== undefined) {
+    const sources = rows("transitSources");
+    if (sources.some(row => !text(row.name) || !https(row.url))) throw new Error("Invalid city transit credits");
+    result.transitSources = sources.map(row => ({name: row.name, url: row.url}));
+  }
+  if (city.defaultExcludedModes !== undefined) {
+    if (!Array.isArray(city.defaultExcludedModes) || city.defaultExcludedModes.some(mode => !modes.includes(mode))) throw new Error("Invalid city mode defaults");
+    result.defaultExcludedModes = [...city.defaultExcludedModes];
+  }
+  if (city.routeGroups !== undefined) {
+    const groups = rows("routeGroups");
+    if (groups.some(row => !text(row.id) || !text(row.label) || !text(row.labelKey) || !modes.includes(row.parentMode as string)
+      || (row.fallback !== undefined && typeof row.fallback !== "boolean")
+      || (row.routeIdPattern !== undefined && (!text(row.routeIdPattern) || row.routeIdPattern.length > 256)))) throw new Error("Invalid city route groups");
+    for (const group of groups) if (group.routeIdPattern) new RegExp(group.routeIdPattern as string);
+    result.routeGroups = groups;
+  }
+  if (city.sharedMobility !== undefined) {
+    const systems = rows("sharedMobility");
+    if (systems.length > 1 || systems.some(row => !text(row.id) || !text(row.name) || !https(row.gbfsDiscoveryUrl))) throw new Error("Invalid city shared mobility");
+    result.sharedMobility = systems.map(row => ({id: row.id, name: row.name, gbfsDiscoveryUrl: row.gbfsDiscoveryUrl}));
+  }
+  return result as Partial<import("./cities.ts").CityConfig>;
+}
+
 /** Resolve host-owned city metadata before any stores or services initialize.
  * Schema 2 accepts full definitions, so the web archive is city-independent.
  * Legacy schema 1 ID allowlists continue to use built-in metadata. */
 export function runtimeCityConfigs(value: unknown, defaults: readonly import("./cities.ts").CityConfig[]): import("./cities.ts").CityConfig[] | null {
   if (value === undefined || value === null) return null;
   const config = value as {schemaVersion?: unknown; cities?: unknown};
+  if (config.schemaVersion === undefined && config.cities !== undefined) return null;
   if (config.schemaVersion !== 2) {
     const ids = usableCityIds(value, defaults.map(city => city.id));
     return ids?.map(id => ({...defaults.find(city => city.id === id)!, available: true})) ?? null;
@@ -91,7 +133,7 @@ export function runtimeCityConfigs(value: unknown, defaults: readonly import("./
     }
     seen.add(city.id);
     return {
-      ...defaults.find(known => known.id === city.id),
+      ...runtimeOptionalMetadata(city),
       id: city.id, name: city.name, tz: city.tz, available: true,
       center: {lat: center.lat, lon: center.lon},
       bbox: {minLat: bbox.minLat, minLon: bbox.minLon, maxLat: bbox.maxLat, maxLon: bbox.maxLon},

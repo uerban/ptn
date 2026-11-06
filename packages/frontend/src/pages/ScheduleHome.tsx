@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/index.ts";
@@ -7,7 +7,6 @@ import type { Stop } from "@pt/shared";
 import { useGeolocation } from "../hooks/useGeolocation.ts";
 import { useLineClick } from "../hooks/useLineClick.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { findNearestCity } from "../config/cities.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
 import { FavoritesBar } from "../components/Favorites/FavoritesBar.tsx";
@@ -27,20 +26,6 @@ export function ScheduleHome() {
 
   // Geolocation
   const { location: userLocation, loading: locating } = useGeolocation();
-
-  // Auto-detect nearest city on first visit. HomePage has the same logic but
-  // consumes the same shared foreground position. Keep the first-visit
-  // detection here too so users who land directly in schedule-only mode
-  // see their local schedule instead of the default city.
-  useEffect(() => {
-    const persisted = localStorage.getItem("ptn-city");
-    if (persisted) return;
-    if (!userLocation) return;
-    const nearest = findNearestCity(userLocation.lat, userLocation.lon);
-    if (nearest.id !== activeCity.id) {
-      useCityStore.getState().setActiveCity(nearest);
-    }
-  }, [userLocation, activeCity.id]);
 
   // Ensure GTFS data is synced for this city. Shares HomePage's reset-on-
   // switch vs defer-on-initial-load policy via useCityGtfsLifecycle; the
