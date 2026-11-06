@@ -675,3 +675,552 @@ fn export_cli_rejects_hash_correct_non_native_bundle_before_signing() {
     assert!(String::from_utf8_lossy(&result.stderr).contains("PTB structure"));
     assert!(!output.exists());
 }
+
+struct TransitRepository {
+    root: tempfile::TempDir,
+    key: ed25519_dalek::SigningKey,
+}
+impl TransitRepository {
+    fn new() -> Self {
+        Self {
+            root: tempfile::tempdir().unwrap(),
+            key: ed25519_dalek::SigningKey::from_bytes(&[17; 32]),
+        }
+    }
+    fn source(&self) -> pt_artifacts::install::LocalRepository {
+        pt_artifacts::install::LocalRepository(self.root.path().into())
+    }
+    fn keys(&self) -> [[u8; 32]; 1] {
+        [self.key.verifying_key().to_bytes()]
+    }
+    fn head_path(&self) -> std::path::PathBuf {
+        self.root
+            .path()
+            .join("transit/catalog/v1/fixture/latest.json")
+    }
+    fn publish(&self, fixture: &Fixture, sequence: u64, variants: &[bool]) -> Vec<String> {
+        use pt_artifacts::{
+            transit_catalog::{self, Catalog, Selection},
+            transit_export,
+        };
+        let now = transit_now();
+        let mut selections = Vec::new();
+        for geometry in variants {
+            let staging = tempfile::tempdir().unwrap();
+            let export = staging.path().join("export");
+            let id = transit_export::export(fixture.path(), &export, *geometry, &self.key).unwrap();
+            let bytes = fs::read(export.join("selection.json")).unwrap();
+            let inventory = transit_export::verify(
+                &bytes,
+                &fs::read(export.join("selection.json.sig")).unwrap(),
+                &self.keys(),
+                "fixture",
+            )
+            .unwrap();
+            let release = self.root.path().join("transit/selections").join(&id);
+            fs::create_dir_all(&release).unwrap();
+            for name in ["selection.json", "selection.json.sig"] {
+                fs::copy(export.join(name), release.join(name)).unwrap();
+            }
+            let objects = self.root.path().join("transit/objects/sha256");
+            fs::create_dir_all(&objects).unwrap();
+            for file in inventory.files {
+                fs::copy(
+                    export.join("files").join(file.path),
+                    objects.join(file.sha256),
+                )
+                .unwrap();
+            }
+            selections.push(Selection {
+                sha256: id,
+                bytes: bytes.len() as u64,
+                geometry_selected: *geometry,
+            });
+        }
+        let catalog = Catalog {
+            schema_version: 1,
+            city: "fixture".into(),
+            sequence,
+            pack_id: fixture.pack.pack_id.clone(),
+            generation_id: fixture.pack.generation_id.clone(),
+            published_at: jiff::Timestamp::from_second(now).unwrap().to_string(),
+            expires_at: jiff::Timestamp::from_second(now + 86400)
+                .unwrap()
+                .to_string(),
+            selections,
+        };
+        let (bytes, sig) = transit_catalog::prepare(&catalog, &self.key, now).unwrap();
+        fs::create_dir_all(self.head_path().parent().unwrap()).unwrap();
+        fs::write(self.head_path(), bytes).unwrap();
+        fs::write(self.head_path().with_extension("json.sig"), sig).unwrap();
+        catalog.selections.into_iter().map(|s| s.sha256).collect()
+    }
+}
+fn transit_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+}
+fn minimal_policy() -> pt_artifacts::transit_install::Policy {
+    pt_artifacts::transit_install::Policy {
+        geometry: false,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn transit_install_switches_geometry_and_rolls_back_without_rewinding_checkpoint() {
+    use pt_artifacts::transit_install::{Policy, TransitStore};
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    let ids = repo.publish(&fixture, 1, &[false, true]);
+    let root = tempfile::tempdir().unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    assert!(TransitStore::open(root.path()).is_err());
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &minimal_policy()
+        )
+        .unwrap());
+    let first = store.status("fixture").unwrap().unwrap();
+    assert_eq!(first.current.selection, ids[0]);
+    assert_eq!(first.revision, 1);
+    assert!(!store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &minimal_policy()
+        )
+        .unwrap());
+    assert_eq!(store.status("fixture").unwrap().unwrap().revision, 1);
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Policy::default()
+        )
+        .unwrap());
+    assert_eq!(
+        store.status("fixture").unwrap().unwrap().current.pack_id,
+        first.current.pack_id
+    );
+    repo.publish(&fixture, 2, &[false, true]);
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Policy::default()
+        )
+        .unwrap());
+    store
+        .rollback("fixture", &repo.keys(), transit_now())
+        .unwrap();
+    let rollback = store.status("fixture").unwrap().unwrap();
+    assert_eq!(rollback.current.selection, ids[0]);
+    assert_eq!(rollback.checkpoint.sequence, 2);
+    assert!(rollback.pinned);
+    fs::remove_file(repo.head_path()).unwrap();
+    assert!(!store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Policy::default()
+        )
+        .unwrap());
+    store
+        .validate_current("fixture", &repo.keys(), transit_now() + 40 * 86400)
+        .unwrap();
+    drop(store);
+    let store = TransitStore::open(root.path()).unwrap();
+    store
+        .validate_current("fixture", &repo.keys(), transit_now() + 40 * 86400)
+        .unwrap();
+    store.set_pinned("fixture", false).unwrap();
+    repo.publish(&fixture, 1, &[false, true]);
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Policy::default()
+        )
+        .is_err());
+    assert_eq!(
+        store.status("fixture").unwrap().unwrap().current.selection,
+        ids[0]
+    );
+    assert_eq!(
+        store
+            .status("fixture")
+            .unwrap()
+            .unwrap()
+            .checkpoint
+            .sequence,
+        2
+    );
+    repo.publish(&fixture, 3, &[false, true]);
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Policy::default()
+        )
+        .unwrap());
+    assert_eq!(
+        store.status("fixture").unwrap().unwrap().current.selection,
+        ids[1]
+    );
+}
+
+#[test]
+fn transit_install_failures_preserve_the_current_selection_and_checkpoint() {
+    use pt_artifacts::transit_install::TransitStore;
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    repo.publish(&fixture, 1, &[false]);
+    let root = tempfile::tempdir().unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &minimal_policy(),
+        )
+        .unwrap();
+    let baseline = serde_json::to_value(store.status("fixture").unwrap()).unwrap();
+    for case in 0..7 {
+        let mut next = Fixture::native();
+        next.pack.publication_inputs_sha256 = digest(format!("update-{case}").as_bytes());
+        next.generation.publication_inputs_sha256 = next.pack.publication_inputs_sha256.clone();
+        let bundle = fs::read(next.path().join("bundle.ptb")).unwrap();
+        next.replace_bundle(if case == 3 {
+            b"hash-correct but invalid PTB"
+        } else {
+            &bundle
+        });
+        next.save();
+        let ids = repo.publish(&next, 2, &[false]);
+        match case {
+            0 => fs::write(repo.head_path().with_extension("json.sig"), [0; 64]).unwrap(),
+            1 => fs::write(
+                repo.root
+                    .path()
+                    .join("transit/selections")
+                    .join(&ids[0])
+                    .join("selection.json"),
+                b"truncated",
+            )
+            .unwrap(),
+            2 => {
+                fs::remove_file(
+                    repo.root
+                        .path()
+                        .join("transit/objects/sha256")
+                        .join(digest(&fs::read(next.path().join("pack.json")).unwrap())),
+                )
+                .unwrap();
+            }
+            4 => {
+                let path = repo
+                    .root
+                    .path()
+                    .join("transit/objects/sha256")
+                    .join(digest(&fs::read(next.path().join("pack.json")).unwrap()));
+                fs::write(path, b"truncated object").unwrap();
+            }
+            5 => {
+                let path = repo
+                    .root
+                    .path()
+                    .join("transit/objects/sha256")
+                    .join(digest(&fs::read(next.path().join("pack.json")).unwrap()));
+                let mut bytes = fs::read(&path).unwrap();
+                bytes[0] ^= 1;
+                fs::write(path, bytes).unwrap();
+            }
+            6 => fs::write(
+                repo.root
+                    .path()
+                    .join("transit/selections")
+                    .join(&ids[0])
+                    .join("selection.json.sig"),
+                [0; 64],
+            )
+            .unwrap(),
+            _ => {}
+        }
+        assert!(store
+            .sync(
+                &repo.source(),
+                "fixture",
+                &repo.keys(),
+                transit_now(),
+                &minimal_policy()
+            )
+            .is_err());
+        assert_eq!(
+            serde_json::to_value(store.status("fixture").unwrap()).unwrap(),
+            baseline
+        );
+        store
+            .validate_current("fixture", &repo.keys(), transit_now())
+            .unwrap();
+    }
+}
+
+#[test]
+fn transit_install_enforces_limits_and_reuses_verified_objects_after_restart() {
+    use pt_artifacts::{install::Repository, transit_install::TransitStore};
+    struct MetadataOnly(pt_artifacts::install::LocalRepository);
+    impl Repository for MetadataOnly {
+        fn open(&self, path: &str) -> std::io::Result<Box<dyn std::io::Read>> {
+            assert!(
+                !path.contains("/objects/"),
+                "unchanged objects must come from verified cache"
+            );
+            self.0.open(path)
+        }
+    }
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    repo.publish(&fixture, 1, &[false, true]);
+    let root = tempfile::tempdir().unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    let limited = pt_artifacts::transit_install::Policy {
+        max_selected_bytes: 1,
+        ..minimal_policy()
+    };
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &limited
+        )
+        .is_err());
+    assert!(store.status("fixture").unwrap().is_none());
+    store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &minimal_policy(),
+        )
+        .unwrap();
+    drop(store);
+    let store = TransitStore::open(root.path()).unwrap();
+    assert!(store
+        .sync(
+            &MetadataOnly(repo.source()),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Default::default()
+        )
+        .unwrap());
+    assert_eq!(
+        fs::read_dir(root.path().join("transit/cities/fixture/releases"))
+            .unwrap()
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn transit_cli_installs_verifies_and_pins_without_builders() {
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    repo.publish(&fixture, 1, &[false]);
+    let root = tempfile::tempdir().unwrap();
+    let public: String = repo
+        .key
+        .verifying_key()
+        .as_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let run = |command: &[&str]| {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_pt-transit"))
+            .arg("--root")
+            .arg(root.path())
+            .args(["--city", "fixture", "--trusted-key", &public])
+            .args(command)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        result.stdout
+    };
+    run(&[
+        "sync",
+        "--source-directory",
+        repo.root.path().to_str().unwrap(),
+        "--without-geometry",
+    ]);
+    let status: serde_json::Value = serde_json::from_slice(&run(&["status"])).unwrap();
+    assert_eq!(status["checkpoint"]["sequence"], 1);
+    let verified = String::from_utf8(run(&["verify"])).unwrap();
+    assert!(Path::new(verified.trim()).join("bundle.ptb").exists());
+    run(&["pin"]);
+    fs::remove_file(repo.head_path()).unwrap();
+    run(&[
+        "sync",
+        "--source-directory",
+        repo.root.path().to_str().unwrap(),
+        "--without-geometry",
+    ]);
+    run(&["verify"]);
+    run(&["unpin"]);
+}
+
+#[test]
+fn transit_install_rejects_expired_equivocating_heads_and_unsafe_city() {
+    use pt_artifacts::transit_install::TransitStore;
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    repo.publish(&fixture, 1, &[false, true]);
+    let root = tempfile::tempdir().unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    let now = transit_now();
+    store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            now,
+            &minimal_policy(),
+        )
+        .unwrap();
+    let baseline = serde_json::to_value(store.status("fixture").unwrap()).unwrap();
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            now + 86401,
+            &minimal_policy()
+        )
+        .is_err());
+    // Same sequence, different set of choices: a signed head still cannot
+    // replace the exact head already accepted at that sequence.
+    repo.publish(&fixture, 1, &[false]);
+    assert!(store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            now,
+            &minimal_policy()
+        )
+        .is_err());
+    assert!(store
+        .sync(
+            &repo.source(),
+            "../fixture",
+            &repo.keys(),
+            now,
+            &minimal_policy()
+        )
+        .is_err());
+    assert_eq!(
+        serde_json::to_value(store.status("fixture").unwrap()).unwrap(),
+        baseline
+    );
+}
+
+#[test]
+fn transit_restart_reuses_complete_unactivated_release_and_cleans_partial_staging() {
+    use pt_artifacts::{install::Repository, transit_install::TransitStore};
+    struct NoObjects(pt_artifacts::install::LocalRepository);
+    impl Repository for NoObjects {
+        fn open(&self, path: &str) -> std::io::Result<Box<dyn std::io::Read>> {
+            assert!(!path.contains("/objects/"));
+            self.0.open(path)
+        }
+    }
+    let fixture = Fixture::native();
+    let repo = TransitRepository::new();
+    repo.publish(&fixture, 1, &[false, true]);
+    let root = tempfile::tempdir().unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &minimal_policy(),
+        )
+        .unwrap();
+    let state_path = root.path().join("transit/state/transit-fixture.json");
+    let old_state = fs::read(&state_path).unwrap();
+    store
+        .sync(
+            &repo.source(),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Default::default(),
+        )
+        .unwrap();
+    drop(store);
+    // Reproduce the durable filesystem state immediately before the activation
+    // rename: both release trees exist, but the old state remains authoritative.
+    fs::write(state_path, old_state).unwrap();
+    let incomplete = root
+        .path()
+        .join("transit/cities/fixture")
+        .join(format!(".staging-{}", digest(b"interrupted")));
+    fs::create_dir_all(&incomplete).unwrap();
+    fs::write(incomplete.join("partial"), b"unfinished").unwrap();
+    let store = TransitStore::open(root.path()).unwrap();
+    assert!(!incomplete.exists());
+    assert!(
+        !store
+            .status("fixture")
+            .unwrap()
+            .unwrap()
+            .current
+            .geometry_selected
+    );
+    assert!(store
+        .sync(
+            &NoObjects(repo.source()),
+            "fixture",
+            &repo.keys(),
+            transit_now(),
+            &Default::default()
+        )
+        .unwrap());
+    assert!(
+        store
+            .status("fixture")
+            .unwrap()
+            .unwrap()
+            .current
+            .geometry_selected
+    );
+}

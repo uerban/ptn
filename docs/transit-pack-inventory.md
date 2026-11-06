@@ -126,5 +126,6 @@ array lengths. Remaining JSON sidecars receive syntax checks with the existing
 
 These checks do not build a routing index, establish complete frontend JSON
 schema validity, or exercise routing/TTS behavior. They do not authenticate
-input by themselves. Authenticated coherent installation and server acceptance
-are still required before a public head can be promoted.
+input by themselves. The [transit installer](transit-pack-installation.md) applies these checks
+before local activation. Server integration and acceptance are still required
+before a public head can be promoted.
