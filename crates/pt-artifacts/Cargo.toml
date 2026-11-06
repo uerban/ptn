@@ -1,7 +1,7 @@
 [package]
 name = "pt-artifacts"
 default-run = "pt-artifacts"
-version = "0.1.1"
+version = "0.1.3"
 edition = "2021"
 rust-version.workspace = true
 publish = false

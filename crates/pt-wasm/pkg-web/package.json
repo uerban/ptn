@@ -1,7 +1,7 @@
 {
   "name": "pt-wasm",
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "license": "AGPL-3.0-or-later",
   "files": [
     "pt_wasm_bg.wasm",
