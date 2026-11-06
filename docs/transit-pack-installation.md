@@ -191,3 +191,7 @@ To add geometry, repeat `sync` without `--without-geometry`; to remove it, inclu
 the flag again. Both selections must be advertised by the source. Use the same
 installer volume and configured keys for `verify`, `pin` and `rollback`. No OSM
 container or search dataset is required for this transit-only path.
+
+For builder-side acceptance of a retained city, use the
+[transit installation validation harness](transit-pack-validation.md). It checks
+both geometry variants and offline serving without changing public deployment.

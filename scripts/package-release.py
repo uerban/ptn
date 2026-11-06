@@ -18,7 +18,7 @@ BINARIES = (
 )
 TRANSIT_DOCS = (
     "transit-pack-installation.md", "transit-pack-inventory.md",
-    "transit-pack-publication.md",
+    "transit-pack-publication.md", "transit-pack-validation.md",
 )
 PLATFORMS = {
     "linux-x86_64": ("x86_64-unknown-linux-musl", 2, 62),
@@ -118,6 +118,8 @@ def main():
         shutil.copy2(ROOT / "docs/runtime-cities.md", bundle / "docs/runtime-cities.md")
         for filename in TRANSIT_DOCS:
             shutil.copy2(ROOT / "docs" / filename, bundle / "docs" / filename)
+        (bundle / "scripts").mkdir()
+        shutil.copy2(ROOT / "scripts/verify-transit-installation.py", bundle / "scripts/verify-transit-installation.py")
         shutil.copytree(ROOT / "release-builder", bundle / "builder")
         for filename in ("LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_NOTICES.md"):
             shutil.copy2(ROOT / filename, bundle / filename)

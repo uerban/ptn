@@ -114,6 +114,7 @@ class ArchiveContents(unittest.TestCase):
                 "examples/native/prebuilt.md": "prebuilt guide",
                 "examples/native/config.prebuilt.example.json": "prebuilt configuration",
                 "examples/VALIDATION.md": "validation",
+                "scripts/verify-transit-installation.py": "transit acceptance harness",
                 "docs/release-platforms.md": "platforms",
                 "docs/gtfs-sources.md": "sources",
                 "docs/runtime-cities.md": "runtime city discovery",
@@ -129,6 +130,6 @@ class ArchiveContents(unittest.TestCase):
                 package.main()
             with tarfile.open(root / "out/ptn-linux-x86_64.tar.gz") as archive:
                 checksums = archive.extractfile("ptn-linux-x86_64/SHA256SUMS").read().decode()
-                for relative in ["examples/native/gtfs.py", "examples/native/prebuilt.py", "examples/native/prebuilt.md", "examples/native/config.prebuilt.example.json", "docs/gtfs-sources.md", *["bin/" + name for name in package.BINARIES], *["docs/" + name for name in package.TRANSIT_DOCS]]:
+                for relative in ["scripts/verify-transit-installation.py", "examples/native/gtfs.py", "examples/native/prebuilt.py", "examples/native/prebuilt.md", "examples/native/config.prebuilt.example.json", "docs/gtfs-sources.md", *["bin/" + name for name in package.BINARIES], *["docs/" + name for name in package.TRANSIT_DOCS]]:
                     content = archive.extractfile("ptn-linux-x86_64/" + relative).read()
                     self.assertIn(hashlib.sha256(content).hexdigest() + "  " + relative, checksums)
