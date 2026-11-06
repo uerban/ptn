@@ -8,7 +8,6 @@ use crate::{
 use pt_shared::{
     fsync,
     osm_manifest::{digest, valid_digest, Component, OsmManifest},
-    poi_manifest_wire::MAX_POI_CITY_SLOTS,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -146,9 +145,6 @@ impl Store {
                     fs::hard_link(&path, staged.join(filename))?;
                     bundles.push(bundle.clone());
                 }
-            }
-            if strict.len() as u64 > MAX_POI_CITY_SLOTS {
-                return Err(invalid("deployment exceeds POI strict corpus slot limit"));
             }
             bundles.sort_by(|a, b| a["filename"].as_str().cmp(&b["filename"].as_str()));
             let manifest = serde_json::json!({"schemaVersion":1,"generatedAt":generated_at,
@@ -317,6 +313,39 @@ mod tests {
     }
     fn active(store: &Store) -> Value {
         read_json(&store.root.join("public/poi/manifest.json")).unwrap()
+    }
+
+    #[test]
+    fn composes_arbitrary_deployment_cities_without_a_corpus_count_ceiling() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path()).unwrap();
+        let cities = [
+            "vilnius", "tricity", "tbilisi", "krakow", "oslo", "riga", "tallinn", "warsaw",
+        ];
+        for city in cities {
+            install(&store, city, 1, 100, true);
+        }
+        store.compose_poi(&cities).unwrap();
+        let manifest = active(&store);
+        let corpora: BTreeSet<_> = manifest["bundles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|record| record["cityId"].as_str().unwrap())
+            .collect();
+        assert_eq!(corpora.len(), 10);
+        assert!(corpora.contains("riga") && corpora.contains("warsaw"));
+        let extras: Vec<_> = (0..24).map(|i| format!("extra{i}")).collect();
+        for city in &extras {
+            install(&store, city, 1, 100, true);
+        }
+        let all: Vec<_> = cities
+            .iter()
+            .copied()
+            .chain(extras.iter().map(String::as_str))
+            .collect();
+        assert!(store.compose_poi(&all).unwrap());
+        assert_eq!(active(&store)["bundles"].as_array().unwrap().len(), 34);
     }
 
     #[test]

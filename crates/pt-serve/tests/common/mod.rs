@@ -198,6 +198,7 @@ pub fn default_test_config(data_root: PathBuf) -> ServerConfig {
         poi_bundle_dir: None,
         poi_lease_root: None,
         poi_bundle_max_decoded_bytes: 1024 * 1024,
+        poi_city_entries_cache_max_bytes: 10 * 1024 * 1024,
         poi_tile_cache_max_entries: 256,
         poi_tile_cache_max_bytes: 2 * 1024 * 1024,
         validated_poi_manifest: None,

@@ -89,10 +89,23 @@ afterEach(() => {
 });
 
 describe("POI release manifest smoke validation", () => {
-  it("caps all strict cities, including inactive records", () => {
+  it("accepts all ten corpora for the eight-city deployment", () => {
+    const dir = mkdtempSync(join(tmpdir(), "poi-smoke-eight-cities-"));
+    dirs.push(dir);
+    const ids = ["vilnius", "gdansk", "gdynia", "sopot", "tbilisi", "krakow", "oslo", "riga", "tallinn", "warsaw"];
+    const bundles = ids.map((cityId, index) => {
+      const bytes = Buffer.from([index]);
+      writeFileSync(join(dir, `${cityId}.br`), bytes);
+      return inactiveRecord(cityId, bytes);
+    });
+    writeFileSync(join(dir, "manifest.json"), JSON.stringify({schemaVersion: 1, bundles}));
+    expect(runSmoke(dir).status).toBe(0);
+  });
+
+  it("accepts larger inactive inventories without a city-count ceiling", () => {
     const dir = mkdtempSync(join(tmpdir(), "poi-smoke-city-cap-"));
     dirs.push(dir);
-    const bundles = Array.from({ length: 6 }, (_, index) => {
+    const bundles = Array.from({ length: 40 }, (_, index) => {
       const cityId = `city${index}`;
       const bytes = Buffer.from([index]);
       writeFileSync(join(dir, `${cityId}.br`), bytes);
@@ -104,8 +117,7 @@ describe("POI release manifest smoke validation", () => {
     );
 
     const result = runSmoke(dir);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("more than 5 strict POI cities");
+    expect(result.status).toBe(0);
   });
 
   it("rejects a malformed inactive strict record before release", () => {

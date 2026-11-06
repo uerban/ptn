@@ -5,6 +5,7 @@ import { open, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import {
   POI_MANIFEST_SCHEMA_VERSION,
+  DEFAULT_POI_CITY_ENTRIES_CACHE_MAX_BYTES,
   TILE_MIN_K,
   tileKeyAt,
   type PoiBundle,
@@ -84,7 +85,6 @@ const LICENSE_URL = "https://opendatacommons.org/licenses/odbl/";
 // which blocks the event loop and is trivially reachable from the network.
 const RESPONSE_CACHE_MAX_ENTRIES = 256;
 const DEFAULT_BUNDLE_MAX_BYTES = 1024 * 1024;
-const MAX_POI_CITY_SLOTS = 5;
 const MIN_POI_TILE_EDGE_KM = 3;
 const MAX_POI_TILE_EDGE_KM = 200;
 const MAX_TILE_COORD_ABS = 999_999;
@@ -435,6 +435,7 @@ export type PoiTileHandler = ReturnType<typeof createPoiTileHandler>;
 export interface BundleFileLoaderConfig {
   bundleDir: string;
   maxDecodedBytes?: number;
+  entriesCacheMaxBytes?: number;
   responseCacheMaxEntries?: number;
 }
 
@@ -442,8 +443,15 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
   const {
     bundleDir,
     maxDecodedBytes = DEFAULT_BUNDLE_MAX_BYTES,
+    entriesCacheMaxBytes = DEFAULT_POI_CITY_ENTRIES_CACHE_MAX_BYTES,
     responseCacheMaxEntries = RESPONSE_CACHE_MAX_ENTRIES,
   } = config;
+  if (!Number.isSafeInteger(maxDecodedBytes) || maxDecodedBytes <= 0) {
+    throw new Error("invalid POI bundle byte cap");
+  }
+  if (!Number.isSafeInteger(entriesCacheMaxBytes) || entriesCacheMaxBytes < 0) {
+    throw new Error("invalid decoded POI cache byte budget");
+  }
   const entriesCache = new Map<string, PoiEntry[]>();
   const entryLoads = new Map<string, Promise<PoiEntry[]>>();
   const tilingCache = new Map<string, CityTilingResolution>();
@@ -532,7 +540,7 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
   async function readCityBundle(
     cityId: string,
     record: PoiManifestBundle,
-  ): Promise<PoiEntry[]> {
+  ): Promise<{entries: PoiEntry[]; decodedBytes: number}> {
     validateStrictRecord(cityId, record);
     if (!pinnedBundleDir) {
       throw new Error("POI bundle directory was not pinned");
@@ -573,7 +581,7 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
     ) {
       throw new Error(`${record.filename} strict bundle metadata mismatch`);
     }
-    return bundle.entries;
+    return {entries: bundle.entries, decodedBytes: decoded.length};
   }
 
   function validateActiveTiling(
@@ -664,6 +672,7 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
     const nextActiveRecords = new Map<string, PoiManifestBundle>();
     const seenStrict = new Set<string>();
     let aggregateCells = 0;
+    let decodedCharge = 0;
 
     for (const record of manifest.bundles) {
       if (record.filename !== `${record.cityId}.br`) continue;
@@ -672,11 +681,6 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
         throw new Error(`duplicate strict manifest record for ${record.cityId}`);
       }
       seenStrict.add(record.cityId);
-      if (seenStrict.size > MAX_POI_CITY_SLOTS) {
-        throw new Error(
-          `manifest has more than ${MAX_POI_CITY_SLOTS} strict POI cities`,
-        );
-      }
 
       const tiling = record.poiTile;
       if (!tiling) {
@@ -690,7 +694,11 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
         nextTiling.set(record.cityId, { status: "inactive" });
         continue;
       }
-      const entries = await readCityBundle(record.cityId, record);
+      const {entries, decodedBytes} = await readCityBundle(record.cityId, record);
+      decodedCharge += decodedBytes * 2;
+      if (decodedCharge > entriesCacheMaxBytes) {
+        throw new Error("decoded POI cache exceeds configured byte budget");
+      }
       const active = validateActiveTiling(record.cityId, record, entries);
       aggregateCells += active.cellCount;
       if (aggregateCells > responseCacheMaxEntries) {
@@ -740,7 +748,7 @@ export function createBundleFileLoader(config: BundleFileLoaderConfig): PoiTileD
     if (!record) return null;
     const inflight = entryLoads.get(cityId);
     if (inflight) return inflight;
-    const load = readCityBundle(cityId, record).then((entries) => {
+    const load = readCityBundle(cityId, record).then(({entries}) => {
       entriesCache.set(cityId, entries);
       return entries;
     });

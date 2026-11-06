@@ -149,7 +149,7 @@ pub enum PoiCityTiling {
         index: Arc<PoiTileIndex>,
         /// Decoded bundle entries the index points into. The loader caps
         /// each bundle via `ServerConfig::poi_bundle_max_decoded_bytes`, and
-        /// `ops::rss_guard` reserves one slot per manifest-backed city.
+        /// preflight charges decoded entries against the configured memory budget.
         entries: Arc<Vec<PoiEntry>>,
         tile_bounds: PoiTileBounds,
         bundle_sha256: Arc<str>,
@@ -157,25 +157,31 @@ pub enum PoiCityTiling {
     Inactive,
 }
 
-/// Resolved tiling status per city, with a five-entry startup ceiling. Each
-/// entry remembers the release directory it was resolved from; a lookup for
-/// another release misses, and the new resolution replaces the old one.
+/// Resolved tiling status for one validated release. Preflight bounds decoded
+/// entries by the configured byte budget. A namespace change drops all old
+/// cache ownership; in-flight requests retain their own references.
 #[derive(Default)]
 pub struct PoiCityTilingCache {
-    inner: Mutex<HashMap<String, (PathBuf, PoiCityTiling)>>,
+    inner: Mutex<(Option<PathBuf>, HashMap<String, PoiCityTiling>)>,
     flights: KeyedSingleflight<PoiCityTiling>,
 }
 
 impl PoiCityTilingCache {
     pub fn get(&self, city_id: &str, release: &Path) -> Option<PoiCityTiling> {
-        lock_recover(&self.inner)
-            .get(city_id)
-            .filter(|(pinned, _)| pinned == release)
-            .map(|(_, resolution)| resolution.clone())
+        let state = lock_recover(&self.inner);
+        if state.0.as_deref() != Some(release) {
+            return None;
+        }
+        state.1.get(city_id).cloned()
     }
 
     pub fn set(&self, city_id: String, release: &Path, resolution: PoiCityTiling) {
-        lock_recover(&self.inner).insert(city_id, (release.to_path_buf(), resolution));
+        let mut state = lock_recover(&self.inner);
+        if state.0.as_deref() != Some(release) {
+            state.1.clear();
+            state.0 = Some(release.to_path_buf());
+        }
+        state.1.insert(city_id, resolution);
     }
 
     /// Resolve one manifest-backed city from one release. Bundle decode and
@@ -197,7 +203,7 @@ impl PoiCityTilingCache {
             }
             // Drop an older release's entries before decoding the new ones,
             // so a promotion does not hold two decoded corpora per city.
-            lock_recover(&self.inner).remove(city_id);
+            lock_recover(&self.inner).1.remove(city_id);
             let resolution = resolve()?;
             self.set(city_id.to_string(), release, resolution.clone());
             Ok(resolution)
@@ -206,7 +212,7 @@ impl PoiCityTilingCache {
 
     #[cfg(test)]
     fn len(&self) -> usize {
-        lock_recover(&self.inner).len()
+        lock_recover(&self.inner).1.len()
     }
 }
 
@@ -500,6 +506,27 @@ mod tests {
             Some(PoiCityTiling::Active { edge_km, .. }) if edge_km == 12.0
         ));
         assert_eq!(c.get("sopot", release), None);
+    }
+
+    #[test]
+    fn namespace_change_drops_removed_corpus_cache_ownership() {
+        let cache = PoiCityTilingCache::default();
+        cache.set(
+            "removed".into(),
+            Path::new("/release/a"),
+            PoiCityTiling::Inactive,
+        );
+        cache.set(
+            "added".into(),
+            Path::new("/release/b"),
+            PoiCityTiling::Inactive,
+        );
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.get("removed", Path::new("/release/a")), None);
+        assert_eq!(
+            cache.get("added", Path::new("/release/b")),
+            Some(PoiCityTiling::Inactive)
+        );
     }
 
     #[test]
