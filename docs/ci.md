@@ -103,9 +103,11 @@ source checks when needed and the reusable security workflow. Existing admin
 bypasses and signature/history protections are preserved. Secret scanning runs
 for every change, including prose; dependency auditing runs for dependency or CI
 configuration changes, manual CI and weekly scheduled scans. Production npm high
-and critical advisories and RustSec vulnerabilities block CI. Development-only
-npm advisories are reported without blocking. The scanner is pinned by image
-digest and redacts findings. Exceptions cover only PEM parser delimiters and
+and critical advisories and RustSec vulnerabilities block CI. The full npm
+dependency-tree report includes development tooling and reports findings as
+warnings and in the job summary, with JSON retained for 14 days. Scanner
+execution/report errors still fail the job. Gitleaks is pinned by image digest
+and redacts findings. Exceptions cover only PEM parser delimiters and
 published RFC test vectors at their exact source path; a negative test proves
 that other keys and paths still fail.
 
