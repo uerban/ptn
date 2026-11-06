@@ -6,4 +6,5 @@ pub mod native;
 pub mod publish;
 pub mod retention;
 pub mod store;
+pub mod transit;
 pub mod transport;
