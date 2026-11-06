@@ -4,7 +4,7 @@ Routine checks and release preparation have different costs and purposes.
 
 | Workflow | Trigger | Required work |
 | --- | --- | --- |
-| **CI** | Pull requests, pushes to main, manual | Classify changed paths; build and test source when needed |
+| **CI** | Pull requests, pushes to main, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
 | **Release candidate validation** | Manual exact-commit run, including dispatch by release preparation | Build all installable platforms and validate native/Docker fresh-host lifecycle |
 | **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
@@ -26,9 +26,20 @@ A workflow skipped by a top-level path filter can leave required checks pending;
 this design uses job conditions instead. See the
 [GitHub workflow-trigger documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
-Source CI retains workspace builds/tests, typechecks and lint. It does not fetch
-reference-city OSM/GTFS inputs, package the platform matrix or run deployment
-lifecycle checks. Those remain mandatory during release candidate validation.
+Source CI retains workspace builds/tests, typechecks and lint. In parallel, its
+native platform matrix builds all six tools for Linux x86_64 musl, ARMv6 hard-float,
+AArch64, macOS Apple Silicon and macOS Intel. It verifies the binary format and
+architecture, runs CLI smoke checks and builds a tiny walking graph. Linux ARM
+checks execute through QEMU; ARMv6 also checks trusted local TLS and hard-float
+attributes. These checks use cached Rust dependencies and pinned Linux compilers.
+The required **CI** aggregate rejects any failed/cancelled platform check; a
+prose-only change deliberately skips both source and platform builds.
+
+Routine checks do not fetch reference-city OSM/GTFS inputs, package release
+archives or run deployment lifecycle checks. Those remain mandatory during
+release candidate validation. Routine platform outputs cannot be promoted as
+release assets; RC archives are built/validated once and later copied unchanged
+during stable promotion.
 
 ## Run regressions when needed
 
