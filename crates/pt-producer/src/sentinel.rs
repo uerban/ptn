@@ -1,5 +1,9 @@
 //! `.producer-data-root-id` — producer↔server data-root sentinel.
 //!
+//! Legacy stat diagnostic. Configured deployments use the separate durable
+//! `pt_shared::data_root_identity` binding, checked before every publish. Their
+//! readers do not compare persisted stat values, which can change on remount.
+//!
 //! The producer and pt-serve must read/write the SAME `data_root`. In k8s a single typo can mount
 //! them to two different PVCs: the producer faithfully writes new generations to volume A, pt-serve
 //! happily mmaps the (stale) bundle from volume B, and the two never converge. The failure is
