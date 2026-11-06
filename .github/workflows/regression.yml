@@ -128,6 +128,7 @@ jobs:
           STEP_RESULTS: ${{ toJSON(steps) }}
         run: python3 "$GATE_TOOLS/scripts/record-regression-evidence.py"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
           name: regression-proof
           retention-days: 30

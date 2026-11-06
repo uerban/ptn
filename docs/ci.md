@@ -6,7 +6,7 @@ Routine checks and release preparation have different costs and purposes.
 | --- | --- | --- |
 | **CI** | Pull requests, pushes to main, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
-| **Release candidate validation** | Manual exact-commit run, including dispatch by release preparation | Build all installable platforms and validate native/Docker fresh-host lifecycle |
+| **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Build all installable platforms, validate native/Docker fresh-host lifecycle and retain archives |
 | **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
 | **Promote immutable RC to stable draft** | Manual on main | Copy the published RC assets and proof unchanged; no builds |
 
@@ -42,6 +42,12 @@ release assets; RC archives are built/validated once and later copied unchanged
 during stable promotion.
 
 ## Run regressions when needed
+
+Each run publishes a human-readable job summary with the exact source revision,
+overall result and every gate/prerequisite outcome, including failures and skips.
+The same report is saved as `regression.md` in `regression-evidence`; machine-readable
+`regression.json` is also uploaded as `regression-proof`, including on failure.
+Both artifacts are retained for 30 days.
 
 After the workflows land on main:
 
@@ -86,6 +92,12 @@ immutable redistributable inputs, query coverage and calibrated baselines exist;
 these small fixtures must not be represented as production capacity evidence.
 
 ## Release evidence
+
+Every push to main automatically runs `release.yml`, which uploads the validated
+archives for all five platforms with 30-day retention. Tagging that exact commit
+reuses those archives; if validation is still running, RC preparation waits for it.
+The ordinary source CI job continues to provide fast feedback independently.
+Release validation is also manually dispatchable for commits without retained builds.
 
 RC preparation selects an eligible run of each workflow for the tag's exact
 source commit. A dispatch's `head_sha` identifies workflow code, so source identity

@@ -23,6 +23,26 @@ class ArtifactPolicyTests(unittest.TestCase):
     def test_complete_artifacts_are_reused(self):
         self.assertEqual(draft.artifact_state(self.artifacts()), 'ready')
 
+    def test_main_push_archives_are_reused_without_dispatch(self):
+        revision = 'a' * 40
+        run = {'id': 42, 'event': 'push', 'head_branch': 'main',
+               'head_sha': revision, 'status': 'completed', 'conclusion': 'success'}
+        with patch.object(draft, 'gh', return_value=json.dumps([
+                {'workflow_runs': [run]}])) as gh, patch.object(
+                draft, 'api', return_value={'artifacts': self.artifacts()}):
+            selected = draft.ensure_validation('example/ptn', revision, 'release.yml',
+                                               'Release validation', draft.REQUIRED,
+                                               False, allow_main_push=True)
+            self.assertEqual(selected, run)
+            self.assertEqual(gh.call_count, 1)
+
+    def test_push_reuse_requires_main_and_exact_revision(self):
+        revision = 'a' * 40
+        run = {'event': 'push', 'head_branch': 'main', 'head_sha': revision}
+        for updates in ({'head_branch': 'feature'}, {'head_sha': 'b' * 40}):
+            self.assertFalse(draft.eligible_run({**run, **updates}, revision,
+                                               'Release validation', allow_main_push=True))
+
     def test_expired_artifacts_require_rebuild(self):
         artifacts = self.artifacts()
         artifacts[0]['expired'] = True
