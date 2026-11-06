@@ -93,7 +93,8 @@ overrides:
   # -deps `.map` handling) and GHSA-v6wh-96g9-6wx3 (launch-editor UNC NTLMv2
   # hash disclosure). @pt/frontend already resolves 6.4.3; this drags the second
   # copy vitest pulls (6.4.1) up to match instead of leaving two lines.
-  vite@6: ">=6.4.3 <7"
+  # 2026-11: GHSA-587h-7wmj-h5pm and related Vite 6 fixes require 6.4.4.
+  vite@6: ">=6.4.4 <7"
   # postcss (via vite) sourceMappingURL handling: GHSA-6g55-p6wh-862q, its
   # incomplete-fix follow-up GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849 (previous
   # -source-map auto-loading path traversal) and GHSA-qx2v-qp2m-jg93 (XSS via an
@@ -142,15 +143,17 @@ overrides:
   # The 2026-09 sweep raised the qs floor to 6.16.0: GHSA-4mjr-xmp4-gh2g
   # (DoS through an attacker-controlled `isBuffer`) and GHSA-x5fp-wj9c-mxmx
   # (array-limit bypass via bracket-key comma parsing).
-  body-parser@1: ">=1.20.6 <2"
-  qs: ">=6.16.0 <7"
+  # 2026-11: GHSA-27r3-jxmh-p828 requires 1.20.9; qs GHSA-6pq8-jhm2-2vcw requires 6.16.1.
+  body-parser@1: ">=1.20.9 <2"
+  qs: ">=6.16.1 <7"
   # The proxy-agent chain under puppeteer-core (lighthouse): basic-ftp
   # GHSA-rpmf-866q-6p89 and GHSA-rp42-5vxx-qpwr (client-side DoS from unbounded
   # buffering), ip-address GHSA-mwp4-54f8-5fhr (leading-zero octets decoded as
   # decimal where resolvers read them as octal — SSRF / trust-boundary bypass)
   # and GHSA-v2v4-37r5-5v8g (XSS in the Address6 HTML-emitting methods).
   basic-ftp: ">=5.3.1 <6"
-  ip-address: ">=10.3.1 <11"
+  # 2026-11: GHSA-rxp7-6hxx-x8q5 and related advisories require 10.7.4.
+  ip-address: ">=10.7.4 <11"
   # protocol-buffers-schema, via resolve-protobuf-schema on the vector-tile
   # parsing chain: GHSA-j452-xhg8-qg39, prototype pollution.
   protocol-buffers-schema: ">=3.6.1 <4"
@@ -166,6 +169,13 @@ overrides:
   # permits the fix — only the lockfile pin held 0.16.7 — but floor it so a
   # fresh resolution cannot fall back. Capped at the 0.16 line eslint accepts.
   "@humanfs/node": ">=0.16.8 <0.17"
+  # 2026-11: compatible source-map and Lighthouse report-server fixes:
+  # GHSA-68fv-2mgg-jv7q, GHSA-jqcg-44mw-7w3h and GHSA-vc2v-76pw-4v95.
+  source-map-js@1: ">=1.2.2 <2"
+  proxy-addr@2: ">=2.0.8 <3"
+  compression@1: ">=1.8.2 <2"
+  # Serialization: GHSA-gfhx-hw2g-v5hg and GHSA-m5mm-p8h7-m29v.
+  serialize-javascript@7: ">=7.1.3 <8"
 # Accepted prod advisories with no reachable fix. The blocking npm-audit gate
 # (.github/workflows/dependency-audit.yml) skips these GHSA ids. Every entry
 # must state why the advisory cannot apply to this codebase AND why it cannot
