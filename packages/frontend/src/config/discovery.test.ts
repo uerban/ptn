@@ -24,3 +24,17 @@ it("uses cached metadata on network failure but rejects an invalid live catalog"
 it("does not invent cities on an offline first visit", async () => {
   await expect(discoverCities(vi.fn().mockRejectedValue(new Error("offline")))).rejects.toThrow("offline");
 });
+
+it("uses backend definitions for legacy ID allowlists, including unknown compiled IDs", async () => {
+  globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 1, cities: ["custom"]};
+  expect((await discoverCities(vi.fn().mockResolvedValue(new Response(JSON.stringify(catalog))))).map(c => c.id)).toEqual(["custom"]);
+});
+it("prefers backend metadata over legacy inline definitions", async () => {
+  globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 2, cities: [{...city, name: "Old name"}]};
+  expect((await discoverCities(vi.fn().mockResolvedValue(new Response(JSON.stringify(catalog)))))[0].name).toBe("Custom");
+});
+it("keeps old hosts compatible only when discovery explicitly returns 404", async () => {
+  globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 2, cities: [city]};
+  expect((await discoverCities(vi.fn().mockResolvedValue(new Response(null, {status: 404}))))[0].id).toBe("custom");
+  await expect(discoverCities(vi.fn().mockResolvedValue(new Response(null, {status: 503})))).rejects.toThrow("503");
+});

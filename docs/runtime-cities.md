@@ -77,14 +77,18 @@ keep the overview independent of third-party map services.
 
 A cached catalog is metadata, not an offline city. It lets the app describe
 known coverage during an outage. Unprepared cities are disabled offline and
-labelled **Connect to download**; they are never presented as usable downloads. A complete current live cache
+labelled **Connect to download**; they are never presented as usable downloads. A discovery outage alone does not disable cities: the picker shows cached metadata
+and allows connection attempts when the device is online. A complete current live cache
 may also be opened offline and is labelled **Cached**, separately from explicit
 **Downloaded** packages; only the latter survive a city switch.
 
 While online, **Settings → Cities on this device** lets the user open and download or
-update any exposed city and remove saved downloads. Downloading explicitly
-loads its timetable, initializes the planner and requires declared walking
-transfer bytes before saving a package. Packages retain PTB, canonical bundle
+update any exposed city and remove saved downloads. Each retained city also has an
+**Open** action that restores its timetable without a network update, including
+while offline. Opening a download does not change its download date. Downloading explicitly
+requires a network-validated timetable, initializes the planner and requires declared walking
+transfer bytes before saving a package. Failed updates retain the previous package and its date
+and report the failure; offline fallback is not counted as a successful update. Packages retain PTB, canonical bundle
 and display tables independently of the live city cache, so switching cities
 does not remove explicit downloads. Only the chosen package is restored into
 the active tables when offline or when the host is unreachable. Transfer bytes
@@ -99,7 +103,11 @@ does not promise every map, address or schedule detail is installed.
 
 ## Migration
 
-Existing releases need one frontend upgrade for discovery. Legacy inline
-schema-1 ID allowlists and schema-2 full definitions remain compatible, but
-new deployments should publish the backend catalog and a separate exposure
-policy. Development builds may use presets without a discovery endpoint.
+Existing releases need one frontend upgrade for discovery. Production always
+attempts backend discovery, including when a legacy inline schema-1 ID allowlist
+or schema-2 definition is present. Those lists become exposure policies over the
+backend definitions. Only an explicit 404 from `/api/cities` permits legacy inline
+metadata fallback for an old host. New deployments must publish the backend
+catalog and a separate exposure policy. The catalog, readiness and routing-bundle
+endpoints bypass service-worker response caching; their loaders own validation
+and offline fallback. Development builds may use presets without a discovery endpoint.

@@ -28,6 +28,11 @@
  */
 export const runtimeCaching = [
   {
+    // Discovery owns its validated metadata fallback; never replay membership here.
+    urlPattern: /\/api\/(?:cities|[^/]+\/(?:ready|raptor-bundle))(?:[/?#]|$)/,
+    handler: "NetworkOnly" as const,
+  },
+  {
     urlPattern: /\/deployment-config\.js$/,
     handler: "NetworkFirst" as const,
     options: {

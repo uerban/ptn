@@ -346,3 +346,19 @@ describe("downloaded-city startup", () => {
     expect(useGtfsDataStore.getState().error).toBeNull();
   });
 });
+
+it("opens an explicit download without network sync even when navigator reports online", async () => {
+  restoreDeviceCityMock.mockResolvedValue(true);
+  await useGtfsDataStore.getState().init("vilnius", {preferDownload: true});
+  expect(restoreDeviceCityMock).toHaveBeenCalledWith("vilnius", expect.anything());
+  expect(syncGtfsDataMock).not.toHaveBeenCalled();
+  expect(useGtfsDataStore.getState().loadedCityId).toBe("vilnius");
+});
+it("does not restore an old package after an explicit update fails", async () => {
+  syncGtfsDataMock.mockRejectedValue(new Error("offline"));
+  restoreDeviceCityMock.mockResolvedValue(true);
+  await useGtfsDataStore.getState().refresh("vilnius", {requireNetwork: true});
+  expect(syncGtfsDataMock).toHaveBeenCalledWith("vilnius", {requireNetwork: true});
+  expect(restoreDeviceCityMock).not.toHaveBeenCalled();
+  expect(useGtfsDataStore.getState().error).toContain("offline");
+});

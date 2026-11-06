@@ -73,9 +73,12 @@ class BumpTests(unittest.TestCase):
 
     def test_node_package_can_be_bumped_individually(self):
         manifests = bump.discover(bump.ROOT)
-        changes = bump.plan(bump.ROOT, manifests, '0.1.2', selected_packages=['@pt/frontend'])
+        current = json.loads((bump.ROOT / 'packages/frontend/package.json').read_text())['version']
+        target = f'{int(current.split(".")[0]) + 1}.0.0'
+        changes = bump.plan(bump.ROOT, manifests, target, selected_packages=['@pt/frontend'])
         self.assertEqual(set(changes), {bump.ROOT / 'packages/frontend/package.json'})
-        self.assertEqual(json.loads(next(iter(changes.values())))['version'], '0.1.2')
+        self.assertEqual(json.loads(next(iter(changes.values())))['version'], target)
+        self.assertFalse(bump.plan(bump.ROOT, manifests, current, selected_packages=['@pt/frontend']))
 
     def test_wasm_package_selection_keeps_crate_paired(self):
         changes = bump.plan(bump.ROOT, bump.discover(bump.ROOT), '0.1.2',

@@ -90,7 +90,7 @@ export interface CityConfig {
   readonly sharedMobility?: readonly SharedMobilitySystem[];
 }
 
-const BUILTIN_CITIES: readonly CityConfig[] = (presets as readonly CityConfig[]).map(city => ({
+export const BUILTIN_CITIES: readonly CityConfig[] = (presets as readonly CityConfig[]).map(city => ({
   ...city, available: city.id === "tbilisi" ? import.meta.env.VITE_PT_TBILISI_ENABLED === "1" : city.available,
 }));
 
