@@ -12,3 +12,4 @@ pub mod transit_export;
 pub mod transit_install;
 pub mod transit_native;
 pub mod transport;
+pub mod transit_publish;

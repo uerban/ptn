@@ -21,14 +21,17 @@ The signed repository layout is:
 ```text
 transit/catalog/v1/CITY/latest.json
 transit/catalog/v1/CITY/latest.json.sig
+transit/catalog/heads/HEAD_SHA256/latest.json.sig
 transit/selections/DESCRIPTOR_SHA256/selection.json
 transit/selections/DESCRIPTOR_SHA256/selection.json.sig
 transit/objects/sha256/FILE_SHA256
 ```
 
-This layout is the download contract. Offline export/catalog commands prepare
-its inputs; a production publisher and atomic public-head promotion are still
-pending. Do not expose a partially assembled repository as a supported source.
+This layout is the download contract. The [transit publisher](transit-pack-publication.md)
+assembles accepted exports, maintains a sequence ledger and switches completed
+heads atomically. Deployment, cache configuration and production acceptance are
+separate work. Clients prefer the immutable head signature matching the exact
+`latest.json` hash, with the mutable signature path retained for older mirrors.
 
 The installer authenticates the catalog and selected descriptor, enforces
 sequence/expiry checks and local resource limits, then streams each missing

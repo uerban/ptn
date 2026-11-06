@@ -1235,3 +1235,6 @@ fn read_only_transit_discovery_never_creates_or_cleans_a_store() {
     );
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
 }
+
+#[path = "support/transit_publication.rs"]
+mod publication;

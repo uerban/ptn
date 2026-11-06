@@ -200,7 +200,14 @@ impl TransitStore {
         let time = wall_time(now)?;
         let head = format!("transit/catalog/v1/{city}/latest.json");
         let bytes = metadata(repository, &head, transit_catalog::MAX_CATALOG_BYTES as u64)?;
-        let sig = metadata(repository, &format!("{head}.sig"), 64)?;
+        // Bind the detached signature to the exact (possibly cached) head.
+        // Legacy mirrors expose only the mutable signature path; retain support.
+        let sig = metadata(
+            repository,
+            &format!("transit/catalog/heads/{}/latest.json.sig", digest(&bytes)),
+            64,
+        )
+        .or_else(|_| metadata(repository, &format!("{head}.sig"), 64))?;
         let catalog = transit_catalog::verify(
             &bytes,
             &sig,

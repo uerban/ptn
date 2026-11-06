@@ -127,5 +127,7 @@ array lengths. Remaining JSON sidecars receive syntax checks with the existing
 These checks do not build a routing index, establish complete frontend JSON
 schema validity, or exercise routing/TTS behavior. They do not authenticate
 input by themselves. The [transit installer](transit-pack-installation.md) applies these checks
-before local activation. Server integration and acceptance are still required
-before a public head can be promoted.
+before local activation. The server can load installed selections directly.
+The [transit publisher](transit-pack-publication.md) assembles accepted exports
+and switches signed heads atomically; real-city and deployment acceptance are
+still required before exposing a supported public source.
