@@ -16,7 +16,7 @@ struct Args {
     #[arg(long)]
     root: PathBuf,
     #[arg(long)]
-    city: String,
+    city: Option<String>,
     /// Configured public keys as 64 lowercase hex characters.
     #[arg(long)]
     trusted_key: Vec<String>,
@@ -25,6 +25,13 @@ struct Args {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Verify served cities and selected download sizes.
+    Cities {
+        #[arg(long, conflicts_with = "source_directory")]
+        source_url: Option<String>,
+        #[arg(long, conflicts_with = "source_url")]
+        source_directory: Option<PathBuf>,
+    },
     Sync {
         #[arg(long, conflicts_with = "source_directory")]
         source_url: Option<String>,
@@ -32,6 +39,9 @@ enum Command {
         source_directory: Option<PathBuf>,
         #[arg(long)]
         without_geometry: bool,
+        /// Install the exact immutable head advertised by signed discovery.
+        #[arg(long)]
+        from_discovery: bool,
         #[arg(long, default_value_t=4*1024*1024*1024u64)]
         max_file_bytes: u64,
         #[arg(long, default_value_t=8*1024*1024*1024u64)]
@@ -64,54 +74,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Result<Vec<_>, _>>()?;
     if matches!(
         args.command,
-        Command::Sync { .. } | Command::Verify | Command::Rollback
+        Command::Sync { .. } | Command::Cities { .. } | Command::Verify | Command::Rollback
     ) && keys.is_empty()
     {
         return Err("at least one configured --trusted-key is required".into());
     }
+    if !matches!(args.command, Command::Cities { .. }) && args.city.is_none() {
+        return Err("--city is required for this command".into());
+    }
+    let city = args.city.as_deref().unwrap_or("");
     let store = TransitStore::open(&args.root)?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_secs()
         .try_into()?;
     match args.command {
-        Command::Status => println!(
-            "{}",
-            serde_json::to_string_pretty(&store.status(&args.city)?)?
-        ),
-        Command::Pin => store.set_pinned(&args.city, true)?,
-        Command::Unpin => store.set_pinned(&args.city, false)?,
-        Command::Rollback => store.rollback(&args.city, &keys, now)?,
-        Command::Verify => println!(
-            "{}",
-            store.validate_current(&args.city, &keys, now)?.display()
-        ),
+        Command::Cities {
+            source_url,
+            source_directory,
+        } => {
+            let repository = source(source_url, source_directory)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&store.discover(repository.as_ref(), &keys, now)?)?
+            );
+        }
+        Command::Status => println!("{}", serde_json::to_string_pretty(&store.status(city)?)?),
+        Command::Pin => store.set_pinned(city, true)?,
+        Command::Unpin => store.set_pinned(city, false)?,
+        Command::Rollback => store.rollback(city, &keys, now)?,
+        Command::Verify => println!("{}", store.validate_current(city, &keys, now)?.display()),
         Command::Sync {
             source_url,
             source_directory,
             without_geometry,
+            from_discovery,
             max_file_bytes,
             max_selected_bytes,
         } => {
-            let repository: Box<dyn Repository> = match (source_url, source_directory) {
-                (Some(url), None) => Box::new(HttpsRepository::new(&url)?),
-                (None, Some(path)) => Box::new(LocalRepository(path)),
-                _ => return Err("sync requires --source-url or --source-directory".into()),
+            let repository = source(source_url, source_directory)?;
+            let policy = Policy {
+                geometry: !without_geometry,
+                max_file_bytes,
+                max_selected_bytes,
+                ..Policy::default()
             };
-            let changed = store.sync(
-                repository.as_ref(),
-                &args.city,
-                &keys,
-                now,
-                &Policy {
-                    geometry: !without_geometry,
-                    max_file_bytes,
-                    max_selected_bytes,
-                    ..Policy::default()
-                },
-            )?;
+            let changed = if from_discovery {
+                store.sync_discovered(repository.as_ref(), city, &keys, now, &policy)?
+            } else {
+                store.sync(repository.as_ref(), city, &keys, now, &policy)?
+            };
             println!("{}", if changed { "activated" } else { "unchanged" });
         }
     }
     Ok(())
+}
+
+fn source(
+    url: Option<String>,
+    directory: Option<PathBuf>,
+) -> Result<Box<dyn Repository>, Box<dyn std::error::Error>> {
+    match (url, directory) {
+        (Some(url), None) => Ok(Box::new(HttpsRepository::new(&url)?)),
+        (None, Some(path)) => Ok(Box::new(LocalRepository(path))),
+        _ => Err("requires --source-url or --source-directory".into()),
+    }
 }

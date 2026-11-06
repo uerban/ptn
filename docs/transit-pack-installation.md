@@ -10,6 +10,32 @@ cargo run -p pt-artifacts --locked --bin pt-transit -- \
   sync --source-url https://mirror.example/ --without-geometry
 ```
 
+Inspect signed served-city discovery and its available geometry choices before
+installing:
+
+```sh
+pt-transit --root /srv/pt-data --trusted-key PUBLIC_KEY_HEX \
+  cities --source-url https://mirror.example/
+pt-transit --root /srv/pt-data --city CITY --trusted-key PUBLIC_KEY_HEX \
+  sync --source-url https://mirror.example/ --from-discovery --without-geometry
+```
+
+`cities` does not require `--city`. Other commands do. `--from-discovery` installs
+the exact immutable city head in the authenticated snapshot, including its
+advertised selected file size. It does not chase a newer mutable city alias.
+A city absent from discovery is not automatically installed or updated through
+this mode. Omitting `--from-discovery` retains direct per-city head lookup for
+older mirrors and explicit city operations.
+
+The installer persists the highest authenticated discovery sequence/hash when it
+accepts a list, separately from city installation state. A failed later download
+does not undo that advertising checkpoint; the city's current selection and its
+catalog checkpoint still change only after coherent installation succeeds. A
+restarted installer rejects replayed or equivocating lists. Pinning a city makes
+its sync return without fetching discovery. Listing cities can still refresh
+discovery metadata. Removing a city from the advertised set does not remove its
+installed files or prevent offline serving and explicit local rollback.
+
 Use `--source-directory /path/to/repository` for an offline local mirror instead
 of `--source-url`. Public keys come from operator configuration, not the mirror.
 Repeat `--trusted-key` during key rotation. Omit `--without-geometry` to request
@@ -22,6 +48,8 @@ The signed repository layout is:
 transit/catalog/v1/CITY/latest.json
 transit/catalog/v1/CITY/latest.json.sig
 transit/catalog/heads/HEAD_SHA256/latest.json.sig
+transit/discovery/v1/latest.json
+transit/discovery/heads/DISCOVERY_SHA256/latest.json.sig
 transit/selections/DESCRIPTOR_SHA256/selection.json
 transit/selections/DESCRIPTOR_SHA256/selection.json.sig
 transit/objects/sha256/FILE_SHA256

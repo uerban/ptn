@@ -40,12 +40,12 @@ pub struct Receipt {
 }
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Ledger {
-    schema_version: u32,
-    city: String,
-    highest_sequence: u64,
-    published: Option<Checkpoint>,
-    pending: Option<Checkpoint>,
+pub(crate) struct Ledger {
+    pub(crate) schema_version: u32,
+    pub(crate) city: String,
+    pub(crate) highest_sequence: u64,
+    pub(crate) published: Option<Checkpoint>,
+    pub(crate) pending: Option<Checkpoint>,
 }
 struct Export {
     root: PathBuf,
@@ -56,7 +56,7 @@ struct Export {
 fn invalid(message: impl ToString) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message.to_string())
 }
-fn bounded(path: &Path, limit: usize) -> io::Result<Vec<u8>> {
+pub(crate) fn bounded(path: &Path, limit: usize) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     File::open(path)?
         .take(limit as u64 + 1)
@@ -66,7 +66,7 @@ fn bounded(path: &Path, limit: usize) -> io::Result<Vec<u8>> {
     }
     Ok(bytes)
 }
-fn regular(path: &Path) -> io::Result<bool> {
+pub(crate) fn regular(path: &Path) -> io::Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(m) if m.is_file() => Ok(true),
         Ok(_) => Err(invalid("immutable publication path must be a regular file")),
@@ -79,7 +79,7 @@ fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.write_all(bytes)?;
     fsync::durable(file.as_fd())
 }
-fn sync_dir(path: &Path) -> io::Result<()> {
+pub(crate) fn sync_dir(path: &Path) -> io::Result<()> {
     fsync::durable_dir(File::open(path)?.as_fd())
 }
 fn same(a: Option<&Checkpoint>, b: Option<&Checkpoint>) -> bool {
@@ -89,7 +89,7 @@ fn same(a: Option<&Checkpoint>, b: Option<&Checkpoint>) -> bool {
         _ => false,
     }
 }
-fn current(channel: &Path, request: &Publication<'_>) -> io::Result<Option<Checkpoint>> {
+fn current(channel: &Path, city: &str, keys: &[[u8; 32]]) -> io::Result<Option<Checkpoint>> {
     match fs::symlink_metadata(channel) {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e),
@@ -106,15 +106,8 @@ fn current(channel: &Path, request: &Publication<'_>) -> io::Result<Option<Check
     let prior: Catalog = serde_json::from_slice(&bytes).map_err(invalid)?;
     // Expired heads can be renewed, but must still authenticate with configured keys.
     let published = timestamp_seconds(&prior.published_at).map_err(invalid)?;
-    let prior = transit_catalog::verify(
-        &bytes,
-        &sig,
-        request.trusted_keys,
-        request.city,
-        None,
-        published,
-    )
-    .map_err(invalid)?;
+    let prior =
+        transit_catalog::verify(&bytes, &sig, keys, city, None, published).map_err(invalid)?;
     let sha256 = digest(&bytes);
     if fs::read_link(channel)? != format!("../heads/{sha256}") {
         return Err(invalid("channel target does not match signed head"));
@@ -148,22 +141,35 @@ fn refuse_prior_heads_without_ledger(channel: &Path, city: &str) -> io::Result<(
     }
     Ok(())
 }
-fn ledger(path: &Path, channel: &Path, request: &Publication<'_>) -> io::Result<Ledger> {
-    let observed = current(channel, request)?;
+pub(crate) fn ledger(
+    path: &Path,
+    channel: &Path,
+    city: &str,
+    keys: &[[u8; 32]],
+) -> io::Result<Ledger> {
+    let observed = current(channel, city, keys)?;
+    if !path.try_exists()? && observed.is_none() {
+        refuse_prior_heads_without_ledger(channel, city)?;
+    }
+    read_ledger(path, city, observed)
+}
+
+pub(crate) fn read_ledger(
+    path: &Path,
+    scope: &str,
+    observed: Option<Checkpoint>,
+) -> io::Result<Ledger> {
     let mut ledger: Ledger = match bounded(path, 64 * 1024) {
         Ok(bytes) => serde_json::from_slice(&bytes).map_err(invalid)?,
-        Err(e) if e.kind() == io::ErrorKind::NotFound && observed.is_none() => {
-            refuse_prior_heads_without_ledger(channel, request.city)?;
-            Ledger {
-                schema_version: 1,
-                city: request.city.into(),
-                ..Default::default()
-            }
-        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound && observed.is_none() => Ledger {
+            schema_version: 1,
+            city: scope.into(),
+            ..Default::default()
+        },
         Err(e) => return Err(e),
     };
     if ledger.schema_version != 1
-        || ledger.city != request.city
+        || ledger.city != scope
         || ledger
             .published
             .iter()
@@ -191,7 +197,7 @@ fn ledger(path: &Path, channel: &Path, request: &Publication<'_>) -> io::Result<
     }
     Ok(ledger)
 }
-fn check_hash(
+pub(crate) fn check_hash(
     reader: &mut impl Read,
     expected: &str,
     size: u64,
@@ -235,7 +241,13 @@ fn object(source: &Path, target: &Path, stage: &Path, sha: &str, size: u64) -> i
     fs::rename(temporary, target)?;
     sync_dir(target.parent().unwrap())
 }
-fn pair(stage: &Path, target: &Path, name: &str, bytes: &[u8], sig: &[u8]) -> io::Result<()> {
+pub(crate) fn pair(
+    stage: &Path,
+    target: &Path,
+    name: &str,
+    bytes: &[u8],
+    sig: &[u8],
+) -> io::Result<()> {
     if fs::symlink_metadata(target).is_ok() {
         if !fs::symlink_metadata(target)?.is_dir()
             || bounded(&target.join(name), bytes.len())? != bytes
@@ -286,7 +298,7 @@ pub fn publish(root: &Path, request: &Publication<'_>) -> io::Result<Receipt> {
     let ledger_path = root
         .join("private/state")
         .join(format!("transit-publish-{}.json", request.city));
-    let mut ledger = ledger(&ledger_path, &channel, request)?;
+    let mut ledger = ledger(&ledger_path, &channel, request.city, request.trusted_keys)?;
     let mut catalog = Catalog {
         schema_version: 1,
         city: request.city.into(),

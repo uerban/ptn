@@ -88,3 +88,48 @@ cached discovery, rollback and in-flight downloads. Publication is additive and
 never rewrites signed pack metadata. Production promotion, retention policy,
 space limits, native/Docker packaging and measured low-memory acceptance must
 still be integrated before treating this as an accepted public service.
+
+## Served-city discovery
+
+After all intended cities have completed per-city publication, publish an
+explicit served-city snapshot:
+
+```sh
+pt-pack-discovery --repository /srv/transit-publisher \
+  --city CITY_A --city CITY_B --expires-at 2026-12-05T00:00:00Z \
+  --signing-key /builder-keys/transit-seed.hex --trusted-key PUBLIC_KEY_HEX
+```
+
+Choose an expiry no later than the earliest included city head expiry. The tool
+holds the same publisher lock, verifies each city's completed publication and
+signed selection, and rechecks every referenced object. Missing, corrupt,
+unpublished or expired dependencies prevent the new list from replacing the old
+one. All explicitly named cities must pass. The city set is sorted and unique;
+removing a city requires publishing a new explicit set, and does not delete its
+artifacts or uninstall existing consumer data.
+
+Discovery uses the separate `PTN-TRANSIT-DISCOVERY-v1` signing domain and its own
+monotonic sequence/expiry checkpoint. Its entries bind the exact immutable city
+head hash and length, city sequence, pack/generation identity, available geometry
+choices and selected file byte counts. Those counts describe a fresh selection's
+file bytes, not runtime memory, peak staging space or total retained disk use.
+
+```text
+public/transit/discovery/v1 -> heads/DISCOVERY_SHA256
+public/transit/discovery/heads/DISCOVERY_SHA256/latest.json
+public/transit/discovery/heads/DISCOVERY_SHA256/latest.json.sig
+private/state/transit-discovery-publish.json
+```
+
+A write-ahead reservation and one symlink switch publish the complete list.
+Interrupted reservations leave sequence gaps; interrupted completion is reconciled
+on retry. Missing or conflicting ledger state fails closed. Retain the immutable
+snapshots and referenced city heads for cached discovery and downloads. Apply the
+short discovery TTL to `discovery/v1/latest.json[.sig]` and the immutable TTL to
+`discovery/heads/<hash>/latest.json[.sig]`.
+
+Per-city publication does not automatically refresh served-city discovery.
+Publish or renew every intended city first, then explicitly publish the list.
+Clients installing from a still-valid older snapshot fetch its exact retained
+immutable heads, even if mutable city aliases have since advanced. This provides
+a coherent advertised snapshot without changing other cities during publication.

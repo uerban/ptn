@@ -533,3 +533,6 @@ fn cities_share_objects_but_keep_independent_sequences() {
             .unwrap());
     }
 }
+
+#[path = "transit_discovery.rs"]
+mod discovery;

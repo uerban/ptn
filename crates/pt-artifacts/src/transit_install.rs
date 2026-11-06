@@ -4,6 +4,7 @@ use crate::{
     install::Repository,
     store::{atomic_json, durable_mkdir, Store},
     transit_catalog::{self, Checkpoint},
+    transit_discovery::{self, Discovery},
     transit_export, transit_native,
 };
 use pt_shared::{
@@ -185,6 +186,70 @@ impl TransitStore {
         state.pinned = true; // Explicit unpin before a later upstream update.
         atomic_json(&self.state_path(city)?, &state)
     }
+    /// Accept authenticated advertising metadata; no city activation is changed.
+    pub fn discover(
+        &self,
+        repository: &(impl Repository + ?Sized),
+        keys: &[[u8; 32]],
+        now: i64,
+    ) -> io::Result<Discovery> {
+        let state = self.store.root.join("state");
+        let prior = match metadata(
+            &crate::install::LocalRepository(state.clone()),
+            "transit-discovery.json",
+            64 * 1024,
+        ) {
+            Ok(bytes) => Some(serde_json::from_slice::<Checkpoint>(&bytes).map_err(invalid)?),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e),
+        };
+        let bytes = metadata(
+            repository,
+            "transit/discovery/v1/latest.json",
+            transit_discovery::MAX_BYTES as u64,
+        )?;
+        let sha256 = digest(&bytes);
+        let sig = metadata(
+            repository,
+            &format!("transit/discovery/heads/{sha256}/latest.json.sig"),
+            64,
+        )?;
+        let discovery =
+            transit_discovery::verify(&bytes, &sig, keys, prior.as_ref(), now).map_err(invalid)?;
+        if !prior
+            .as_ref()
+            .is_some_and(|old| old.sequence == discovery.sequence && old.sha256 == sha256)
+        {
+            atomic_json(
+                &state.join("transit-discovery.json"),
+                &Checkpoint {
+                    sequence: discovery.sequence,
+                    sha256,
+                },
+            )?;
+        }
+        Ok(discovery)
+    }
+    /// Install the exact immutable city head advertised by fresh signed discovery.
+    pub fn sync_discovered(
+        &self,
+        repository: &(impl Repository + ?Sized),
+        city: &str,
+        keys: &[[u8; 32]],
+        now: i64,
+        policy: &Policy,
+    ) -> io::Result<bool> {
+        if self.status(city)?.is_some_and(|state| state.pinned) {
+            return Ok(false);
+        }
+        let discovery = self.discover(repository, keys, now)?;
+        let selected = discovery
+            .cities
+            .iter()
+            .find(|entry| entry.city == city)
+            .ok_or_else(|| invalid("city is not advertised by transit discovery"))?;
+        self.sync_inner(repository, city, keys, now, policy, Some(selected))
+    }
     pub fn sync(
         &self,
         repository: &(impl Repository + ?Sized),
@@ -193,12 +258,26 @@ impl TransitStore {
         now: i64,
         policy: &Policy,
     ) -> io::Result<bool> {
+        self.sync_inner(repository, city, keys, now, policy, None)
+    }
+    fn sync_inner(
+        &self,
+        repository: &(impl Repository + ?Sized),
+        city: &str,
+        keys: &[[u8; 32]],
+        now: i64,
+        policy: &Policy,
+        discovered: Option<&transit_discovery::City>,
+    ) -> io::Result<bool> {
         let previous = self.status(city)?; // Validates city before any URL is built.
         if previous.as_ref().is_some_and(|p| p.pinned) {
             return Ok(false);
         }
         let time = wall_time(now)?;
-        let head = format!("transit/catalog/v1/{city}/latest.json");
+        let head = discovered.map_or_else(
+            || format!("transit/catalog/v1/{city}/latest.json"),
+            |entry| format!("transit/catalog/heads/{}/latest.json", entry.head_sha256),
+        );
         let bytes = metadata(repository, &head, transit_catalog::MAX_CATALOG_BYTES as u64)?;
         // Bind the detached signature to the exact (possibly cached) head.
         // Legacy mirrors expose only the mutable signature path; retain support.
@@ -207,15 +286,32 @@ impl TransitStore {
             &format!("transit/catalog/heads/{}/latest.json.sig", digest(&bytes)),
             64,
         )
-        .or_else(|_| metadata(repository, &format!("{head}.sig"), 64))?;
-        let catalog = transit_catalog::verify(
-            &bytes,
-            &sig,
-            keys,
-            city,
-            previous.as_ref().map(|p| &p.checkpoint),
-            now,
-        )
+        .or_else(|error| {
+            if discovered.is_none() {
+                metadata(repository, &format!("{head}.sig"), 64)
+            } else {
+                Err(error)
+            }
+        })?;
+        let catalog = if let Some(entry) = discovered {
+            transit_discovery::verify_city(
+                entry,
+                &bytes,
+                &sig,
+                keys,
+                previous.as_ref().map(|p| &p.checkpoint),
+                now,
+            )
+        } else {
+            transit_catalog::verify(
+                &bytes,
+                &sig,
+                keys,
+                city,
+                previous.as_ref().map(|p| &p.checkpoint),
+                now,
+            )
+        }
         .map_err(invalid)?;
         let selected = catalog
             .selections
@@ -237,6 +333,16 @@ impl TransitStore {
             policy.geometry,
         )
         .map_err(invalid)?;
+        if discovered.is_some_and(|entry| {
+            !entry.choices.iter().any(|choice| {
+                choice.geometry_selected == policy.geometry
+                    && choice.selected_bytes == inventory.selected_bytes
+            })
+        }) {
+            return Err(invalid(
+                "transit selected byte count does not match discovery",
+            ));
+        }
         if inventory.files.len() > policy.max_files
             || inventory.selected_bytes > policy.max_selected_bytes
             || inventory.files.iter().any(|f| {

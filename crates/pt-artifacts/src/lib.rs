@@ -13,3 +13,5 @@ pub mod transit_install;
 pub mod transit_native;
 pub mod transport;
 pub mod transit_publish;
+pub mod transit_discovery;
+pub mod transit_discovery_publish;
