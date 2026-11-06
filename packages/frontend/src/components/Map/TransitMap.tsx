@@ -1236,7 +1236,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           maxzoom: ZOOM_OVERVIEW_MAX,
           paint: {
             "circle-color": "#1d4ed8",
-            "circle-radius": 8,
+            "circle-radius": ["get", "radius"],
             "circle-stroke-width": 2,
             "circle-stroke-color": "#ffffff",
           },

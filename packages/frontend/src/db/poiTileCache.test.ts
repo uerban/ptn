@@ -37,7 +37,7 @@ describe("poiTileCache table", () => {
   it("opens with poiTileCache present", async () => {
     const { db } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(1);
+    expect(db.verno).toBe(2);
     expect(db.poiTileCache).toBeDefined();
     expect(await db.poiTileCache.count()).toBe(0);
   });

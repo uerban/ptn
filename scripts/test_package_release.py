@@ -113,6 +113,7 @@ class ArchiveContents(unittest.TestCase):
                 "examples/VALIDATION.md": "validation",
                 "docs/release-platforms.md": "platforms",
                 "docs/gtfs-sources.md": "sources",
+                "docs/runtime-cities.md": "runtime city discovery",
                 "LICENSE": "license", "LICENSE-MIT": "MIT", "LICENSE-APACHE": "Apache",
                 "THIRD_PARTY_NOTICES.md": "notices",
             }.items():

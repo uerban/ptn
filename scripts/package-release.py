@@ -107,6 +107,7 @@ def main():
         (bundle / "docs").mkdir()
         shutil.copy2(ROOT / "docs/release-platforms.md", bundle / "docs/release-platforms.md")
         shutil.copy2(ROOT / "docs/gtfs-sources.md", bundle / "docs/gtfs-sources.md")
+        shutil.copy2(ROOT / "docs/runtime-cities.md", bundle / "docs/runtime-cities.md")
         shutil.copytree(ROOT / "release-builder", bundle / "builder")
         for filename in ("LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_NOTICES.md"):
             shutil.copy2(ROOT / filename, bundle / filename)

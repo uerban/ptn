@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {runtimeCityIds, deploymentCityIds} from "./deployment.ts";
+import {runtimeCityIds, deploymentCityIds, runtimeCityConfigs, deploymentCityConfigs} from "./deployment.ts";
 
 afterEach(() => {
   delete globalThis.__PTN_DEPLOYMENT__;
@@ -52,5 +52,51 @@ describe("runtime deployment city selection", () => {
       expect(getAvailableCities().map(city => city.id)).toEqual(["tbilisi", "tricity"]);
       expect(findCityByLocation(54.68, 25.28)).toBeNull();
     } finally {vi.unstubAllEnvs();}
+  });
+});
+
+const runtimeCity = {
+  id: "host-only-city", name: "Host City", tz: "Europe/Riga",
+  center: {lat: 56.95, lon: 24.1},
+  bbox: {minLat: 56.8, minLon: 23.9, maxLat: 57.1, maxLon: 24.4},
+};
+
+describe("host-defined runtime cities", () => {
+  it("boots an unknown city across catalog, store, API URLs and location lookup", async () => {
+    globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 2, cities: [runtimeCity]};
+    const {CITIES, getAvailableCities, findNearestCity, findCityByLocation} = await import("./cities.ts");
+    const {useCityStore} = await import("../stores/cityStore.ts");
+    expect(CITIES).toEqual([{...runtimeCity, available: true}]);
+    expect(getAvailableCities()[0]).toEqual(CITIES[0]);
+    expect(findNearestCity(56.95, 24.1).id).toBe(runtimeCity.id);
+    expect(findCityByLocation(56.95, 24.1)?.id).toBe(runtimeCity.id);
+    expect(findCityByLocation(54.68, 25.28)).toBeNull();
+    expect(useCityStore.getState().activeCity.tz).toBe("Europe/Riga");
+    expect(useCityStore.getState().getApiUrl()).toBe("/api/host-only-city");
+  });
+  it("retains complete metadata for an offline cold start", () => {
+    globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 2, cities: [runtimeCity]};
+    expect(deploymentCityConfigs([])?.[0].center).toEqual(runtimeCity.center);
+    delete globalThis.__PTN_DEPLOYMENT__;
+    expect(deploymentCityConfigs([])?.[0]).toEqual({...runtimeCity, available: true});
+  });
+  it("rejects invalid metadata instead of silently serving an unrelated default city", () => {
+    const bad = [
+      {...runtimeCity, tz: "not/a-zone"}, {...runtimeCity, id: "../bad"},
+      {...runtimeCity, center: {lat: NaN, lon: 24.1}},
+      {...runtimeCity, bbox: {...runtimeCity.bbox, minLat: 58}},
+      {...runtimeCity, center: {lat: 40, lon: 24.1}}, {...runtimeCity, name: ""},
+    ];
+    for (const city of bad) expect(() => runtimeCityConfigs({schemaVersion: 2, cities: [city]}, [])).toThrow();
+    expect(() => runtimeCityConfigs({schemaVersion: 2, cities: [runtimeCity, runtimeCity]}, [])).toThrow();
+  });
+  it("refreshes a saved city's metadata from the host catalog", async () => {
+    globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 2, cities: [runtimeCity]};
+    localStorage.setItem("ptn-city", JSON.stringify({state: {activeCity: {...runtimeCity, name: "Old name", tz: "UTC"}}, version: 0}));
+    try {
+      const {useCityStore} = await import("../stores/cityStore.ts");
+      expect(useCityStore.getState().activeCity.name).toBe("Host City");
+      expect(useCityStore.getState().activeCity.tz).toBe("Europe/Riga");
+    } finally {localStorage.removeItem("ptn-city");}
   });
 });

@@ -87,7 +87,7 @@ loopback. In another terminal, start the web server from the extracted archive:
 PTN_SITE=http://localhost:8080 \
 PTN_WEB_ROOT="$PWD/web" \
 PTN_ARTIFACT_PUBLIC=/absolute/state/directory/artifacts/public \
-  caddy run --config examples/native/Caddyfile --adapter caddyfile
+  caddy run --config /var/lib/ptn/public-config/Caddyfile --adapter caddyfile
 ```
 
 Open <http://localhost:8080> in a fresh browser profile. Allow the initial city
@@ -131,3 +131,30 @@ host updater does not rebuild OSM. Retain the state directory across restarts.
 Run the server, updater, and Caddy under your host's process supervisor for a
 persistent deployment. No systemd or other supervisor template is included in
 the initial example; those need separate lifecycle validation before shipping.
+
+## City discovery and custom cities
+
+The host publishes its configured city descriptor at `/api/cities`; the web
+archive discovers it before starting transit services. There is no default
+city: first launch offers a world map and optional location lookup.
+
+`refresh` and `serve` write the catalog and city-specific proxy configuration
+to `<stateDirectory>/public-config/`. To generate them without downloading or
+starting transit, run `host.py --config /absolute/path/config.json web-config`.
+Use the generated Caddyfile with the same `PTN_WEB_ROOT`, `PTN_ARTIFACT_PUBLIC`,
+`PTN_MAIN` and `PTN_AUX` environment as above. Replace `/var/lib/ptn` in the
+command with your configured state directory when necessary.
+
+For a custom city, set `city`, `timezone`, and `cityMetadata` with `name`,
+`center` and `bbox`. Known entries in `city-presets.json` are optional
+onboarding presets, not a restriction on supported cities. Optional credits,
+route groups, excluded modes, POI mode and shared mobility can be supplied
+explicitly in the metadata. Feed and signed OSM data still need to be prepared
+for the configured city; this does not make the reference Vilnius OSM builder
+a generic city builder.
+
+Only public city metadata is emitted. Feed URLs, signing configuration and
+internal addresses are not part of the catalog. Multi-city deployments can
+use `catalog.publish_catalog(configs, output_directory)` with their accepted
+city configurations and expose the resulting `cities.json` at `/api/cities`.
+Catalog membership describes configured cities, independently of readiness.

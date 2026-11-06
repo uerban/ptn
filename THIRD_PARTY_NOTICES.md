@@ -30,3 +30,10 @@ artifact metadata where available.
 See the
 [POI build instructions](packages/backend/scripts/README.md) for regeneration
 details.
+
+## Natural Earth world land outlines
+
+The first-launch world map uses public-domain Natural Earth 1:110m land
+geometry, with feature properties omitted and geometry unchanged.
+Source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_land.geojson
+Terms: https://www.naturalearthdata.com/about/terms-of-use/

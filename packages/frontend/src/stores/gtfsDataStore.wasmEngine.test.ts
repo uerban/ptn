@@ -10,6 +10,7 @@ import type { PtRouterHandle } from "../services/raptorWasm.ts";
 // registry is cleared by resetModules) so the fresh module graph picks up the
 // stubs. The mock fns themselves live at module scope so they survive
 // `resetModules` and can be configured per-test.
+const restoreDeviceCityMock = vi.fn();
 const syncGtfsDataMock = vi.fn();
 const needsSyncMock = vi.fn();
 const clearGtfsDataMock = vi.fn();
@@ -28,6 +29,9 @@ function makeRouter(): PtRouterHandle {
 
 beforeEach(async () => {
   vi.resetModules();
+  vi.unstubAllGlobals();
+  restoreDeviceCityMock.mockReset().mockResolvedValue(false);
+  vi.doMock("../services/deviceCities.ts", () => ({restoreDeviceCity: restoreDeviceCityMock, hasLiveDeviceCity: vi.fn().mockResolvedValue(false)}));
 
   syncGtfsDataMock.mockReset().mockResolvedValue(true);
   needsSyncMock.mockReset().mockResolvedValue(false);
@@ -319,5 +323,26 @@ describe("gtfsDataStore warm start builds the engine alongside the JS index", ()
     await vi.waitFor(() => expect(useGtfsDataStore.getState().wasmEngine.status).toBe("idle"));
     expect(useGtfsDataStore.getState().raptorIndex).toBeNull();
     expect(useGtfsDataStore.getState().ptRouter).toBeNull();
+  });
+});
+
+describe("downloaded-city startup", () => {
+  it("restores a downloaded city while offline without refreshing from the host", async () => {
+    vi.stubGlobal("navigator", {onLine: false});
+    restoreDeviceCityMock.mockResolvedValue(true);
+    initOrSwapPtRouterMock.mockRejectedValue(new Error("test engine stub"));
+    await useGtfsDataStore.getState().init("downloaded");
+    expect(restoreDeviceCityMock).toHaveBeenCalledWith("downloaded", expect.any(AbortSignal));
+    expect(syncGtfsDataMock).not.toHaveBeenCalled();
+    expect(useGtfsDataStore.getState().loadedCityId).toBe("downloaded");
+  });
+  it("restores a downloaded package when an apparently online host is unreachable", async () => {
+    needsSyncMock.mockResolvedValue(true);
+    syncGtfsDataMock.mockRejectedValue(new Error("network failed"));
+    restoreDeviceCityMock.mockResolvedValue(true);
+    initOrSwapPtRouterMock.mockRejectedValue(new Error("test engine stub"));
+    await useGtfsDataStore.getState().init("downloaded");
+    expect(useGtfsDataStore.getState().loadedCityId).toBe("downloaded");
+    expect(useGtfsDataStore.getState().error).toBeNull();
   });
 });

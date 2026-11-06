@@ -10,17 +10,19 @@ import subprocess
 import sys
 import time
 from gtfs import prepare
+from catalog import publish_catalog, descriptor
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("command", choices=("refresh", "serve", "refresh-loop"))
+    parser.add_argument("command", choices=("refresh", "serve", "refresh-loop", "web-config"))
     args = parser.parse_args()
     config_path = args.config.resolve()
     config = json.loads(config_path.read_text())
     city = config.get("city", "vilnius")
-    timezone = config.get("timezone", "Europe/Vilnius")
+    timezone = descriptor(config)["tz"]
+    config.update(city=city, timezone=timezone)
     if args.command == "refresh-loop":
         while True:
             result = subprocess.run(
@@ -42,6 +44,14 @@ def main():
     data.mkdir(exist_ok=True)
     runtime = state / "run"
     runtime.mkdir(exist_ok=True)
+    public_config = state / "public-config"
+    publish_catalog([config], public_config)
+    caddy = Path(__file__).with_name("Caddyfile").read_text().replace("vilnius", city)
+    (public_config / "Caddyfile").write_text(caddy)
+    if args.command == "web-config":
+        print(public_config / "Caddyfile")
+        return
+
     # Keep the standard pool/cache settings. These are capacity allowances,
     # not measured memory guarantees for an arbitrary feed.
     serve_args = [

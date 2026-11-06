@@ -1,3 +1,4 @@
+import {db} from "../db/index.ts";
 import { decode as decodeTransfers, type DecodedTransfers } from "@pt/shared/transfers";
 
 /**
@@ -15,6 +16,9 @@ export async function fetchTransfersArtifactBytes(
   expectedHash: string,
   opts: { signal?: AbortSignal } = {},
 ): Promise<Uint8Array> {
+  // Prepared cities retain verified, content-addressed transfer bytes offline.
+  const cached = await db.offlineTransfers.get(expectedHash).catch(() => undefined);
+  if (cached && await sha256Hex(cached.bytes.slice().buffer as ArrayBuffer) === expectedHash) return cached.bytes;
   const absolute = new URL(url, window.location.origin).toString();
   // F9: callers key the signal to the city/init generation so a city switch
   // mid-download aborts the transfer instead of resolving into stale state.
@@ -30,7 +34,9 @@ export async function fetchTransfersArtifactBytes(
       `transfers artifact hash mismatch for ${url}: got ${hash.slice(0, 8)}…, expected ${expectedHash.slice(0, 8)}…`,
     );
   }
-  return new Uint8Array(buffer);
+  const bytes = new Uint8Array(buffer);
+  await db.offlineTransfers.put({hash: expectedHash, bytes}).catch(() => {});
+  return bytes;
 }
 
 /**

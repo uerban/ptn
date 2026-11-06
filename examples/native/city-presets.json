@@ -1,0 +1,144 @@
+[
+  {
+    "id": "vilnius",
+    "name": "Vilnius",
+    "center": {
+      "lat": 54.6872,
+      "lon": 25.2797
+    },
+    "bbox": {
+      "minLat": 54.62,
+      "minLon": 25.15,
+      "maxLat": 54.75,
+      "maxLon": 25.42
+    },
+    "available": true,
+    "tz": "Europe/Vilnius",
+    "defaultExcludedModes": [
+      "FERRY"
+    ],
+    "poiFetchMode": "lazy-tile",
+    "sharedMobility": [
+      {
+        "id": "cyclocity",
+        "name": "Cyclocity Vilnius",
+        "gbfsDiscoveryUrl": "https://api.cyclocity.fr/contracts/vilnius/gbfs/gbfs.json"
+      }
+    ]
+  },
+  {
+    "id": "tricity",
+    "name": "Trójmiasto",
+    "center": {
+      "lat": 54.352,
+      "lon": 18.6466
+    },
+    "bbox": {
+      "minLat": 54.28,
+      "minLon": 18.45,
+      "maxLat": 54.54,
+      "maxLon": 18.85
+    },
+    "available": true,
+    "tz": "Europe/Warsaw",
+    "poiFetchMode": "lazy-tile",
+    "poiCityIds": [
+      "gdansk",
+      "gdynia"
+    ]
+  },
+  {
+    "id": "krakow",
+    "name": "Krakow",
+    "center": {
+      "lat": 50.0647,
+      "lon": 19.945
+    },
+    "bbox": {
+      "minLat": 49.97,
+      "minLon": 19.77,
+      "maxLat": 50.13,
+      "maxLon": 20.17
+    },
+    "available": true,
+    "tz": "Europe/Warsaw"
+  },
+  {
+    "id": "paris",
+    "name": "Paris",
+    "center": {
+      "lat": 48.8566,
+      "lon": 2.3522
+    },
+    "bbox": {
+      "minLat": 48.75,
+      "minLon": 2.15,
+      "maxLat": 49.02,
+      "maxLon": 2.55
+    },
+    "available": true,
+    "tz": "Europe/Paris"
+  },
+  {
+    "id": "oslo",
+    "name": "Oslo",
+    "center": {
+      "lat": 59.9139,
+      "lon": 10.7522
+    },
+    "bbox": {
+      "minLat": 59.8,
+      "minLon": 10.4,
+      "maxLat": 60.05,
+      "maxLon": 11
+    },
+    "available": true,
+    "tz": "Europe/Oslo"
+  },
+  {
+    "id": "tbilisi",
+    "routeGroups": [
+      {
+        "id": "bus",
+        "parentMode": "BUS",
+        "label": "Bus",
+        "labelKey": "settings.mode_bus",
+        "fallback": true
+      },
+      {
+        "id": "minibus",
+        "parentMode": "BUS",
+        "label": "Minibus",
+        "labelKey": "settings.mode_minibus",
+        "routeIdPattern": "(?:^|:)minibusR[0-9]+$"
+      }
+    ],
+    "name": "Tbilisi",
+    "center": {
+      "lat": 41.7151,
+      "lon": 44.8271
+    },
+    "bbox": {
+      "minLat": 41.6,
+      "minLon": 44.6,
+      "maxLat": 41.85,
+      "maxLon": 45.05
+    },
+    "available": true,
+    "tz": "Asia/Tbilisi",
+    "transitSources": [
+      {
+        "name": "Tbilisi Transport Company",
+        "url": "https://ttc.com.ge"
+      },
+      {
+        "name": "Tbilisi GTFS",
+        "url": "https://gitlab.spline.de/spline/transitous/tbilisi-gtfs"
+      },
+      {
+        "name": "Transitous",
+        "url": "https://transitous.org"
+      }
+    ]
+  }
+]

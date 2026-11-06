@@ -1,4 +1,5 @@
-import {deploymentCityIds} from "./deployment.ts";
+import presets from "../../../../examples/native/city-presets.json";
+import {deploymentCityConfigs} from "./deployment.ts";
 import type { RouteGroup } from "../services/routeGroups.ts";
 import type { PoiFetchMode, SelfHostedGeocoderConfig, TransportMode } from "@pt/shared";
 
@@ -70,6 +71,8 @@ export interface CityConfig {
    * default (today's eager-bundle).
    */
   readonly poiFetchMode?: PoiFetchMode;
+  /** Artifact city IDs for a multi-area deployment; defaults to this city ID. */
+  readonly poiCityIds?: readonly string[];
   /**
    * Shared-mobility (GBFS) operators whose live station availability the map
    * can overlay as an opt-in bike layer. When set, the bike toggle chip shows
@@ -87,99 +90,25 @@ export interface CityConfig {
   readonly sharedMobility?: readonly SharedMobilitySystem[];
 }
 
-export const CITIES: readonly CityConfig[] = [
-  // Existing cities retain their order (Vilnius is the default).
-  {
-    id: "vilnius",
-    name: "Vilnius",
-    center: { lat: 54.6872, lon: 25.2797 },
-    bbox: { minLat: 54.62, minLon: 25.15, maxLat: 54.75, maxLon: 25.42 },
-    available: true,
-    tz: "Europe/Vilnius",
-    // The Neris river ferry is in the feed with a nominal schedule, but in
-    // practice skips stops so often that riders usually can't board. Default
-    // it out of itineraries; the chip stays so it can be re-enabled.
-    defaultExcludedModes: ["FERRY"],
-    poiFetchMode: "lazy-tile", // ← per-tile activation. vilnius backend POI city is poiTileDeliveryActive.
-    sharedMobility: [
-      {
-        id: "cyclocity",
-        name: "Cyclocity Vilnius",
-        // JCDecaux public GBFS 2.3 feed (verified live 2026-07-17: CORS open,
-        // 36 stations, station_status TTL 1 s). No SLA — the typed-error path
-        // degrades the layer gracefully if the endpoint changes.
-        gbfsDiscoveryUrl: "https://api.cyclocity.fr/contracts/vilnius/gbfs/gbfs.json",
-      },
-    ],
-  },
-  {
-    id: "tricity",
-    name: "Trójmiasto",
-    center: { lat: 54.352, lon: 18.6466 },
-    bbox: { minLat: 54.28, minLon: 18.45, maxLat: 54.54, maxLon: 18.85 },
-    available: true,
-    tz: "Europe/Warsaw",
-    poiFetchMode: "lazy-tile", // ← per-tile activation. gdansk backend POI city is poiTileDeliveryActive.
-  },
-  {
-    id: "krakow",
-    name: "Krakow",
-    center: { lat: 50.0647, lon: 19.9450 },
-    bbox: { minLat: 49.97, minLon: 19.77, maxLat: 50.13, maxLon: 20.17 },
-    available: true,
-    tz: "Europe/Warsaw",
-  },
-  {
-    id: "paris",
-    name: "Paris",
-    center: { lat: 48.8566, lon: 2.3522 },
-    bbox: { minLat: 48.75, minLon: 2.15, maxLat: 49.02, maxLon: 2.55 },
-    available: true,
-    tz: "Europe/Paris",
-  },
-  {
-    id: "oslo",
-    name: "Oslo",
-    center: { lat: 59.9139, lon: 10.7522 },
-    // Covers Oslo built-up area + the Drammen-line western corridor
-    // (Lysaker, Sandvika, Asker — all on Ruter's zone 1/2 commuter
-    // network). Excludes Gardermoen Airport (60.19, 11.10) which is
-    // out-of-area for the Ruter feed; routes there require the
-    // Norway-aggregated feed and a wider bbox.
-    bbox: { minLat: 59.80, minLon: 10.40, maxLat: 60.05, maxLon: 11.00 },
-    available: true,
-    tz: "Europe/Oslo",
-  },
-  {
-    id: "tbilisi",
-    // TTC identifies municipal minibuses in the route ID. Both are GTFS Bus;
-    // this private opt-in city rule avoids guessing from colours or 4xx/5xx.
-    routeGroups: [
-      { id: "bus", parentMode: "BUS", label: "Bus", labelKey: "settings.mode_bus", fallback: true },
-      { id: "minibus", parentMode: "BUS", label: "Minibus", labelKey: "settings.mode_minibus", routeIdPattern: "(?:^|:)minibusR[0-9]+$" },
-    ],
-    name: "Tbilisi",
-    center: { lat: 41.7151, lon: 44.8271 },
-    bbox: { minLat: 41.60, minLon: 44.60, maxLat: 41.85, maxLon: 45.05 },
-    // Staging opt-in, after the operator completes the city onboarding notes.
-    available: import.meta.env.VITE_PT_TBILISI_ENABLED === "1",
-    tz: "Asia/Tbilisi",
-    transitSources: [
-      { name: "Tbilisi Transport Company", url: "https://ttc.com.ge" },
-      { name: "Tbilisi GTFS", url: "https://gitlab.spline.de/spline/transitous/tbilisi-gtfs" },
-      { name: "Transitous", url: "https://transitous.org" },
-    ],
-  },
-];
+const BUILTIN_CITIES: readonly CityConfig[] = (presets as readonly CityConfig[]).map(city => ({
+  ...city, available: city.id === "tbilisi" ? import.meta.env.VITE_PT_TBILISI_ENABLED === "1" : city.available,
+}));
 
-const deploymentCities = deploymentCityIds(CITIES.map(city => city.id));
+// All consumers (including timezone and geocoder lookup) share the runtime catalog.
+let deploymentCities = deploymentCityConfigs(BUILTIN_CITIES);
+export let CITIES: readonly CityConfig[] = deploymentCities ?? BUILTIN_CITIES;
 
-/** Cities visible in pickers and findNearestCity — the `available:true` entries. */
+/** Explicitly install discovery results even when bundler shared chunks have
+ * evaluated catalog consumers before the asynchronous bootstrap completes. */
+export function installCityCatalog(cities: readonly CityConfig[]): void {
+  if (!cities.length) throw new Error("Host serves no cities");
+  deploymentCities = [...cities];
+  CITIES = deploymentCities;
+}
+
+/** Cities enabled by the host, or source defaults when no host config exists. */
 export function getAvailableCities(): CityConfig[] {
-  if (deploymentCities) return deploymentCities.map(id => ({
-    ...CITIES.find(city => city.id === id)!, available: true,
-  }));
-  return CITIES.filter((c) => c.available);
+  return CITIES.filter(city => city.available);
 }
 
 /** Find nearest available city to a lat/lon coordinate. */
