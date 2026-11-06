@@ -10,7 +10,7 @@ use pt_shared::{
     schedule_tile_manifest::ScheduleTileManifest,
     tile_coord::{parse_tile_coords, SCHEDULE_TILE_SIZE_LABEL},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -21,8 +21,8 @@ use std::{
 
 const MAX_METADATA_BYTES: u64 = 16 * 1024 * 1024;
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TransitInventory {
     pub schema_version: u32,
     pub city: String,
@@ -36,8 +36,8 @@ pub struct TransitInventory {
     pub selected_bytes: u64,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InventoryFile {
     pub path: String,
     pub kind: String,
@@ -306,7 +306,7 @@ fn add_tiles(
 
 /// Reject links at every component; never inventory private data through a
 /// generated symlink. The caller owns an immutable root during inspection.
-fn file_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
+pub(crate) fn file_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
     validate_artifact_path(relative).map_err(invalid)?;
     let mut path = root.to_path_buf();
     let mut parts = relative.split('/').peekable();

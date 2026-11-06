@@ -7,4 +7,5 @@ pub mod publish;
 pub mod retention;
 pub mod store;
 pub mod transit;
+pub mod transit_export;
 pub mod transport;

@@ -290,3 +290,91 @@ fn rejects_nested_symlink_for_a_tile() {
         .to_string()
         .contains("regular artifact path"));
 }
+
+#[test]
+fn signed_export_preserves_identity_and_excludes_unselected_data() {
+    use ed25519_dalek::{Signer, SigningKey};
+    use pt_artifacts::transit_export::{export, verify};
+    let mut fixture = Fixture::new();
+    fixture.artifact("shapes-bin", "shapes.bin", b"optional geometry");
+    fixture.artifact("address-search", "address.bin", b"independent extra");
+    fixture.tiles(true);
+    fixture.save();
+    fs::write(fixture.path().join("private-source.txt"), b"never export").unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    let output = parent.path().join("export");
+    let key = SigningKey::from_bytes(&[17; 32]);
+    let id = export(fixture.path(), &output, false, &key).unwrap();
+    let bytes = fs::read(output.join("selection.json")).unwrap();
+    let sig = fs::read(output.join("selection.json.sig")).unwrap();
+    assert_eq!(id, digest(&bytes));
+    let keys = [key.verifying_key().to_bytes()];
+    let selection = verify(&bytes, &sig, &keys, "fixture").unwrap();
+    assert_eq!(selection.pack_id, fixture.pack.pack_id);
+    assert!(!selection.geometry_selected);
+    assert!(!output.join("files/shapes.bin").exists());
+    assert!(!output.join("files/address.bin").exists());
+    assert!(!output.join("files/private-source.txt").exists());
+    for file in selection.files {
+        let body = fs::read(output.join("files").join(file.path)).unwrap();
+        assert_eq!(digest(&body), file.sha256);
+        assert_eq!(body.len() as u64, file.size_bytes);
+    }
+    assert!(verify(&bytes, &sig, &[], "fixture").is_err());
+    assert!(verify(&bytes, &sig, &keys, "another-city").is_err());
+    for case in 0..3 {
+        let mut descriptor: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        match case {
+            0 => descriptor["files"][0]["path"] = json!("../outside"),
+            1 => descriptor["selectedBytes"] = json!(0),
+            _ => {
+                let duplicate = descriptor["files"][0].clone();
+                descriptor["files"].as_array_mut().unwrap().push(duplicate);
+            }
+        }
+        let body = serde_json::to_vec(&descriptor).unwrap();
+        let message = [b"PTN-TRANSIT-SELECTION-v1\0".as_slice(), &body].concat();
+        assert!(verify(&body, &key.sign(&message).to_bytes(), &keys, "fixture").is_err());
+    }
+
+    let mut tampered = bytes.clone();
+    tampered.push(b' ');
+    assert!(verify(&tampered, &sig, &keys, "fixture").is_err());
+    // Neither a raw Ed25519 signature nor the OSM catalog signing domain works.
+    for message in [
+        bytes.clone(),
+        pt_artifacts::catalog::signing_message(&bytes).unwrap(),
+    ] {
+        assert!(verify(&bytes, &key.sign(&message).to_bytes(), &keys, "fixture").is_err());
+    }
+    assert!(export(fixture.path(), &output, false, &key).is_err());
+    assert_eq!(fs::read(output.join("selection.json")).unwrap(), bytes);
+    let full = parent.path().join("full");
+    assert_ne!(export(fixture.path(), &full, true, &key).unwrap(), id);
+    let full_selection = verify(
+        &fs::read(full.join("selection.json")).unwrap(),
+        &fs::read(full.join("selection.json.sig")).unwrap(),
+        &keys,
+        "fixture",
+    )
+    .unwrap();
+    assert_eq!(full_selection.pack_id, fixture.pack.pack_id);
+    assert!(full.join("files/shapes.bin").exists());
+}
+
+#[test]
+fn corrupt_source_does_not_create_export_directory() {
+    use ed25519_dalek::SigningKey;
+    let fixture = Fixture::new();
+    let parent = tempfile::tempdir().unwrap();
+    let output = parent.path().join("export");
+    fs::write(fixture.path().join("bundle.ptb"), b"corrupt").unwrap();
+    assert!(pt_artifacts::transit_export::export(
+        fixture.path(),
+        &output,
+        true,
+        &SigningKey::from_bytes(&[17; 32])
+    )
+    .is_err());
+    assert!(!output.exists());
+}

@@ -37,3 +37,35 @@ with shapes omitted; explicit runtime component selection is subsequent work.
 OSM, address indexes and POI data are independent optional artifacts. Their
 versions do not need to match the transit generation. The inspection does not
 fetch or validate them and does not require their original build inputs.
+
+## Signed offline export
+
+`pt-pack-export` copies a verified selection into a **new** staging directory:
+
+```sh
+cargo run -p pt-artifacts --locked --bin pt-pack-export -- \
+  --generation /path/to/transit/generations/GENERATION_ID \
+  --output /path/to/new-export --without-geometry \
+  --signing-key /private/builder/transit-signing-seed.hex
+```
+
+The key file contains a 32-byte Ed25519 seed encoded as lowercase hex. Keep it
+on the builder. The output contains `files/` with the original relative paths,
+`selection.json`, and a raw detached `selection.json.sig`. The command prints
+the descriptor's SHA-256. Full and geometry-free selections have different
+descriptor hashes while retaining the same original pack ID.
+
+The signature authenticates the exact descriptor bytes with the domain prefix
+`PTN-TRANSIT-SELECTION-v1\0`. It binds all selected hashes, including generation
+metadata and tile bodies. Verification requires separately configured public
+keys and an expected city. It also rejects unsafe/duplicate paths and invalid
+size totals. This signature provides no expiry or update sequence; a refresh
+catalog must supply those before automatic remote installation is available.
+
+Export streams and rehashes each copied file, rejects changed bytes, and refuses
+to reuse an existing output. Normal failures remove the new output. A crash can
+leave staging data; the descriptor is written last as a completion marker.
+Keep both source and staging directories private and immutable during export;
+never serve the staging directory while the command is running. This command
+neither promotes a public channel nor performs native-format validation. Ops
+must validate and promote a completed tree before exposing it.
