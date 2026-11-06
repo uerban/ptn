@@ -1,11 +1,8 @@
-name: Build and validate installable release
+name: Release candidate validation
 
 run-name: Release validation ${{ inputs.revision || github.sha }}
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       revision:
@@ -18,10 +15,14 @@ permissions:
 
 concurrency:
   group: release-validation-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: false
 
 env:
   RELEASE_REVISION: ${{ inputs.revision || github.sha }}
+
+defaults:
+  run:
+    working-directory: source
 
 jobs:
   build:
@@ -32,18 +33,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.RELEASE_REVISION }}
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: "22.22.0"
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
+      - uses: ./gate-tools/.github/actions/setup-build
+        with:
+          working-directory: source
+          cache-profile: release-native
+          save-cache: ${{ github.ref == 'refs/heads/main' && (!inputs.revision || inputs.revision == github.sha) }}
       - name: Install build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools pkg-config osmium-tool openjdk-21-jre-headless
-          corepack enable
-          rustup show
-          cargo install wasm-pack --version 0.15.0 --locked
       - name: Build the browser engine from clean source
-        working-directory: crates/pt-wasm
+        working-directory: source/crates/pt-wasm
         env:
           CARGO_PROFILE_RELEASE_PANIC: abort
           CARGO_PROFILE_RELEASE_OPT_LEVEL: z
@@ -53,7 +60,7 @@ jobs:
       - name: Build and test source
         run: |
           pnpm install --frozen-lockfile
-          node --test scripts/hosting-navigation.test.mjs
+          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'
           cargo build --release --locked --workspace
           cargo test --workspace --locked
@@ -96,8 +103,8 @@ jobs:
           name: ptn-release-inputs
           retention-days: 7
           path: |
-            packages/frontend/dist/
-            release-builder/
+            source/packages/frontend/dist/
+            source/release-builder/
           if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -105,8 +112,8 @@ jobs:
           retention-days: 7
           compression-level: 0
           path: |
-            release/ptn-linux-x86_64.tar.gz
-            release/ptn-linux-x86_64.tar.gz.sha256
+            source/release/ptn-linux-x86_64.tar.gz
+            source/release/ptn-linux-x86_64.tar.gz.sha256
           if-no-files-found: error
 
   platforms:
@@ -138,10 +145,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.RELEASE_REVISION }}
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ptn-release-inputs
-          path: .
+          path: source
       - name: Install Linux build and emulation tools
         if: runner.os == 'Linux'
         env:
@@ -150,6 +164,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y perl pkg-config qemu-user binutils
           bash scripts/install-musl-toolchain.sh "$TARGET"
+      - uses: ./gate-tools/.github/actions/setup-build
+        with:
+          working-directory: source
+          node: 'false'
+          wasm-pack: 'false'
+          cache-profile: release-${{ matrix.target }}
+          save-cache: ${{ github.ref == 'refs/heads/main' && (!inputs.revision || inputs.revision == github.sha) }}
       - name: Build all host tools
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
@@ -189,33 +210,40 @@ jobs:
           retention-days: 30
           compression-level: 0
           path: |
-            release/ptn-${{ matrix.platform }}.tar.gz
-            release/ptn-${{ matrix.platform }}.tar.gz.sha256
+            source/release/ptn-${{ matrix.platform }}.tar.gz
+            source/release/ptn-${{ matrix.platform }}.tar.gz.sha256
           if-no-files-found: error
 
-  validate:
-    name: Validate extracted release on a fresh host
+  prepare-validation:
+    name: Prepare signed hosting inputs
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      # Native test/release outputs consumed the build runner's disk before
-      # OSM download. This job receives only the archive, never target/.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.RELEASE_REVISION }}
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: "22.22.0"
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
+      - uses: ./gate-tools/.github/actions/setup-build
+        with:
+          working-directory: source
+          rust: 'false'
+          wasm-pack: 'false'
+          save-cache: ${{ github.ref == 'refs/heads/main' && (!inputs.revision || inputs.revision == github.sha) }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ptn-linux-x86_64-candidate
-          path: release
+          path: source/release
       - name: Install validation tools and verify release
         run: |
           sudo apt-get update
           sudo apt-get install -y osmium-tool openjdk-21-jre-headless
-          corepack enable
           pnpm install --frozen-lockfile
           cd release
           sha256sum --check ptn-linux-x86_64.tar.gz.sha256
@@ -240,30 +268,141 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/ptn-evidence"
-          bundle="$GITHUB_WORKSPACE/release/ptn-linux-x86_64"
+          bundle="$GITHUB_WORKSPACE/source/release/ptn-linux-x86_64"
           node "$bundle/examples/native/prepare-osm.mjs" "$RUNNER_TEMP/ptn-osm"
           PT_ADDRESS_EXTRACT_SCRIPT="$bundle/builder/packages/backend/scripts/extract-addr-fixture.mjs" \
             node "$bundle/builder/packages/backend/src/poi/buildArtifacts.mjs" "$RUNNER_TEMP/ptn-osm/builder.json" \
               2>&1 | tee "$RUNNER_TEMP/ptn-evidence/osm-build.log"
-      - name: Install browser and test web server
+      - name: Share only signed public hosting inputs
         run: |
-          pnpm --filter @pt/frontend exec playwright install --with-deps chromium
+          tar -czf "$RUNNER_TEMP/hosting-inputs.tar.gz" -C "$RUNNER_TEMP/ptn-osm" repository artifact-source.json
+          cd "$RUNNER_TEMP"
+          sha256sum hosting-inputs.tar.gz > hosting-inputs.tar.gz.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: hosting-inputs
+          retention-days: 7
+          compression-level: 0
+          path: |
+            ${{ runner.temp }}/hosting-inputs.tar.gz
+            ${{ runner.temp }}/hosting-inputs.tar.gz.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: hosting-input-preparation
+          retention-days: 14
+          path: ${{ runner.temp }}/ptn-evidence/osm-build.log
+          if-no-files-found: warn
+
+  validate:
+    name: Validate ${{ matrix.kind }} on a fresh host
+    needs: [build, prepare-validation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [native, docker]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_REVISION }}
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
+      - uses: ./gate-tools/.github/actions/setup-build
+        with:
+          working-directory: source
+          rust: 'false'
+          wasm-pack: 'false'
+          save-cache: ${{ github.ref == 'refs/heads/main' && (!inputs.revision || inputs.revision == github.sha) }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ptn-linux-x86_64-candidate
+          path: source/release
+      - name: Install validation tools and verify release
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool openjdk-21-jre-headless
+          pnpm install --frozen-lockfile
+          cd release
+          sha256sum --check ptn-linux-x86_64.tar.gz.sha256
+          tar -xzf ptn-linux-x86_64.tar.gz
+          cd ptn-linux-x86_64
+          sha256sum --check SHA256SUMS
+          python3 -c 'import json, os; r = json.load(open("release.json")); assert not r["sourceDirty"]; assert r["revision"] == os.environ["RELEASE_REVISION"]'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hosting-inputs
+          path: ${{ runner.temp }}
+      - name: Restore signed hosting inputs
+        run: |
+          cd "$RUNNER_TEMP"
+          sha256sum --check hosting-inputs.tar.gz.sha256
+          mkdir ptn-osm
+          tar -xzf hosting-inputs.tar.gz -C ptn-osm
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "ptn-osm"
+          path = root / "artifact-source.json"
+          config = json.loads(path.read_text())
+          assert config["artifactSource"]["kind"] == "local"
+          config["artifactSource"]["directory"] = str(root / "repository")
+          path.write_text(json.dumps(config))
+          PYTHON
+      - name: Install browser
+        run: pnpm --filter @pt/frontend exec playwright install --with-deps chromium
+      - name: Install native test web server
+        if: matrix.kind == 'native'
+        run: |
           docker pull caddy:2.11.7-alpine
           container=$(docker create caddy:2.11.7-alpine)
           docker cp "$container:/usr/bin/caddy" "$RUNNER_TEMP/caddy"
           docker rm "$container"
       - name: Validate native fresh-host lifecycle over HTTP and TLS
+        if: matrix.kind == 'native'
         run: |
           python3 scripts/verify-native-installation.py \
             --bundle release/ptn-linux-x86_64 \
             --source-config "$RUNNER_TEMP/ptn-osm/artifact-source.json" \
             --caddy "$RUNNER_TEMP/caddy" --evidence "$RUNNER_TEMP/ptn-evidence/native"
       - name: Validate Docker fresh-host lifecycle over HTTP and TLS
+        if: matrix.kind == 'docker'
         run: |
           python3 scripts/verify-docker-installation.py \
             --source-config "$RUNNER_TEMP/ptn-osm/artifact-source.json" \
-            --probe "$RUNNER_TEMP/ptn-evidence/native/probe.json" \
             --evidence "$RUNNER_TEMP/ptn-evidence/docker"
+      - name: Report validation disk usage
+        if: always()
+        run: |
+          df -h "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
+          du -sh "$RUNNER_TEMP/ptn-osm" "$RUNNER_TEMP/ptn-evidence" release 2>/dev/null || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: hosting-${{ matrix.kind }}
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ptn-evidence/**/*.log
+            ${{ runner.temp }}/ptn-evidence/**/result.json
+            ${{ runner.temp }}/ptn-evidence/**/*.png
+          if-no-files-found: warn
+
+  validated-archive:
+    name: Retain archive after both hosting validations
+    needs: [build, validate]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ptn-linux-x86_64-candidate
+          path: release
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptn-linux-x86_64
@@ -273,18 +412,3 @@ jobs:
             release/ptn-linux-x86_64.tar.gz
             release/ptn-linux-x86_64.tar.gz.sha256
           if-no-files-found: error
-      - name: Report validation disk usage
-        if: always()
-        run: |
-          df -h "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
-          du -sh "$RUNNER_TEMP/ptn-osm" "$RUNNER_TEMP/ptn-evidence" release 2>/dev/null || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: always()
-        with:
-          name: hosting-validation
-          retention-days: 14
-          path: |
-            ${{ runner.temp }}/ptn-evidence/**/*.log
-            ${{ runner.temp }}/ptn-evidence/**/result.json
-            ${{ runner.temp }}/ptn-evidence/**/*.png
-          if-no-files-found: warn

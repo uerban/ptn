@@ -20,6 +20,8 @@
 // hardcoding a dist asset URL — that path bypasses Vite's hashed-bundle
 // resolution and would silently rot when the hash changes.
 import { test, expect } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   mockApi,
   PTB_MATCHED_FIXED_TIME,
@@ -101,6 +103,15 @@ async function measureCold(
 const p95 = (xs: number[]): number =>
   xs.slice().sort((a, b) => a - b)[Math.floor(xs.length * 0.95)];
 
+function recordColdMetrics(profile: string, samples: ColdSample[], budgets: ColdSample) {
+  const directory = resolve(process.env.PTN_PERF_EVIDENCE_DIR ?? "test-results/perf-metrics");
+  mkdirSync(directory, { recursive: true });
+  const measured = Object.fromEntries((Object.keys(budgets) as (keyof ColdSample)[])
+    .map(key => [key, p95(samples.map(sample => sample[key]))]));
+  writeFileSync(resolve(directory, `wasm-coldstart-${profile}.json`),
+    JSON.stringify({profile, samples, p95: measured, budgets}, null, 2));
+}
+
 test.describe("wasm engine cold-start @coldstart @mock-api", () => {
   test("first plan() respects 4-component split budget (p95 over N=10, fast profile)", async ({
     page,
@@ -118,6 +129,7 @@ test.describe("wasm engine cold-start @coldstart @mock-api", () => {
       await ctx.close();
     }
     samples.shift(); // discard warm-up sample (CDN/proxy cold caches)
+    recordColdMetrics("fast", samples, BUDGETS_MS_FAST);
 
     expect(p95(samples.map((s) => s.dynImport))).toBeLessThan(
       BUDGETS_MS_FAST.dynImport,
@@ -151,6 +163,11 @@ test.describe("wasm engine cold-start @coldstart @mock-api", () => {
       await ctx.close();
     }
     samples.shift();
+    recordColdMetrics("throttled", samples, BUDGETS_MS_THROTTLED);
+    for (const key of Object.keys(BUDGETS_MS_THROTTLED) as (keyof ColdSample)[]) {
+      expect(p95(samples.map(sample => sample[key])), `throttled ${key} p95`)
+        .toBeLessThan(BUDGETS_MS_THROTTLED[key]);
+    }
     expect(p95(samples.map((s) => s.total))).toBeLessThan(
       BUDGETS_MS_THROTTLED.total,
     );

@@ -1,0 +1,21 @@
+title = "PTN secret scanning"
+[extend]
+useDefault = true
+
+# PEM parser delimiters and the exact RFC 8410 section 10.3 example key.
+# Scope both path AND literal content; a different key in this file still fails.
+[[rules]]
+id = "private-key"
+description = "Private key"
+regex = '''(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?KEY(?: BLOCK)?-----'''
+keywords = ["-----begin"]
+[[rules.allowlists]]
+description = "PEM parser literals and published RFC 8410 test vectors"
+condition = "AND"
+paths = ['''^crates/pt-artifacts/src/bin/pt-artifact-publish\.rs$''']
+regexTarget = "match"
+regexes = [
+  '''-----BEGIN[ ]PRIVATE[ ]KEY-----"\)\s*\.and_then\(\|rest\| rest\.strip_suffix\("-----END[ ]PRIVATE[ ]KEY-----''',
+  '''-----BEGIN[ ]PRIVATE[ ]KEY-----\\nMC4CAQAwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp\+K06/nwoy/HU\+\+CXqI9EdVhC\\n-----END[ ]PRIVATE[ ]KEY-----''',
+  '''-----BEGIN[ ]PRIVATE[ ]KEY-----\\nMC4CAQAwBQYDK2VuBCIEINTuctv5E1hK1bbY8fdp\+K06/nwoy/HU\+\+CXqI9EdVhC\\n-----END[ ]PRIVATE[ ]KEY-----''',
+]

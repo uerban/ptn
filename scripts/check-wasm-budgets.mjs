@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync, writeFileSync} from 'node:fs';
+import {gzipSync} from 'node:zlib';
+const [path, output] = process.argv.slice(2);
+const bytes = readFileSync(path);
+const imports = WebAssembly.Module.imports(new WebAssembly.Module(bytes));
+const forbidden = imports.filter(({module, name}) => /wasi|getrandom|__wbg_clock|__wbg_fs|fd_(close|read|write|seek)/i.test(`${module}/${name}`));
+assert.deepEqual(forbidden, [], 'WASM acquired forbidden platform imports');
+const gzipBytes = gzipSync(bytes, {level: 9}).length;
+assert(gzipBytes > 0 && gzipBytes <= 250000, `WASM gzip size ${gzipBytes} exceeds 250000-byte budget`);
+writeFileSync(output, JSON.stringify({rawBytes: bytes.length, gzipBytes, budget: 250000, imports}, null, 2) + '\n');
+console.log(`WASM imports and size passed: ${gzipBytes}/250000 gzip bytes`);
