@@ -55,8 +55,18 @@ pt-transit --root /srv/pt-data --city CITY --trusted-key PUBLIC_KEY_HEX verify
 
 `verify` prints the selected immutable `files/` directory after validation. This
 is not yet a `pt-serve` data root: installer activation does not write producer
-pointers or reload a running server. Runtime integration must honor the selected
-geometry policy without rewriting the publisher's metadata.
+pointers or reload a running server. Reading installer activation records from
+`pt-serve` is still pending.
+
+For an existing producer data root, `pt-serve --without-geometry` (or
+`PT_SERVE_WITHOUT_GEOMETRY=true`) disables shapes loading at startup and on reload.
+It skips opening `shapes.bin`, suppresses geometry bodies and their advertised
+hashes, and leaves publisher metadata and pack identity unchanged. Other selected
+transit artifacts still undergo their normal validation. Geometry is enabled by
+default. Pair this with `--page-warm-mode off` when speculative page-in is
+undesirable on a constrained host. These runtime flags do not install packs or
+change the installer selection; the installed-source adapter must bind runtime
+geometry to the activated selection before that mode can be used.
 
 To pause updates, use `pin`; use `unpin` to enable them again. `rollback` validates
 and switches to the previous installed selection, preserves the highest accepted

@@ -501,6 +501,7 @@ mod tests {
             loopback_listen_addr: "127.0.0.1:0".into(),
             loopback_worker_count: 2,
             max_retained_generations: 10,
+            without_geometry: false,
             page_warm_mode: PageWarmMode::WillNeed,
             log_format: LogFormat::Text,
             pattern_mode: PatternModeArg::Off,

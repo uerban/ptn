@@ -172,6 +172,7 @@ fn main() {
     // serve the first publish.
     if let Err(e) = verify_producer_sentinel(&config.data_root) {
         let reason = match &e {
+            SentinelError::Identity(_) => "data_root_identity",
             SentinelError::StatDataRoot { .. } => "stat_data_root",
             SentinelError::ReadFile { .. } => "read_file",
             SentinelError::Malformed { .. } => "malformed",
@@ -230,7 +231,7 @@ fn main() {
     let metrics = Metrics::new();
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
 
-    let initial = pt_serve::bundle::load_initial_generation_with_force_and_page_warm(
+    let initial = pt_serve::bundle::load_initial_generation_with_geometry(
         &config.data_root,
         &config.city_slug,
         clock.as_ref(),
@@ -240,6 +241,7 @@ fn main() {
         config.city_tz_iana_default.as_deref(),
         config.pattern_mode.into(),
         config.page_warm_mode.enabled(),
+        !config.without_geometry,
     )
     .unwrap_or_else(|e| {
         eprintln!("pt-serve: startup load failed: {e}");

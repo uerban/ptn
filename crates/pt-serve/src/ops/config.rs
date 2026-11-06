@@ -147,6 +147,10 @@ pub struct ServerConfig {
     )]
     pub page_warm_mode: PageWarmMode,
 
+    /// Skip route geometry loading and serving; retain transit routing data.
+    #[arg(long, env = "PT_SERVE_WITHOUT_GEOMETRY", default_value_t = false)]
+    pub without_geometry: bool,
+
     /// Operator log format. `json` (default) is parseable by the k8s log
     /// pipeline; `text` is for local dev.
     #[arg(
@@ -722,6 +726,17 @@ mod tests {
             Err(ConfigError::RtPollIntervalMsZero) => {}
             other => panic!("expected RtPollIntervalMsZero, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn geometry_defaults_on_and_can_be_disabled() {
+        use clap::Parser;
+        let config = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert!(!config.without_geometry);
+        let mut args = base_args();
+        args.push("--without-geometry".into());
+        let config = ServerConfig::try_parse_from(args).unwrap();
+        assert!(config.without_geometry);
     }
 
     #[test]

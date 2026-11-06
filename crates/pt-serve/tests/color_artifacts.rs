@@ -461,3 +461,69 @@ fn shapes_interner_mismatch_is_rejected() {
         Err(other) => panic!("expected Io(InvalidData), got {other:?}"),
     }
 }
+
+#[test]
+fn geometry_policy_skips_unusable_shapes_without_changing_manifest() {
+    let root = tempfile::TempDir::new().unwrap();
+    let clock = anchored_clock();
+    let artifacts = SidecarArtifacts {
+        color_config: Some(br#"{"colors":{}}"#.to_vec()),
+        route_styles: None,
+        shapes_bin: Some(b"SHPBcorrupt".to_vec()),
+        departures_idx: None,
+        label_anchors: None,
+        address_search: None,
+    };
+    let id = publisher::publish_generation_with_artifacts(
+        root.path(),
+        "vilnius",
+        &tiny_ptb_path(),
+        &publisher::rfc3339_format(ANCHOR_UNIX),
+        &artifacts,
+    );
+    let manifest_path = publisher::manifest_path_for(root.path(), &id);
+    let before = std::fs::read(&manifest_path).unwrap();
+    // Exercise normal startup and the explicit recovery startup path.
+    for forced in [None, Some(id.as_str())] {
+        let generation = pt_serve::bundle::load_initial_generation_with_geometry(
+            root.path(),
+            "vilnius",
+            clock.as_ref(),
+            &Metrics::new(),
+            forced,
+            pt_serve::ops::LogFormat::Json,
+            Some("Europe/Vilnius"),
+            pt_core::PatternMode::Off,
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(generation.color_config.is_some());
+        assert!(generation.shapes_json_bytes().is_none());
+        assert!(generation.shapes_json_sha256.is_none());
+        assert!(generation.shapes_json_size_bytes.is_none());
+        assert!(generation.shapes_json_etag.is_none());
+        assert!(generation.route_geometry_etag.is_none());
+    }
+    assert_eq!(std::fs::read(manifest_path).unwrap(), before);
+    assert!(build_from_published(root.path(), "vilnius", &id, clock.as_ref()).is_err());
+    // Skipping geometry must not bypass integrity checks for other artifacts.
+    let color = publisher::bundle_path_for(root.path(), &id)
+        .parent()
+        .unwrap()
+        .join("color-config.json");
+    std::fs::write(color, b"corrupt").unwrap();
+    assert!(pt_serve::bundle::load_initial_generation_with_geometry(
+        root.path(),
+        "vilnius",
+        clock.as_ref(),
+        &Metrics::new(),
+        None,
+        pt_serve::ops::LogFormat::Json,
+        Some("Europe/Vilnius"),
+        pt_core::PatternMode::Off,
+        false,
+        false,
+    )
+    .is_err());
+}

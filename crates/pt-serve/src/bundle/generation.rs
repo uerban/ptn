@@ -446,6 +446,7 @@ pub(crate) fn load_color_artifacts(
     recomputed_stops_sha: &[u8; 32],
     expected_shapes_json_sha: Option<&str>,
     expected_shapes_json_size: Option<u64>,
+    geometry_enabled: bool,
 ) -> Result<ColorArtifacts, ValidationError> {
     let color_config = read_optional_arc(&gen_dir.join("color-config.json"))?;
     if let (Some(bytes), Some(expected)) = (color_config.as_deref(), color_config_sha) {
@@ -478,6 +479,18 @@ pub(crate) fn load_color_artifacts(
                 format!("sha256 mismatch: manifest={expected}, on-disk={actual}"),
             ));
         }
+    }
+
+    if !geometry_enabled {
+        return Ok(ColorArtifacts {
+            color_config,
+            route_styles,
+            label_anchors,
+            shapes_mmap: None,
+            shapes_bin_sha256: None,
+            shapes_json_sha256: None,
+            shapes_json_size_bytes: None,
+        });
     }
 
     let shapes_path = gen_dir.join("shapes.bin");
@@ -989,7 +1002,7 @@ impl Generation {
         let (trips_sha, stops_sha) = crate::bundle::integrity::bundle_namespace_shas(&reader)
             .map_err(|e| format!("interner: {e}"))?;
         let artifacts = load_color_artifacts(
-            gen_dir, None, None, None, None, &trips_sha, &stops_sha, None, None,
+            gen_dir, None, None, None, None, &trips_sha, &stops_sha, None, None, true,
         )
         .map_err(|e| format!("color artifacts: {e}"))?;
         let shapes_json_etag = artifacts

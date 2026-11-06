@@ -22,7 +22,7 @@
 //! the latch and runs exactly one follow-up. Consulting AFTER swap-or-abort
 //! ensures `mapped_generation_count` never exceeds 2 even under coalescing.
 
-use crate::bundle::{build_generation_with_page_warm, BuildInputs, Generation};
+use crate::bundle::{build_generation_with_geometry, BuildInputs, Generation};
 use crate::ops::metrics::{ReloadCause, ReloadResult};
 use crate::ops::{Metrics, ServerConfig};
 use crate::reload::test_barrier::ReloadBarrier;
@@ -390,7 +390,7 @@ impl ReloadRunner {
 
         // ---- 3-7. build the new generation via the shared builder ----
         let epoch = self.next_epoch.fetch_add(1, Ordering::SeqCst);
-        let new_gen = build_generation_with_page_warm(
+        let new_gen = build_generation_with_geometry(
             BuildInputs {
                 manifest: &target,
                 bundle_path: &bundle_path,
@@ -405,6 +405,7 @@ impl ReloadRunner {
             },
             self.config.page_warm_mode.enabled(),
             Some(self.config.log_format),
+            !self.config.without_geometry,
         )?;
 
         // ---- 8. write last-good.json PRE-SWAP (rev 3 ordering) ----

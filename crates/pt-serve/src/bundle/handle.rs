@@ -156,6 +156,17 @@ pub fn build_generation_with_page_warm(
     page_warm_enabled: bool,
     log_format: Option<LogFormat>,
 ) -> Result<Generation, ValidationError> {
+    build_generation_with_geometry(inputs, page_warm_enabled, log_format, true)
+}
+
+/// Build a generation with explicit geometry and page-warming policies.
+/// Disabling geometry leaves publisher metadata intact and never opens shapes.
+pub fn build_generation_with_geometry(
+    inputs: BuildInputs<'_>,
+    page_warm_enabled: bool,
+    log_format: Option<LogFormat>,
+    geometry_enabled: bool,
+) -> Result<Generation, ValidationError> {
     let mut phases = PhaseLog::new(log_format);
 
     // ---- Step 4: mmap bundle ----
@@ -357,6 +368,7 @@ pub fn build_generation_with_page_warm(
         &recomputed_stops_sha,
         inputs.manifest.shapes_json_sha256.as_deref(),
         inputs.manifest.shapes_json_size_bytes,
+        geometry_enabled,
     )?;
     phases.done(
         "color_artifacts",
