@@ -100,6 +100,10 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?', args.tag):
         raise RuntimeError('Expected a version tag such as v0.1.1')
+    if '-' not in args.tag:
+        raise RuntimeError('Stable releases must be promoted from an immutable RC using promote-release.py')
+    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*', args.tag):
+        raise RuntimeError('Expected an RC tag such as v0.2.0-rc.1')
     repo = os.environ['GH_REPO']
     revision = api(f'repos/{repo}/commits/{args.tag}')['sha']
     gate = ensure_validation(repo, revision, 'regression.yml', 'Regression gates',
@@ -132,10 +136,19 @@ def main():
     notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\nSource commit: {revision}\n\n'
              'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
              'ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
-    flags = ['--prerelease'] if '-' in args.tag else []
+    (dest / 'regression.json').write_text(json.dumps(proof, indent=2) + '\n')
+    hashes = {}
+    for path in sorted(dest.iterdir()):
+        with path.open('rb') as stream:
+            hashes[path.name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    (dest / 'release-evidence.json').write_text(json.dumps({
+        'schemaVersion': 1, 'revision': revision, 'releaseRunId': str(run['id']),
+        'regressionRunId': str(gate['id']), 'sha256': hashes,
+    }, indent=2) + '\n')
+    flags = ['--prerelease']
     gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--draft', *flags,
        '--title', args.tag, '--notes', notes,
-       *(str(dest / f'ptn-{p}.tar.gz{s}') for p in PLATFORMS for s in ('', '.sha256')))
+       *(str(path) for path in sorted(dest.iterdir())))
 
 
 if __name__ == '__main__':

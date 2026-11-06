@@ -16,6 +16,12 @@ class ScopeTests(unittest.TestCase):
                      'packages/frontend/src/template.md', 'scripts/check.py']:
             self.assertFalse(scope.documentation_only(['README.md', path]), path)
 
+    def test_dependency_scope_covers_lockfiles_manifests_and_workflow_policy(self):
+        for path in ['Cargo.lock', 'crates/pt-core/Cargo.toml', 'packages/frontend/package.json',
+                     'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/actions/setup-build/action.yml']:
+            self.assertTrue(scope.dependency_changes([path]), path)
+        self.assertFalse(scope.dependency_changes(['README.md', 'docs/ci.md', 'crates/pt-core/src/lib.rs']))
+
     def test_empty_and_unknown_events_run(self):
         self.assertFalse(scope.documentation_only([]))
         self.assertIsNone(scope.changed_paths('workflow_dispatch', {}))

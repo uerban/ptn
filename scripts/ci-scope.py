@@ -14,6 +14,11 @@ def documentation_only(paths):
     return bool(paths) and all(prose(path) for path in paths)
 
 
+def dependency_changes(paths):
+    return any(PurePosixPath(path).name in ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'Cargo.toml', 'Cargo.lock')
+               or path.startswith(('.github/workflows/', '.github/actions/')) for path in paths)
+
+
 def changed_paths(event, payload):
     if event == 'pull_request':
         base = payload['pull_request']['base']['sha']
@@ -36,6 +41,7 @@ def main():
     source = paths is None or not documentation_only(paths)
     with args.output.open('a') as output:
         output.write(f'source={str(source).lower()}\n')
+        output.write(f'dependencies={str(paths is None or dependency_changes(paths)).lower()}\n')
     print('Source build required' if source else 'Prose-only change: source build omitted')
 
 

@@ -14,6 +14,12 @@ class ArtifactPolicyTests(unittest.TestCase):
     def artifacts(self):
         return [{'name': name, 'expired': False} for name in sorted(draft.REQUIRED)]
 
+    def test_stable_tag_cannot_dispatch_a_rebuild(self):
+        with patch('sys.argv', ['prepare-release-draft.py', 'v0.2.0']), patch.object(draft, 'gh') as gh:
+            with self.assertRaisesRegex(RuntimeError, 'promoted from an immutable RC'):
+                draft.main()
+            gh.assert_not_called()
+
     def test_complete_artifacts_are_reused(self):
         self.assertEqual(draft.artifact_state(self.artifacts()), 'ready')
 

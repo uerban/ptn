@@ -47,14 +47,14 @@ jobs:
           [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
           mkdir -p evidence
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: ./gate-tools/.github/actions/setup-build
         with:
-          node-version: "22.22.0"
+          working-directory: source
+          cache-profile: regression-size-optimized
+          save-cache: ${{ github.ref == 'refs/heads/main' && (inputs.revision == '' || inputs.revision == github.sha) }}
       - name: Build browser bindings and native reference
         id: build
         run: |
-          corepack enable
-          cargo install wasm-pack --version 0.15.0 --locked
           cd crates/pt-wasm
           wasm-pack build --release --target web --out-dir pkg-web
           wasm-pack build --release --target nodejs --out-dir pkg-node
