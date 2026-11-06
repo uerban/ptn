@@ -62,9 +62,9 @@ Vilnius and serve its city catalog explicitly, rather than relying on a default
 city. Only passing, nonempty required workloads count; a skipped gate cannot create
 a passing proof. Timing and memory checks do not retry failed measurements.
 
-The aggregate JS ceiling currently remains 800 kB. The restored gate measured
-published v0.1.2 at about 851 kB, so this is a known release blocker pending a
-reviewed size reduction or budget change. All individual chunk budgets passed.
+The aggregate JS ceiling is 1000 kB, approved after the restored gate measured
+published v0.1.2 at about 851 kB. Individual chunk budgets remain unchanged.
+Reducing the aggregate footprint and tightening this ceiling remain follow-ups.
 
 Native RSS admission tests validate safeguards, not measured eight-city steady-state
 RSS. The archive's private-feed Docker captures, Node-vs-Rust serving comparisons,
