@@ -378,3 +378,83 @@ fn corrupt_source_does_not_create_export_directory() {
     .is_err());
     assert!(!output.exists());
 }
+
+#[test]
+fn catalog_cli_checks_both_exports_before_preparing_a_head() {
+    use ed25519_dalek::SigningKey;
+    use pt_artifacts::{transit_catalog, transit_export};
+    use std::process::Command;
+    let mut fixture = Fixture::new();
+    fixture.artifact("shapes-bin", "shapes.bin", b"optional shapes");
+    fixture.tiles(true);
+    fixture.save();
+    let parent = tempfile::tempdir().unwrap();
+    let key = SigningKey::from_bytes(&[17; 32]);
+    let public: String = key
+        .verifying_key()
+        .as_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let seed = parent.path().join("seed");
+    fs::write(&seed, "11".repeat(32)).unwrap();
+    let minimal = parent.path().join("minimal");
+    let full = parent.path().join("full");
+    transit_export::export(fixture.path(), &minimal, false, &key).unwrap();
+    transit_export::export(fixture.path(), &full, true, &key).unwrap();
+    let output = parent.path().join("head");
+    let run = |output: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_pt-pack-catalog"))
+            .arg("--selection")
+            .arg(&minimal)
+            .arg("--selection")
+            .arg(&full)
+            .args([
+                "--city",
+                "fixture",
+                "--sequence",
+                "1",
+                "--expires-at",
+                "2099-01-01T00:00:00Z",
+            ])
+            .arg("--signing-key")
+            .arg(&seed)
+            .arg("--trusted-key")
+            .arg(&public)
+            .arg("--output")
+            .arg(output)
+            .output()
+            .unwrap()
+    };
+    let result = run(&output);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let bytes = fs::read(output.join("latest.json")).unwrap();
+    let signature = fs::read(output.join("latest.json.sig")).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let keys = [key.verifying_key().to_bytes()];
+    let head = transit_catalog::verify(&bytes, &signature, &keys, "fixture", None, now).unwrap();
+    assert_eq!(head.selections.len(), 2);
+    for (root, geometry) in [(&minimal, false), (&full, true)] {
+        transit_catalog::verify_selection(
+            &head,
+            &fs::read(root.join("selection.json")).unwrap(),
+            &fs::read(root.join("selection.json.sig")).unwrap(),
+            &keys,
+            geometry,
+        )
+        .unwrap();
+    }
+    assert!(!run(&output).status.success());
+    assert_eq!(fs::read(output.join("latest.json")).unwrap(), bytes);
+    fs::write(full.join("files/shapes.bin"), b"corrupt").unwrap();
+    let failed = parent.path().join("failed-head");
+    assert!(!run(&failed).status.success());
+    assert!(!failed.exists());
+}
