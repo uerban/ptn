@@ -1,0 +1,18 @@
+{
+  "transitMode": "prebuilt",
+  "city": "vilnius",
+  "stateDirectory": "state",
+  "transitPack": {
+    "source": {
+      "kind": "https",
+      "url": "https://REPLACE-WITH-YOUR-TRANSIT-MIRROR"
+    },
+    "trustedKeys": ["REPLACE-WITH-64-LOWERCASE-HEX-ED25519-PUBLIC-KEY"],
+    "geometry": false
+  },
+  "memoryBudget": {
+    "maxRssBytes": 2147483648,
+    "processFixedOverheadBytes": 200000000,
+    "perWorkerOverheadBytes": 50000000
+  }
+}

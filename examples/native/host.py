@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from prebuilt import refresh_delay, run as run_prebuilt
 from gtfs import prepare
 from catalog import publish_catalog, descriptor
 
@@ -20,17 +21,18 @@ def main():
     args = parser.parse_args()
     config_path = args.config.resolve()
     config = json.loads(config_path.read_text())
+    mode = config.get("transitMode", "source")
+    if mode not in ("source", "prebuilt"):
+        raise ValueError("transitMode must be source or prebuilt")
     city = config.get("city", "vilnius")
     timezone = descriptor(config)["tz"]
     config.update(city=city, timezone=timezone)
     if args.command == "refresh-loop":
         while True:
+            interval = refresh_delay(config)
             result = subprocess.run(
                 [sys.executable, __file__, "--config", str(args.config), "refresh"]
             )
-            interval = config.get("refreshIntervalSeconds", 3600)
-            if not isinstance(interval, int) or interval < 60:
-                raise ValueError("refreshIntervalSeconds must be an integer >= 60")
             print(
                 f"PTN refresh exit={result.returncode}; retrying in {interval}s",
                 flush=True,
@@ -50,6 +52,10 @@ def main():
     (public_config / "Caddyfile").write_text(caddy)
     if args.command == "web-config":
         print(public_config / "Caddyfile")
+        return
+
+    if mode == "prebuilt":
+        run_prebuilt(args.command, config, state, binary_dir)
         return
 
     # Keep the standard pool/cache settings. These are capacity allowances,

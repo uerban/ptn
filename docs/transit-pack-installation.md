@@ -2,7 +2,8 @@
 
 `pt-transit` installs signed prebuilt transit data without feed downloads,
 Java, Node, producer execution or OSM extras. `pt-serve` can consume installed
-selections directly.
+selections directly. The [native host prebuilt mode](../examples/native/prebuilt.md)
+provides a configuration-based install, serve and update loop.
 
 ```sh
 cargo run -p pt-artifacts --locked --bin pt-transit -- \
