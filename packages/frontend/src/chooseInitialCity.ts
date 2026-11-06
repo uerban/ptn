@@ -21,7 +21,7 @@ export async function chooseInitialCity(cities: readonly CityConfig[], hostUnava
   const downloaded = new Set((await listDeviceCities()).map(city => city.cityId));
   const installed = new Set(downloaded);
   for (const city of cities) if (await hasLiveDeviceCity(city.id)) installed.add(city.id);
-  const offline = hostUnavailable || navigator.onLine === false;
+  const offline = navigator.onLine === false;
   const saved = restoredCityId(cities);
   if (saved && (!offline || installed.has(saved))) {
     const {useCityStore} = await import("./stores/cityStore.ts");
@@ -57,6 +57,7 @@ export async function chooseInitialCity(cities: readonly CityConfig[], hostUnava
     }
     const status = document.getElementById("city-location-status")!;
     if (offline) status.textContent = "No connection. Only cities with data on this device can be opened.";
+    else if (hostUnavailable) status.textContent = "City discovery is unavailable. Showing previously known cities; you can still try opening one.";
     document.getElementById("locate-city")!.onclick = () => {
       if (!navigator.geolocation) { status.textContent = "Location is unavailable. Choose a city on the map or list."; return; }
       status.textContent = "Finding nearby coverage…";

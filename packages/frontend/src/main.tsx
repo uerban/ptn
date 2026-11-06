@@ -2,9 +2,8 @@ import {discoverCities, catalogWasCached} from "./config/discovery.ts";
 import "./index.css";
 
 async function start(): Promise<void> {
-  // Development builds and legacy inline catalogs retain their explicit setup.
-  const config = globalThis.__PTN_DEPLOYMENT__ as {schemaVersion?: unknown} | null;
-  const cities = import.meta.env.DEV || config?.schemaVersion === 1 || config?.schemaVersion === 2
+  // Production always attempts backend discovery, including legacy deployments.
+  const cities = import.meta.env.DEV
     ? (await import("./config/cities.ts")).getAvailableCities()
     : await discoverCities();
   const {installCityCatalog} = await import("./config/cities.ts");

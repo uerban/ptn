@@ -23,11 +23,21 @@ export function selectCities(catalog: unknown, policy: unknown): CityConfig[] {
  * catalog; an explicit empty/invalid catalog never resurrects removed cities. */
 export async function discoverCities(fetcher: typeof fetch = fetch): Promise<CityConfig[]> {
   catalogWasCached = false;
-  const policy = (globalThis.__PTN_DEPLOYMENT__ as {cities?: unknown} | null)?.cities;
+  const config = globalThis.__PTN_DEPLOYMENT__ as {schemaVersion?: unknown; cities?: unknown} | null;
+  const policy = config?.schemaVersion === 2 && Array.isArray(config.cities)
+    ? config.cities.map(city => (city as {id?: unknown}).id) : config?.cities;
   let catalog: unknown;
   let response: Response | undefined;
   try {
     response = await fetcher("/api/cities", {cache: "no-store", signal: AbortSignal.timeout(5000)});
+    // An old host may only support an inline catalog. Prefer discovery whenever
+    // present, and retain compatibility only for an explicit missing endpoint.
+    if (response.status === 404 && (config?.schemaVersion === 1 || config?.schemaVersion === 2)) {
+      const {BUILTIN_CITIES} = await import("./cities.ts");
+      const legacy = runtimeCityConfigs(config, BUILTIN_CITIES);
+      if (!legacy?.length) throw new Error("Legacy host has no usable cities");
+      return legacy;
+    }
     if (!response.ok) throw new Error(`City discovery failed (${response.status})`);
 
   } catch (error) {

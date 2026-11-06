@@ -5,9 +5,10 @@ const browser = await chromium.launch({headless: true, args: ["--use-angle=swift
 const context = await browser.newContext({viewport: {width: 1000, height: 740}});
 const city = {id: "custom", name: "Custom City", tz: "UTC", center: {lat: 10, lon: 10}, bbox: {minLat: 9, minLon: 9, maxLat: 11, maxLon: 11}};
 let transitRequests = 0;
+let discoveryUnavailable = false;
 await context.route("**/deployment-config.js", route => route.fulfill({contentType: "application/javascript", body: 'globalThis.__PTN_DEPLOYMENT__={cities:"all"};'}));
 await context.route("**/api/**", route => {
-  if (new URL(route.request().url()).pathname === "/api/cities") return route.fulfill({json: {schemaVersion: 2, cities: [city]}});
+  if (new URL(route.request().url()).pathname === "/api/cities") return discoveryUnavailable ? route.fulfill({status: 503}) : route.fulfill({json: {schemaVersion: 2, cities: [city]}});
   transitRequests++;
   return route.fulfill({status: 503, body: "test backend"});
 });
@@ -34,6 +35,11 @@ try {
   await context.setOffline(false);
   await page.reload();
   await page.getByRole("button", {name: "Custom City", exact: true}).first().waitFor();
+  // Discovery failure alone must not disable cities whose API may still work.
+  discoveryUnavailable = true;
+  await page.reload();
+  await page.getByText(/City discovery is unavailable/).waitFor();
+  assert.equal(await page.getByRole("button", {name: "Custom City", exact: true}).isDisabled(), false);
   const selectedRequest = page.waitForRequest(request => new URL(request.url()).pathname.startsWith("/api/custom/"));
   await page.getByRole("button", {name: "Custom City", exact: true}).first().click();
   await selectedRequest;
@@ -41,5 +47,15 @@ try {
   const restoredRequest = page.waitForRequest(request => new URL(request.url()).pathname.startsWith("/api/custom/"));
   await page.reload();
   await restoredRequest;
+  for (const config of [{schemaVersion: 1, cities: [city.id]}, {schemaVersion: 2, cities: [{...city, name: "Old inline name"}]}]) {
+    const legacy = await browser.newContext({serviceWorkers: "block"});
+    try {
+      await legacy.route("**/deployment-config.js", route => route.fulfill({contentType: "application/javascript", body: `globalThis.__PTN_DEPLOYMENT__=${JSON.stringify(config)};`}));
+      await legacy.route("**/api/cities", route => route.fulfill({json: {schemaVersion: 2, cities: [city]}}));
+      const legacyPage = await legacy.newPage();
+      await legacyPage.goto(base);
+      await legacyPage.getByRole("button", {name: "Custom City", exact: true}).waitFor();
+    } finally {await legacy.close();}
+  }
   console.log("PASS: unknown city discovery, no default fetch/GPS, offline metadata is not a download");
 } finally {await context.close(); await browser.close();}

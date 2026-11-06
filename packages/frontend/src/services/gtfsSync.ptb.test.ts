@@ -152,6 +152,7 @@ describe("syncGtfsData PTB catalog", () => {
     globalThis.fetch = vi.fn(async () => {
       throw new TypeError("offline");
     }) as typeof fetch;
+    await expect(syncGtfsData("vilnius", {requireNetwork: true})).rejects.toThrow("offline");
     await expect(syncGtfsData("vilnius")).resolves.toBe(false);
     expect((await db.gtfsSyncMeta.get("current"))!.lastSynced).toBe(syncedAt);
   });

@@ -42,6 +42,7 @@ async function hasUsableCachedBundle(cityId: string): Promise<boolean> {
 async function fetchCatalog(
   cityId: string,
   meta: PriorCatalogMeta | undefined,
+  requireNetwork = false,
 ): Promise<CatalogResult> {
   try {
     // Bracket the bundle fetch with the Rust generation id. If pt-serve swaps
@@ -109,6 +110,7 @@ async function fetchCatalog(
       ...(after.shapesArtifact ? { shapesHash: after.shapesArtifact.hash } : {}),
     };
   } catch (error) {
+    if (requireNetwork) throw error;
     // OFFLINE BOOT. A stale-but-valid local catalog must still boot with no
     // network at all. Do not call this a 304: no server confirmed it, so
     // `revalidated: false` keeps lastSynced where it is.
@@ -188,12 +190,12 @@ function aggregateDisplayRoutes(routes: readonly RoutingBundleRoute[]): {
   return order.map((id) => byId.get(id)!);
 }
 
-export async function syncGtfsData(cityId: string): Promise<boolean> {
+export async function syncGtfsData(cityId: string, opts: {requireNetwork?: boolean} = {}): Promise<boolean> {
   performance.mark("ptn:gtfs-sync-start");
   resetQuotaGuardForSync();
 
   const meta = await db.gtfsSyncMeta.get("current");
-  const result = await fetchCatalog(cityId, meta);
+  const result = await fetchCatalog(cityId, meta, opts.requireNetwork);
 
   if (result.data?.version && result.data.version > RAPTOR_DATA_VERSION) {
     console.warn(`Catalog wire version ${result.data.version} is newer than expected (client supports ${RAPTOR_DATA_VERSION}). Some fields may be unsupported.`);

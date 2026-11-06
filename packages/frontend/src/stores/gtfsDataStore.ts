@@ -111,8 +111,8 @@ interface GtfsDataState {
    * at the same city/generation.
    */
   ensureWasmReady: (cityId: string, opts?: { preferCache?: boolean }) => Promise<PtRouterHandle>;
-  init: (cityId: string) => Promise<void>;
-  refresh: (cityId: string) => Promise<void>;
+  init: (cityId: string, opts?: {preferDownload?: boolean}) => Promise<void>;
+  refresh: (cityId: string, opts?: {requireNetwork?: boolean}) => Promise<void>;
   reset: () => Promise<void>;
   /**
    * Set the live PtRouter handle. If an older handle was installed and
@@ -364,7 +364,7 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
     }
   },
 
-  async init(cityId: string) {
+  async init(cityId: string, opts: {preferDownload?: boolean} = {}) {
     if (get().syncing) return;
     const gen = bumpInitGeneration();
     const signal = initAbort?.signal;
@@ -380,7 +380,7 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
       }
       if (gen !== initGeneration) return;
 
-      if (navigator.onLine === false && (await restoreDeviceCity(cityId, signal) || await hasLiveDeviceCity(cityId))) {
+      if ((opts.preferDownload || navigator.onLine === false) && (await restoreDeviceCity(cityId, signal) || await hasLiveDeviceCity(cityId))) {
         const index = await buildRaptorIndex({signal});
         const stopNames = await buildStopNames();
         if (gen !== initGeneration) return;
@@ -437,12 +437,12 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
     }
   },
 
-  async refresh(cityId: string) {
+  async refresh(cityId: string, opts: {requireNetwork?: boolean} = {}) {
     const gen = bumpInitGeneration();
     const signal = initAbort?.signal;
     set({ syncing: true, error: null });
     try {
-      await syncGtfsData(cityId);
+      await syncGtfsData(cityId, opts);
       if (gen !== initGeneration) return;
       const index = await buildRaptorIndex({ signal });
       if (gen !== initGeneration) return;

@@ -290,3 +290,9 @@ describe("rule ordering", () => {
     expect(gtfsIdx).toBeLessThan(catchAllIdx);
   });
 });
+
+it("leaves catalog, readiness and routing bundle freshness to their verified loaders", () => {
+  for (const path of ["/api/cities", "/api/custom/ready", "/api/custom/raptor-bundle"]) {
+    expect(firstMatch(path)?.handler).toBe("NetworkOnly");
+  }
+});
