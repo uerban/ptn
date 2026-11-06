@@ -115,6 +115,17 @@ pub struct Args {
 /// Subcommands. Each one is its own publish/refresh mode.
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
+    /// Bind a fresh root, or explicitly migrate an accepted existing root to a
+    /// stable deployment identity. Does not fetch, rebuild or change generations.
+    BindDataRoot {
+        #[arg(long)]
+        data_root: PathBuf,
+        #[arg(long)]
+        identity: String,
+        /// Required when migrating an existing current.json.
+        #[arg(long)]
+        expected_generation: Option<String>,
+    },
     /// P4 publish-protocol periodic refresh loop. Each tick acquires
     /// `producer.lock` on the `--data-root`, builds a PTB from one or more
     /// `--gtfs <ZIP>` paths (multi-feed union via `pass1::run_pass1_union`

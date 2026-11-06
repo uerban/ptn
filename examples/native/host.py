@@ -13,6 +13,27 @@ from gtfs import prepare
 from catalog import publish_catalog, descriptor
 
 
+def data_root_environment(config, data, binary_dir):
+    """Bind fresh roots only; existing roots require explicit pinned migration."""
+    environment = dict(os.environ)
+    identity = config.get("dataRootId", environment.get("PT_DATA_ROOT_ID"))
+    if identity is None:
+        return environment  # Legacy configurations retain their legacy guard.
+    if not isinstance(identity, str) or not identity:
+        raise ValueError("dataRootId must be a nonempty deployment-specific string")
+    if environment.get("PT_DATA_ROOT_ID", identity) != identity:
+        raise ValueError("dataRootId conflicts with PT_DATA_ROOT_ID")
+    environment["PT_DATA_ROOT_ID"] = identity
+    # Existing readers must boot without taking the producer's publish lock.
+    # Both native binaries verify the configured identity before using the root.
+    if not (data / ".data-root-identity.json").exists():
+        subprocess.run(
+            [str(binary_dir / "pt-producer"), "bind-data-root", "--data-root", str(data), "--identity", identity],
+            check=True, env=environment,
+        )
+    return environment
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -52,6 +73,8 @@ def main():
         print(public_config / "Caddyfile")
         return
 
+    environment = data_root_environment(config, data, binary_dir)
+
     # Keep the standard pool/cache settings. These are capacity allowances,
     # not measured memory guarantees for an arbitrary feed.
     serve_args = [
@@ -76,7 +99,7 @@ def main():
     if rt:
         serve_args.append(f"--rt-trip-updates-urls={rt}")
     if args.command == "serve":
-        os.execv(serve_args[0], serve_args)
+        os.execve(serve_args[0], serve_args, environment)
     # Serialize the entire update, including artifact activation and feed fetch.
     with (state / "refresh.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -125,7 +148,7 @@ def main():
             # On an empty root the server advertises its reader version before
             # rejecting the absent generation. Never manufacture this sentinel.
             seed = subprocess.run(
-                serve_args, capture_output=True, text=True, timeout=30
+                serve_args, capture_output=True, text=True, timeout=30, env=environment
             )
             if not (data / "pt-serve.version").is_file():
                 raise RuntimeError(
@@ -152,7 +175,7 @@ def main():
                 "3",
             ],
             check=True,
-            env={**os.environ, "PT_COLOR_BUILD": "rust", "PT_TILE_BUILD": "rust"},
+            env={**environment, "PT_COLOR_BUILD": "rust", "PT_TILE_BUILD": "rust"},
         )
 
 

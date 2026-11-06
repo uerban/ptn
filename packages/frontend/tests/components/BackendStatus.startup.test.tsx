@@ -8,7 +8,7 @@ import { CITIES } from "../../src/config/cities.ts";
 const VILNIUS = CITIES.find((c) => c.id === "vilnius")!; // not in STALE_FEED_THRESHOLD_BY_CITY → no stale banner to confound the "ok" case
 
 function mockFetch(ok: boolean, body: unknown = {}) {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(body) }));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok, status: ok ? 200 : 503, json: () => Promise.resolve(body) }));
 }
 
 describe("BackendStatus startup banner", () => {
@@ -73,6 +73,47 @@ describe("BackendStatus sustained-outage banner", () => {
     const banner = container.querySelector("[role='status']");
     expect(banner).toHaveTextContent(/Transit data is loading/i);
     expect(banner).not.toHaveTextContent(/unreachable/i);
+  });
+
+  it.each([502, 504])("treats repeated HTTP %s as a gateway outage", async (status) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status }));
+    const { container } = render(<BackendStatus />);
+    await tick(0);
+    expect(container.querySelector("[role='status']")).toHaveTextContent(/Transit data is loading/i);
+    await tick(30_000);
+    expect(container.querySelector("[role='status']")).toHaveTextContent(/unreachable/i);
+  });
+
+  it("counts mixed network and gateway failures toward the same outage", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue({ ok: false, status: 502 }));
+    const { container } = render(<BackendStatus />);
+    await tick(0);
+    await tick(30_000);
+    expect(container.querySelector("[role='status']")).toHaveTextContent(/unreachable/i);
+  });
+
+  it("clears a gateway outage when readiness returns", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 502 });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container } = render(<BackendStatus />);
+    await tick(0);
+    await tick(30_000);
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: "ready" }) });
+    await tick(30_000);
+    expect(container.querySelector("[role='status']")).toBeNull();
+  });
+
+  it("starts a new city's failure count from zero", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+    const { container } = render(<BackendStatus />);
+    await tick(0);
+    await tick(30_000);
+    expect(container.querySelector("[role='status']")).toHaveTextContent(/unreachable/i);
+    await act(async () => { useCityStore.getState().setActiveCity(CITIES.find((c) => c.id === "krakow")!); });
+    await tick(0);
+    expect(container.querySelector("[role='status']")).toHaveTextContent(/Transit data is loading/i);
   });
 
   it("clears the banner when the server comes back", async () => {

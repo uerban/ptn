@@ -60,6 +60,17 @@ fn validate_tz(iana: Option<&str>, offset: Option<i32>) -> Result<()> {
 
 fn run() -> Result<()> {
     let args = Args::parse();
+    if let Some(Command::BindDataRoot {
+        data_root,
+        identity,
+        expected_generation,
+    }) = &args.command
+    {
+        let _lock = pt_producer::producer_lock::acquire(data_root)
+            .map_err(|e| Error::Config(e.to_string()))?;
+        pt_shared::data_root_identity::bind(data_root, identity, expected_generation.as_deref())?;
+        return Ok(());
+    }
 
     // P4 modes: hand off to the publish protocol.
     // - PeriodicRefresh: long-running loop (one tick per `refresh-interval-

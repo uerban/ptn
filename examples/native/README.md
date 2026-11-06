@@ -67,6 +67,9 @@ Copy `examples/native/config.example.json` to a working `config.json` outside
 the archive. Replace its `artifactSource` and `trustedKeys` with the values in
 `osm-build/artifact-source.json`. Keep the local repository directory absolute.
 Set `stateDirectory` to an absolute writable directory such as `/var/lib/ptn`.
+Set `dataRootId` to a unique identity for this deployment and city, such as
+`release-3:vilnius`. Keep it unchanged across restarts and restores of this
+deployment; use a different identity for an isolated candidate deployment.
 For a downloaded signed catalog, use `{"kind":"https","url":"https://your-data-host"}`
 and its public signing key instead. No private staging source is used.
 
@@ -79,6 +82,39 @@ The first command installs and verifies OSM artifacts, downloads the current
 GTFS feed, validates its canonical GTFS and upcoming service coverage, obtains the reader-version sentinel from the matching server, then
 publishes a complete generation. It explicitly selects the Rust color and
 schedule-tile builders, so generation publishing needs no Node helper.
+
+### Existing state and mount identity
+
+New configurations bind the transit directory to `dataRootId`. The host passes
+that identity to both native binaries as `PT_DATA_ROOT_ID`. They verify the
+stored `.data-root-identity.json` against configuration, independently of Linux
+device numbers and directory inodes, which can change after reboot or restore.
+An already bound reader starts without running or locking the producer.
+
+For an existing unbound root, stop its producer and reader, verify its mount and
+the accepted generation against your deployment record, then explicitly bind it
+using the matching new producer binary:
+
+```sh
+bin/pt-producer bind-data-root --data-root /var/lib/ptn/transit \
+  --identity release-3:vilnius --expected-generation ACCEPTED_64_HEX_GENERATION
+```
+
+Set `dataRootId` to the same identity in the private host configuration and
+restart the reader. Binding checks the pinned current generation and changes
+only the identity marker, without fetching feeds or rebuilding generations.
+It refuses to overwrite another identity. Normal startup cannot migrate a
+populated unbound root. Keep the legacy `.producer-data-root-id` file intact;
+the new verifier ignores its device/inode comparison for a valid bound root.
+
+When invoking binaries directly, set `PT_DATA_ROOT_ID` consistently on every
+reader and producer command. Missing configuration, missing/corrupt identity,
+and mismatched identity fail closed for configured roots. Configurations that
+omit the identity retain the legacy guard and need migration to gain remount
+recovery. Older binaries still use the legacy guard, so use a matching new
+release for both processes. A cloned root with the same identity is the same
+logical dataset; the marker does not prove producer liveness or freshness.
+Monitor generation adoption and freshness separately.
 
 Leave the second command running. It binds transit and auxiliary listeners to
 loopback. In another terminal, start the web server from the extracted archive:

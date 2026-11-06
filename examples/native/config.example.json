@@ -1,5 +1,6 @@
 {
   "stateDirectory": "state",
+  "dataRootId": "vilnius-reference-1",
   "gtfsURL": "https://stops.lt/vilnius/vilnius/gtfs.zip",
   "tripUpdatesURL": "https://www.stops.lt/vilnius/trip_updates.pb",
   "artifactSource": {
