@@ -165,7 +165,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          for binary in pt-serve pt-producer pt-build-transfers pt-artifacts pt-walk-build pt-artifact-publish; do
+          for binary in pt-serve pt-producer pt-build-transfers pt-artifacts pt-walk-build pt-artifact-publish pt-transit pt-pack-inspect pt-pack-export pt-pack-catalog pt-pack-publish pt-pack-discovery; do
             path="target/$TARGET/release/$binary"
             readelf -h "$path" | grep -F 'hard-float ABI'
             attributes=$(readelf -A "$path")

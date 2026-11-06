@@ -1,7 +1,7 @@
 # Release platforms
 
 The release workflow packages these targets from one source revision. Each
-archive contains six native tools, matching PWA assets, the local OSM builder,
+archive contains twelve native tools, matching PWA assets, the local OSM builder,
 hosting instructions, and checksums.
 
 | Archive platform | Rust target | Intended native host |
@@ -24,11 +24,18 @@ The macOS archives are built on native Apple Silicon and Intel runners, with
 the deployment target set to macOS 13. They use macOS system libraries; the
 Linux static-link requirement does not apply to them.
 
+The archives include `pt-transit` for installing signed prebuilt transit packs
+and `pt-pack-inspect`, `pt-pack-export`, `pt-pack-catalog`, `pt-pack-publish` and
+`pt-pack-discovery` for builder-side validation and publication. Self-hosts need
+only `pt-transit`, `pt-serve` and the matching web assets for transit hosting;
+see the [transit installation guide](transit-pack-installation.md). Signing keys
+belong on the publisher, never on consumer hosts.
+
 ## Validation
 
 Publication waits for every platform job and the Linux x86_64 installation
 validation job. Every archive must pass architecture checks, source-revision
-and checksum verification, and execution of all six tools. The walking-graph
+and checksum verification, and execution of all twelve tools. The walking-graph
 tool builds a small graph. ARM binaries execute under QEMU with an ARM1176
 CPU for ARMv6 and a Cortex-A53 CPU for AArch64. ELF ARM attributes are checked
 for the hard-float ABI and, when present, the ARMv6 CPU level.

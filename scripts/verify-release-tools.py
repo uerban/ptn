@@ -14,7 +14,7 @@ import threading
 
 
 def verify_native_tls(runner, binaries, work):
-    """A trusted local HTTPS 404 proves both ARMv6 clients reach HTTP over TLS."""
+    """Exercise ARMv6 native TLS; bundled-root rustls targets ignore SSL_CERT_FILE."""
     config = work / "openssl.cnf"
     config.write_text("""[req]
 distinguished_name = dn
@@ -53,6 +53,8 @@ basicConstraints = critical,CA:TRUE
         "source": {"kind": "https", "url": url}, "trustedKeys": ["11" * 32],
         "cities": {"vilnius": {}}}))
     commands = [
+        [str(binaries / "pt-transit"), "--root", str(work / "transit"),
+         "--trusted-key", "11" * 32, "cities", "--source-url", url],
         [str(binaries / "pt-artifacts"), "--config", str(artifact_config), "sync"],
         [str(binaries / "pt-producer"), "--gtfs-url", url + "/feed.zip", "--listen-addr", "127.0.0.1:0"],
     ]
@@ -67,7 +69,7 @@ basicConstraints = critical,CA:TRUE
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-    print("PASS: ARMv6 artifact and GTFS clients completed trusted local TLS requests")
+    print("PASS: ARMv6 artifact, transit and GTFS clients completed trusted local TLS requests")
 
 
 def main():
@@ -88,7 +90,8 @@ def main():
         expected, name = line.split("  ", 1)
         assert hashlib.sha256((bundle / name).read_bytes()).hexdigest() == expected, name
     binaries = bundle / "bin"
-    for name in ("pt-serve", "pt-producer", "pt-build-transfers", "pt-artifacts", "pt-artifact-publish"):
+    for name in ("pt-serve", "pt-producer", "pt-build-transfers", "pt-artifacts", "pt-artifact-publish", "pt-transit", "pt-pack-inspect",
+                 "pt-pack-export", "pt-pack-catalog", "pt-pack-publish", "pt-pack-discovery"):
         result = subprocess.run(runner + [str(binaries / name), "--help"],
                                 check=True, capture_output=True, text=True, timeout=60)
         assert "Usage:" in result.stdout, (name, result.stdout)
@@ -108,7 +111,7 @@ def main():
         assert graph.read_bytes()[:4] == b"PTWG"
         if metadata["rustTarget"] == "arm-unknown-linux-musleabihf":
             verify_native_tls(runner, binaries, work)
-    print("PASS: all six packaged native tools execute; walking graph fixture built")
+    print("PASS: all twelve packaged native tools execute; walking graph fixture built")
 
 
 if __name__ == "__main__":

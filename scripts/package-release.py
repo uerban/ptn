@@ -11,7 +11,15 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARIES = ("pt-serve", "pt-producer", "pt-build-transfers", "pt-artifacts", "pt-walk-build", "pt-artifact-publish")
+BINARIES = (
+    "pt-serve", "pt-producer", "pt-build-transfers", "pt-artifacts",
+    "pt-walk-build", "pt-artifact-publish", "pt-transit", "pt-pack-inspect",
+    "pt-pack-export", "pt-pack-catalog", "pt-pack-publish", "pt-pack-discovery",
+)
+TRANSIT_DOCS = (
+    "transit-pack-installation.md", "transit-pack-inventory.md",
+    "transit-pack-publication.md",
+)
 PLATFORMS = {
     "linux-x86_64": ("x86_64-unknown-linux-musl", 2, 62),
     "linux-armv6-rpi1": ("arm-unknown-linux-musleabihf", 1, 40),
@@ -108,6 +116,8 @@ def main():
         shutil.copy2(ROOT / "docs/release-platforms.md", bundle / "docs/release-platforms.md")
         shutil.copy2(ROOT / "docs/gtfs-sources.md", bundle / "docs/gtfs-sources.md")
         shutil.copy2(ROOT / "docs/runtime-cities.md", bundle / "docs/runtime-cities.md")
+        for filename in TRANSIT_DOCS:
+            shutil.copy2(ROOT / "docs" / filename, bundle / "docs" / filename)
         shutil.copytree(ROOT / "release-builder", bundle / "builder")
         for filename in ("LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_NOTICES.md"):
             shutil.copy2(ROOT / filename, bundle / filename)
@@ -115,6 +125,8 @@ def main():
             "# PTN host archive\n\n"
             "Start with [the native host guide](examples/native/README.md). "
             "It covers local OSM builds, initialization, localhost, HTTPS and updates.\n\n"
+            "For prebuilt transit without feed or OSM builds, use the "
+            "[transit installation guide](docs/transit-pack-installation.md).\n\n"
             "Run `sha256sum --check SHA256SUMS` to verify the extracted files. "
             "`release.json` identifies the source revision and platform.\n\n"
             "[Source and build instructions](https://github.com/uerban/ptn#build).\n"

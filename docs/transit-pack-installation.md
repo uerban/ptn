@@ -10,6 +10,11 @@ cargo run -p pt-artifacts --locked --bin pt-transit -- \
   sync --source-url https://mirror.example/ --without-geometry
 ```
 
+Release archives include these commands under `bin/` and this guide under
+`docs/`. Add the extracted `bin/` directory to `PATH`; the installer and server
+do not invoke the other builder tools bundled in the archive. Use binaries and
+web assets from the same validated release.
+
 Inspect signed served-city discovery and its available geometry choices before
 installing:
 
@@ -140,3 +145,48 @@ The default local limits are 4 GiB per file, 8 GiB of selected file bytes and
 limits. They bound an individual install, not total disk consumption: cached
 objects, staging and retained releases also need space. These are configurable
 ceilings, not claims about minimum host memory or capacity.
+
+## Docker installation
+
+The transit installer has a separate scratch-image target containing the native
+client and CA certificates. Build it and the server from the same reviewed
+source revision on a builder with Docker BuildKit. These commands build local
+images; they do not refer to a published image or a configured public mirror.
+The server image currently targets Linux x86_64.
+
+```sh
+docker build --target transit -f docker/pt-artifacts.Dockerfile -t ptn-transit:local .
+docker build -f docker/pt-serve.Dockerfile -t ptn-serve:local .
+docker volume create ptn-transit
+
+docker run --rm -v ptn-transit:/data ptn-transit:local \
+  --root /data --trusted-key "$PUBLIC_KEY_HEX" cities --source-url "$SOURCE_URL"
+docker run --rm -v ptn-transit:/data ptn-transit:local \
+  --root /data --city "$CITY" --trusted-key "$PUBLIC_KEY_HEX" \
+  sync --source-url "$SOURCE_URL" --from-discovery --without-geometry
+
+docker run --name ptn-serve --read-only \
+  -v ptn-transit:/data:ro --tmpfs /runtime -p 127.0.0.1:3000:3000 \
+  ptn-serve:local --transit-store-root /data \
+  --transit-trusted-key "$PUBLIC_KEY_HEX" --city-slug "$CITY" \
+  --data-root /runtime --pidfile-path /runtime/serve.pid \
+  --listen-addr 0.0.0.0:3000 --page-warm-mode off \
+  --max-rss-bytes "$RSS_BUDGET_BYTES" \
+  --process-fixed-overhead-bytes "$FIXED_OVERHEAD_BYTES" \
+  --per-worker-overhead-bytes "$WORKER_OVERHEAD_BYTES"
+```
+
+Set the mirror URL, independently obtained public key, city and measured memory
+budgets before running these commands. The API is bound to host loopback; use
+it with the matching PWA assets and your hosting proxy. The runtime tmpfs is
+separate from the persistent pack volume. The server mounts that volume read
+only, while each installer invocation mounts it writable. Keep the volume across
+container replacement. Run the same `sync` command to update; the server watcher
+observes the atomic activation. Stop concurrent installer invocations rather
+than bypassing the writer lock. During a mirror outage the existing installation
+continues to serve without an installer or builder container.
+
+To add geometry, repeat `sync` without `--without-geometry`; to remove it, include
+the flag again. Both selections must be advertised by the source. Use the same
+installer volume and configured keys for `verify`, `pin` and `rollback`. No OSM
+container or search dataset is required for this transit-only path.
