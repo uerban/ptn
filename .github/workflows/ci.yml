@@ -61,6 +61,87 @@ jobs:
           pnpm test
           pnpm typecheck
           pnpm lint
+  platforms:
+    name: Build and smoke-test ${{ matrix.platform }}
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+            emulator: ""
+          - platform: linux-armv6-rpi1
+            target: arm-unknown-linux-musleabihf
+            runner: ubuntu-24.04
+            emulator: qemu-arm -cpu arm1176
+          - platform: linux-aarch64-rpi3
+            target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04
+            emulator: qemu-aarch64 -cpu cortex-a53
+          - platform: darwin-arm64
+            target: aarch64-apple-darwin
+            runner: macos-15
+            emulator: ""
+          - platform: darwin-x86_64
+            target: x86_64-apple-darwin
+            runner: macos-15-intel
+            emulator: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Linux build and emulation tools
+        if: runner.os == 'Linux'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y perl pkg-config qemu-user binutils
+          bash scripts/install-musl-toolchain.sh "$TARGET"
+      - uses: ./.github/actions/setup-build
+        with:
+          node: 'false'
+          wasm-pack: 'false'
+          cache-profile: release-${{ matrix.target }}
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build all host tools
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "13.0"
+          TARGET: ${{ matrix.target }}
+          PT_SERVE_GIT_SHA: ${{ github.sha }}
+          PT_PRODUCER_GIT_SHA: ${{ github.sha }}
+        run: |
+          rustup target add "$TARGET"
+          cargo build --release --locked --target "$TARGET" \
+            -p pt-serve -p pt-producer -p pt-artifacts -p pt-walk --features pt-walk/build
+      - name: Verify Armv6 hard-float attributes
+        if: matrix.platform == 'linux-armv6-rpi1'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          for binary in pt-serve pt-producer pt-build-transfers pt-artifacts pt-walk-build pt-artifact-publish; do
+            path="target/$TARGET/release/$binary"
+            readelf -h "$path" | grep -F 'hard-float ABI'
+            attributes=$(readelf -A "$path")
+            echo "$attributes"
+            if echo "$attributes" | grep -q 'Tag_CPU_arch:'; then
+              echo "$attributes" | grep -E 'Tag_CPU_arch: v6$'
+            fi
+          done
+      - name: Verify compiled tools without packaging release assets
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          TARGET: ${{ matrix.target }}
+          EMULATOR: ${{ matrix.emulator }}
+        run: |
+          python3 scripts/verify-release-tools.py --bin-dir "target/$TARGET/release" \
+            --platform "$PLATFORM" --runner "$EMULATOR"
+
   security:
     name: Security scans
     needs: changes
@@ -69,7 +150,7 @@ jobs:
       audit-dependencies: ${{ needs.changes.outputs.dependencies == 'true' }}
   result:
     name: CI
-    needs: [changes, source, security]
+    needs: [changes, source, platforms, security]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -78,13 +159,16 @@ jobs:
           SCOPE_RESULT: ${{ needs.changes.result }}
           SOURCE_REQUIRED: ${{ needs.changes.outputs.source }}
           SOURCE_RESULT: ${{ needs.source.result }}
+          PLATFORM_RESULT: ${{ needs.platforms.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           test "$SCOPE_RESULT" = success
           test "$SECURITY_RESULT" = success
           if [ "$SOURCE_REQUIRED" = true ]; then
             test "$SOURCE_RESULT" = success
+            test "$PLATFORM_RESULT" = success
           else
             test "$SOURCE_REQUIRED" = false
             test "$SOURCE_RESULT" = skipped
+            test "$PLATFORM_RESULT" = skipped
           fi
