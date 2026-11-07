@@ -247,14 +247,8 @@ describe("MotisAdapter", () => {
     expect(typeof adapter.getNearbyStops).toBe("function");
     expect(typeof adapter.getDepartures).toBe("function");
     expect(typeof adapter.searchStops).toBe("function");
-    expect(typeof adapter.getAlerts).toBe("function");
     expect(typeof adapter.getVehiclePositions).toBe("function");
     expect(typeof adapter.healthCheck).toBe("function");
-  });
-
-  it("getAlerts returns empty array (phase 2 feature)", async () => {
-    const alerts = await adapter.getAlerts();
-    expect(alerts).toEqual([]);
   });
 
   it("getVehiclePositions returns empty array (phase 2 feature)", async () => {

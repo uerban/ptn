@@ -5,7 +5,6 @@ import type { RoutingAdapter } from "@pt/shared";
 import { searchStops } from "../../src/routes/search.js";
 import { planRoute } from "../../src/routes/plan.js";
 import { getNearby } from "../../src/routes/nearby.js";
-import { getAlerts } from "../../src/routes/alerts.js";
 import { getHealth } from "../../src/routes/health.js";
 
 function createMockAdapter(): RoutingAdapter {
@@ -31,9 +30,6 @@ function createMockAdapter(): RoutingAdapter {
     getDepartures: vi.fn().mockResolvedValue([
       { routeName: "1", destination: "Center", departureTime: "10:00" },
     ]),
-    getAlerts: vi.fn().mockResolvedValue([
-      { id: "alert1", message: "Service disruption" },
-    ]),
     healthCheck: vi.fn().mockResolvedValue(true),
   };
 }
@@ -58,7 +54,6 @@ describe("Route handlers - success paths", () => {
     app.get("/api/stops/search", searchStops);
     app.get("/api/plan", planRoute);
     app.get("/api/nearby", getNearby);
-    app.get("/api/alerts", getAlerts);
     app.get("/api/health", getHealth);
     await app.ready();
   });
@@ -167,16 +162,6 @@ describe("Route handlers - success paths", () => {
       { lat: 54.67, lon: 25.28 },
       500
     );
-  });
-
-  // Alerts
-  it("getAlerts returns alerts", async () => {
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/alerts",
-    });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().data).toHaveLength(1);
   });
 
   // Health
@@ -298,7 +283,6 @@ describe("Health endpoint - degraded and down states", () => {
       planTrip: vi.fn(),
       getNearbyStops: vi.fn(),
       getDepartures: vi.fn(),
-      getAlerts: vi.fn(),
       healthCheck: vi.fn().mockResolvedValue(true),
     };
     const unhealthyAdapter: RoutingAdapter = {
@@ -307,7 +291,6 @@ describe("Health endpoint - degraded and down states", () => {
       planTrip: vi.fn(),
       getNearbyStops: vi.fn(),
       getDepartures: vi.fn(),
-      getAlerts: vi.fn(),
       healthCheck: vi.fn().mockResolvedValue(false),
     };
 
@@ -338,7 +321,6 @@ describe("Health endpoint - degraded and down states", () => {
       planTrip: vi.fn(),
       getNearbyStops: vi.fn(),
       getDepartures: vi.fn(),
-      getAlerts: vi.fn(),
       healthCheck: vi.fn().mockRejectedValue(new Error("connection refused")),
     };
 

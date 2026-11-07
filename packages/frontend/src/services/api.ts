@@ -2,7 +2,6 @@ import { BUNDLE_HASH_HEADER } from "@pt/shared/schedule-tile";
 import type {
   Stop,
   Departure,
-  Alert,
   HealthStatus,
   ApiResponse,
   RoutingBundleShape,
@@ -236,10 +235,6 @@ export const api = {
 
   searchStops(query: string, signal?: AbortSignal): Promise<ApiResponse<Stop[]>> {
     return fetchJson(`${getBaseUrl()}/stops/search`, { q: query }, signal);
-  },
-
-  getAlerts(): Promise<ApiResponse<Alert[]>> {
-    return fetchJson(`${getBaseUrl()}/alerts`);
   },
 
   getHealth(): Promise<HealthStatus> {

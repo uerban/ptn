@@ -232,24 +232,6 @@ export interface TripResult {
   nextPageCursor?: string;
 }
 
-/** Disruption alert severity (inspired by Trafi's system) */
-export type AlertSeverity = "INFO" | "WARNING" | "CANCELLATION";
-
-/** A service disruption alert */
-export interface Alert {
-  id: string;
-  severity: AlertSeverity;
-  headerText: string;
-  descriptionText: string;
-  affectedRouteIds: string[];
-  affectedStopIds: string[];
-  /** Direction-specific filtering (Trafi pattern) */
-  affectedDirectionId?: string;
-  activeFrom?: string;
-  activeUntil?: string;
-  updatedAt: string;
-}
-
 /** A vehicle position for real-time tracking */
 export interface VehiclePosition {
   vehicleId: string;

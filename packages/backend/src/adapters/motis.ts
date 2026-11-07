@@ -4,7 +4,6 @@ import type {
   TripResult,
   Stop,
   Departure,
-  Alert,
   VehiclePosition,
   Itinerary,
   Leg,
@@ -151,12 +150,6 @@ export class MotisAdapter implements RoutingAdapter {
     // Order before truncating, or the promotion is pointless: the local match
     // this exists to surface is precisely the one sitting past `limit`.
     return orderLocalFirst(stops, this.cityBbox).slice(0, limit);
-  }
-
-  async getAlerts(): Promise<Alert[]> {
-    // MOTIS returns alerts embedded in routing responses
-    // A dedicated alerts endpoint would require GTFS-RT integration
-    return [];
   }
 
   async getVehiclePositions(_bbox: {

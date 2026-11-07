@@ -13,7 +13,6 @@ function createFailingAdapter(errorMessage: string): RoutingAdapter {
     planTrip: vi.fn().mockRejectedValue(new Error(errorMessage)),
     getNearbyStops: vi.fn().mockRejectedValue(new Error(errorMessage)),
     getDepartures: vi.fn().mockRejectedValue(new Error(errorMessage)),
-    getAlerts: vi.fn().mockRejectedValue(new Error(errorMessage)),
     healthCheck: vi.fn().mockResolvedValue(false),
   };
 }
@@ -94,7 +93,6 @@ describe("Route error handling", () => {
       planTrip: vi.fn().mockRejectedValue(42),
       getNearbyStops: vi.fn().mockRejectedValue(null),
       getDepartures: vi.fn().mockRejectedValue(undefined),
-      getAlerts: vi.fn().mockResolvedValue([]),
       healthCheck: vi.fn().mockResolvedValue(true),
     };
 

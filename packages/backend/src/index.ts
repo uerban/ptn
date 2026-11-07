@@ -6,7 +6,6 @@ import { readFileSync } from "node:fs";
 import { planRoute } from "./routes/plan.js";
 import { getNearby } from "./routes/nearby.js";
 import { searchStops } from "./routes/search.js";
-import { getAlerts } from "./routes/alerts.js";
 import { getHealth, registerHealthProbes } from "./routes/health.js";
 import { createAdapterRegistry } from "./adapters/registry.js";
 import { GtfsScheduler } from "./gtfs/scheduler.js";
@@ -424,7 +423,6 @@ async function main() {
     onRequest: (status, poiCity) =>
       metricsRegistry.poiTileRequests.labels(String(status), poiCity).inc(),
   });
-  app.get("/api/alerts", getAlerts);
   app.get("/api/health", getHealth);
   app.get("/api/version", getVersion);
   registerHealthProbes(app, {

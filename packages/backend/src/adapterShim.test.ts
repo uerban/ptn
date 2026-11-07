@@ -76,14 +76,16 @@ describe("adapter shim — per-request city resolution", () => {
     expect(JSON.parse(res.body).data.map((s: { id: string }) => s.id)).toEqual(["tbilisi-local", "far"]);
   });
 
-  it("serves nearby and alerts under the same city-scoped shape", async () => {
+  it("serves nearby under the same city-scoped shape", async () => {
     stubGeocode();
     const nearby = await app.inject({ url: "/api/tricity/nearby?lat=54.35&lon=18.65" });
     expect(nearby.statusCode).toBe(200);
+  });
 
-    // `/alerts` is the one route with no query contract at all.
+  it("does not answer service alerts — pt-serve is their only implementation", async () => {
     const alerts = await app.inject({ url: "/api/oslo/alerts" });
-    expect(alerts.statusCode).toBe(200);
+    expect(alerts.statusCode).toBe(404);
+    expect(app.printRoutes({ commonPrefix: false })).not.toContain("alerts");
   });
 
   it("keeps the city segment in the route label — this is the plane discriminator", async () => {
