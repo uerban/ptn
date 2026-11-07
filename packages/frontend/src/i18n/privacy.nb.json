@@ -137,6 +137,8 @@
   "privacy.flow.operator.transitData.purpose": "Laster ned offentlige rutetider, holdeplasser, rutekurver og andre data som trengs for å kjøre PTN.",
   "privacy.flow.operator.realtime.name": "Sanntidsoppdateringer fra PTN-operatøren",
   "privacy.flow.operator.realtime.purpose": "Henter aktuelle forsinkelser, avgangstider og endringer i rutetabellen når sanntidsoppdateringer er aktivert.",
+  "privacy.flow.operator.serviceAlerts.name": "Trafikkmeldinger fra PTN-operatøren",
+  "privacy.flow.operator.serviceAlerts.purpose": "Henter byens gjeldende trafikkmeldinger, som avvik og omkjøringer, mens meldinger vises. Forespørselen oppgir bare byen; koblingen av meldinger til holdeplasser og linjer skjer på denne enheten.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Holdeplasser i nærheten fra PTN-operatøren",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Laster inn holdeplasser i nærheten raskere ved å bruke sentrum av den nærmeste holdeplassen, aldri den målte GPS-posisjonen.",
   "privacy.flow.external.detailedBasemap.name": "Detaljert eksternt kart",

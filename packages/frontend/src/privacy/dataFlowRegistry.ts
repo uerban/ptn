@@ -90,6 +90,33 @@ const RAW_DATA_FLOW_REGISTRY: PrivacyDataFlowDescriptor[] = [
     inactiveStatus: "not-shared",
   },
   {
+    // City-wide service alerts (/api/<city>/alerts). The request names only
+    // the city; which stops, lines or trips concern the rider is worked out
+    // on the device.
+    id: "operator.service-alerts",
+    nameKey: "privacy.flow.operator.serviceAlerts.name",
+    purposeKey: "privacy.flow.operator.serviceAlerts.purpose",
+    destination: "operator",
+    networkPath: "operator",
+    trigger: "automatic",
+    data: [
+      ...OPERATOR_NETWORK_METADATA,
+      {
+        category: "transit-resource",
+        precision: "public-id",
+        recipient: "operator",
+      },
+    ],
+    requestFields: ["city"],
+    controls: { policyAxes: [], settingKeys: [] },
+    retention: {
+      device: "none",
+      operator: "operator-manifest",
+      provider: "none",
+    },
+    inactiveStatus: "not-shared",
+  },
+  {
     id: "operator.nearby-stop-centroid",
     nameKey: "privacy.flow.operator.nearbyStopCentroid.name",
     purposeKey: "privacy.flow.operator.nearbyStopCentroid.purpose",

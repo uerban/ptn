@@ -138,6 +138,8 @@
   "privacy.flow.operator.transitData.purpose": "Lejupielādē sabiedriskā transporta grafiku, pieturas, maršrutu kontūras un citus datus, kas nepieciešami PTN darbībai.",
   "privacy.flow.operator.realtime.name": "Reāllaika atjauninājumi no PTN operatora",
   "privacy.flow.operator.realtime.purpose": "Ja ir ieslēgti reāllaika atjauninājumi, tiek iegūta informācija par pašreizējiem kavējumiem, atiešanas laikiem un izmaiņām pakalpojumu sniegšanā.",
+  "privacy.flow.operator.serviceAlerts.name": "Satiksmes paziņojumi no PTN operatora",
+  "privacy.flow.operator.serviceAlerts.purpose": "Kamēr tiek rādīti paziņojumi, iegūst pilsētas aktuālos satiksmes paziņojumus, piemēram, par traucējumiem un apbraucamajiem ceļiem. Pieprasījumā norādīta tikai pilsēta; paziņojumi ar pieturām un līnijām tiek saskaņoti šajā ierīcē.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Tuvākās pieturas no PTN operatora",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Tuvējās pieturas tiek ielādētas ātrāk, izmantojot tuvākās sabiedriskā transporta pieturas centru, nekad neizmantojot izmērīto GPS pozīciju.",
   "privacy.flow.external.detailedBasemap.name": "Detalizēta ārējā karte",

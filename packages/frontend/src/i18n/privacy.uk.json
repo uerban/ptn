@@ -140,6 +140,8 @@
   "privacy.flow.operator.transitData.purpose": "Завантажує розклади руху, зупинки, схеми маршрутів та інші дані, необхідні для роботи PTN.",
   "privacy.flow.operator.realtime.name": "Оновлення в режимі реального часу від оператора PTN",
   "privacy.flow.operator.realtime.purpose": "Отримує інформацію про поточні затримки, відправлення та зміни в розкладі, якщо увімкнено оновлення в режимі реального часу.",
+  "privacy.flow.operator.serviceAlerts.name": "Повідомлення про рух від оператора PTN",
+  "privacy.flow.operator.serviceAlerts.purpose": "Отримує поточні повідомлення про рух у місті, наприклад про збої та об'їзди, поки повідомлення показуються. Запит містить лише місто; зіставлення повідомлень із зупинками й лініями виконується на цьому пристрої.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Найближчі зупинки від оператора PTN",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Швидше завантажує найближчі зупинки, використовуючи центр найближчої зупинки громадського транспорту, а не виміряне GPS-положення.",
   "privacy.flow.external.detailedBasemap.name": "Детальна зовнішня карта",

@@ -129,6 +129,8 @@
   "privacy.flow.operator.transitData.purpose": "Спампоўвае графікі руху, прыпынкі, траекторыі маршрутаў і іншыя даныя, неабходныя для працы PTN.",
   "privacy.flow.operator.realtime.name": "Абнаўленні ў рэальным часе ад аператара ПТН",
   "privacy.flow.operator.realtime.purpose": "Атрымлівае бягучыя затрымкі, адпраўленні і змены ў абслугоўванні, калі ўключаны абнаўленні ў рэальным часе.",
+  "privacy.flow.operator.serviceAlerts.name": "Абвесткі пра рух ад аператара ПТН",
+  "privacy.flow.operator.serviceAlerts.purpose": "Атрымлівае бягучыя абвесткі пра рух у горадзе, напрыклад збоі і аб'езды, пакуль абвесткі паказваюцца. Запыт называе толькі горад; прыпынкі і лініі, да якіх адносяцца абвесткі, вызначаюцца на гэтай прыладзе.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Бліжэйшыя прыпынкі аператара PTN",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Загрузка бліжэйшых прыпынкаў адбываецца хутчэй з дапамогай цэнтра грамадскага прыпынку, а не вымеранай GPS-каардынаты.",
   "privacy.flow.external.detailedBasemap.name": "Падрабязная знешняя карта",

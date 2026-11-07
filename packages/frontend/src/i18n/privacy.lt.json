@@ -138,6 +138,8 @@
   "privacy.flow.operator.transitData.purpose": "Atsisiunčia viešojo transporto tvarkaraščius, stoteles, maršrutų kontūrus ir kitus duomenis, reikalingus PTN veikimui.",
   "privacy.flow.operator.realtime.name": "PTN operatoriaus teikiami atnaujinimai realiuoju laiku",
   "privacy.flow.operator.realtime.purpose": "Kai įjungti atnaujinimai realiuoju laiku, gauna informaciją apie dabartinius vėlavimus, išvykimus ir paslaugų pakeitimus.",
+  "privacy.flow.operator.serviceAlerts.name": "PTN operatoriaus eismo pranešimai",
+  "privacy.flow.operator.serviceAlerts.purpose": "Kol rodomi pranešimai, gauna dabartinius miesto eismo pranešimus, pavyzdžiui, apie sutrikimus ir apvažiavimus. Užklausoje nurodomas tik miestas; pranešimai su stotelėmis ir linijomis susiejami šiame įrenginyje.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Artimiausios stotelės pagal PTN operatoriaus duomenis",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Artimiausios viešojo transporto stotelės centras naudojamas greitesniam artimiausių stotelių įkėlimui, o ne išmatuota GPS padėtis.",
   "privacy.flow.external.detailedBasemap.name": "Išsamus išorinis žemėlapis",

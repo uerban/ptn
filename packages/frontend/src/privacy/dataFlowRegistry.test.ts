@@ -20,6 +20,7 @@ describe("dataFlowRegistry", () => {
     expect(DATA_FLOW_REGISTRY.map((flow) => flow.id)).toEqual([
       "operator.transit-data",
       "operator.realtime",
+      "operator.service-alerts",
       "operator.nearby-stop-centroid",
       "external.detailed-basemap",
       "operator.place-search",
@@ -30,6 +31,15 @@ describe("dataFlowRegistry", () => {
       "operator.client-report",
     ]);
     expect(() => validateDataFlowRegistry(DATA_FLOW_REGISTRY)).not.toThrow();
+  });
+
+  it("declares service alerts as a city-only automatic operator request", () => {
+    const flow = getDataFlow("operator.service-alerts");
+    expect(flow.destination).toBe("operator");
+    expect(flow.networkPath).toBe("operator");
+    expect(flow.trigger).toBe("automatic");
+    expect(flow.requestFields).toEqual(["city"]);
+    expect(flow.data.every((item) => item.recipient === "operator")).toBe(true);
   });
 
   it("rejects duplicate flow IDs", () => {

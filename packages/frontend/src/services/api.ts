@@ -1,4 +1,4 @@
-import { BUNDLE_HASH_HEADER } from "@pt/shared/schedule-tile";
+import { BUNDLE_HASH_HEADER, REALTIME_HEADER } from "@pt/shared/schedule-tile";
 import type {
   Stop,
   Departure,
@@ -15,6 +15,7 @@ import type {
 
 import { useCityStore } from "../stores/cityStore.ts";
 import { reportTelemetry } from "./errorReporter.ts";
+import { recordRealtimeHeader } from "./realtimeAvailability.ts";
 
 function getBaseUrl(): string {
   return useCityStore.getState().getApiUrl();
@@ -334,10 +335,13 @@ export class ManifestUnavailableError extends Error {
 export async function fetchManifest(
   cached?: { manifest: BundleManifest; etag: string | null },
 ): Promise<FetchManifestResult> {
+  const cityId = useCityStore.getState().activeCity.id;
   const res = await fetch(`${getBaseUrl()}/gtfs/manifest`, {
     headers: cached?.etag ? new Headers({ "If-None-Match": cached.etag }) : new Headers(),
   });
   const bundleHash = res.headers.get(BUNDLE_HASH_HEADER);
+  // 200 and 304 carry the city's realtime availability; keep it for offline launches.
+  if (res.ok || res.status === 304) recordRealtimeHeader(cityId, res.headers.get(REALTIME_HEADER));
   if (res.status === 304 && cached) {
     return { manifest: cached.manifest, etag: cached.etag ?? null, bundleHash, fromCache: true };
   }

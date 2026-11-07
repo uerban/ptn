@@ -3,6 +3,7 @@ import type { PrivacyPolicy } from "./privacy.js";
 export const PRIVACY_DATA_FLOW_IDS = [
   "operator.transit-data",
   "operator.realtime",
+  "operator.service-alerts",
   "operator.nearby-stop-centroid",
   "external.detailed-basemap",
   "operator.place-search",

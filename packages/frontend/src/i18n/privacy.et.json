@@ -128,6 +128,8 @@
   "privacy.flow.operator.transitData.purpose": "Laadib alla ühistranspordi sõiduplaanid, peatused, marsruutide kujundid ja muud PTN-i töötamiseks vajalikud andmed.",
   "privacy.flow.operator.realtime.name": "Reaalajas uuendused PTN-operaatorilt",
   "privacy.flow.operator.realtime.purpose": "Kuvab praegused hilinemised, väljumised ja teenuse muudatused, kui reaalajas uuendused on sisse lülitatud.",
+  "privacy.flow.operator.serviceAlerts.name": "Liiklusteated PTN-operaatorilt",
+  "privacy.flow.operator.serviceAlerts.purpose": "Laadib linna kehtivad liiklusteated, näiteks häired ja ümbersõidud, kui teateid kuvatakse. Päring sisaldab ainult linna; teadete sobitamine peatuste ja liinidega toimub selles seadmes.",
   "privacy.flow.operator.nearbyStopCentroid.name": "PTN-operaatori lähedal asuvad peatused",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Laadib lähedal asuvaid peatusi kiiremini, kasutades lähima ühistranspordipeatuse raskuskeskme asukohta, mitte kunagi mõõdetud GPS-asukohta.",
   "privacy.flow.external.detailedBasemap.name": "Üksikasjalik väline kaart",

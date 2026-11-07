@@ -138,6 +138,8 @@
   "privacy.flow.operator.transitData.purpose": "Pobiera publiczne rozkłady jazdy, nazwy przystanków, trasy i inne dane potrzebne do działania PTN.",
   "privacy.flow.operator.realtime.name": "Aktualizacje w czasie rzeczywistym od operatora PTN",
   "privacy.flow.operator.realtime.purpose": "Pobiera aktualne opóźnienia, odjazdy i zmiany w rozkładzie, gdy włączone są aktualizacje w czasie rzeczywistym.",
+  "privacy.flow.operator.serviceAlerts.name": "Komunikaty o utrudnieniach od operatora PTN",
+  "privacy.flow.operator.serviceAlerts.purpose": "Pobiera bieżące komunikaty o utrudnieniach w mieście, np. awariach i objazdach, gdy komunikaty są wyświetlane. Żądanie zawiera tylko miasto; dopasowanie komunikatów do przystanków i linii odbywa się na tym urządzeniu.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Przystanki w pobliżu od operatora PTN",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Szybciej ładuje pobliskie przystanki, korzystając z środka ciężkości najbliższego przystanku komunikacji miejskiej, a nie z pozycji GPS.",
   "privacy.flow.external.detailedBasemap.name": "Szczegółowa mapa zewnętrzna",

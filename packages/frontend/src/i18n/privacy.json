@@ -139,6 +139,8 @@
   "privacy.flow.operator.transitData.purpose": "Downloads public schedules, stops, route shapes, and other data needed to run PTN.",
   "privacy.flow.operator.realtime.name": "Real-time updates from the PTN operator",
   "privacy.flow.operator.realtime.purpose": "Retrieves current delays, departures, and service changes when real-time updates are enabled.",
+  "privacy.flow.operator.serviceAlerts.name": "Service alerts from the PTN operator",
+  "privacy.flow.operator.serviceAlerts.purpose": "Retrieves the city's current service alerts, such as disruptions and detours, while alerts are shown. The request names only the city; matching alerts to stops and lines happens on this device.",
   "privacy.flow.operator.nearbyStopCentroid.name": "Nearby stops from the PTN operator",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Loads nearby stops faster using the nearest public stop centroid, never the measured GPS position.",
   "privacy.flow.external.detailedBasemap.name": "Detailed external map",

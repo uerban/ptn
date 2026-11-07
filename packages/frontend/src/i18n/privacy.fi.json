@@ -138,6 +138,8 @@
   "privacy.flow.operator.transitData.purpose": "Lataa julkisen liikenteen aikataulut, pysäkit, reittien muodot ja muut PTN:n toimintaan tarvittavat tiedot.",
   "privacy.flow.operator.realtime.name": "Reaaliaikaiset päivitykset PTN-operaattorilta",
   "privacy.flow.operator.realtime.purpose": "Hakee ajankohtaiset viivästykset, lähtöajat ja liikennemuutokset, kun reaaliaikaiset päivitykset ovat käytössä.",
+  "privacy.flow.operator.serviceAlerts.name": "Liikennetiedotteet PTN-operaattorilta",
+  "privacy.flow.operator.serviceAlerts.purpose": "Hakee kaupungin ajankohtaiset liikennetiedotteet, kuten häiriöt ja poikkeusreitit, kun tiedotteita näytetään. Pyyntö kertoo vain kaupungin; tiedotteiden kohdistus pysäkkeihin ja linjoihin tehdään tällä laitteella.",
   "privacy.flow.operator.nearbyStopCentroid.name": "PTN-operaattorin lähimmät pysäkit",
   "privacy.flow.operator.nearbyStopCentroid.purpose": "Läheiset pysäkit ladataan nopeammin käyttämällä lähimmän julkisen pysäkin keskipistettä, ei koskaan mitattua GPS-sijaintia.",
   "privacy.flow.external.detailedBasemap.name": "Yksityiskohtainen ulkoinen kartta",
