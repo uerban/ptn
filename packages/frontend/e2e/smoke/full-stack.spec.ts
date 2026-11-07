@@ -1,8 +1,13 @@
 import { test, expect } from "@playwright/test";
+import { seedCompletedSetup } from "../helpers/setup-complete";
 
 const baseURL = process.env.E2E_BASE_URL;
 
 test.describe("Full stack smoke tests", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedCompletedSetup(page, { cityId: "vilnius" });
+  });
+
   test.skip(!baseURL, "Smoke tests require E2E_BASE_URL to be set");
 
   test("health endpoint returns ok", async ({ request }) => {

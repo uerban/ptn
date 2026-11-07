@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 // here fails every core spec at module load. Matches `catalogPtb.ts`.
 import { PATTERN_MODE } from "../../../shared/src/raptor/patternMode.ts";
 import { buildCatalogPtb } from "../fixtures/catalogPtb.ts";
+import { seedCompletedSetup } from "./setup-complete.ts";
 import {
   FIXTURE_BUNDLE_HASH,
   buildFixtureManifest,
@@ -155,6 +156,12 @@ interface MockApiOptions {
    * the primary path.
    */
   scheduleTile?: "served" | "unavailable";
+  /**
+   * `"complete"` (default) seeds a finished first-run setup so the spec starts
+   * in the app (see `seedCompletedSetup`). `"fresh"` leaves the profile new,
+   * for specs that drive setup themselves.
+   */
+  setup?: "complete" | "fresh";
 }
 
 /**
@@ -218,6 +225,7 @@ function makeDepartures(now: Date = new Date()) {
 
 /** Set up API route interception before navigation. Call this before page.goto(). */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
+  if (options.setup !== "fresh") await seedCompletedSetup(page);
   // These specs start inside a selected city. Model discovery and the saved
   // selection explicitly; production no longer chooses a default city.
   await page.route("**/api/cities", route => route.fulfill({json: {
@@ -225,7 +233,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
       center: {lat: 54.6872, lon: 25.2797},
       bbox: {minLat: 54.6, minLon: 25.1, maxLat: 54.8, maxLon: 25.5}}],
   }}));
-  await page.addInitScript(() => {
+  if (options.setup !== "fresh") await page.addInitScript(() => {
     if (!localStorage.getItem("ptn-city")) {
       localStorage.setItem("ptn-city", JSON.stringify({state: {activeCity: {id: "vilnius"}}, version: 0}));
     }

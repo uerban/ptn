@@ -1,6 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { seedCompletedSetup } from "../helpers/setup-complete";
 
 test.describe("global appearance propagation", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedCompletedSetup(page, { cityId: "vilnius" });
+  });
+
   test("data-variant defaults to consumer on first paint", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-variant", "consumer");

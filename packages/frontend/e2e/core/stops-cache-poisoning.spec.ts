@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { seedCompletedSetup } from "../helpers/setup-complete";
 
 /**
  * Regression test for the PWA stops loader cache-poisoning bug.
@@ -66,6 +67,7 @@ test.describe("Stops cache-poisoning recovery @mock-api", () => {
     // require running mockApi for the SHAPES_BODY constant.
     await page.route("**/gtfs/shapes/shapes-*.json", (route) => route.fulfill({ status: 404 }));
 
+    await seedCompletedSetup(page, { cityId: "vilnius" });
     await page.goto("/");
 
     // Wait for at least one cache-bypassed request. Retry backoffs are
