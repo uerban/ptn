@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   AXIS_STRICTNESS_ORDER,
-  LEVEL_FLOORS,
+  compatLevelFloor,
   PRIVACY_LEVELS,
   type PrivacyLevel,
   type PrivacyPolicy,
@@ -31,7 +31,7 @@ function minLevelForOption<K extends keyof PrivacyPolicy>(
 ): PrivacyLevel {
   let best: PrivacyLevel = PRIVACY_LEVELS[0];
   for (const level of PRIVACY_LEVELS) {
-    const floorVal = LEVEL_FLOORS[level][axis];
+    const floorVal = compatLevelFloor(level)[axis];
     const floorIdx = values.indexOf(floorVal);
     if (floorIdx >= 0 && floorIdx <= optionIdx) best = level;
   }
@@ -52,7 +52,7 @@ export function PolicyAxisControl<K extends keyof PrivacyPolicy>({
 
   const order = AXIS_STRICTNESS_ORDER[axis];
   const current = policy[axis];
-  const floorValue = LEVEL_FLOORS[level][axis];
+  const floorValue = compatLevelFloor(level)[axis];
 
   if (order.kind === "numeric") {
     return (

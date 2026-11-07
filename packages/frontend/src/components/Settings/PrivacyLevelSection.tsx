@@ -1,4 +1,5 @@
 import { PRIVACY_LEVELS, type PrivacyLevel, type PrivacyPolicy } from "@pt/shared/privacy";
+import { CarriedOverOverrides } from "./CarriedOverOverrides.tsx";
 import { PolicyAxisControl } from "./PolicyAxisControl.tsx";
 import { ThirdPartyProvidersSection } from "./ThirdPartyProvidersSection.tsx";
 import { usePolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
@@ -138,7 +139,7 @@ const DISCLOSURES: Record<string, string> = {
   m10DedupCache:
     "Dedup cache reduces third-party calls but creates a write-once query log on device. The log is unconditionally encrypted via the install key and expires per your privacy level (30d Baseline, 7d Standard, 1d Hardened when third-party is re-enabled). Strict and Paranoid do not cache. Browser profile reset destroys it with the install key.",
   m11Tiles:
-    "Panning the map fetches area-of-interest tiles from the PTN backend. Each tile names a ~12 km grid cell and is guaranteed to contain at least 50 places (build-time check). Single tiles reveal a coarse area; a long sequence of tiles from the same IP reveals pan patterns at that granularity. Your privacy preset picks a defense: Baseline loads on demand (no extra traffic); Standard prefetches the whole city once (~70–110 kB per city, zero runtime requests after that); Hardened adds 2 decoy tiles alongside each real fetch; Strict and Paranoid also fire a decoy tile every 2–5 minutes while the app is visible. None of these defenses fully defeat an operator who logs tile requests over time — use Tor or a VPN if you need network-layer unlinkability.",
+    "Panning the map fetches area-of-interest tiles from the PTN backend. Each tile names a ~12 km grid cell and is guaranteed to contain at least 50 places (build-time check). Single tiles reveal a coarse area; a long sequence of tiles from the same IP reveals pan patterns at that granularity. Your privacy preset picks a defense: Baseline loads on demand (no extra traffic); Standard prefetches the whole city once (~70–110 kB per city, zero runtime requests after that); Hardened adds 2 decoy tiles alongside each real fetch; Strict does the same; Paranoid also fires a decoy tile every 2–5 minutes while the app is visible. None of these defenses fully defeat an operator who logs tile requests over time — use Tor or a VPN if you need network-layer unlinkability.",
 };
 
 export function PrivacyLevelSection() {
@@ -274,6 +275,8 @@ export function PrivacyLevelSection() {
           </div>
         ))}
       </section>
+
+      <CarriedOverOverrides />
 
       <ThirdPartyProvidersSection />
     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LEVEL_FLOORS, type PrivacyPolicy } from "@pt/shared/privacy";
+import { compatLevelFloor, type PrivacyPolicy } from "@pt/shared/privacy";
 import {
   fetchBasemapStyle,
   isExternalBasemapAllowed,
@@ -10,9 +10,9 @@ const style = { version: 8, sources: {}, layers: [] };
 
 describe("basemap privacy gate", () => {
   it("allows registered CARTO only below the local-only floor", () => {
-    expect(isExternalBasemapAllowed(LEVEL_FLOORS.standard, "carto")).toBe(true);
-    expect(isExternalBasemapAllowed(LEVEL_FLOORS.hardened, "carto")).toBe(false);
-    expect(isExternalBasemapAllowed(LEVEL_FLOORS.standard, "unknown")).toBe(false);
+    expect(isExternalBasemapAllowed(compatLevelFloor("standard"), "carto")).toBe(true);
+    expect(isExternalBasemapAllowed(compatLevelFloor("hardened"), "carto")).toBe(false);
+    expect(isExternalBasemapAllowed(compatLevelFloor("standard"), "unknown")).toBe(false);
   });
 
   it("does not fetch when local-only or when the provider is unknown", async () => {
@@ -22,7 +22,7 @@ describe("basemap privacy gate", () => {
         providerId: "carto",
         dark: false,
         signal: controller.signal,
-        getPolicy: () => LEVEL_FLOORS.hardened,
+        getPolicy: () => compatLevelFloor("hardened"),
         fetchImpl,
       }),
     ).resolves.toBeNull();
@@ -31,7 +31,7 @@ describe("basemap privacy gate", () => {
         providerId: "unknown",
         dark: false,
         signal: controller.signal,
-        getPolicy: () => LEVEL_FLOORS.standard,
+        getPolicy: () => compatLevelFloor("standard"),
         fetchImpl,
       }),
     ).resolves.toBeNull();
@@ -39,9 +39,9 @@ describe("basemap privacy gate", () => {
   });
 
   it("drops a fetched style when policy changes before the response applies", async () => {
-    let policy: PrivacyPolicy = LEVEL_FLOORS.standard;
+    let policy: PrivacyPolicy = compatLevelFloor("standard");
     const fetchImpl = vi.fn().mockImplementation(async () => {
-      policy = LEVEL_FLOORS.hardened;
+      policy = compatLevelFloor("hardened");
       return new Response(JSON.stringify(style), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -73,7 +73,7 @@ describe("basemap privacy gate", () => {
         providerId: "carto",
         dark: true,
         signal: controller.signal,
-        getPolicy: () => LEVEL_FLOORS.standard,
+        getPolicy: () => compatLevelFloor("standard"),
         fetchImpl,
       }),
     ).resolves.toEqual(style);

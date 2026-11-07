@@ -1,4 +1,4 @@
-import type { PrivacyPolicy } from "@pt/shared";
+import type { ProtectionPolicy } from "@pt/shared";
 import {
   usePrivacyChoicesStore,
   type OptionalStorageCategory,
@@ -10,7 +10,7 @@ import { isPrivacyDataMigrationComplete } from "./privacyDataMigrationState.ts";
 export function isOptionalStorageEnabled(
   category: OptionalStorageCategory,
   choices: Readonly<OptionalStorageChoices>,
-  policy: PrivacyPolicy,
+  policy: ProtectionPolicy,
 ): boolean {
   if (choices[category] !== "enabled") return false;
 

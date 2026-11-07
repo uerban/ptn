@@ -20,7 +20,7 @@
  * overriding it (`isDetailedMapLocked`).
  */
 import {
-  LEVEL_FLOORS,
+  compatLevelFloor,
   PRIVACY_LEVELS,
   type PrivacyLevel,
   type PrivacyPolicy,
@@ -47,7 +47,7 @@ export function basemapModeFor(
 /** True when the level preset floors the axis at `local-only`, i.e. the
  *  external basemap cannot be selected without lowering the privacy level. */
 export function isDetailedMapLocked(level: PrivacyLevel): boolean {
-  return LEVEL_FLOORS[level].basemapMode === "local-only";
+  return compatLevelFloor(level).basemapMode === "local-only";
 }
 
 /**
@@ -58,7 +58,7 @@ export function isDetailedMapLocked(level: PrivacyLevel): boolean {
 export function maxLevelForDetailedMap(): PrivacyLevel {
   let best = PRIVACY_LEVELS[0];
   for (const level of PRIVACY_LEVELS) {
-    if (LEVEL_FLOORS[level].basemapMode === "external-detailed") best = level;
+    if (compatLevelFloor(level).basemapMode === "external-detailed") best = level;
   }
   return best;
 }
@@ -95,7 +95,7 @@ export function applyMapMode(
 ): void {
   setMapDetailMode(mode);
   const desired = basemapModeFor(mode);
-  if (desired === LEVEL_FLOORS[level].basemapMode) {
+  if (desired === compatLevelFloor(level).basemapMode) {
     clearOverride("basemapMode");
   } else {
     setOverride("basemapMode", desired);

@@ -2,11 +2,15 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   AXIS_STRICTNESS_ORDER,
-  effectivePolicy,
+  compatEffectivePolicy,
   PRIVACY_LEVELS,
   type PrivacyLevel,
   type PrivacyPolicy,
 } from "@pt/shared/privacy";
+import {
+  readOnboardingRecord,
+  writeOnboardingRecord,
+} from "../services/onboardingRecord.ts";
 
 export interface SetLevelOptions {
   /**
@@ -51,6 +55,30 @@ export const DEFAULT_DOWNGRADE_MESSAGE =
 
 function isDowngrade(prev: PrivacyLevel, next: PrivacyLevel): boolean {
   return PRIVACY_LEVELS.indexOf(next) < PRIVACY_LEVELS.indexOf(prev);
+}
+
+/**
+ * Overrides carried over from an older version only preserve what that
+ * version did at `strict`. Below `strict` they would keep tightening a level
+ * the user deliberately lowered (overrides survive level changes), so they
+ * go, together with their carried-over tag.
+ */
+function withoutCarriedOverOverrides(
+  level: PrivacyLevel,
+  overrides: Partial<PrivacyPolicy>,
+): Partial<PrivacyPolicy> | null {
+  if (PRIVACY_LEVELS.indexOf(level) >= PRIVACY_LEVELS.indexOf("strict")) return null;
+  const read = readOnboardingRecord();
+  if (read.status !== "ok") return null;
+  const carried = read.record.legacyOverrides;
+  const axes = Object.keys(carried) as (keyof typeof carried)[];
+  if (axes.length === 0) return null;
+  const next = { ...overrides };
+  for (const axis of axes) {
+    if (next[axis] === carried[axis]) delete next[axis];
+  }
+  writeOnboardingRecord({ ...read.record, legacyOverrides: {} });
+  return next;
 }
 
 interface PrivacyState {
@@ -128,7 +156,8 @@ export const usePrivacyStore = create<PrivacyState>()(
           const message = opts.downgradeMessage ?? DEFAULT_DOWNGRADE_MESSAGE;
           if (!opts.confirm(message)) return false;
         }
-        set({ level });
+        const overrides = withoutCarriedOverOverrides(level, get().overrides);
+        set(overrides ? { level, overrides } : { level });
         for (const fn of levelChangeListeners) {
           try {
             await fn(prev, level);
@@ -184,12 +213,12 @@ export const usePrivacyStore = create<PrivacyState>()(
 export function usePolicy(): PrivacyPolicy {
   const level = usePrivacyStore((s) => s.level);
   const overrides = usePrivacyStore((s) => s.overrides);
-  return effectivePolicy(level, overrides);
+  return compatEffectivePolicy(level, overrides);
 }
 
 export function getPolicy(): PrivacyPolicy {
   const { level, overrides } = usePrivacyStore.getState();
-  return effectivePolicy(level, overrides);
+  return compatEffectivePolicy(level, overrides);
 }
 
 // Raw current level — only for consumers that legitimately need to branch on

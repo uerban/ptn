@@ -1,7 +1,11 @@
 import {discoverCities, catalogWasCached} from "./config/discovery.ts";
+import {classifyInstallation} from "./services/installClassifier.ts";
 import "./index.css";
 
 async function start(): Promise<void> {
+  // Before any store module loads: hydration rewrites the stored state the
+  // classification reads.
+  try { classifyInstallation(); } catch { /* Storage unavailable: setup runs on session state. */ }
   // Production always attempts backend discovery, including legacy deployments.
   const cities = import.meta.env.DEV
     ? (await import("./config/cities.ts")).getAvailableCities()

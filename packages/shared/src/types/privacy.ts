@@ -1,10 +1,17 @@
-// Privacy policy: 5 levels × 22 axes.
+// Privacy policy: 5 protection levels.
 //
 // Source of truth for both backend and frontend. Levels enumerate increasing
-// strictness presets; axes are independent dimensions a user (or preset) can
-// tighten. `effectivePolicy(level, overrides)` applies the override-ratchet:
-// per axis, the result is whichever of (level floor, user override) is
-// stricter — overrides may only tighten, never loosen.
+// strictness presets over the protection axes (retention, coarsening, link
+// sharing, export, tile defense, ...). `effectivePolicy(level, overrides)`
+// applies the override-ratchet: per axis, the result is whichever of (level
+// floor, user override) is stricter — overrides may only tighten, never
+// loosen.
+//
+// Optional network activity is no longer part of the protection level: it is
+// governed by per-flow network decisions (see networkDecisions.ts). The
+// former network axes stay in `PrivacyPolicy` only as a compatibility view
+// for callers that have not moved to the decision resolver yet; their values
+// come from the frozen `LEGACY_NETWORK_FLOORS_V1` table below.
 
 export type PrivacyLevel =
   | "baseline"
@@ -90,14 +97,143 @@ export interface PrivacyPolicy {
   stopUsageRetention: "30d" | "7d" | "off";
 }
 
-export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
+/**
+ * Former policy axes that gated optional network activity. They are not part
+ * of the protection level any more: network activity is decided per data flow
+ * (networkDecisions.ts). Kept here so older stored state can be read and so
+ * callers not yet on the decision resolver keep a typed compatibility view.
+ */
+export const NETWORK_POLICY_AXES = [
+  "m9SelfHosted",
+  "m10ThirdPartyEnabled",
+  "routingAdapter",
+  "poiResidency",
+  "realTimePolling",
+  "basemapMode",
+  "nearbyStopLookup",
+] as const;
+
+export type NetworkPolicyAxis = (typeof NETWORK_POLICY_AXES)[number];
+export type LegacyNetworkPolicy = Pick<PrivacyPolicy, NetworkPolicyAxis>;
+/** The axes a protection level (and its override ratchet) governs. */
+export type ProtectionPolicy = Omit<PrivacyPolicy, NetworkPolicyAxis>;
+export type ProtectionAxis = keyof ProtectionPolicy;
+
+export function isNetworkPolicyAxis(axis: string): axis is NetworkPolicyAxis {
+  return (NETWORK_POLICY_AXES as readonly string[]).includes(axis);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * Frozen copy of the network floors as they were when the network axes left
+ * the protection level. Installation classification reads it to compute the
+ * network behavior an existing installation had, so it must never be edited:
+ * a later change would silently rewrite what "previously effective" means.
+ */
+export const LEGACY_NETWORK_FLOORS_V1: Readonly<
+  Record<PrivacyLevel, Readonly<LegacyNetworkPolicy>>
+> = deepFreeze({
+  baseline: {
+    m9SelfHosted: "respect-multitenant",
+    m10ThirdPartyEnabled: true,
+    routingAdapter: "user-choice",
+    poiResidency: "user-choice",
+    realTimePolling: "backend-adaptive",
+    basemapMode: "external-detailed",
+    nearbyStopLookup: "centroid-server",
+  },
+  standard: {
+    m9SelfHosted: "respect-multitenant",
+    m10ThirdPartyEnabled: true,
+    routingAdapter: "user-choice",
+    poiResidency: "user-choice",
+    realTimePolling: "backend-adaptive",
+    basemapMode: "external-detailed",
+    nearbyStopLookup: "centroid-server",
+  },
+  hardened: {
+    m9SelfHosted: "always-coarsen",
+    m10ThirdPartyEnabled: false,
+    routingAdapter: "local-only",
+    poiResidency: "local-only",
+    realTimePolling: "backend-foreground-only",
+    basemapMode: "local-only",
+    nearbyStopLookup: "local-only",
+  },
+  strict: {
+    m9SelfHosted: "disabled",
+    m10ThirdPartyEnabled: false,
+    routingAdapter: "local-only",
+    poiResidency: "local-only",
+    realTimePolling: "disabled-schedule-only",
+    basemapMode: "local-only",
+    nearbyStopLookup: "local-only",
+  },
+  paranoid: {
+    m9SelfHosted: "disabled",
+    m10ThirdPartyEnabled: false,
+    routingAdapter: "local-only",
+    poiResidency: "local-only",
+    realTimePolling: "disabled-schedule-only",
+    basemapMode: "local-only",
+    nearbyStopLookup: "local-only",
+  },
+});
+
+/** Frozen strictness order of the former network axes (ascending). */
+export const LEGACY_NETWORK_AXIS_ORDER_V1: {
+  readonly [K in NetworkPolicyAxis]: readonly LegacyNetworkPolicy[K][];
+} = deepFreeze({
+  m9SelfHosted: ["respect-multitenant", "always-coarsen", "disabled"],
+  m10ThirdPartyEnabled: [true, false],
+  routingAdapter: ["user-choice", "local-only"],
+  poiResidency: ["user-choice", "local-only"],
+  realTimePolling: [
+    "backend-adaptive",
+    "backend-foreground-only",
+    "disabled-schedule-only",
+  ],
+  basemapMode: ["external-detailed", "local-only"],
+  nearbyStopLookup: ["centroid-server", "local-only"],
+});
+
+/**
+ * Network behavior that the legacy level floors plus stored overrides
+ * produced. `rawOverrides` is untrusted stored data: unknown axes and values
+ * are ignored, and overrides can only tighten.
+ */
+export function legacyEffectiveNetworkPolicy(
+  level: PrivacyLevel,
+  rawOverrides: unknown,
+): LegacyNetworkPolicy {
+  const result: Record<string, unknown> = { ...LEGACY_NETWORK_FLOORS_V1[level] };
+  const overrides =
+    rawOverrides && typeof rawOverrides === "object"
+      ? (rawOverrides as Record<string, unknown>)
+      : {};
+  for (const axis of NETWORK_POLICY_AXES) {
+    if (!Object.hasOwn(overrides, axis)) continue;
+    const order = LEGACY_NETWORK_AXIS_ORDER_V1[axis] as readonly unknown[];
+    const overrideIdx = order.indexOf(overrides[axis]);
+    const floorIdx = order.indexOf(result[axis]);
+    if (overrideIdx > floorIdx) result[axis] = order[overrideIdx];
+  }
+  return result as unknown as LegacyNetworkPolicy;
+}
+
+export const LEVEL_FLOORS: Record<PrivacyLevel, ProtectionPolicy> = {
   baseline: {
     recentsEncryption: "plaintext",
     savesEncryption: "opt-in",
     mapTapPersistedPrecision: "raw",
     mapTapSnapRadiusMeters: 0,
-    m9SelfHosted: "respect-multitenant",
-    m10ThirdPartyEnabled: true,
     m10CoarsenGridFloorMeters: 0,
     m10CoarsenGridDefaultMeters: 0,
     m10Jitter: false,
@@ -107,11 +243,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     urlShare: "coords-raw",
     errorReporting: true,
     m11TileCacheBudgetBytes: 100_000_000,
-    routingAdapter: "user-choice",
-    poiResidency: "user-choice",
-    realTimePolling: "backend-adaptive",
-    basemapMode: "external-detailed",
-    nearbyStopLookup: "centroid-server",
     viewportPersistence: "raw",
     stopUsageRetention: "30d",
   },
@@ -120,8 +251,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     savesEncryption: "default",
     mapTapPersistedPrecision: "snap-centroid",
     mapTapSnapRadiusMeters: 25,
-    m9SelfHosted: "respect-multitenant",
-    m10ThirdPartyEnabled: true,
     m10CoarsenGridFloorMeters: 25,
     m10CoarsenGridDefaultMeters: 50,
     m10Jitter: true,
@@ -131,11 +260,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     urlShare: "coords-rounded",
     errorReporting: true,
     m11TileCacheBudgetBytes: 50_000_000,
-    routingAdapter: "user-choice",
-    poiResidency: "user-choice",
-    realTimePolling: "backend-adaptive",
-    basemapMode: "external-detailed",
-    nearbyStopLookup: "centroid-server",
     viewportPersistence: "snap-centroid",
     stopUsageRetention: "30d",
   },
@@ -144,8 +268,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     savesEncryption: "always",
     mapTapPersistedPrecision: "snap-rounded-50m",
     mapTapSnapRadiusMeters: 50,
-    m9SelfHosted: "always-coarsen",
-    m10ThirdPartyEnabled: false,
     m10CoarsenGridFloorMeters: 50,
     m10CoarsenGridDefaultMeters: 100,
     m10Jitter: true,
@@ -155,11 +277,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     urlShare: "coords-stripped",
     errorReporting: false,
     m11TileCacheBudgetBytes: 25_000_000,
-    routingAdapter: "local-only",
-    poiResidency: "local-only",
-    realTimePolling: "backend-foreground-only",
-    basemapMode: "local-only",
-    nearbyStopLookup: "local-only",
     viewportPersistence: "rounded-50m",
     stopUsageRetention: "7d",
   },
@@ -168,22 +285,16 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     savesEncryption: "always-no-export",
     mapTapPersistedPrecision: "snap-rounded-100m",
     mapTapSnapRadiusMeters: 100,
-    m9SelfHosted: "disabled",
-    m10ThirdPartyEnabled: false,
     m10CoarsenGridFloorMeters: 100,
     m10CoarsenGridDefaultMeters: 200,
     m10Jitter: true,
-    m11TileDefense: "prefetch-padding-decoy",
+    // The decoy timer is reserved for `paranoid`.
+    m11TileDefense: "prefetch-padding",
     m10DedupCache: "disabled",
     providerFallback: "fail-loud",
     urlShare: "coords-stripped",
     errorReporting: false,
     m11TileCacheBudgetBytes: 10_000_000,
-    routingAdapter: "local-only",
-    poiResidency: "local-only",
-    realTimePolling: "disabled-schedule-only",
-    basemapMode: "local-only",
-    nearbyStopLookup: "local-only",
     viewportPersistence: "rounded-100m",
     stopUsageRetention: "off",
   },
@@ -192,8 +303,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     savesEncryption: "always-no-share",
     mapTapPersistedPrecision: "snap-rounded-100m-no-reverse",
     mapTapSnapRadiusMeters: 100,
-    m9SelfHosted: "disabled",
-    m10ThirdPartyEnabled: false,
     m10CoarsenGridFloorMeters: 100,
     m10CoarsenGridDefaultMeters: 200,
     m10Jitter: true,
@@ -203,11 +312,6 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, PrivacyPolicy> = {
     urlShare: "disabled",
     errorReporting: false,
     m11TileCacheBudgetBytes: 5_000_000,
-    routingAdapter: "local-only",
-    poiResidency: "local-only",
-    realTimePolling: "disabled-schedule-only",
-    basemapMode: "local-only",
-    nearbyStopLookup: "local-only",
     viewportPersistence: "off",
     stopUsageRetention: "off",
   },
@@ -341,13 +445,24 @@ export function stricterValue<K extends keyof PrivacyPolicy>(
   return ia >= ib ? a : b;
 }
 
+/** Axes governed by the protection level and its override ratchet. */
+export const PROTECTION_AXES: readonly ProtectionAxis[] = Object.freeze(
+  Object.keys(LEVEL_FLOORS.baseline) as ProtectionAxis[],
+);
+
+export function isProtectionAxis(axis: string): axis is ProtectionAxis {
+  return (PROTECTION_AXES as readonly string[]).includes(axis);
+}
+
+/** Protection policy of a level after the override ratchet. Overrides on
+ * axes outside the protection level are ignored. */
 export function effectivePolicy(
   level: PrivacyLevel,
   overrides: Partial<PrivacyPolicy> = {},
-): PrivacyPolicy {
+): ProtectionPolicy {
   const floor = LEVEL_FLOORS[level];
   const result = { ...floor };
-  for (const key of Object.keys(floor) as (keyof PrivacyPolicy)[]) {
+  for (const key of Object.keys(floor) as ProtectionAxis[]) {
     const override = overrides[key];
     if (override === undefined) continue;
     // Type-narrowing helper: per-axis stricterValue.
@@ -359,3 +474,24 @@ export function effectivePolicy(
   }
   return result;
 }
+
+/**
+ * Level floor including the legacy network values, for callers that still
+ * read network axes from the policy instead of resolving a network decision.
+ */
+export function compatLevelFloor(level: PrivacyLevel): PrivacyPolicy {
+  return { ...LEVEL_FLOORS[level], ...LEGACY_NETWORK_FLOORS_V1[level] };
+}
+
+/** `effectivePolicy` plus the legacy network view (see `compatLevelFloor`). */
+export function compatEffectivePolicy(
+  level: PrivacyLevel,
+  overrides: Partial<PrivacyPolicy> = {},
+): PrivacyPolicy {
+  return {
+    ...effectivePolicy(level, overrides),
+    ...legacyEffectiveNetworkPolicy(level, overrides),
+  };
+}
+
+export * from "./networkDecisions.js";

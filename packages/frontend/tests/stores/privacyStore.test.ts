@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { LEVEL_FLOORS, effectivePolicy } from "@pt/shared";
+import { LEVEL_FLOORS, compatEffectivePolicy, compatLevelFloor } from "@pt/shared";
 import {
   getPolicy,
   usePrivacyStore,
@@ -47,7 +47,7 @@ describe("usePrivacyStore", () => {
 describe("getPolicy", () => {
   it("returns the level floor when no overrides are set", () => {
     usePrivacyStore.getState().setLevel("hardened");
-    expect(getPolicy()).toEqual(LEVEL_FLOORS.hardened);
+    expect(getPolicy()).toEqual(compatLevelFloor("hardened"));
   });
 
   it("applies overrides via effectivePolicy semantics (stricter wins)", () => {
@@ -69,7 +69,7 @@ describe("getPolicy", () => {
     usePrivacyStore.getState().setOverride("m11TileCacheBudgetBytes", 1_000_000);
     usePrivacyStore.getState().setOverride("urlShare", "disabled");
     const { level, overrides } = usePrivacyStore.getState();
-    expect(getPolicy()).toEqual(effectivePolicy(level, overrides));
+    expect(getPolicy()).toEqual(compatEffectivePolicy(level, overrides));
   });
 
   it("allows Standard to disable external basemap and nearby-stop requests", () => {

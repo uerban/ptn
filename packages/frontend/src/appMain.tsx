@@ -15,6 +15,10 @@ import { listenForSwUpdates } from "./services/poiLoader.ts";
 import { loadGeocoderConfig, syncPoi } from "./bootPoi.ts";
 import { useCityStore } from "./stores/cityStore.ts";
 import { useSettingsStore } from "./stores/settingsStore.ts";
+import {
+  applyPendingOnboardingJournal,
+  installPrivacyStateSync,
+} from "./stores/onboardingStore.ts";
 import { ensureDataSchemaUpToDate } from "./db/dataSchemaVersion.ts";
 import { scheduleIdle } from "./utils/idle.ts";
 import "./index.css";
@@ -57,6 +61,11 @@ async function bootApp(): Promise<void> {
       context: { where: "main.runPrivacyDataMigration" },
     });
   }
+
+  // A committed setup journal must reach the preference stores before any
+  // optional feature reads them.
+  await applyPendingOnboardingJournal();
+  installPrivacyStateSync();
 
   registerScheduleTileEvictor();
 

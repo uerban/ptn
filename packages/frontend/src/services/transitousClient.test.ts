@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { PrivacyPolicy } from "@pt/shared";
-import { LEVEL_FLOORS } from "@pt/shared/privacy";
+import { compatLevelFloor } from "@pt/shared/privacy";
 import {
   buildTransitousQuery,
   planViaTransitous,
@@ -8,8 +8,8 @@ import {
 } from "./transitousClient.ts";
 import { RoutingNotAllowedError } from "./routingSource.ts";
 
-const allow = (): PrivacyPolicy => LEVEL_FLOORS.baseline;
-const deny = (): PrivacyPolicy => LEVEL_FLOORS.hardened;
+const allow = (): PrivacyPolicy => compatLevelFloor("baseline");
+const deny = (): PrivacyPolicy => compatLevelFloor("hardened");
 const args = { from: { lat: 1, lon: 2 }, to: { lat: 3, lon: 4 }, departAtIso: "2026-06-26T08:00:00Z" };
 
 afterEach(() => { vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });

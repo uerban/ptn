@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   AXIS_STRICTNESS_ORDER,
+  compatEffectivePolicy,
+  compatLevelFloor,
   effectivePolicy,
+  LEGACY_NETWORK_FLOORS_V1,
   LEVEL_FLOORS,
   PRIVACY_LEVELS,
   stricterValue,
@@ -133,7 +136,7 @@ describe("LEVEL_FLOORS", () => {
 
 describe("AXIS_STRICTNESS_ORDER", () => {
   it("declares an order for every axis in PrivacyPolicy", () => {
-    const floorKeys = Object.keys(LEVEL_FLOORS.baseline).sort();
+    const floorKeys = Object.keys(compatLevelFloor("baseline")).sort();
     const orderKeys = Object.keys(AXIS_STRICTNESS_ORDER).sort();
     expect(orderKeys).toEqual(floorKeys);
   });
@@ -154,8 +157,8 @@ describe("AXIS_STRICTNESS_ORDER", () => {
 });
 
 describe("Privacy Center policy axes", () => {
-  it("defines the approved floors for basemap and nearby-stop network access", () => {
-    expect(PRIVACY_LEVELS.map((level) => LEVEL_FLOORS[level].basemapMode)).toEqual([
+  it("records the former floors for basemap and nearby-stop network access", () => {
+    expect(PRIVACY_LEVELS.map((level) => LEGACY_NETWORK_FLOORS_V1[level].basemapMode)).toEqual([
       "external-detailed",
       "external-detailed",
       "local-only",
@@ -163,7 +166,7 @@ describe("Privacy Center policy axes", () => {
       "local-only",
     ]);
     expect(
-      PRIVACY_LEVELS.map((level) => LEVEL_FLOORS[level].nearbyStopLookup),
+      PRIVACY_LEVELS.map((level) => LEGACY_NETWORK_FLOORS_V1[level].nearbyStopLookup),
     ).toEqual([
       "centroid-server",
       "centroid-server",
@@ -190,18 +193,18 @@ describe("Privacy Center policy axes", () => {
 
   it("lets Standard tighten network axes but never lets Hardened loosen them", () => {
     expect(
-      effectivePolicy("standard", { basemapMode: "local-only" }).basemapMode,
+      compatEffectivePolicy("standard", { basemapMode: "local-only" }).basemapMode,
     ).toBe("local-only");
     expect(
-      effectivePolicy("standard", { nearbyStopLookup: "local-only" })
+      compatEffectivePolicy("standard", { nearbyStopLookup: "local-only" })
         .nearbyStopLookup,
     ).toBe("local-only");
     expect(
-      effectivePolicy("hardened", { basemapMode: "external-detailed" })
+      compatEffectivePolicy("hardened", { basemapMode: "external-detailed" })
         .basemapMode,
     ).toBe("local-only");
     expect(
-      effectivePolicy("hardened", { nearbyStopLookup: "centroid-server" })
+      compatEffectivePolicy("hardened", { nearbyStopLookup: "centroid-server" })
         .nearbyStopLookup,
     ).toBe("local-only");
   });
@@ -209,11 +212,11 @@ describe("Privacy Center policy axes", () => {
 
 describe("poiResidency axis (POI residency ceiling)", () => {
   it("floors: user-choice at baseline/standard, local-only at hardened/strict/paranoid", () => {
-    expect(LEVEL_FLOORS.baseline.poiResidency).toBe("user-choice");
-    expect(LEVEL_FLOORS.standard.poiResidency).toBe("user-choice");
-    expect(LEVEL_FLOORS.hardened.poiResidency).toBe("local-only");
-    expect(LEVEL_FLOORS.strict.poiResidency).toBe("local-only");
-    expect(LEVEL_FLOORS.paranoid.poiResidency).toBe("local-only");
+    expect(LEGACY_NETWORK_FLOORS_V1.baseline.poiResidency).toBe("user-choice");
+    expect(LEGACY_NETWORK_FLOORS_V1.standard.poiResidency).toBe("user-choice");
+    expect(LEGACY_NETWORK_FLOORS_V1.hardened.poiResidency).toBe("local-only");
+    expect(LEGACY_NETWORK_FLOORS_V1.strict.poiResidency).toBe("local-only");
+    expect(LEGACY_NETWORK_FLOORS_V1.paranoid.poiResidency).toBe("local-only");
   });
 
   it("declares the strictness order user-choice < local-only (mirrors routingAdapter)", () => {
