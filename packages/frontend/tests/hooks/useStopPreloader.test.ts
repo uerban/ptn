@@ -57,11 +57,14 @@ vi.mock("../../src/stores/cityStore.ts", () => ({
 
 import { api, HttpError } from "../../src/services/api.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 
 describe("useStopPreloader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePrivacyStore.getState().reset();
+    resetFlows();
+    allowFlow("operator.nearby-stop-centroid");
     cachedStops = [
       {
         id: "public-centroid",
@@ -127,11 +130,27 @@ describe("useStopPreloader", () => {
     await waitFor(() => expect(api.getNearbyStops).toHaveBeenCalledTimes(2));
   });
 
-  it("skips the nearby endpoint when the policy is local-only", async () => {
-    await usePrivacyStore.getState().setLevel("hardened");
+  it.each([
+    ["unset", () => resetFlows()],
+    ["denied", () => denyFlow("operator.nearby-stop-centroid")],
+  ])("skips the nearby endpoint while the lookup is %s", async (_name, apply) => {
+    apply();
     renderHook(() => useStopPreloader({ lat: 54.68123, lon: 25.28456 }, 1));
     await Promise.resolve();
     expect(api.getNearbyStops).not.toHaveBeenCalled();
+  });
+
+  it("asks again after the lookup is allowed", async () => {
+    resetFlows();
+    const { rerender } = renderHook(({ requestId }) =>
+      useStopPreloader({ lat: 54.68123, lon: 25.28456 }, requestId), {
+      initialProps: { requestId: 1 },
+    });
+    await Promise.resolve();
+    expect(api.getNearbyStops).not.toHaveBeenCalled();
+    allowFlow("operator.nearby-stop-centroid");
+    rerender({ requestId: 2 });
+    await waitFor(() => expect(api.getNearbyStops).toHaveBeenCalledTimes(1));
   });
 
   it("skips the nearby endpoint on a cold cache", async () => {
@@ -141,14 +160,14 @@ describe("useStopPreloader", () => {
     expect(api.getNearbyStops).not.toHaveBeenCalled();
   });
 
-  it("re-reads policy before a retry after the level becomes stricter", async () => {
+  it("re-reads the decision before a retry after it is revoked", async () => {
     vi.useFakeTimers();
     (api.getNearbyStops as any).mockRejectedValue(new Error("temporary"));
     renderHook(() => useStopPreloader({ lat: 54.68123, lon: 25.28456 }, 1));
 
     await vi.advanceTimersByTimeAsync(0);
     expect(api.getNearbyStops).toHaveBeenCalledTimes(1);
-    await usePrivacyStore.getState().setLevel("hardened");
+    denyFlow("operator.nearby-stop-centroid");
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(api.getNearbyStops).toHaveBeenCalledTimes(1);

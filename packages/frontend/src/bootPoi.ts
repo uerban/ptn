@@ -16,8 +16,7 @@ import { useCityStore } from "./stores/cityStore.ts";
 import { useSettingsStore } from "./stores/settingsStore.ts";
 import { geocoderRegistry } from "./services/geocoder/instance.ts";
 import { setSearchModeAccessor, setGeocoderPresentAccessor, setThirdPartyEgressAccessor, ADDR_AUG_ENABLED } from "./services/searchSuggestions.ts";
-import { getPolicy } from "./stores/privacyStore.ts";
-import { isTransitousAllowed } from "./services/transitousAvailability.ts";
+import { canUseRemoteStopSearch } from "./services/routingAccess.ts";
 import {
   setRuntimeGeocoderConfig,
   syncSelfHostedRegistration,
@@ -48,12 +47,12 @@ setSearchModeAccessor((cityId) => resolvePoiFetchMode(cityId));
 // import edge (bootPoi already imports hasServerSideGeocoder).
 setGeocoderPresentAccessor((cityId) => hasServerSideGeocoder(cityId));
 // Third capability accessor: the third-party egress gate for remote STOP search.
-// Remote stop search reaches transitous through the backend proxy, so it passes
-// the SAME two axes as remote routing — the operator hop does not exempt it
-// (services/transitousAvailability.ts). Read lazily per query so a privacy-level
-// change takes effect without a reload. Kept adjacent to the accessors above so
-// one grep finds the full search-time injection set.
-setThirdPartyEgressAccessor(() => isTransitousAllowed(getPolicy()));
+// Remote stop search reaches transitous through the backend proxy, so it is its
+// own third-party flow (`external.stop-search`) — the operator hop does not
+// exempt it. Resolved lazily per query so a grant or revocation takes effect
+// without a reload. Kept adjacent to the accessors above so one grep finds the
+// full search-time injection set.
+setThirdPartyEgressAccessor(canUseRemoteStopSearch);
 
 /** Max wait for the single /geocoder-config.json fetch before boot proceeds.
  *  Bounds the awaited fetch on the common UNCONFIGURED path so a 404/offline-hang

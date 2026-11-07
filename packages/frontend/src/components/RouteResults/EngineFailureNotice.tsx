@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { usePolicy } from "../../stores/privacyStore.ts";
-import { ENGINE_FAILURE_REPORT_KEYS, sendEngineFailureReport } from "../../services/engineFailureReport.ts";
+import {
+  canOfferEngineFailureReport,
+  ENGINE_FAILURE_REPORT_KEYS,
+  sendEngineFailureReportOnRequest,
+} from "../../services/engineFailureReport.ts";
+import { useNetworkDecisionsStore } from "../../stores/networkDecisionsStore.ts";
 import type { EngineFailureKind } from "../../services/engineFailure.ts";
 
 const HEADLINE: Record<EngineFailureKind, string> = {
@@ -13,9 +17,9 @@ const HEADLINE: Record<EngineFailureKind, string> = {
 
 /**
  * Honest engine-failure surface. The message + inline diagnostic are ALWAYS shown (the user is
- * never left in the dark). The opt-in "Send report" is offered ONLY when the `errorReporting`
- * privacy axis allows it; the disclosure enumerates exactly the payload keys (payload is the
- * source of truth). The optional "Search on the server" action is shown when `remoteSearch` is
+ * never left in the dark). The opt-in "Send report" is offered whenever the report flow can run;
+ * clicking it is the explicit action that allows it. The disclosure enumerates exactly the
+ * payload keys (payload is the source of truth). The optional "Search on the server" action is shown when `remoteSearch` is
  * present (its presence encodes both the privacy ceiling AND a wired handler).
  */
 export function EngineFailureNotice({
@@ -33,7 +37,9 @@ export function EngineFailureNotice({
 }) {
   const [sent, setSent] = useState(false);
   const k = kind ?? "other";
-  const canReport = usePolicy().errorReporting;
+  // Re-render when the report decision changes (Settings, another tab).
+  useNetworkDecisionsStore((s) => s.decisions);
+  const canReport = canOfferEngineFailureReport();
 
   return (
     <div
@@ -72,7 +78,7 @@ export function EngineFailureNotice({
             data-testid="engine-failure-send"
             disabled={sent}
             onClick={() => {
-              void sendEngineFailureReport(k);
+              void sendEngineFailureReportOnRequest(k);
               setSent(true);
             }}
             className="w-full rounded-lg border border-danger/40 py-2 text-sm text-danger hover:bg-danger/10 disabled:opacity-60"

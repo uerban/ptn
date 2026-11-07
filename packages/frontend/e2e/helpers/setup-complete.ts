@@ -91,3 +91,34 @@ export async function seedCompletedSetup(
     { record, decisions, cityId },
   );
 }
+
+/**
+ * Record network decisions as if the user had made them in Settings, merged
+ * over whatever the profile already stores. Works for new and existing
+ * installations alike (an existing one keeps the decisions its classifier
+ * derives for other flows).
+ *
+ * MUST be called before `page.goto(...)`.
+ */
+export async function seedNetworkDecisions(
+  page: Page,
+  decisions: Record<string, "allowed" | "denied">,
+): Promise<void> {
+  await page.addInitScript((decisions) => {
+    const key = "ptn-network-decisions";
+    let stored: { state?: { decisions?: Record<string, unknown> }; version?: number } = {};
+    try {
+      stored = JSON.parse(localStorage.getItem(key) ?? "{}");
+    } catch {
+      stored = {};
+    }
+    const merged: Record<string, unknown> = { ...(stored.state?.decisions ?? {}) };
+    for (const [flow, value] of Object.entries(decisions)) {
+      merged[flow] = { value, source: "settings", decidedAt: 1 };
+    }
+    localStorage.setItem(
+      key,
+      JSON.stringify({ state: { decisions: merged }, version: stored.version ?? 1 }),
+    );
+  }, decisions);
+}

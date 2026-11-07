@@ -1,35 +1,30 @@
 /**
  * The single map-mode choice.
  *
- * Two controls used to answer almost the same question: the Settings "Map
- * detail" radio (`settingsStore.mapDetailMode`) and the privacy centre's
- * "Detailed map" axis (`policy.basemapMode`). A user could set them to
- * disagree, and the map then obeyed whichever was stricter — the classic
- * "why is my setting ignored?" trap. There is now ONE control (Settings →
- * Map) and this module is the seam between it and the policy axis:
+ * The Settings map control (`settingsStore.mapDetailMode`) is a display
+ * preference. Whether the detailed map may reach its external provider is a
+ * separate, per-provider network decision (`external.detailed-basemap`). This
+ * module is the seam between the two:
  *
- *   - `basemapModeFor` maps a chosen mode onto the axis value it implies,
- *   - `applyMapMode` writes both at once (axis via override, exactly the way
- *     `PolicyAxisControl` does: clear when it equals the level floor, set
- *     otherwise, so lowering the privacy level un-sticks it),
- *   - `effectiveMapMode` resolves what the canvas should actually draw, given
- *     that the privacy level can still clamp the external basemap away.
+ *   - `applyMapMode` stores the preference and, when the user deliberately
+ *     picks the detailed map, records the decision for its provider. Picking
+ *     a local mode never rewrites the decision.
+ *   - `effectiveMapMode` resolves what the canvas actually draws: a detailed
+ *     preference without an allowed provider falls back to the micromap.
  *
- * The policy axis remains the ceiling — a preset that floors `basemapMode` to
- * `local-only` makes the "detailed" option unselectable rather than silently
- * overriding it (`isDetailedMapLocked`).
+ * The detailed option is only unselectable when its provider cannot run at all
+ * (`isDetailedMapLocked`), never because of the protection level.
  */
-import {
-  compatLevelFloor,
-  PRIVACY_LEVELS,
-  type PrivacyLevel,
-  type PrivacyPolicy,
-} from "@pt/shared/privacy";
 import {
   useSettingsStore,
   type MapDetailMode,
 } from "../stores/settingsStore.ts";
-import { usePolicy } from "../stores/privacyStore.ts";
+import {
+  DEFAULT_BASEMAP_PROVIDER,
+  DETAILED_BASEMAP_FLOW,
+  useExternalBasemapAllowed,
+} from "../services/basemapPrivacy.ts";
+import { grantFlow, isFlowAvailable } from "../privacy/flowGrants.ts";
 
 /** Presentation order of the single map-mode control (loosest first). */
 export const MAP_MODE_ORDER = [
@@ -38,73 +33,56 @@ export const MAP_MODE_ORDER = [
   "gtfs-only",
 ] as const satisfies readonly MapDetailMode[];
 
-export function basemapModeFor(
-  mode: MapDetailMode,
-): PrivacyPolicy["basemapMode"] {
-  return mode === "detailed" ? "external-detailed" : "local-only";
-}
-
-/** True when the level preset floors the axis at `local-only`, i.e. the
- *  external basemap cannot be selected without lowering the privacy level. */
-export function isDetailedMapLocked(level: PrivacyLevel): boolean {
-  return compatLevelFloor(level).basemapMode === "local-only";
-}
-
-/**
- * The lowest privacy level at which the external basemap is still selectable.
- * Mirrors `PolicyAxisControl.minLevelForOption` for the one axis this control
- * owns, so the locked copy names the same level in both places.
- */
-export function maxLevelForDetailedMap(): PrivacyLevel {
-  let best = PRIVACY_LEVELS[0];
-  for (const level of PRIVACY_LEVELS) {
-    if (compatLevelFloor(level).basemapMode === "external-detailed") best = level;
-  }
-  return best;
+/** True when the detailed map's provider cannot run in this build. */
+export function isDetailedMapLocked(
+  providerId: string = DEFAULT_BASEMAP_PROVIDER,
+): boolean {
+  return !isFlowAvailable(DETAILED_BASEMAP_FLOW, providerId);
 }
 
 /**
  * What the canvas draws. A `detailed` preference is demoted to `micromap`
- * whenever policy withholds the external basemap: dots on an empty background
- * are strictly worse than the local city outline we already ship.
+ * whenever the provider is not allowed: dots on an empty background are
+ * strictly worse than the local city outline we already ship.
  */
 export function effectiveMapMode(
   mode: MapDetailMode,
-  basemapMode: PrivacyPolicy["basemapMode"],
+  basemapAllowed: boolean,
 ): MapDetailMode {
-  if (mode === "detailed" && basemapMode !== "external-detailed") {
+  if (mode === "detailed" && !basemapAllowed) {
     return "micromap";
   }
   return mode;
 }
 
 interface ApplyMapModeDeps {
-  level: PrivacyLevel;
   setMapDetailMode: (mode: MapDetailMode) => void;
-  setOverride: <K extends keyof PrivacyPolicy>(
-    axis: K,
-    value: PrivacyPolicy[K],
-  ) => void;
-  clearOverride: <K extends keyof PrivacyPolicy>(axis: K) => void;
+  /** Records the decision; defaults to a Settings grant. */
+  grantDetailedMap?: (providerId: string) => void;
+  providerId?: string;
 }
 
-/** Apply the single choice to both the display setting and the policy axis. */
+function grantDetailedMapInSettings(providerId: string): void {
+  grantFlow(DETAILED_BASEMAP_FLOW, "settings", providerId);
+}
+
+/** Apply the single choice: the display preference, plus the provider grant
+ * when the detailed map is chosen. */
 export function applyMapMode(
   mode: MapDetailMode,
-  { level, setMapDetailMode, setOverride, clearOverride }: ApplyMapModeDeps,
+  {
+    setMapDetailMode,
+    grantDetailedMap = grantDetailedMapInSettings,
+    providerId = DEFAULT_BASEMAP_PROVIDER,
+  }: ApplyMapModeDeps,
 ): void {
+  if (mode === "detailed") grantDetailedMap(providerId);
   setMapDetailMode(mode);
-  const desired = basemapModeFor(mode);
-  if (desired === compatLevelFloor(level).basemapMode) {
-    clearOverride("basemapMode");
-  } else {
-    setOverride("basemapMode", desired);
-  }
 }
 
 /** React binding for `effectiveMapMode` — the one hook map layers should use. */
 export function useEffectiveMapMode(): MapDetailMode {
   const mode = useSettingsStore((s) => s.mapDetailMode);
-  const basemapMode = usePolicy().basemapMode;
-  return effectiveMapMode(mode, basemapMode);
+  const basemapAllowed = useExternalBasemapAllowed();
+  return effectiveMapMode(mode, basemapAllowed);
 }

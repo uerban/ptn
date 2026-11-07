@@ -1,5 +1,6 @@
 import { api } from "./api.ts";
-import { getPolicy } from "../stores/privacyStore.ts";
+import { canUse } from "../privacy/canUse.ts";
+import { REALTIME_FLOW } from "./departuresPolicy.ts";
 import type { RtRouteUpdate } from "@pt/shared";
 import {
   RT_CLIENT_IDLE_INTERVAL_MS,
@@ -17,23 +18,13 @@ const INTERVALS: Record<RtMode, number> = {
 };
 
 /**
- * The realTimePolling privacy axis, read at every poll — the level can change
- * while the poller runs. "disabled-schedule-only" never asks; "backend-
- * foreground-only" asks only while the page is visible. Every live-data
- * surface (guidance, result cards, line preview) polls through here, so this
- * is the one place the axis has to hold.
+ * Live departures, resolved at every poll — the decision can change (also in
+ * another tab) while the poller runs. Every live-data surface (guidance,
+ * result cards, line preview) polls through here, so this is the one place
+ * the decision has to hold.
  */
 function pollingAllowed(): boolean {
-  const mode = getPolicy().realTimePolling;
-  if (mode === "disabled-schedule-only") return false;
-  if (
-    mode === "backend-foreground-only" &&
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
-    return false;
-  }
-  return true;
+  return canUse(REALTIME_FLOW);
 }
 
 export class RtPoller {
@@ -99,7 +90,8 @@ export class RtPoller {
     const results = await Promise.allSettled(
       entries.map(async ([routeId, callback]) => {
         const update = await api.fetchRouteRt(routeId);
-        callback(update);
+        // A revocation during the request drops its late result.
+        if (pollingAllowed()) callback(update);
       }),
     );
     for (let i = 0; i < results.length; i++) {

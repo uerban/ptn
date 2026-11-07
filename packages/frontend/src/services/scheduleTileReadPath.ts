@@ -259,9 +259,8 @@ const rtTileReuse = new Map<string, { at: number; updates: Promise<RtOverlay> }>
  * `getDeparturesFromTile` looks trips up: `tripId|startDate` when the feed
  * scopes the trip to a service day, the bare `tripId` otherwise.
  *
- * Nothing is fetched at the schedule-only real-time level
- * (`realTimePolling: "disabled-schedule-only"`): that level promises no live
- * data, so every tile read (the stop popup, the departure sheet, the map
+ * Nothing is fetched unless live departures (`operator.realtime`) are
+ * allowed: every tile read (the stop popup, the departure sheet, the map
  * strip) is then the timetable alone. Otherwise a request made for the same
  * tile within `RT_TILE_REUSE_MS` (or still in flight) is reused. Never throws:
  * any non-200 (409 roll/unavailable, network) → `undefined` = schedule-only,

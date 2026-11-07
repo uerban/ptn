@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PrivacyPolicy } from "@pt/shared";
+import type { ProtectionPolicy } from "@pt/shared/privacy";
 import { useTranslation } from "../../i18n/index.ts";
 import {
   usePrivacyChoicesStore,
@@ -23,7 +23,7 @@ export interface OptionalStorageChoiceProps {
 
 function policyPermits(
   category: OptionalStorageCategory,
-  policy: PrivacyPolicy,
+  policy: ProtectionPolicy,
 ): boolean {
   switch (category) {
     case "recents":

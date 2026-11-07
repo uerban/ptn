@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  compatEffectivePolicy,
-  compatLevelFloor,
   effectivePolicy,
   isProtectionAxis,
   LEGACY_NETWORK_FLOORS_V1,
@@ -81,14 +79,11 @@ describe("LEGACY_NETWORK_FLOORS_V1", () => {
     );
   });
 
-  it("the compatibility view matches the former full floors", () => {
-    expect(compatLevelFloor("hardened")).toEqual({
-      ...LEVEL_FLOORS.hardened,
-      ...LEGACY_NETWORK_FLOORS_V1.hardened,
-    });
-    expect(
-      compatEffectivePolicy("standard", { basemapMode: "local-only" }).basemapMode,
-    ).toBe("local-only");
+  it("the protection policy carries no network axis", () => {
+    for (const level of PRIVACY_LEVELS) {
+      const policy = effectivePolicy(level, { basemapMode: "local-only" });
+      for (const axis of NETWORK_POLICY_AXES) expect(policy).not.toHaveProperty(axis);
+    }
   });
 });
 

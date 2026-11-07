@@ -1,40 +1,50 @@
-import type { PrivacyPolicy } from "@pt/shared";
 import type { CartoStyleJson } from "../map/styleBuilder.ts";
 import {
   getBasemapProvider,
   type BasemapProviderId,
 } from "../config/basemapProviders.ts";
+import { canUse, useCanUse } from "../privacy/canUse.ts";
 
+export const DETAILED_BASEMAP_FLOW = "external.detailed-basemap";
+/** The provider the detailed map uses today. */
+export const DEFAULT_BASEMAP_PROVIDER: BasemapProviderId = "carto";
+
+/** Whether the detailed map may reach `providerId`. The decision is per
+ * provider: allowing one never covers another. */
 export function isExternalBasemapAllowed(
-  policy: PrivacyPolicy,
-  providerId: string,
+  providerId: string = DEFAULT_BASEMAP_PROVIDER,
 ): boolean {
-  return (
-    policy.basemapMode === "external-detailed" &&
-    getBasemapProvider(providerId) !== undefined
-  );
+  return canUse(DETAILED_BASEMAP_FLOW, providerId);
+}
+
+/** React binding of `isExternalBasemapAllowed`; re-renders on revocation. */
+export function useExternalBasemapAllowed(
+  providerId: string = DEFAULT_BASEMAP_PROVIDER,
+): boolean {
+  return useCanUse(DETAILED_BASEMAP_FLOW, providerId);
 }
 
 interface FetchBasemapStyleOptions {
   providerId: BasemapProviderId | string;
   dark: boolean;
   signal: AbortSignal;
-  getPolicy: () => PrivacyPolicy;
+  /** Override of the decision check, for tests. */
+  isAllowed?: (providerId: string) => boolean;
   fetchImpl?: typeof fetch;
 }
 
-/** Fetch an external style only while both the provider and live policy allow
- * it. The second policy read closes the async-response race: a style fetched
- * before a privacy change is never applied after that change. */
+/** Fetch an external style only while the provider's flow is allowed. The
+ * second check closes the async-response race: a style fetched before a
+ * revocation is never applied after it. */
 export async function fetchBasemapStyle({
   providerId,
   dark,
   signal,
-  getPolicy,
+  isAllowed = isExternalBasemapAllowed,
   fetchImpl = fetch,
 }: FetchBasemapStyleOptions): Promise<CartoStyleJson | null> {
   const provider = getBasemapProvider(providerId);
-  if (!provider || !isExternalBasemapAllowed(getPolicy(), provider.id)) {
+  if (!provider || !isAllowed(provider.id)) {
     return null;
   }
 
@@ -45,5 +55,5 @@ export async function fetchBasemapStyle({
   if (!response.ok) throw new Error(`${provider.id} HTTP ${response.status}`);
   const style = (await response.json()) as CartoStyleJson;
 
-  return isExternalBasemapAllowed(getPolicy(), provider.id) ? style : null;
+  return isAllowed(provider.id) ? style : null;
 }

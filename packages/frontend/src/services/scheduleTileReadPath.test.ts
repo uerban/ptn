@@ -12,6 +12,7 @@ import type {
   RtTileResponse,
 } from "@pt/shared/schedule-tile";
 import type { FetchManifestResult, FetchRtTileResult, FetchScheduleTileResult } from "./api.ts";
+import { allowFlow, denyFlow, resetFlows } from "../test-helpers/networkDecisions.ts";
 
 // ─── Boundary mocks ───────────────────────────────────────────────────────────
 // `@pt/shared/poi` geometry stays REAL (resolved coords are genuine). Only `./api.ts`
@@ -182,6 +183,10 @@ async function clearStops(): Promise<void> {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  // Real-time updates allowed unless a case says otherwise (persisted, so
+  // freshly imported modules see it too).
+  resetFlows();
+  allowFlow("operator.realtime");
   isScheduleTileEnabledMock.mockReturnValue(true);
   pruneToBundleHashMock.mockResolvedValue(undefined);
   ensureUnderBudgetMock.mockResolvedValue(undefined);
@@ -1234,21 +1239,16 @@ describe("departuresForStops (several stops, tile-only)", () => {
 
   // The live overlay is shared by every tile read: the stop popup and the
   // departure sheet (`departuresForStop`) and the map strip (both reads).
-  describe("rt-tile: privacy level and reuse", () => {
-    type PrivacyStore = typeof import("../stores/privacyStore.ts").usePrivacyStore;
-
-    afterEach(async () => {
-      const { usePrivacyStore } = await import("../stores/privacyStore.ts");
-      usePrivacyStore.setState({ level: "standard", overrides: {} });
-      localStorage.removeItem("ptn-privacy");
+  describe("rt-tile: real-time decision and reuse", () => {
+    afterEach(() => {
+      resetFlows();
       vi.restoreAllMocks();
     });
 
-    /** Fresh modules, the privacy store set up by `apply`, then the SUT. */
-    async function loadAt(apply: (store: PrivacyStore) => void) {
+    /** The decision set up by `apply`, then fresh modules and the SUT. */
+    async function loadAt(apply: () => void = () => {}) {
+      apply();
       vi.resetModules();
-      const { usePrivacyStore } = await import("../stores/privacyStore.ts");
-      apply(usePrivacyStore);
       return import("./scheduleTileReadPath.ts");
     }
 
@@ -1264,11 +1264,9 @@ describe("departuresForStops (several stops, tile-only)", () => {
     }
 
     it.each([
-      ["the strict level", (s: PrivacyStore) =>
-        s.setState({ level: "strict", overrides: {} })],
-      ["a realTimePolling override", (s: PrivacyStore) =>
-        s.setState({ level: "standard", overrides: { realTimePolling: "disabled-schedule-only" } })],
-    ])("fetches no /gtfs/rt-tile/ at the schedule-only level (%s)", async (_name, apply) => {
+      ["unset", () => resetFlows()],
+      ["denied", () => denyFlow("operator.realtime")],
+    ])("fetches no /gtfs/rt-tile/ while real-time updates are %s", async (_name, apply) => {
       const { departuresForStop, departuresForStops } = await loadAt(apply);
       await seedTwoStopsInOneTile();
 
@@ -1282,8 +1280,8 @@ describe("departuresForStops (several stops, tile-only)", () => {
       expect(reportTelemetryMock).not.toHaveBeenCalledWith("rt_tile_unavailable", expect.anything());
     });
 
-    it("still fetches it at the default level", async () => {
-      const { departuresForStop } = await loadAt((s) => s.setState({ level: "standard", overrides: {} }));
+    it("fetches it once real-time updates are allowed", async () => {
+      const { departuresForStop } = await loadAt(() => allowFlow("operator.realtime"));
       await seedTwoStopsInOneTile();
 
       await departuresForStop({ stopId: "A1", now: NOW });
@@ -1294,7 +1292,7 @@ describe("departuresForStops (several stops, tile-only)", () => {
 
     it("reuses a tile's rt-tile within RT_TILE_REUSE_MS, in flight or settled, and refetches after", async () => {
       const { departuresForStop, departuresForStops, RT_TILE_REUSE_MS } =
-        await loadAt((s) => s.setState({ level: "standard", overrides: {} }));
+        await loadAt();
       await seedTwoStopsInOneTile();
       const t0 = Date.now();
       const clock = vi.spyOn(Date, "now").mockReturnValue(t0);
@@ -1319,7 +1317,7 @@ describe("departuresForStops (several stops, tile-only)", () => {
 
     it("keeps one rt-tile per tile for a whole batch, even one that outlasts RT_TILE_REUSE_MS", async () => {
       const { departuresForStops, RT_TILE_REUSE_MS } =
-        await loadAt((s) => s.setState({ level: "standard", overrides: {} }));
+        await loadAt();
       await seedTwoStopsInOneTile();
       const t0 = Date.now();
       const clock = vi.spyOn(Date, "now").mockReturnValue(t0);

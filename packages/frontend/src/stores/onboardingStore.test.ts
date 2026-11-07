@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  compatEffectivePolicy,
   effectivePolicy,
   matchOnboardingPreset,
   type GuidedNetworkChoice,
@@ -249,7 +248,7 @@ describe("legacy installations", () => {
     await bootLegacy({ level: "strict", overrides: {} });
     const { level, overrides } = usePrivacyStore.getState();
     expect(level).toBe("strict");
-    expect(compatEffectivePolicy(level, overrides).m11TileDefense).toBe(
+    expect(effectivePolicy(level, overrides).m11TileDefense).toBe(
       "prefetch-padding-decoy",
     );
     expect(record().legacyOverrides).toEqual({ m11TileDefense: "prefetch-padding-decoy" });

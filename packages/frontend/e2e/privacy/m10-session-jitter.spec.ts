@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
+import { seedNetworkDecisions } from "../helpers/setup-complete";
 
 const ADAPTER_MODULE = "/src/services/geocoder/ThirdPartyGeocoderAdapter.ts";
 const COORD_PRIVACY_MODULE = "/src/services/coordPrivacy.ts";
@@ -30,7 +31,6 @@ async function triggerForward(page: Page): Promise<void> {
         ThirdPartyGeocoderAdapter: new (
           config: { provider: string; endpoint: string },
           getPolicy: () => {
-            m10ThirdPartyEnabled: boolean;
             m10CoarsenGridDefaultMeters: number;
           },
         ) => {
@@ -47,7 +47,6 @@ async function triggerForward(page: Page): Promise<void> {
           endpoint: "https://nominatim.openstreetmap.org",
         },
         () => ({
-          m10ThirdPartyEnabled: true,
           m10CoarsenGridDefaultMeters: grid,
         }),
       );
@@ -74,7 +73,6 @@ async function triggerSeededForward(
         ThirdPartyGeocoderAdapter: new (
           config: { provider: string; endpoint: string },
           getPolicy: () => {
-            m10ThirdPartyEnabled: boolean;
             m10CoarsenGridDefaultMeters: number;
           },
         ) => {
@@ -91,7 +89,6 @@ async function triggerSeededForward(
           endpoint: "https://nominatim.openstreetmap.org",
         },
         () => ({
-          m10ThirdPartyEnabled: true,
           m10CoarsenGridDefaultMeters: grid,
         }),
       );
@@ -115,9 +112,9 @@ test.describe("M10 T-16: Per-session jitter across sessions @mock-api", () => {
     const page = await ctx.newPage();
 
     await bootAtPrivacyLevel(page, "standard", {
-      m10ThirdPartyEnabled: true,
       m10CoarsenGridDefaultMeters: GRID,
     });
+    await seedNetworkDecisions(page, { "external.place-search@nominatim": "allowed" });
     await mockApi(page);
 
     const urls: string[] = [];
@@ -146,9 +143,9 @@ test.describe("M10 T-16: Per-session jitter across sessions @mock-api", () => {
       const page = await ctx.newPage();
 
       await bootAtPrivacyLevel(page, "standard", {
-        m10ThirdPartyEnabled: true,
         m10CoarsenGridDefaultMeters: GRID,
       });
+      await seedNetworkDecisions(page, { "external.place-search@nominatim": "allowed" });
       await mockApi(page);
 
       let capturedUrl = "";

@@ -6,6 +6,7 @@ import {
   type ThirdPartyGeocoderConfig,
 } from "./ThirdPartyGeocoderAdapter.ts";
 import { _resetSessionJitter, type CoarsenedRequest } from "../coordPrivacy.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 const NOMINATIM_CONFIG: ThirdPartyGeocoderConfig = {
   provider: "nominatim",
@@ -24,12 +25,6 @@ const MAPBOX_CONFIG: ThirdPartyGeocoderConfig = {
 };
 
 const ENABLED_POLICY = () => ({
-  m10ThirdPartyEnabled: true as const,
-  m10CoarsenGridDefaultMeters: 500,
-});
-
-const DISABLED_POLICY = () => ({
-  m10ThirdPartyEnabled: false as const,
   m10CoarsenGridDefaultMeters: 500,
 });
 
@@ -37,6 +32,10 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   _resetSessionJitter();
+  resetFlows();
+  for (const provider of ["nominatim", "photon", "mapbox"]) {
+    allowFlow("external.place-search", provider);
+  }
   fetchSpy = vi.fn();
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -211,15 +210,28 @@ describe("ThirdPartyGeocoderAdapter", () => {
   });
 
   describe("isAvailable()", () => {
-    test("returns false when m10ThirdPartyEnabled === false", () => {
+    test("returns false while the provider's decision is unset or denied", () => {
       const adapter = new ThirdPartyGeocoderAdapter(
         NOMINATIM_CONFIG,
-        DISABLED_POLICY,
+        ENABLED_POLICY,
+      );
+      resetFlows();
+      expect(adapter.isAvailable()).toBe(false);
+      denyFlow("external.place-search", "nominatim");
+      expect(adapter.isAvailable()).toBe(false);
+    });
+
+    test("is scoped to its own provider", () => {
+      resetFlows();
+      allowFlow("external.place-search", "photon");
+      const adapter = new ThirdPartyGeocoderAdapter(
+        NOMINATIM_CONFIG,
+        ENABLED_POLICY,
       );
       expect(adapter.isAvailable()).toBe(false);
     });
 
-    test("returns true when m10ThirdPartyEnabled === true", () => {
+    test("returns true once the provider is allowed", () => {
       const adapter = new ThirdPartyGeocoderAdapter(
         NOMINATIM_CONFIG,
         ENABLED_POLICY,
@@ -725,9 +737,10 @@ describe("ThirdPartyGeocoderAdapter", () => {
         expect(adapter.unavailableReason).toMatch(/Mapbox/);
       });
 
-      test("surfaces disabled policy reason", () => {
+      test("surfaces the not-allowed reason", () => {
+        denyFlow("external.place-search", "nominatim");
         const config = configFromAllowlist("nominatim");
-        const adapter = new ThirdPartyGeocoderAdapter(config, DISABLED_POLICY);
+        const adapter = new ThirdPartyGeocoderAdapter(config, ENABLED_POLICY);
 
         expect(adapter.unavailableReason).toMatch(/disabled/i);
       });
@@ -739,9 +752,10 @@ describe("ThirdPartyGeocoderAdapter", () => {
         expect(adapter.unavailableReason).toBeNull();
       });
 
-      test("policy check takes precedence over API key check", () => {
+      test("decision check takes precedence over API key check", () => {
+        denyFlow("external.place-search", "mapbox");
         const config = configFromAllowlist("mapbox");
-        const adapter = new ThirdPartyGeocoderAdapter(config, DISABLED_POLICY);
+        const adapter = new ThirdPartyGeocoderAdapter(config, ENABLED_POLICY);
 
         expect(adapter.unavailableReason).toMatch(/disabled/i);
         expect(adapter.unavailableReason).not.toMatch(/API key/);

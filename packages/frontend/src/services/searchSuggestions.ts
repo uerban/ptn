@@ -335,7 +335,7 @@ export function __resetGeocoderPresentAccessorForTests(): void {
 }
 
 // Third injected accessor: "may this device egress to a third party?" Wired from
-// bootPoi.ts over isTransitousAllowed, alongside the two mode accessors above —
+// bootPoi.ts over the `external.stop-search` flow, alongside the two mode accessors above —
 // same leaf-module reason (importing privacyStore here would pull the store graph
 // into a leaf that tests instantiate directly).
 //
@@ -749,10 +749,10 @@ async function fetchStopsForProvider(
 
   // Call-time third-party egress backstop, mirroring planViaTransitous
   // (services/transitousClient.ts): the remote provider reaches transitous even
-  // though the PTN backend proxies the call, so it needs m10ThirdPartyEnabled —
-  // the operator hop does NOT exempt it (services/transitousAvailability.ts).
-  // Settings disables the radio, but a stale render or a persisted "remote"
-  // choice made before the level tightened must not egress either.
+  // though the PTN backend proxies the call, so it needs its own flow
+  // (`external.stop-search`) — the operator hop does NOT exempt it. A stale
+  // render or a persisted "remote" choice made before a revocation must not
+  // egress either.
   //
   // Degrade to the local scan rather than returning nothing: the user asked for
   // stop results, and the local path reads the already-loaded stops table, so

@@ -289,13 +289,16 @@ import {
   registerSelfHostedGeocoder,
   unregisterSelfHostedGeocoder,
 } from "./registerSelfHosted.ts";
+import { allowFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 describe("server-side search through the EXISTING stack (AC-4 / AC-4c / AC-16)", () => {
   beforeEach(() => {
     geocoderRegistry.setActiveModeAccessor(() => "server-side");
     unregisterSelfHostedGeocoder();
+    allowFlow("operator.place-search");
   });
   afterEach(() => {
+    resetFlows();
     unregisterSelfHostedGeocoder();
     geocoderRegistry.setActiveModeAccessor(() => "eager-bundle"); // restore default
     vi.unstubAllGlobals();

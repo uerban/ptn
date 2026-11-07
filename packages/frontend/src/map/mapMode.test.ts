@@ -1,89 +1,67 @@
-import { describe, expect, test, beforeEach, vi, type Mock } from "vitest";
-import {
-  applyMapMode,
-  basemapModeFor,
-  effectiveMapMode,
-  isDetailedMapLocked,
-  maxLevelForDetailedMap,
-} from "./mapMode.ts";
-
-describe("basemapModeFor", () => {
-  test("only the detailed mode implies the external basemap", () => {
-    expect(basemapModeFor("detailed")).toBe("external-detailed");
-    expect(basemapModeFor("micromap")).toBe("local-only");
-    expect(basemapModeFor("gtfs-only")).toBe("local-only");
-  });
-});
+import { LEVEL_FLOORS } from "@pt/shared/privacy";
+import { describe, expect, test, beforeEach, vi } from "vitest";
+import { applyMapMode, effectiveMapMode, isDetailedMapLocked } from "./mapMode.ts";
+import { canUse, getNetworkDecision } from "../privacy/canUse.ts";
+import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
+import { denyFlow, resetFlows } from "../test-helpers/networkDecisions.ts";
 
 describe("effectiveMapMode", () => {
-  test("passes the mode through when policy allows the external basemap", () => {
-    expect(effectiveMapMode("detailed", "external-detailed")).toBe("detailed");
-    expect(effectiveMapMode("micromap", "external-detailed")).toBe("micromap");
-    expect(effectiveMapMode("gtfs-only", "external-detailed")).toBe("gtfs-only");
+  test("passes the mode through when the detailed map is allowed", () => {
+    expect(effectiveMapMode("detailed", true)).toBe("detailed");
+    expect(effectiveMapMode("micromap", true)).toBe("micromap");
+    expect(effectiveMapMode("gtfs-only", true)).toBe("gtfs-only");
   });
 
-  test("demotes a detailed preference to the micromap under local-only policy", () => {
-    expect(effectiveMapMode("detailed", "local-only")).toBe("micromap");
+  test("demotes a detailed preference to the micromap while the provider is not allowed", () => {
+    expect(effectiveMapMode("detailed", false)).toBe("micromap");
   });
 
-  test("leaves an explicit gtfs-only choice alone under local-only policy", () => {
-    expect(effectiveMapMode("gtfs-only", "local-only")).toBe("gtfs-only");
+  test("leaves an explicit gtfs-only choice alone", () => {
+    expect(effectiveMapMode("gtfs-only", false)).toBe("gtfs-only");
   });
 });
 
-describe("privacy floors", () => {
-  test("hardened and above lock the external basemap", () => {
-    expect(isDetailedMapLocked("baseline")).toBe(false);
-    expect(isDetailedMapLocked("standard")).toBe(false);
-    expect(isDetailedMapLocked("hardened")).toBe(true);
-    expect(isDetailedMapLocked("strict")).toBe(true);
-    expect(isDetailedMapLocked("paranoid")).toBe(true);
-  });
-
-  test("names standard as the strictest level still allowing the external map", () => {
-    expect(maxLevelForDetailedMap()).toBe("standard");
+describe("isDetailedMapLocked", () => {
+  test("locks only a provider the build does not ship, at any level", async () => {
+    await usePrivacyStore.getState().setLevel("paranoid");
+    expect(isDetailedMapLocked()).toBe(false);
+    expect(isDetailedMapLocked("carto")).toBe(false);
+    expect(isDetailedMapLocked("unknown")).toBe(true);
+    usePrivacyStore.getState().reset();
   });
 });
 
 describe("applyMapMode", () => {
-  type Deps = Parameters<typeof applyMapMode>[1];
-  let setMapDetailMode: Mock<Deps["setMapDetailMode"]>;
-  let setOverride: Mock<Deps["setOverride"]>;
-  let clearOverride: Mock<Deps["clearOverride"]>;
-
   beforeEach(() => {
-    setMapDetailMode = vi.fn();
-    setOverride = vi.fn();
-    clearOverride = vi.fn();
+    resetFlows();
+    usePrivacyStore.getState().reset();
   });
 
-  const deps = (level: "baseline" | "standard" | "hardened") => ({
-    level,
-    setMapDetailMode,
-    setOverride,
-    clearOverride,
+  test("choosing the detailed map records the provider decision and the display setting", () => {
+    const setMapDetailMode = vi.fn();
+    applyMapMode("detailed", { setMapDetailMode });
+    expect(setMapDetailMode).toHaveBeenCalledWith("detailed");
+    expect(canUse("external.detailed-basemap", "carto")).toBe(true);
+    expect(getNetworkDecision("external.detailed-basemap", "carto")).toMatchObject({
+      value: "allowed",
+      source: "settings",
+    });
   });
 
-  test("writes the display setting and the axis override together", () => {
-    applyMapMode("micromap", deps("standard"));
+  test("choosing a local mode only changes the display setting", () => {
+    denyFlow("external.detailed-basemap", "carto");
+    const setMapDetailMode = vi.fn();
+    const grantDetailedMap = vi.fn();
+    applyMapMode("micromap", { setMapDetailMode, grantDetailedMap });
     expect(setMapDetailMode).toHaveBeenCalledWith("micromap");
-    expect(setOverride).toHaveBeenCalledWith("basemapMode", "local-only");
-    expect(clearOverride).not.toHaveBeenCalled();
+    expect(grantDetailedMap).not.toHaveBeenCalled();
+    expect(getNetworkDecision("external.detailed-basemap", "carto").value).toBe("denied");
   });
 
-  test("clears the override instead of pinning it to the level floor", () => {
-    // At standard the floor is already external-detailed, so choosing the
-    // detailed map must leave NO override behind — otherwise a later level
-    // change would find a stale pin.
-    applyMapMode("detailed", deps("standard"));
-    expect(clearOverride).toHaveBeenCalledWith("basemapMode");
-    expect(setOverride).not.toHaveBeenCalled();
-  });
-
-  test("clears the override for a local mode when the floor is already local", () => {
-    applyMapMode("gtfs-only", deps("hardened"));
-    expect(setMapDetailMode).toHaveBeenCalledWith("gtfs-only");
-    expect(clearOverride).toHaveBeenCalledWith("basemapMode");
-    expect(setOverride).not.toHaveBeenCalled();
+  test("never touches the protection level or its overrides", () => {
+    applyMapMode("detailed", { setMapDetailMode: vi.fn() });
+    applyMapMode("gtfs-only", { setMapDetailMode: vi.fn() });
+    expect(getPolicy()).toEqual(LEVEL_FLOORS.standard);
+    expect(usePrivacyStore.getState().overrides).toEqual({});
   });
 });

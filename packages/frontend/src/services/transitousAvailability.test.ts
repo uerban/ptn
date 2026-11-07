@@ -1,25 +1,30 @@
-import { describe, it, expect } from "vitest";
-import type { PrivacyPolicy } from "@pt/shared";
-import { compatLevelFloor } from "@pt/shared/privacy";
+import { beforeEach, describe, it, expect } from "vitest";
 import { isTransitousAllowed } from "./transitousAvailability.ts";
+import { usePrivacyStore } from "../stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../test-helpers/networkDecisions.ts";
 
-describe("isTransitousAllowed (double-gate)", () => {
-  it("allows only when remote residency AND third-party are both permitted", () => {
-    expect(isTransitousAllowed(compatLevelFloor("baseline"))).toBe(true);
-    expect(isTransitousAllowed(compatLevelFloor("standard"))).toBe(true);
-    expect(isTransitousAllowed(compatLevelFloor("hardened"))).toBe(false);
-    expect(isTransitousAllowed(compatLevelFloor("strict"))).toBe(false);
-    expect(isTransitousAllowed(compatLevelFloor("paranoid"))).toBe(false);
+describe("isTransitousAllowed", () => {
+  beforeEach(() => {
+    resetFlows();
+    usePrivacyStore.getState().reset();
   });
 
-  it("is false when a user override disables third-party even at user-choice residency", () => {
-    const overridden: PrivacyPolicy = { ...compatLevelFloor("standard"), m10ThirdPartyEnabled: false };
-    expect(overridden.routingAdapter).toBe("user-choice"); // residency still allows remote
-    expect(isTransitousAllowed(overridden)).toBe(false);    // but third-party gate closes it
+  it("is off until Transitous routing is allowed", () => {
+    expect(isTransitousAllowed()).toBe(false);
+    allowFlow("external.remote-routing", "transitous");
+    expect(isTransitousAllowed()).toBe(true);
   });
 
-  it("is false when residency is local-only even if third-party is enabled", () => {
-    const overridden: PrivacyPolicy = { ...compatLevelFloor("hardened"), m10ThirdPartyEnabled: true };
-    expect(isTransitousAllowed(overridden)).toBe(false);
+  it("is off when Transitous routing is denied", () => {
+    denyFlow("external.remote-routing", "transitous");
+    expect(isTransitousAllowed()).toBe(false);
+  });
+
+  it("does not follow the operator's routing decision or the level", async () => {
+    allowFlow("operator.remote-routing");
+    expect(isTransitousAllowed()).toBe(false);
+    allowFlow("external.remote-routing", "transitous");
+    await usePrivacyStore.getState().setLevel("paranoid");
+    expect(isTransitousAllowed()).toBe(true);
   });
 });

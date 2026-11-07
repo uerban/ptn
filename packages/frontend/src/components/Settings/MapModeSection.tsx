@@ -1,8 +1,4 @@
 import {
-  usePrivacyStore,
-  usePolicy,
-} from "../../stores/privacyStore.ts";
-import {
   useSettingsStore,
   type MapDetailMode,
 } from "../../stores/settingsStore.ts";
@@ -11,31 +7,26 @@ import {
   effectiveMapMode,
   isDetailedMapLocked,
   MAP_MODE_ORDER,
-  maxLevelForDetailedMap,
 } from "../../map/mapMode.ts";
+import { useExternalBasemapAllowed } from "../../services/basemapPrivacy.ts";
 import { BASEMAP_PROVIDERS } from "../../config/basemapProviders.ts";
 import { useTranslation } from "../../i18n/index.ts";
 
 /**
  * The single map-mode control.
  *
- * It replaces the pair that used to disagree with each other: the old Display →
- * "Map detail" radio and the privacy centre's "Detailed map" axis. Selecting a
- * mode here writes the display setting AND the `basemapMode` privacy override
- * (see `map/mapMode.ts`); the privacy preset still caps what is selectable, so
- * at Hardened and above the external option renders locked instead of being
- * silently ignored.
+ * Selecting a mode writes the display setting; selecting the detailed map is
+ * also the deliberate action that allows its provider (see `map/mapMode.ts`).
+ * While the provider is not allowed, a detailed preference draws the micromap
+ * and says so, with a way to allow it.
  */
 export function MapModeSection() {
   const { t } = useTranslation();
   const mapDetailMode = useSettingsStore((s) => s.mapDetailMode);
   const setMapDetailMode = useSettingsStore((s) => s.setMapDetailMode);
-  const level = usePrivacyStore((s) => s.level);
-  const setOverride = usePrivacyStore((s) => s.setOverride);
-  const clearOverride = usePrivacyStore((s) => s.clearOverride);
-  const basemapMode = usePolicy().basemapMode;
-  const effectiveMode = effectiveMapMode(mapDetailMode, basemapMode);
-  const detailedLocked = isDetailedMapLocked(level);
+  const basemapAllowed = useExternalBasemapAllowed();
+  const effectiveMode = effectiveMapMode(mapDetailMode, basemapAllowed);
+  const detailedLocked = isDetailedMapLocked();
 
   const providerName = BASEMAP_PROVIDERS.carto.name;
 
@@ -64,11 +55,9 @@ export function MapModeSection() {
   };
 
   const lockedCopy = t(
-    "settings.map_mode_locked",
-    "Locked by the {level} preset. Lower your privacy level to {minLevel} to use the external map.",
-  )
-    .replace("{level}", level)
-    .replace("{minLevel}", maxLevelForDetailedMap());
+    "privacy.map.detailedUnavailable",
+    "The detailed map is not available in this version of the app.",
+  );
 
   return (
     <section id="settings-map-mode" aria-labelledby="settings-map-mode-heading">
@@ -113,12 +102,7 @@ export function MapModeSection() {
                 checked={mapDetailMode === mode}
                 disabled={disabled}
                 onChange={() =>
-                  applyMapMode(mode, {
-                    level,
-                    setMapDetailMode,
-                    setOverride,
-                    clearOverride,
-                  })
+                  applyMapMode(mode, { setMapDetailMode })
                 }
                 className="accent-accent mt-1"
               />
@@ -141,13 +125,22 @@ export function MapModeSection() {
           </a>
         </p>
       )}
-      {mapDetailMode === "detailed" && basemapMode !== "external-detailed" && (
-        <p className="text-xs text-fg-muted mt-2">
-          {t(
-            "settings.map_mode_demoted",
-            "Your privacy level is withholding the external map, so the offline micromap is drawn instead.",
-          )}
-        </p>
+      {mapDetailMode === "detailed" && !basemapAllowed && !detailedLocked && (
+        <div className="text-xs text-fg-muted mt-2 flex flex-col items-start gap-1">
+          <p>
+            {t(
+              "privacy.map.detailedNotAllowed",
+              "Detailed maps from {provider} are off, so the offline micromap is drawn instead.",
+            ).replace("{provider}", providerName)}
+          </p>
+          <button
+            type="button"
+            onClick={() => applyMapMode("detailed", { setMapDetailMode })}
+            className="text-accent underline"
+          >
+            {t("privacy.map.allowDetailed", "Use detailed maps")}
+          </button>
+        </div>
       )}
     </section>
   );

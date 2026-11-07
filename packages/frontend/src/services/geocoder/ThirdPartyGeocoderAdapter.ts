@@ -4,7 +4,7 @@ import type {
   GeocoderProviderId,
   LatLon,
   PrivacyTier,
-  PrivacyPolicy,
+  ProtectionPolicy,
 } from "@pt/shared";
 import { coarsen, type CoarsenedRequest } from "../coordPrivacy.ts";
 import { fetchThirdPartyGeocoder, formatCoord } from "./fetchThirdParty.ts";
@@ -16,6 +16,7 @@ import {
 import { dedupKey } from "./dedupKey.ts";
 import { readDedupEntry, writeDedupEntry } from "./dedupCache.ts";
 import { reportError } from "../errorReporter.ts";
+import { canUse } from "../../privacy/canUse.ts";
 
 const PROVIDER_IDS: Record<ThirdPartyProviderId, GeocoderProviderId> = {
   mapbox: "third-party-mapbox",
@@ -41,10 +42,7 @@ export function configFromAllowlist(
   };
 }
 
-type PolicySlice = Pick<
-  PrivacyPolicy,
-  "m10ThirdPartyEnabled" | "m10CoarsenGridDefaultMeters"
->;
+type PolicySlice = Pick<ProtectionPolicy, "m10CoarsenGridDefaultMeters">;
 
 const RESULT_LIMIT = 5;
 export const DEFAULT_GRID_METERS = 500;
@@ -54,20 +52,28 @@ export class ThirdPartyGeocoderAdapter implements GeocoderAdapter {
   readonly privacyTier = "third-party" as const;
   private readonly providerMeta: Readonly<ProviderConfig>;
   private readonly getApiKey: () => string | undefined;
+  private readonly isAllowed: () => boolean;
 
+  /**
+   * `isAllowed` resolves `external.place-search` for this provider; it is read
+   * on every availability check, so a revocation applies to the next query.
+   */
   constructor(
     private readonly config: ThirdPartyGeocoderConfig,
     private readonly getPolicy: () => PolicySlice,
     getApiKey?: () => string | undefined,
+    isAllowed?: () => boolean,
   ) {
     this.id = PROVIDER_IDS[config.provider];
     this.providerMeta = getProvider(config.provider);
     this.getApiKey = getApiKey ?? (() => config.apiKey);
+    this.isAllowed =
+      isAllowed ?? (() => canUse("external.place-search", config.provider));
   }
 
   get unavailableReason(): string | null {
-    if (!this.getPolicy().m10ThirdPartyEnabled) {
-      return "third-party geocoding is disabled by privacy policy";
+    if (!this.isAllowed()) {
+      return `third-party geocoding with ${this.providerMeta.name} is disabled until it is allowed`;
     }
     if (this.providerMeta.apiKeyFormat && !this.getApiKey()) {
       return `${this.providerMeta.name} requires an API key`;

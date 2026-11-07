@@ -39,7 +39,7 @@ export function registerSelfHostedGeocoder(
   currentConfig = config;
   geocoderRegistry.register(
     new SelfHostedGeocoderAdapter(config, () => ({
-      m9SelfHosted: getPolicy().m9SelfHosted,
+      m10CoarsenGridFloorMeters: getPolicy().m10CoarsenGridFloorMeters,
       m10CoarsenGridDefaultMeters: getPolicy().m10CoarsenGridDefaultMeters,
     })),
   );

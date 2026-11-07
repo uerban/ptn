@@ -44,6 +44,7 @@ import { useStopStore } from "../../src/stores/stopStore.ts";
 import { useGtfsDataStore } from "../../src/stores/gtfsDataStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 
 // ─── Geometry (metres from the grid origin) ──────────────────────────────────
 
@@ -88,6 +89,8 @@ const realCity = useCityStore.getState().activeCity;
 beforeEach(() => {
   vi.clearAllMocks();
   usePrivacyStore.getState().reset();
+  resetFlows();
+  allowFlow("operator.realtime");
   useCityStore.setState({ activeCity: { ...realCity, tz: "UTC" } });
   useStopStore.setState({ stops: STREET, hydrated: true } as never);
   useGtfsDataStore.setState({ raptorIndex: STREET_INDEX });
@@ -474,7 +477,7 @@ describe("useNearbyDirections — the other stops' batch over time", () => {
 
 describe("useNearbyDirections — privacy", () => {
   it("api.getDepartures is never called with a non-S stop id", async () => {
-    // The tile cannot serve S → useDepartures' policy-gated fallback asks the
+    // The tile cannot serve S → useDepartures' decision-gated fallback asks the
     // server about S. The other stops must never take that path.
     vi.mocked(departuresForStop).mockResolvedValue({ state: "unavailable" } as never);
     vi.mocked(departuresForStops).mockResolvedValue(new Map());

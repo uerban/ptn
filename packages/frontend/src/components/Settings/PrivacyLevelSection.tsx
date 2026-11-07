@@ -1,8 +1,14 @@
-import { PRIVACY_LEVELS, type PrivacyLevel, type PrivacyPolicy } from "@pt/shared/privacy";
+import {
+  PRIVACY_LEVELS,
+  type PrivacyLevel,
+  type ProtectionAxis,
+  type ProtectionPolicy,
+} from "@pt/shared/privacy";
 import { CarriedOverOverrides } from "./CarriedOverOverrides.tsx";
+import { NetworkDecisionsSection } from "./NetworkDecisionsSection.tsx";
 import { PolicyAxisControl } from "./PolicyAxisControl.tsx";
 import { ThirdPartyProvidersSection } from "./ThirdPartyProvidersSection.tsx";
-import { usePolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
+import { usePrivacyStore } from "../../stores/privacyStore.ts";
 import { useTranslation, usePrivacyNamespace } from "../../i18n/index.ts";
 import { countRecents, clearRecents } from "../../services/recents.ts";
 
@@ -35,19 +41,12 @@ const LEVEL_FALLBACKS: Record<PrivacyLevel, { name: string; description: string 
 };
 
 const AXES: {
-  axis: keyof PrivacyPolicy;
+  axis: ProtectionAxis;
   title: string;
   /** Always-visible one-line summary. */
   description: string;
   /** Key into DISCLOSURES — the full threat-model detail for this knob. */
   disclosure?: string;
-  /**
-   * Set when the axis is driven by a control that lives elsewhere in Settings.
-   * The axis still renders (its threat-model copy is load-bearing) but as a
-   * read-only summary plus a pointer, never as a second control for the same
-   * decision.
-   */
-  controlledBy?: "map-mode";
 }[] = [
   {
     axis: "recentsEncryption",
@@ -68,13 +67,6 @@ const AXES: {
     disclosure: "mapTap",
   },
   {
-    axis: "m10ThirdPartyEnabled",
-    title: "Third-party geocoding (M10)",
-    description:
-      "Whether queries may be sent to third-party providers such as Mapbox, Nominatim, or Photon.",
-    disclosure: "m10DedupCache",
-  },
-  {
     axis: "urlShare",
     title: "URL share & deep links",
     description: "What coordinate data may appear in shareable URLs.",
@@ -91,30 +83,6 @@ const AXES: {
     title: "Error reporting",
     description: "Allow the app to buffer error reports for later delivery.",
     disclosure: "errorReporting",
-  },
-  {
-    axis: "realTimePolling",
-    title: "Real-time polling",
-    description: "How often the app polls the backend for live departure data.",
-    disclosure: "realTimePolling",
-  },
-  {
-    // No control here on purpose: this axis is driven by the single Map
-    // control (Settings -> Map, `components/Settings/MapModeSection.tsx`).
-    // A second radio group for the same decision let the two disagree, and
-    // the map then obeyed whichever was stricter.
-    axis: "basemapMode",
-    title: "Detailed map",
-    description:
-      "Choose external street-level detail or PTN's local transit schematic.",
-    disclosure: "m11Tiles",
-    controlledBy: "map-mode",
-  },
-  {
-    axis: "nearbyStopLookup",
-    title: "Nearby-stop loading",
-    description:
-      "Choose whether PTN may request nearby stops using a public stop centroid.",
   },
 ];
 
@@ -134,8 +102,6 @@ const DISCLOSURES: Record<string, string> = {
     "Geocoder providers are tried in order of privacy tier (local, then self-hosted, then third-party). Fallbacks never happen silently at Standard or above — a status indicator shows which provider answered.",
   errorReporting:
     "If enabled, internal error reports are buffered locally for possible later delivery to help fix bugs. At Hardened and above, error reporting is disabled and the buffer is never written.",
-  realTimePolling:
-    "Real-time departure polling has distinct cadences (idle / navigating / transfer). Adaptive mode adds jitter to obscure phase transitions. At Strict the app only polls when visible; at Paranoid polling is disabled entirely.",
   m10DedupCache:
     "Dedup cache reduces third-party calls but creates a write-once query log on device. The log is unconditionally encrypted via the install key and expires per your privacy level (30d Baseline, 7d Standard, 1d Hardened when third-party is re-enabled). Strict and Paranoid do not cache. Browser profile reset destroys it with the install key.",
   m11Tiles:
@@ -149,8 +115,6 @@ export function PrivacyLevelSection() {
   usePrivacyNamespace();
   const level = usePrivacyStore((s) => s.level);
   const setLevel = usePrivacyStore((s) => s.setLevel);
-  // Read-only display for axes whose control lives elsewhere (see AXES.controlledBy).
-  const policy = usePolicy();
 
   // Intercept changes to the recentsEncryption axis: when the user selects
   // "off", confirm they want to purge any existing recents and then clear
@@ -160,7 +124,7 @@ export function PrivacyLevelSection() {
   // A programmatic `setOverride("recentsEncryption", "off")` would not
   // trigger the purge — no such caller exists today.
   const recentsInterceptChange = async (
-    next: PrivacyPolicy["recentsEncryption"],
+    next: ProtectionPolicy["recentsEncryption"],
   ): Promise<boolean> => {
     if (next !== "off") return true;
     const n = await countRecents();
@@ -229,7 +193,7 @@ export function PrivacyLevelSection() {
         <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
           {t("settings.privacy_overrides", "Per-axis overrides")}
         </h2>
-        {AXES.map(({ axis, title, description, disclosure, controlledBy }) => (
+        {AXES.map(({ axis, title, description, disclosure }) => (
           <div key={String(axis)} data-axis-group={String(axis)}>
             <h3 className="text-sm font-semibold text-fg mb-1">
               {t(`privacy.axis.${String(axis)}.title`, title)}
@@ -237,31 +201,11 @@ export function PrivacyLevelSection() {
             <p className="text-xs text-fg-muted mb-2">
               {t(`privacy.axis.${String(axis)}.description`, description)}
             </p>
-            {controlledBy === "map-mode" ? (
-              <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3">
-                <div className="text-sm text-fg">
-                  {t(
-                    `privacy.axis.${String(axis)}.option.${String(policy[axis])}`,
-                    String(policy[axis]),
-                  )}
-                </div>
-                <a
-                  href="#settings-map-mode"
-                  className="text-xs text-accent underline mt-1 inline-block"
-                >
-                  {t(
-                    `privacy.axis.${String(axis)}.controlledByMap`,
-                    "Change it under Map",
-                  )}
-                </a>
-              </div>
-            ) : (
-              <PolicyAxisControl
-                axis={axis}
-                i18nKeyPrefix={`privacy.axis.${String(axis)}`}
-                interceptChange={axis === "recentsEncryption" ? (recentsInterceptChange as never) : undefined}
-              />
-            )}
+            <PolicyAxisControl
+              axis={axis}
+              i18nKeyPrefix={`privacy.axis.${String(axis)}`}
+              interceptChange={axis === "recentsEncryption" ? (recentsInterceptChange as never) : undefined}
+            />
             {disclosure && (
               <details className="mt-2">
                 <summary className="text-xs text-fg-muted cursor-pointer select-none">
@@ -275,6 +219,19 @@ export function PrivacyLevelSection() {
           </div>
         ))}
       </section>
+
+      <NetworkDecisionsSection
+        details={{
+          "external.place-search": t(
+            "privacy.disclosure.m10DedupCache",
+            DISCLOSURES.m10DedupCache,
+          ),
+          "external.detailed-basemap": t(
+            "privacy.disclosure.m11Tiles",
+            DISCLOSURES.m11Tiles,
+          ),
+        }}
+      />
 
       <CarriedOverOverrides />
 

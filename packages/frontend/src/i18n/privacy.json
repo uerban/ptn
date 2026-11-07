@@ -214,5 +214,14 @@
   "privacy.carriedOver.description": "These protections were part of your privacy level before this update. They stay until you remove them or choose a level below Strict.",
   "privacy.carriedOver.label": "Carried over",
   "privacy.carriedOver.remove": "Remove",
-  "privacy.carriedOver.removeLabel": "Remove {title}"
+  "privacy.carriedOver.removeLabel": "Remove {title}",
+  "privacy.decisions.title": "Network services",
+  "privacy.decisions.description": "Each optional service connects only while it is on. Changing one never changes your privacy level or the other services.",
+  "privacy.decision.allowed": "On",
+  "privacy.decision.unset": "Ask first",
+  "privacy.decision.denied": "Off",
+  "privacy.map.detailedUnavailable": "The detailed map is not available in this version of the app.",
+  "privacy.map.detailedNotAllowed": "Detailed maps from {provider} are off, so the offline micromap is drawn instead.",
+  "privacy.map.allowDetailed": "Use detailed maps",
+  "privacy.thirdParty.unavailable": "Third-party geocoding is not available in this version of the app."
 }

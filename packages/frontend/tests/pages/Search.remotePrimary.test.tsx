@@ -9,6 +9,7 @@ import { useRoutingStore } from "../../src/stores/routingStore.ts";
 import { useGtfsDataStore } from "../../src/stores/gtfsDataStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 import * as connectivity from "../../src/hooks/useConnectivity.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
 
@@ -55,12 +56,16 @@ const nonEmptyResults = [
 // set) it ALWAYS falls back to on-device (the index is loaded) and SIGNALS it
 // (the transient banner); `navigator.onLine` (read via the `isDeviceOnline()`
 // seam) only PICKS the banner copy. A reachable-but-empty remote result is the
-// distinct `serverEmpty` state (no on-device retry). At the `local-only` privacy
-// ceiling the mode is inert → the on-device-first path runs.
+// distinct `serverEmpty` state (no on-device retry). While remote routing is
+// not allowed the mode is inert → the on-device-first path runs.
 describe("Search remote-primary flow", () => {
   beforeEach(async () => {
-    // `standard` keeps routingAdapter = "user-choice" → remoteAllowed === true.
+    // The standing remote mode was chosen in Settings, which allowed the
+    // routing flows it uses.
     usePrivacyStore.setState({ level: "standard", overrides: {} });
+    resetFlows();
+    allowFlow("operator.remote-routing");
+    allowFlow("external.remote-routing", "transitous");
     useSettingsStore.setState({
       routingMode: "remote-primary",
       routingProvider: "operator",
@@ -350,9 +355,9 @@ describe("Search remote-primary flow", () => {
     expect(searchSpy.mock.calls[0][3]).toEqual({ remote: true });
   });
 
-  // (7) remote-primary at local-only behaves as on-device-first; no indicator.
-  it("at local-only behaves as on-device-first (no { remote: true } first call, no indicator)", async () => {
-    usePrivacyStore.setState({ level: "hardened", overrides: {} });
+  // (7) remote-primary without an allowed decision behaves as on-device-first; no indicator.
+  it("while remote routing is denied behaves as on-device-first (no { remote: true } first call, no indicator)", async () => {
+    denyFlow("operator.remote-routing");
     const searchSpy = vi.fn().mockImplementation(async () => {
       useRoutingStore.setState({
         results: [], error: null, engineError: null, engineFailureKind: null, loading: false,
@@ -369,7 +374,7 @@ describe("Search remote-primary flow", () => {
     await waitFor(() => expect(searchSpy).toHaveBeenCalled());
     // The on-device-first path ran: the first call has NO { remote: true }.
     expect(searchSpy.mock.calls[0][3]).toBeUndefined();
-    // The indicator is inert at the local-only ceiling.
+    // The indicator is inert while remote routing is denied.
     expect(screen.queryByTestId("routing-mode-indicator")).not.toBeInTheDocument();
   });
 

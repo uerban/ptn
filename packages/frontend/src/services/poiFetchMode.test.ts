@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { clampPoiFetchModeToPolicy, resolvePoiFetchMode } from "./poiFetchMode.ts";
-import type { PrivacyPolicy } from "@pt/shared";
+import { clampPoiFetchModeToDecision, resolvePoiFetchMode } from "./poiFetchMode.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { usePrivacyStore } from "../stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../test-helpers/networkDecisions.ts";
 
 // Mock the WHOLE registerSelfHosted module so resolvePoiFetchMode's namespace
 // import (`import * as selfHosted`) resolves through the mock. Include EVERY
@@ -32,6 +32,12 @@ vi.mock("../config/cities.ts", () => ({
 }));
 
 import * as selfHosted from "./geocoder/registerSelfHosted.ts";
+
+// The precedence suites below exercise the ladder itself, so the server-side
+// place search is allowed (persisted, so freshly imported modules see it too).
+// The clamp suites revoke it explicitly.
+beforeEach(() => allowFlow("operator.place-search"));
+afterEach(() => resetFlows());
 
 async function freshResolve() {
   vi.resetModules();
@@ -190,22 +196,18 @@ describe("scoping over the REAL CITIES", () => {
   });
 });
 
-describe("clampPoiFetchModeToPolicy (privacy residency ceiling)", () => {
-  // Only poiResidency is read; cast a partial as the full policy for the unit.
-  const policy = (poiResidency: "user-choice" | "local-only") =>
-    ({ poiResidency }) as unknown as PrivacyPolicy;
-
-  it("local-only clamps server-side -> eager-bundle", () => {
-    expect(clampPoiFetchModeToPolicy("server-side", policy("local-only"))).toBe("eager-bundle");
+describe("clampPoiFetchModeToDecision (server-side place search decision)", () => {
+  it("a place search that is not allowed clamps server-side -> eager-bundle", () => {
+    expect(clampPoiFetchModeToDecision("server-side", false)).toBe("eager-bundle");
   });
 
-  it("user-choice leaves server-side intact", () => {
-    expect(clampPoiFetchModeToPolicy("server-side", policy("user-choice"))).toBe("server-side");
+  it("an allowed place search leaves server-side intact", () => {
+    expect(clampPoiFetchModeToDecision("server-side", true)).toBe("server-side");
   });
 
-  it("local-only leaves the local modes (eager-bundle, lazy-tile) unchanged", () => {
-    expect(clampPoiFetchModeToPolicy("eager-bundle", policy("local-only"))).toBe("eager-bundle");
-    expect(clampPoiFetchModeToPolicy("lazy-tile", policy("local-only"))).toBe("lazy-tile");
+  it("leaves the local modes (eager-bundle, lazy-tile) unchanged", () => {
+    expect(clampPoiFetchModeToDecision("eager-bundle", false)).toBe("eager-bundle");
+    expect(clampPoiFetchModeToDecision("lazy-tile", false)).toBe("lazy-tile");
   });
 });
 
@@ -270,32 +272,27 @@ describe("vilnius precedence over the REAL CITIES (AC-V0/AC-V1/AC-V2)", () => {
   });
 });
 
-describe("resolvePoiFetchMode applies the privacy residency clamp (AC-PR)", () => {
+describe("resolvePoiFetchMode applies the place-search decision (AC-PR)", () => {
   afterEach(() => {
     useSettingsStore.setState({ poiFetchModeOverride: undefined });
     usePrivacyStore.setState({ level: "standard", overrides: {} });
   });
 
-  it("AC-PR1: a local-only (hardened) policy clamps an explicit server-side override to eager-bundle", () => {
+  it("AC-PR1: an unset place-search decision clamps an explicit server-side override to eager-bundle", () => {
+    resetFlows();
     useSettingsStore.setState({ poiFetchModeOverride: "server-side" });
-    usePrivacyStore.setState({ level: "hardened", overrides: {} });
-    // override is the highest rung -> raw resolves "server-side"; the hardened
-    // policy (poiResidency: "local-only") clamps it to the local floor.
     expect(resolvePoiFetchMode("vilnius")).toBe("eager-bundle");
   });
 
-  it("AC-PR2: a user-choice (standard) policy keeps the server-side override", () => {
+  it("AC-PR2: an allowed place search keeps the server-side override, at any level", () => {
     useSettingsStore.setState({ poiFetchModeOverride: "server-side" });
-    usePrivacyStore.setState({ level: "standard", overrides: {} });
+    usePrivacyStore.setState({ level: "paranoid", overrides: {} });
     expect(resolvePoiFetchMode("vilnius")).toBe("server-side");
   });
 
-  it("AC-PR3: a standard level with an explicit poiResidency:local-only override clamps server-side to eager-bundle", () => {
-    // The clamp must follow the EFFECTIVE policy (getPolicy = effectivePolicy(level, overrides)),
-    // not the bare level: standard's floor is user-choice, but a tightening override to
-    // local-only ratchets the effective axis to local-only, so the server-side mode is clamped.
+  it("AC-PR3: a denied place search clamps server-side to eager-bundle", () => {
+    denyFlow("operator.place-search");
     useSettingsStore.setState({ poiFetchModeOverride: "server-side" });
-    usePrivacyStore.setState({ level: "standard", overrides: { poiResidency: "local-only" } });
     expect(resolvePoiFetchMode("vilnius")).toBe("eager-bundle");
   });
 });

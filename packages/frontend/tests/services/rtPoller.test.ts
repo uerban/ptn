@@ -10,7 +10,7 @@ vi.mock("../../src/services/api.ts", () => ({
 
 // Import after mock so we get the mocked version
 import { api } from "../../src/services/api.ts";
-import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 
 const mockUpdate: RtRouteUpdate = {
   routeId: "r1",
@@ -24,6 +24,8 @@ describe("RtPoller", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(api.fetchRouteRt).mockResolvedValue(mockUpdate);
+    resetFlows();
+    allowFlow("operator.realtime");
     poller = new RtPoller();
   });
 
@@ -87,39 +89,62 @@ describe("RtPoller", () => {
   });
 });
 
-describe("RtPoller — the realTimePolling privacy axis", () => {
+describe("RtPoller — the real-time decision", () => {
   let poller: RtPoller;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(api.fetchRouteRt).mockReset().mockResolvedValue(mockUpdate);
+    resetFlows();
     poller = new RtPoller();
   });
 
   afterEach(() => {
     poller.stop();
-    usePrivacyStore.setState({ level: "standard", overrides: {} });
+    resetFlows();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
-  it("never asks the server where live data is switched off", async () => {
-    usePrivacyStore.setState({ level: "strict", overrides: {} });
+  it("never asks the server while real-time updates are unset", async () => {
     poller.subscribe("r1", vi.fn());
     poller.start();
     await vi.advanceTimersByTimeAsync(120_000);
     expect(api.fetchRouteRt).not.toHaveBeenCalled();
   });
 
-  it("asks only while the app is in the foreground where the level says so", async () => {
-    usePrivacyStore.setState({ level: "hardened", overrides: {} });
-    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  it("never asks the server while real-time updates are denied", async () => {
+    denyFlow("operator.realtime");
     poller.subscribe("r1", vi.fn());
+    poller.start();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(api.fetchRouteRt).not.toHaveBeenCalled();
+  });
+
+  it("resumes polling after a grant", async () => {
+    const callback = vi.fn();
+    poller.subscribe("r1", callback);
     poller.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(api.fetchRouteRt).not.toHaveBeenCalled();
-    visibility.mockReturnValue("visible");
+    allowFlow("operator.realtime");
     await vi.advanceTimersByTimeAsync(60_000);
     expect(api.fetchRouteRt).toHaveBeenCalledWith("r1");
+    expect(callback).toHaveBeenCalledWith(mockUpdate);
+  });
+
+  it("drops a result that lands after the decision is revoked", async () => {
+    allowFlow("operator.realtime");
+    let resolve!: (u: RtRouteUpdate) => void;
+    vi.mocked(api.fetchRouteRt).mockReturnValue(new Promise((r) => { resolve = r; }));
+    const callback = vi.fn();
+    poller.subscribe("r1", callback);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.fetchRouteRt).toHaveBeenCalledOnce();
+    denyFlow("operator.realtime");
+    resolve(mockUpdate);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(callback).not.toHaveBeenCalled();
   });
 });

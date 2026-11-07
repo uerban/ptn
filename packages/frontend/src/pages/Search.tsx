@@ -41,9 +41,8 @@ import { runViewportPrefetch } from "../services/poiSearchStream.ts";
 import { buildSearchPrefetchDriver } from "../services/poiSearchDriver.ts";
 import { getCityPoiTiling } from "../services/poiManifest.ts";
 import { PREFETCH_EST_TILE_BYTES } from "@pt/shared/poi";
-import { getPolicy, usePolicy } from "../stores/privacyStore.ts";
-import { isRemoteRoutingAllowed } from "../services/routingSource.ts";
-import { isTransitousAllowed } from "../services/transitousAvailability.ts";
+import { getPolicy } from "../stores/privacyStore.ts";
+import { grantRemoteRouting, isRemoteRoutingAvailable, useCanUseRemoteRouting } from "../services/routingAccess.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { isDeviceOnline } from "../hooks/useConnectivity.ts";
 import { getActiveTileLoader } from "../services/poiSync.ts";
@@ -426,12 +425,10 @@ export function SearchPage() {
   }, [cityRouteGroups, raptorIndex]);
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const cityDefaultExcludedModes = useCityStore((s) => s.activeCity.defaultExcludedModes);
-  const privacyPolicy = usePolicy();
-  // Privacy ceiling for remote routing: when the policy's
-  // routingAdapter is "local-only", the engine-failure surface must NOT offer
-  // "Search on the server". "user-choice" permits a user-initiated request.
-  const remoteAllowed = isRemoteRoutingAllowed(privacyPolicy);
-  const transitousAllowed = isTransitousAllowed(privacyPolicy);
+  // Standing remote use needs an allowed routing flow; a per-search grant on
+  // an on-device setup must not turn into automatic remote searches.
+  const remoteAllowed = useCanUseRemoteRouting("operator") && routingMode !== "on-device";
+  const transitousAllowed = useCanUseRemoteRouting("transitous") && routingMode !== "on-device";
   // Availability of the remote routing source — a cached,
   // fail-closed up/down hint refreshed OFF the search hot path. Gates only the
   // recovery affordance; the standing modes are NOT gated on it.
@@ -899,16 +896,21 @@ export function SearchPage() {
   // route — gate on the privacy ceiling ONLY, never on the availability probe. If the source is
   // truly down, the real plan() rejection drives the signalled fallback; a wrong/transient probe
   // must never strand the user with no action.
-  const remoteSearch = remoteAllowed && routingProvider === "operator"
-    ? { onSearchOnServer: handleSearchOnServer }
+  // The explicit "Search on the server" click is the action that allows it.
+  const remoteOffered = isRemoteRoutingAvailable("operator");
+  const handleSearchOnServerRequest = useCallback(() => {
+    if (grantRemoteRouting("operator", "contextual")) handleSearchOnServer();
+  }, [handleSearchOnServer]);
+  const remoteSearch = remoteOffered && routingProvider === "operator"
+    ? { onSearchOnServer: handleSearchOnServerRequest }
     : undefined;
   // The empty-state nicety (on-device ran and found nothing) — cheap to suppress
   // on a hint, so it DOES gate on availability (don't offer a dead button).
   const emptyRemoteSearch =
-    remoteAllowed &&
+    remoteOffered &&
     routingProvider === "operator" &&
     remoteRoutingAvailable
-    ? { onSearchOnServer: handleSearchOnServer }
+    ? { onSearchOnServer: handleSearchOnServerRequest }
     : undefined;
 
   const handleTransitousPrimaryFallback = useCallback(() => {

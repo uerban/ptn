@@ -2,10 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   AXIS_STRICTNESS_ORDER,
-  compatEffectivePolicy,
+  effectivePolicy,
+  isProtectionAxis,
   PRIVACY_LEVELS,
   type PrivacyLevel,
   type PrivacyPolicy,
+  type ProtectionAxis,
+  type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import {
   readOnboardingRecord,
@@ -103,11 +106,11 @@ interface PrivacyState {
    * non-awaited callers still observe the new level immediately.
    */
   setLevel: (level: PrivacyLevel, opts?: SetLevelOptions) => Promise<boolean>;
-  setOverride: <K extends keyof PrivacyPolicy>(
+  setOverride: <K extends ProtectionAxis>(
     axis: K,
-    value: PrivacyPolicy[K],
+    value: ProtectionPolicy[K],
   ) => void;
-  clearOverride: <K extends keyof PrivacyPolicy>(axis: K) => void;
+  clearOverride: <K extends ProtectionAxis>(axis: K) => void;
   markCityPrefetched: (cityId: string, at?: number) => void;
   clearPrefetchedCities: () => void;
   reset: () => void;
@@ -130,11 +133,14 @@ function isValidAxisValue<K extends keyof PrivacyPolicy>(
   return (order.values as readonly unknown[]).includes(value);
 }
 
+// Only protection axes survive hydration. Former network axes are read from
+// raw storage by the installation classifier before any store loads; network
+// activity is decided per flow (`canUse`), never by an override.
 function sanitizeOverrides(raw: unknown): Partial<PrivacyPolicy> {
   if (!raw || typeof raw !== "object") return {};
   const result: Partial<PrivacyPolicy> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!(k in AXIS_STRICTNESS_ORDER)) continue;
+    if (!isProtectionAxis(k)) continue;
     const axis = k as keyof PrivacyPolicy;
     if (isValidAxisValue(axis, v)) {
       (result as Record<string, unknown>)[axis] = v;
@@ -210,15 +216,17 @@ export const usePrivacyStore = create<PrivacyState>()(
   ),
 );
 
-export function usePolicy(): PrivacyPolicy {
+/** Protection policy of the current level after the override ratchet. It
+ * holds no network gate: requests resolve their flow through `canUse`. */
+export function usePolicy(): ProtectionPolicy {
   const level = usePrivacyStore((s) => s.level);
   const overrides = usePrivacyStore((s) => s.overrides);
-  return compatEffectivePolicy(level, overrides);
+  return effectivePolicy(level, overrides);
 }
 
-export function getPolicy(): PrivacyPolicy {
+export function getPolicy(): ProtectionPolicy {
   const { level, overrides } = usePrivacyStore.getState();
-  return compatEffectivePolicy(level, overrides);
+  return effectivePolicy(level, overrides);
 }
 
 // Raw current level — only for consumers that legitimately need to branch on

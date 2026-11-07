@@ -22,7 +22,6 @@ import {
 } from "../services/raptorWasm.ts";
 import { classifyEngineFailure, type EngineFailureKind } from "../services/engineFailure.ts";
 import { makeRemoteStopPlanner } from "../services/routingSource.ts";
-import { getPolicy } from "./privacyStore.ts";
 
 /**
  * Engine-class errors: thrown by the on-device planning boundary when the
@@ -170,7 +169,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           plan: api.plan.bind(api),
         },
         stopPlanner: opts?.remote
-          ? makeRemoteStopPlanner(api.plan.bind(api), getPolicy)
+          ? makeRemoteStopPlanner(api.plan.bind(api))
           : undefined,
       };
 

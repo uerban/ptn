@@ -9,16 +9,24 @@ import { PrivacyLevelSection } from "./PrivacyLevelSection.tsx";
 // The only level-wide disclosure, atRest, is intro copy under the level
 // picker instead.
 
-/** disclosure text -> the axis control it must be attached to */
-const ATTACHED: { needle: RegExp; axisTitle: string }[] = [
+/** disclosure text -> the control (axis or network flow) it must be attached to */
+const ATTACHED: { needle: RegExp; axisTitle: string; flowGroup?: string }[] = [
   { needle: /Shareable URLs can carry coordinates/i, axisTitle: "URL share & deep links" },
   { needle: /per-install encryption key|sealed with a per-install key/i, axisTitle: "Recent locations" },
   { needle: /coordinate saved into recents is snapped/i, axisTitle: "Map tap precision" },
   { needle: /Geocoder providers are tried in order/i, axisTitle: "Provider fallback" },
   { needle: /internal error reports are buffered/i, axisTitle: "Error reporting" },
-  { needle: /departure polling has distinct cadences/i, axisTitle: "Real-time polling" },
-  { needle: /Dedup cache reduces third-party calls/i, axisTitle: "Third-party geocoding (M10)" },
-  { needle: /area-of-interest tiles from the PTN backend/i, axisTitle: "Detailed map" },
+  // Network disclosures hang off the decision row of their flow.
+  {
+    needle: /Dedup cache reduces third-party calls/i,
+    axisTitle: "Third-party place search",
+    flowGroup: "external.place-search@nominatim",
+  },
+  {
+    needle: /area-of-interest tiles from the PTN backend/i,
+    axisTitle: "Detailed map",
+    flowGroup: "external.detailed-basemap@carto",
+  },
 ];
 
 describe("per-axis disclosures", () => {
@@ -33,7 +41,7 @@ describe("per-axis disclosures", () => {
     expect(intro.closest("details")).toBeNull();
   });
 
-  for (const { needle, axisTitle } of ATTACHED) {
+  for (const { needle, axisTitle, flowGroup } of ATTACHED) {
     test(`"${axisTitle}" carries its own disclosure`, () => {
       render(<PrivacyLevelSection />);
       const text = screen.getByText(needle);
@@ -42,8 +50,11 @@ describe("per-axis disclosures", () => {
       // Collapsed by default — the summary line is what the user reads first.
       expect(details?.hasAttribute("open")).toBe(false);
       // And it must live under the axis it describes.
-      const group = details?.closest("[data-axis-group]");
-      expect(group?.textContent).toContain(axisTitle);
+      if (flowGroup) {
+        expect(details?.closest("[data-flow-group]")?.getAttribute("data-flow-group")).toBe(flowGroup);
+      } else {
+        expect(details?.closest("[data-axis-group]")?.textContent).toContain(axisTitle);
+      }
     });
   }
 });

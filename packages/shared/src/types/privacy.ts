@@ -9,9 +9,9 @@
 //
 // Optional network activity is no longer part of the protection level: it is
 // governed by per-flow network decisions (see networkDecisions.ts). The
-// former network axes stay in `PrivacyPolicy` only as a compatibility view
-// for callers that have not moved to the decision resolver yet; their values
-// come from the frozen `LEGACY_NETWORK_FLOORS_V1` table below.
+// former network axes stay in `PrivacyPolicy` only so older stored state can
+// be read; their last values live in the frozen `LEGACY_NETWORK_FLOORS_V1`
+// table below, which only installation classification consults.
 
 export type PrivacyLevel =
   | "baseline"
@@ -100,8 +100,7 @@ export interface PrivacyPolicy {
 /**
  * Former policy axes that gated optional network activity. They are not part
  * of the protection level any more: network activity is decided per data flow
- * (networkDecisions.ts). Kept here so older stored state can be read and so
- * callers not yet on the decision resolver keep a typed compatibility view.
+ * (networkDecisions.ts). Kept here so older stored state can be read.
  */
 export const NETWORK_POLICY_AXES = [
   "m9SelfHosted",
@@ -473,25 +472,6 @@ export function effectivePolicy(
     );
   }
   return result;
-}
-
-/**
- * Level floor including the legacy network values, for callers that still
- * read network axes from the policy instead of resolving a network decision.
- */
-export function compatLevelFloor(level: PrivacyLevel): PrivacyPolicy {
-  return { ...LEVEL_FLOORS[level], ...LEGACY_NETWORK_FLOORS_V1[level] };
-}
-
-/** `effectivePolicy` plus the legacy network view (see `compatLevelFloor`). */
-export function compatEffectivePolicy(
-  level: PrivacyLevel,
-  overrides: Partial<PrivacyPolicy> = {},
-): PrivacyPolicy {
-  return {
-    ...effectivePolicy(level, overrides),
-    ...legacyEffectiveNetworkPolicy(level, overrides),
-  };
 }
 
 export * from "./networkDecisions.js";

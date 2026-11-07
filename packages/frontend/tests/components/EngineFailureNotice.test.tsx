@@ -3,6 +3,7 @@ import "@testing-library/jest-dom";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { EngineFailureNotice } from "../../src/components/RouteResults/EngineFailureNotice.tsx";
 import { ENGINE_FAILURE_REPORT_KEYS } from "../../src/services/engineFailureReport.ts";
+import { denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 
 // engineFailureReport.ts is loaded for real (via orig()) so the disclosure can
 // import the genuine ENGINE_FAILURE_REPORT_KEYS; that pulls in buildInfo.ts,
@@ -11,27 +12,28 @@ import { ENGINE_FAILURE_REPORT_KEYS } from "../../src/services/engineFailureRepo
 vi.mock("../../src/buildInfo.ts", () => ({
   buildInfo: { version: "test-version", commit: "abc", builtAt: "2026-01-01" },
 }));
-vi.mock("../../src/stores/privacyStore.ts", () => ({ usePolicy: vi.fn(() => ({ errorReporting: true })) }));
 vi.mock("../../src/services/engineFailureReport.ts", async (orig) => ({
   ...(await orig<typeof import("../../src/services/engineFailureReport.ts")>()),
-  sendEngineFailureReport: vi.fn(async () => {}),
+  sendEngineFailureReportOnRequest: vi.fn(async () => {}),
 }));
-import { usePolicy } from "../../src/stores/privacyStore.ts";
-import { sendEngineFailureReport } from "../../src/services/engineFailureReport.ts";
+import { sendEngineFailureReportOnRequest } from "../../src/services/engineFailureReport.ts";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetFlows();
+});
 
 describe("EngineFailureNotice", () => {
   it("always shows an honest message + the inline diagnostic (kind)", () => {
-    (usePolicy as ReturnType<typeof vi.fn>).mockReturnValue({ errorReporting: false });
+    denyFlow("operator.client-report");
     render(<EngineFailureNotice message="wasm engine selected but no PtRouter on store" kind="no-wasm" />);
     expect(screen.getByTestId("engine-error")).toBeInTheDocument();
     expect(screen.getByTestId("engine-failure-diagnostic")).toHaveTextContent("no-wasm");
+    // Turned off by the user: the report is not offered.
     expect(screen.queryByTestId("engine-failure-send")).not.toBeInTheDocument();
   });
 
-  it("offers the opt-in report only when allowed and discloses payload plus network metadata", () => {
-    (usePolicy as ReturnType<typeof vi.fn>).mockReturnValue({ errorReporting: true });
+  it("offers the explicit report while unset and discloses payload plus network metadata", () => {
     render(<EngineFailureNotice message="x" kind="import" />);
     const disclosure = screen.getByTestId("engine-failure-disclosure").textContent ?? "";
     for (const key of ENGINE_FAILURE_REPORT_KEYS) expect(disclosure).toContain(key);
@@ -39,7 +41,7 @@ describe("EngineFailureNotice", () => {
     expect(disclosure).toMatch(/request time/i);
     expect(disclosure).not.toMatch(/anonymous/i);
     fireEvent.click(screen.getByTestId("engine-failure-send"));
-    expect(sendEngineFailureReport).toHaveBeenCalledWith("import");
+    expect(sendEngineFailureReportOnRequest).toHaveBeenCalledWith("import");
   });
 
   it("offers 'Search on the server' only when remoteSearch is provided, and calls it", () => {

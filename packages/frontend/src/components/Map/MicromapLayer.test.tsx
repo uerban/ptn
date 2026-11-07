@@ -16,6 +16,7 @@ vi.mock("../../stores/cityStore.ts", () => ({
 import { MicromapLayer, MICROMAP_LAYERS, MICROMAP_SOURCES } from "./MicromapLayer.tsx";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
+import { allowFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 const SQUARE = "_rzlI_{xxC?o}@o}@??n}@n}@?";
 
@@ -99,6 +100,7 @@ beforeEach(() => {
   loadMicromap.mockReset();
   loadMicromap.mockResolvedValue(ARTIFACT);
   usePrivacyStore.getState().reset();
+  resetFlows();
   useSettingsStore.getState().setMapDetailMode("micromap");
   useSettingsStore.setState({ resolvedTheme: "light" });
 });
@@ -179,6 +181,7 @@ describe("MicromapLayer", () => {
     const { rerender } = await renderLayer(map);
 
     await act(async () => {
+      allowFlow("external.detailed-basemap", "carto");
       useSettingsStore.getState().setMapDetailMode("detailed");
       await Promise.resolve();
     });

@@ -66,8 +66,11 @@ import {
   localGlyphRequest,
   type CartoStyleJson,
 } from "../../map/styleBuilder.ts";
-import { fetchBasemapStyle } from "../../services/basemapPrivacy.ts";
-import { getPolicy, usePolicy } from "../../stores/privacyStore.ts";
+import {
+  fetchBasemapStyle,
+  isExternalBasemapAllowed,
+  useExternalBasemapAllowed,
+} from "../../services/basemapPrivacy.ts";
 import { useEffectiveMapMode } from "../../map/mapMode.ts";
 
 interface TransitMapProps {
@@ -316,7 +319,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
     // Any mode other than `detailed` draws locally and never touches the
     // external basemap — see map/mapMode.ts for the single choice behind it.
     const localMapOnly = useEffectiveMapMode() !== "detailed";
-    const basemapMode = usePolicy().basemapMode;
+    const basemapAllowed = useExternalBasemapAllowed();
     const activeCity = useCityStore((s) => s.activeCity);
     const currentMapThemeRef = useRef<"light" | "dark" | null>(null);
     const lastFlownCityRef = useRef<string>(activeCity.id);
@@ -840,12 +843,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             providerId: "carto",
             dark,
             signal: ctrl.signal,
-            getPolicy,
           });
           if (
             !cartoStyle ||
             localMapOnlyRef.current ||
-            getPolicy().basemapMode !== "external-detailed"
+            !isExternalBasemapAllowed()
           ) {
             cartoStateRef.current = { status: "idle", abortCtrl: null };
             return;
@@ -870,7 +872,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           cartoStateRef.current = {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
@@ -880,7 +882,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           cartoStateRef.current = {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "failed"
                 : "idle",
             abortCtrl: null,
@@ -1182,7 +1184,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       const map = mapRef.current;
       if (!map || !mapReady) return;
 
-      if (basemapMode === "local-only" || localMapOnly) {
+      if (!basemapAllowed || localMapOnly) {
         const wasLoaded = cartoAppliedRef.current;
         cartoStateRef.current.abortCtrl?.abort();
         cartoStateRef.current = { status: "idle", abortCtrl: null };
@@ -1204,7 +1206,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       ) {
         void loadCartoRef.current?.();
       }
-    }, [basemapMode, localMapOnly, mapReady, debouncedResolveLabels]);
+    }, [basemapAllowed, localMapOnly, mapReady, debouncedResolveLabels]);
 
     // Update stops source and layers
     useEffect(() => {
@@ -1544,12 +1546,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             providerId: "carto",
             dark: isDark,
             signal: ctrl.signal,
-            getPolicy,
           });
           if (
             !cartoStyle ||
             localMapOnlyRef.current ||
-            getPolicy().basemapMode !== "external-detailed"
+            !isExternalBasemapAllowed()
           ) {
             cartoStateRef.current = { status: "idle", abortCtrl: null };
             return;
@@ -1589,7 +1590,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           cartoStateRef.current = {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed" &&
+              isExternalBasemapAllowed() &&
               cartoAppliedRef.current
                 ? "loaded"
                 : "idle",
@@ -1602,7 +1603,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           cartoStateRef.current = {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,

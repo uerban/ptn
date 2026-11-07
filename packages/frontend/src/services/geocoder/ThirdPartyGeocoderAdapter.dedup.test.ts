@@ -11,6 +11,7 @@ import { __resetInstallKeyCacheForTests } from "../installKey.ts";
 import { __resetDegradedModeForTests } from "../installKeyDegrade.ts";
 import { __resetDedupCacheWarningsForTests } from "./dedupCache.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 const NOMINATIM_CONFIG: ThirdPartyGeocoderConfig = {
   provider: "nominatim",
@@ -18,7 +19,6 @@ const NOMINATIM_CONFIG: ThirdPartyGeocoderConfig = {
 };
 
 const ENABLED_POLICY = () => ({
-  m10ThirdPartyEnabled: true as const,
   m10CoarsenGridDefaultMeters: 500,
 });
 
@@ -46,6 +46,8 @@ const HINT: LatLon = { lat: 54.35, lon: 18.65 };
 
 beforeEach(async () => {
   _resetSessionJitter();
+  resetFlows();
+  allowFlow("external.place-search", "nominatim");
   if (!db.isOpen()) await db.open();
   await db.geocoderDedup.clear();
   await db.installKey.clear();
@@ -166,14 +168,9 @@ describe("ThirdPartyGeocoderAdapter dedup cache", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  test("adapter unavailable by policy (m10ThirdPartyEnabled=false) throws without touching cache", async () => {
-    const disabledAdapter = new ThirdPartyGeocoderAdapter(
-      NOMINATIM_CONFIG,
-      () => ({
-        m10ThirdPartyEnabled: false,
-        m10CoarsenGridDefaultMeters: 500,
-      }),
-    );
+  test("adapter whose provider is denied throws without touching cache", async () => {
+    denyFlow("external.place-search", "nominatim");
+    const disabledAdapter = new ThirdPartyGeocoderAdapter(NOMINATIM_CONFIG, ENABLED_POLICY);
 
     await expect(
       disabledAdapter.forward("Gdansk", HINT, new AbortController().signal),

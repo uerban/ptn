@@ -12,8 +12,14 @@ import {
   type RoutingMode,
   type RemoteRoutingProvider,
 } from "../stores/settingsStore.ts";
-import { usePolicy } from "../stores/privacyStore.ts";
-import { isRemoteRoutingAllowed } from "../services/routingSource.ts";
+import {
+  chooseRoutingMode,
+  chooseRoutingProvider,
+  chooseSearchProvider,
+  isRemoteRoutingAvailable,
+  REMOTE_STOP_SEARCH_FLOW,
+} from "../services/routingAccess.ts";
+import { isFlowAvailable } from "../privacy/flowGrants.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
@@ -23,7 +29,6 @@ import { LanguagePicker } from "../components/Settings/LanguagePicker.tsx";
 import { MapModeSection } from "../components/Settings/MapModeSection.tsx";
 import { ProjectLinks } from "../components/Settings/ProjectLinks.tsx";
 import { TransitAttribution } from "../components/Settings/TransitAttribution.tsx";
-import { isTransitousAllowed } from "../services/transitousAvailability.ts";
 import { getRoutingProvider } from "../config/routingProviders.ts";
 import {
   HUYLO_FLASH_LABEL,
@@ -136,17 +141,17 @@ export function SettingsPage() {
     startupLocate, setStartupLocate,
     tripNotificationsEnabled, setTripNotificationsEnabled,
     routeSearchVariant, setRouteSearchVariant,
-    searchProvider, setSearchProvider,
-    setRoutingMode, setRoutingProvider,
+    searchProvider,
   } = useSettingsStore();
   const routingMode = useSettingsStore((s) => s.routingMode);
   const routingProvider = useSettingsStore((s) => s.routingProvider);
   // Rounded to the slider's 0.1 km/h step, so the thumb, the label and the
   // screen-reader value agree (wheelchair 0.8 m/s reads 2.9 km/h).
   const walkSpeedKmh = Math.round(walkSpeedMps * 36) / 10;
-  const privacyPolicy = usePolicy();
-  const remoteForbidden = !isRemoteRoutingAllowed(privacyPolicy);
-  const transitousForbidden = !isTransitousAllowed(privacyPolicy);
+  // Options are offered whenever their flow can run; choosing one grants it.
+  const remoteForbidden = !isRemoteRoutingAvailable("operator");
+  const transitousForbidden = !isRemoteRoutingAvailable("transitous");
+  const stopSearchForbidden = !isFlowAvailable(REMOTE_STOP_SEARCH_FLOW);
   // Availability of the remote routing source — a cached,
   // fail-closed up/down hint. Distinct from `remoteForbidden`: a mode can be
   // ALLOWED (user-choice) yet currently DOWN, in which case it stays selectable
@@ -261,7 +266,7 @@ export function SettingsPage() {
               // the proxy hop does not exempt it. Local stays selectable so a
               // user can always withdraw the remote choice, mirroring the
               // routing-provider list below.
-              const disabled = provider === "remote" && transitousForbidden;
+              const disabled = provider === "remote" && stopSearchForbidden;
               return (
               <label
                 key={provider}
@@ -300,7 +305,7 @@ export function SettingsPage() {
                   value={provider}
                   checked={searchProvider === provider}
                   disabled={disabled}
-                  onChange={() => setSearchProvider(provider satisfies SearchProvider)}
+                  onChange={() => chooseSearchProvider(provider satisfies SearchProvider)}
                   className="accent-accent"
                 />
               </label>
@@ -360,7 +365,7 @@ export function SettingsPage() {
                     value={mode}
                     data-testid={`routing-mode-${mode}`}
                     checked={routingMode === mode}
-                    onChange={() => setRoutingMode(mode satisfies RoutingMode)}
+                    onChange={() => chooseRoutingMode(mode satisfies RoutingMode)}
                     disabled={disabled}
                     className="accent-accent"
                   />
@@ -436,7 +441,7 @@ export function SettingsPage() {
                     data-testid={`routing-provider-${providerId}`}
                     checked={routingProvider === providerId}
                     onChange={() =>
-                      setRoutingProvider(
+                      chooseRoutingProvider(
                         providerId satisfies RemoteRoutingProvider,
                       )
                     }

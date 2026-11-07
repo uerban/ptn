@@ -4,7 +4,7 @@ import { api, HttpError } from "../services/api.ts";
 import { reportError } from "../services/errorReporter.ts";
 import { useStopStore } from "../stores/stopStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { getPolicy } from "../stores/privacyStore.ts";
+import { canUse } from "../privacy/canUse.ts";
 import { haversineDistance } from "../utils/geo.ts";
 
 const RETRY_BACKOFFS_MS = [1_000, 4_000] as const;
@@ -89,9 +89,9 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
     // already has the full stop set from loadAll; no errorReporter call.
     async function attemptNearby(attemptIdx: number): Promise<void> {
       if (isStale()) return;
-      // Read policy and cached stops at the request boundary. A stricter level
-      // selected after render (or between retries) must stop future egress.
-      if (getPolicy().nearbyStopLookup !== "centroid-server") return;
+      // Resolve the flow and cached stops at the request boundary. A
+      // revocation after render (or between retries) must stop future egress.
+      if (!canUse("operator.nearby-stop-centroid")) return;
       const centroid = nearestStopCentroid(
         location!,
         useStopStore.getState().stops,
@@ -104,6 +104,7 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
           1000,
         );
         if (isStale() || nearby.data.length === 0) return;
+        if (!canUse("operator.nearby-stop-centroid")) return;
         await useStopStore.getState().upsertStops(nearby.data, { isStale });
       } catch (e) {
         if (isStale()) return;

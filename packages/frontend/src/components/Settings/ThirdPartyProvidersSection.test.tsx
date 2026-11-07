@@ -3,11 +3,14 @@ import { render, fireEvent, cleanup } from "@testing-library/react";
 import { ThirdPartyProvidersSection } from "./ThirdPartyProvidersSection.tsx";
 import { usePrivacyStore, getPolicy } from "../../stores/privacyStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { getNetworkDecision } from "../../privacy/canUse.ts";
+import { resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 afterEach(() => cleanup());
 
 beforeEach(() => {
   usePrivacyStore.getState().reset();
+  resetFlows();
   useSettingsStore.setState({
     thirdPartyProvider: "nominatim",
     thirdPartyApiKeys: {},
@@ -57,32 +60,16 @@ describe("ThirdPartyProvidersSection", () => {
     );
   });
 
-  test("grayed at hardened level with locked copy", () => {
-    usePrivacyStore.getState().setLevel("hardened");
-    const { container } = render(<ThirdPartyProvidersSection />);
-    expect(
-      container.querySelectorAll('input[name="third-party-provider"]').length,
-    ).toBe(0);
-    expect(container.textContent).toMatch(/disabled/i);
-  });
-
-  test("grayed at strict level with locked copy", () => {
-    usePrivacyStore.getState().setLevel("strict");
-    const { container } = render(<ThirdPartyProvidersSection />);
-    expect(
-      container.querySelectorAll('input[name="third-party-provider"]').length,
-    ).toBe(0);
-    expect(container.textContent).toMatch(/disabled/i);
-  });
-
-  test("grayed at paranoid level with locked copy", () => {
-    usePrivacyStore.getState().setLevel("paranoid");
-    const { container } = render(<ThirdPartyProvidersSection />);
-    expect(
-      container.querySelectorAll('input[name="third-party-provider"]').length,
-    ).toBe(0);
-    expect(container.textContent).toMatch(/disabled/i);
-  });
+  test.each(["hardened", "strict", "paranoid"] as const)(
+    "stays configurable at %s: the level does not decide network use",
+    async (level) => {
+      await usePrivacyStore.getState().setLevel(level);
+      const { container } = render(<ThirdPartyProvidersSection />);
+      expect(
+        container.querySelectorAll('input[name="third-party-provider"]').length,
+      ).toBe(3);
+    },
+  );
 
   test("selecting a provider updates the store", () => {
     const { container } = render(<ThirdPartyProvidersSection />);
@@ -91,6 +78,16 @@ describe("ThirdPartyProvidersSection", () => {
     ) as HTMLInputElement;
     fireEvent.click(photon);
     expect(useSettingsStore.getState().thirdPartyProvider).toBe("photon");
+  });
+
+  test("selecting a provider does not allow it", () => {
+    const { container } = render(<ThirdPartyProvidersSection />);
+    fireEvent.click(
+      container.querySelector(
+        'input[name="third-party-provider"][value="photon"]',
+      ) as HTMLInputElement,
+    );
+    expect(getNetworkDecision("external.place-search", "photon").value).toBe("unset");
   });
 
   test("API key input updates the store", () => {
@@ -144,12 +141,12 @@ describe("inline threat-model disclosure", () => {
     expect(disclosure.textContent).not.toContain("Nominatim");
   });
 
-  test("disclosure not shown at locked levels", async () => {
+  test("disclosure is shown at strict too", async () => {
     await usePrivacyStore.getState().setLevel("strict");
     const { container } = render(<ThirdPartyProvidersSection />);
     expect(
       container.querySelector('[data-testid="third-party-disclosure"]'),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 });
 
@@ -174,10 +171,11 @@ describe("grid-size slider", () => {
     expect(Number(slider.min)).toBe(0);
   });
 
-  test("no slider rendered at hardened level", async () => {
+  test("slider min follows the stricter floor at hardened", async () => {
     await usePrivacyStore.getState().setLevel("hardened");
     const { container } = render(<ThirdPartyProvidersSection />);
-    expect(container.querySelector('input[type="range"]')).toBeNull();
+    const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
+    expect(Number(slider.min)).toBe(getPolicy().m10CoarsenGridFloorMeters);
   });
 
   test("default value = policy.m10CoarsenGridDefaultMeters", () => {
@@ -210,9 +208,9 @@ describe("grid-size slider", () => {
     ).toBe(500);
   });
 
-  test("no slider rendered at locked levels", async () => {
+  test("slider rendered at strict too", async () => {
     await usePrivacyStore.getState().setLevel("strict");
     const { container } = render(<ThirdPartyProvidersSection />);
-    expect(container.querySelector('input[type="range"]')).toBeNull();
+    expect(container.querySelector('input[type="range"]')).not.toBeNull();
   });
 });

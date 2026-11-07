@@ -9,6 +9,8 @@ import { useRoutingStore } from "../../src/stores/routingStore.ts";
 import { useGtfsDataStore } from "../../src/stores/gtfsDataStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { getNetworkDecision } from "../../src/privacy/canUse.ts";
+import { resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 import * as availability from "../../src/services/remoteRoutingAvailability.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
 
@@ -20,16 +22,15 @@ const emptyRaptorIndex: RaptorIndex = {
 };
 
 // Wiring contract (routing-source S2a): the "Search on the server" button in the
-// engine-failure surface re-runs the HELD query with `{ remote: true }`, and the
-// button only appears when the privacy ceiling permits remote routing
-// (`routingAdapter !== "local-only"`). At the `standard` level routingAdapter is
-// "user-choice", so `remoteAllowed` is true.
+// engine-failure surface re-runs the HELD query with `{ remote: true }`. It is
+// offered whenever the operator's routing can run; the click itself is the
+// explicit action that allows it.
 describe("Search 'search on the server' re-run + remoteAllowed", () => {
   let searchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    // `standard` keeps routingAdapter = "user-choice" → remoteAllowed === true.
     usePrivacyStore.setState({ level: "standard", overrides: {} });
+    resetFlows();
     // Default the availability hook to "up" so the server affordance shows. The
     // real hook fires a bounded probe on mount that fail-closes to false in jsdom
     // (no fetch), which would otherwise suppress the button mid-`waitFor`. Cases
@@ -96,11 +97,16 @@ describe("Search 'search on the server' re-run + remoteAllowed", () => {
     // First (auto) search is local — no remote opt-in.
     expect(searchSpy.mock.calls[0][3]).toBeUndefined();
 
-    // remoteAllowed is true at `standard`, so the remote button is present.
+    // Offered although nothing is allowed yet: the click is the request.
     const serverButton = await screen.findByTestId("engine-failure-search-server");
+    expect(getNetworkDecision("operator.remote-routing").value).toBe("unset");
 
     searchSpy.mockClear();
     fireEvent.click(serverButton);
+    expect(getNetworkDecision("operator.remote-routing")).toEqual({
+      value: "allowed",
+      source: "contextual",
+    });
 
     await waitFor(() => expect(searchSpy).toHaveBeenCalledTimes(1));
     // The held query re-runs through the gated pt-serve planner: same endpoints,

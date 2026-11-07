@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { REALTIME_POLL_INTERVAL_MS } from "@pt/shared";
 import { useDepartures } from "../../src/hooks/useDepartures.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 import { HEDGE_MS, DEFAULT_SCHEDULE_TILE_LIMIT } from "../../src/services/scheduleTileConstants.ts";
 
 // Mock the api module
@@ -63,6 +64,12 @@ const mockTileDepartures = [
 
 // Vitest 4's restoreAllMocks only restores vi.spyOn spies; resetAllMocks is
 // what returns the vi.mock factory fns above to a clean slate between cases.
+// Live departures are allowed unless a case denies them.
+beforeEach(() => {
+  resetFlows();
+  allowFlow("operator.realtime");
+});
+
 describe("useDepartures — flag-OFF (regression anchor)", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -489,7 +496,7 @@ describe("useDepartures — G9 module-graph: dynamic not static load", () => {
   });
 });
 
-describe("useDepartures — /departures privacy gate", () => {
+describe("useDepartures — /departures real-time gate", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     usePrivacyStore.getState().reset();
@@ -500,8 +507,8 @@ describe("useDepartures — /departures privacy gate", () => {
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); vi.restoreAllMocks(); });
 
-  it("paranoid + tile-unavailable does NOT call /departures (fallback gated)", async () => {
-    await usePrivacyStore.getState().setLevel("paranoid");
+  it("real-time denied + tile-unavailable does NOT call /departures (fallback gated)", async () => {
+    denyFlow("operator.realtime");
     (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({ state: "unavailable" });
     const { result } = renderHook(() => useDepartures("S1", false, 1.5));
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -509,14 +516,14 @@ describe("useDepartures — /departures privacy gate", () => {
     expect(result.current.departures).toEqual([]);
   });
 
-  it("standard + tile-unavailable DOES fall back to /departures", async () => {
+  it("real-time allowed + tile-unavailable DOES fall back to /departures", async () => {
     (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({ state: "unavailable" });
     renderHook(() => useDepartures("S1", false, 1.5));
     await waitFor(() => expect(api.getDepartures).toHaveBeenCalled());
   });
 
-  it("paranoid + background poll whose tile fails does NOT call /departures", async () => {
-    await usePrivacyStore.getState().setLevel("paranoid");
+  it("real-time denied + background poll whose tile fails does NOT call /departures", async () => {
+    denyFlow("operator.realtime");
     (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({ state: "unavailable" });
     renderHook(() => useDepartures("S1", true, 24)); // polling
     // Foreground initial fetch settles first — gated, no /departures.
@@ -529,8 +536,8 @@ describe("useDepartures — /departures privacy gate", () => {
     expect(api.getDepartures).not.toHaveBeenCalled();
   });
 
-  it("global-off + paranoid uses /departures (rollback override)", async () => {
-    await usePrivacyStore.getState().setLevel("paranoid");
+  it("global-off + real-time denied uses /departures (rollback override)", async () => {
+    denyFlow("operator.realtime");
     (isScheduleTileEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
     renderHook(() => useDepartures("S1", false, 1.5));
     await waitFor(() => expect(api.getDepartures).toHaveBeenCalled());
@@ -625,8 +632,8 @@ describe("useDepartures — cache-miss hedge", () => {
     expect(api.getDepartures).not.toHaveBeenCalled();
   });
 
-  it("paranoid level + hedge:true + slow COLD tile → /departures is never called (allowBackend gate)", async () => {
-    await usePrivacyStore.getState().setLevel("paranoid");
+  it("real-time denied + hedge:true + slow COLD tile → /departures is never called (allowBackend gate)", async () => {
+    denyFlow("operator.realtime");
     // Cold tile: signals download start then hangs longer than HEDGE_MS.
     (departuresForStop as ReturnType<typeof vi.fn>).mockImplementation(async (_a, opts) => {
       opts?.onTileDownloadStart?.();
@@ -634,7 +641,7 @@ describe("useDepartures — cache-miss hedge", () => {
       return { state: "ok", departures: [TILE_DEP], serviceState: "active" };
     });
     renderHook(() => useDepartures("S1", false, 1.5, { hedge: true }));
-    // Advance past the hedge window — with paranoid level, allowBackend=false so
+    // Advance past the hedge window — with real-time denied, allowBackend=false so
     // canHedge is false and the timer is never armed.
     await act(async () => { await vi.advanceTimersByTimeAsync(HEDGE_MS + 50); });
     expect(api.getDepartures).not.toHaveBeenCalled();
