@@ -50,6 +50,7 @@ import { createClientReportHandler } from "./routes/clientReport.js";
 import { getCityProfile } from "./harness/cities/index.js";
 import {
   RT_BACKEND_POLL_INTERVAL_MS,
+  formatRealtimeHeader,
   type CityProfile,
   type SelfHostedGeocoderConfig,
 } from "@pt/shared";
@@ -555,6 +556,8 @@ async function main() {
       getRtEntriesForTrip: (tripId) => scheduler.getStore().rtEntriesForTrip(tripId),
     }),
   );
+  // Node serves departures only; service alerts are pt-serve's alone.
+  const realtimeHeader = formatRealtimeHeader(GTFS_RT_TRIP_UPDATES_URLS.length > 0 ? ["departures"] : []);
   app.get(
     "/api/gtfs/manifest",
     { config: { rateLimit: rateLimitForRoute("gtfsManifest") } },
@@ -566,10 +569,12 @@ async function main() {
             // the current manifest is mid-rename, mirroring scheduler semantics.
             getManifestSnapshot: () => producerTileSource.getManifestSnapshot(),
             getLastKnownBundleHash: () => producerTileSource.getCurrentBundleHash(),
+            realtimeHeader,
           }
         : {
             getManifestSnapshot: () => scheduler.getManifestSnapshot(),
             getLastKnownBundleHash: () => scheduler.getLastKnownBundleHash(),
+            realtimeHeader,
           },
     ),
   );
