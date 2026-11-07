@@ -132,11 +132,25 @@ export interface StopGroupRecord {
  * WebCrypto CryptoKey persisted via IndexedDB's structured-clone.
  */
 export interface InstallKeyRecord {
-  id: "current";
+  /** `current`: AES-GCM sealing key; `hmac`: keyed lookup identifiers. */
+  id: "current" | "hmac";
   key: CryptoKey;
 }
 
 /**
+ * Personal record at rest: an opaque random id plus ciphertext. Everything
+ * else (endpoints, labels, timestamps, counts, stop IDs) is inside `sealed`;
+ * see `services/personalStorage.ts`.
+ */
+export interface SealedPersonalRow {
+  id: string;
+  sealed: EncryptedRecord;
+}
+
+/**
+ * Legacy row shape, read only by the encrypted-storage migration: rows are now
+ * `SealedPersonalRow`s.
+ *
  * Recent route endpoints (M8b). Endpoint coordinates live in `endpoint`, which
  * carries a `BaseEndpoint` at `plaintext` tier or an `EncryptedRecord` at
  * `encrypted` tier. Metadata (`id`, `usedAt`, `usedAsOrigin`) stays plaintext
@@ -152,6 +166,9 @@ export interface RecentLocationRecord {
 }
 
 /**
+ * Legacy row shape, read only by the encrypted-storage migration: rows are now
+ * `SealedPersonalRow`s.
+ *
  * Saved locations (M8c) — user-pinned places. Like recents, the endpoint is
  * polymorphic across encryption tier: a `BaseEndpoint` when stored plaintext,
  * an `EncryptedRecord` when sealed via cryptoBox. The plaintext metadata
@@ -487,6 +504,7 @@ interface PtnTables {
   offlineTransfers: EntityTable<OfflineTransferRecord, "hash">;
   stops: EntityTable<StopRecord, "id">;
   usageStats: EntityTable<UsageStatRecord, "stopId">;
+  personalUsage: EntityTable<SealedPersonalRow, "id">;
   gtfsRoutes: EntityTable<GtfsRouteRecord, "id">;
   gtfsTrips: EntityTable<GtfsTripRecord, "tripId">;
   gtfsServices: EntityTable<GtfsServiceRecord, "serviceId">;
@@ -494,8 +512,8 @@ interface PtnTables {
   gtfsStops: EntityTable<GtfsStopRecord, "id">;
   stopGroups: EntityTable<StopGroupRecord, "groupId">;
   installKey: EntityTable<InstallKeyRecord, "id">;
-  recentLocations: EntityTable<RecentLocationRecord, "id">;
-  savedLocations: EntityTable<SavedLocationRecord, "id">;
+  recentLocations: EntityTable<SealedPersonalRow, "id">;
+  savedLocations: EntityTable<SealedPersonalRow, "id">;
   poiIndex: EntityTable<PoiIndexRecord, "id">;
   poiSyncMeta: EntityTable<PoiSyncMetaRecord, "cityId">;
   geocoderDedup: EntityTable<GeocoderDedupRecord, "queryHash">;
@@ -525,6 +543,7 @@ export type TableKind = "server-derived" | "user-owned";
 export const TABLE_KIND = {
   stops: "server-derived",
   usageStats: "user-owned",
+  personalUsage: "user-owned",
   gtfsRoutes: "server-derived",
   gtfsTrips: "server-derived",
   gtfsServices: "server-derived",
@@ -536,7 +555,8 @@ export const TABLE_KIND = {
   savedLocations: "user-owned",
   poiIndex: "server-derived",
   poiSyncMeta: "server-derived",
-  geocoderDedup: "server-derived",
+  // Searches the rider made, keyed by an install-keyed HMAC.
+  geocoderDedup: "user-owned",
   poiTileCache: "server-derived",
   poiTileGenerations: "server-derived",
   gtfsBundle: "server-derived",
@@ -556,7 +576,8 @@ export const STORES = {
   offlineCities: "cityId",
   offlineTransfers: "hash",
   stops: "id, lastSeen",
-  usageStats: "stopId, lastTapped",
+  usageStats: "stopId",
+  personalUsage: "id",
   gtfsRoutes: "id",
   gtfsTrips: "tripId, routeId",
   gtfsServices: "serviceId",
@@ -564,8 +585,8 @@ export const STORES = {
   gtfsStops: "id",
   stopGroups: "groupId, name",
   installKey: "id",
-  recentLocations: "id, usedAt",
-  savedLocations: "id, savedAt",
+  recentLocations: "id",
+  savedLocations: "id",
   poiIndex: "id, [cityId+name], [cityId+geoBucket]",
   poiSyncMeta: "cityId",
   geocoderDedup: "queryHash, [providerId+createdAt]",
@@ -585,11 +606,23 @@ export const STORES = {
 migrationCoordinator.reserve({
   id: "ptn",
   version: 1,
-  stores: Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers"].includes(name))),
+  stores: {
+    ...Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers", "personalUsage"].includes(name))),
+    // Version-1 shape of the personal tables (changed in version 3 below).
+    usageStats: "stopId, lastTapped",
+    recentLocations: "id, usedAt",
+    savedLocations: "id, savedAt",
+  },
 });
 
 migrationCoordinator.reserve({id: "offline-city-packages", version: 2,
   stores: {offlineCities: "cityId", offlineTransfers: "hash"}});
+
+// Personal records keep only an opaque id outside their ciphertext, so their
+// timestamp indexes go and stop usage moves to opaque-keyed rows. Rows are
+// converted by services/personalStorageMigration.ts, not by this upgrade.
+migrationCoordinator.reserve({id: "personal-encrypted-storage", version: 3,
+  stores: {personalUsage: "id", recentLocations: "id", savedLocations: "id", usageStats: "stopId"}});
 
 for (const decl of migrationCoordinator.declaredMigrations()) {
   const v = db.version(decl.version).stores(decl.stores);

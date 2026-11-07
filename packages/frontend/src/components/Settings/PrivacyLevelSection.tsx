@@ -16,7 +16,7 @@ const LEVEL_FALLBACKS: Record<PrivacyLevel, { name: string; description: string 
   baseline: {
     name: "Baseline",
     description:
-      "Default posture. If enabled, recents are stored in plaintext. Third-party geocoding is allowed and error reporting is on. Fastest and most convenient.",
+      "Default posture. If enabled, recents are encrypted on this device, and saves are always encrypted. Third-party geocoding is allowed and error reporting is on. Fastest and most convenient.",
   },
   standard: {
     name: "Standard",
@@ -93,7 +93,7 @@ const DISCLOSURES: Record<string, string> = {
   atRest:
     "Recent locations, saved places, and preferences can be stored in this browser according to your settings. PTN also requests public transit data from its operator; enabled map, search, and routing providers receive only the fields listed in their disclosures.",
   installKey:
-    "A per-install encryption key will be generated on first use (M8). It is derived and stored locally; wiping site data destroys it and makes any encrypted records unreadable.",
+    "Saved places, recents and favorites are encrypted on this device with a per-install key kept in this browser. Clearing site data destroys the key and makes them unreadable.",
   mapTap:
     "When you tap the map to set an origin or destination, the coordinate saved into recents is snapped or rounded according to your privacy preset. Exact taps are never persisted at Hardened or above.",
   urlShare:

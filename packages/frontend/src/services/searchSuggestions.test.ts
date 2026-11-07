@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { clearPersonal, putPersonal } from "./personalStorage.ts";
 import "fake-indexeddb/auto";
 import { db, type AddressSearchArtifactRecord, type PoiIndexRecord } from "../db/index.ts";
 import type { Stop, ApiResponse, PoiManifestBundle } from "@pt/shared";
@@ -120,7 +121,7 @@ describe("searchSuggestions", () => {
   beforeEach(async () => {
     await db.poiIndex.clear();
     await db.poiSyncMeta.clear();
-    await db.usageStats.clear();
+    await clearPersonal("personalUsage");
     await db.stopGroups.clear();
     await db.gtfsStops.clear();
     await db.addressSearchArtifacts.clear();
@@ -460,7 +461,7 @@ describe("searchSuggestions", () => {
       gtfsStop("stop-substring-tapped", "Stepono Batoro st."),
       gtfsStop("stop-prefix-cold", "Oro uostas"),
     ]);
-    await db.usageStats.put({
+    await putPersonal("personalUsage", crypto.randomUUID(), {
       stopId: "stop-substring-tapped",
       tapCount: 5,
       lastTapped: Date.now() - 3600_000,
@@ -505,7 +506,7 @@ describe("searchSuggestions", () => {
       gtfsStop("stop-recent", "Dworzec A"),
       gtfsStop("stop-old", "Dworzec B"),
     ]);
-    await db.usageStats.put({ stopId: "stop-recent", tapCount: 5, lastTapped: Date.now() - 3600_000 });
+    await putPersonal("personalUsage", crypto.randomUUID(), { stopId: "stop-recent", tapCount: 5, lastTapped: Date.now() - 3600_000 });
 
     const { searchSuggestions } = await import("./searchSuggestions.ts");
     const results = await searchSuggestions("dworz", "gdansk", null, new AbortController().signal, "local");

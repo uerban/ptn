@@ -2,25 +2,29 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { FavoritePlace } from "@pt/shared";
 import { db } from "../db/index.ts";
-import {
-  decrypt,
-  __clearRamStoreForTests,
-  type EncryptedRecord,
-} from "./cryptoBox.ts";
-import {
-  getOrCreateInstallKey,
-  __resetInstallKeyCacheForTests,
-} from "./installKey.ts";
-import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
+import { getOrCreateInstallKey } from "./installKey.ts";
 import {
   LEGACY_FAVORITES_KEY,
   migrateFavoritesToSaves,
 } from "./favoritesMigration.ts";
+import { listSaves } from "./saves.ts";
+import { sealString } from "./sealedLocalStorage.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
+import {
+  findLeaks,
+  rawLocalStorageText,
+  rawTableText,
+  resetPersonalStorage,
+} from "../test-helpers/personalStorage.ts";
 
-function seedLegacyFavorites(favs: FavoritePlace[]): void {
+async function seedLegacyFavorites(favs: FavoritePlace[]): Promise<void> {
   const envelope = { state: { favorites: favs }, version: 0 };
-  localStorage.setItem(LEGACY_FAVORITES_KEY, JSON.stringify(envelope));
+  const sealed = await sealString(JSON.stringify(envelope), await getOrCreateInstallKey());
+  localStorage.setItem(LEGACY_FAVORITES_KEY, sealed);
+}
+
+async function saveById(id: string) {
+  return (await listSaves()).find((s) => s.id === id);
 }
 
 function home(overrides: Partial<FavoritePlace> = {}): FavoritePlace {
@@ -74,19 +78,14 @@ function placeFav(overrides: Partial<FavoritePlace> = {}): FavoritePlace {
 
 describe("migrateFavoritesToSaves", () => {
   beforeEach(async () => {
-    if (!db.isOpen()) await db.open();
-    await db.savedLocations.clear();
-    await db.installKey.clear();
+    await resetPersonalStorage();
     localStorage.removeItem(LEGACY_FAVORITES_KEY);
-    __clearRamStoreForTests();
-    __resetInstallKeyCacheForTests();
-    __resetDegradedModeForTests();
     useSettingsStore.setState({ enableFavoritesMigration: true });
   });
 
   it("skips when the flag is off", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: false });
-    seedLegacyFavorites([home()]);
+    await seedLegacyFavorites([home()]);
     const result = await migrateFavoritesToSaves();
     expect(result).toEqual({
       migrated: 0,
@@ -106,70 +105,45 @@ describe("migrateFavoritesToSaves", () => {
     });
   });
 
-  it("maps home/work to encrypted rows", async () => {
-    seedLegacyFavorites([home(), work()]);
+  it("writes every favorite as a sealed save with no readable field", async () => {
+    await seedLegacyFavorites([home(), work(), stopFav(), placeFav()]);
     const result = await migrateFavoritesToSaves();
-    expect(result.migrated).toBe(2);
+    expect(result.migrated).toBe(4);
     expect(result.legacyCleared).toBe(true);
 
-    const rows = await db.savedLocations.toArray();
-    expect(rows).toHaveLength(2);
-    for (const row of rows) {
-      expect(row.encrypted).toBe(true);
-      // Ciphertext must not contain the plaintext label.
-      expect(JSON.stringify(row.endpoint)).not.toContain("Dom");
-      expect(JSON.stringify(row.endpoint)).not.toContain("Biuro");
-    }
-
-    const homeRow = rows.find((r) => r.id === "fav-home")!;
-    const key = await getOrCreateInstallKey();
-    const decrypted = (await decrypt(
-      homeRow.endpoint as EncryptedRecord,
-      key,
-    )) as { kind: string; label?: string; lat: number; lon: number };
-    expect(decrypted.kind).toBe("geocoded");
-    expect(decrypted.label).toBe("Dom");
-    expect(decrypted.lat).toBe(54.35);
+    const raw = (await rawTableText("savedLocations")) + rawLocalStorageText();
+    expect(findLeaks(raw, ["Dom", "Biuro", "Central", "Rynek", "S-42", "54.35"])).toEqual([]);
+    expect(await db.savedLocations.count()).toBe(4);
   });
 
-  it("maps stop/place to plaintext rows", async () => {
-    seedLegacyFavorites([stopFav(), placeFav()]);
-    const result = await migrateFavoritesToSaves();
-    expect(result.migrated).toBe(2);
+  it("keeps endpoints, labels and kinds of every favorite", async () => {
+    await seedLegacyFavorites([home(), stopFav(), placeFav()]);
+    await migrateFavoritesToSaves();
 
-    const rows = await db.savedLocations.toArray();
-    const stopRow = rows.find((r) => r.id === "fav-stop")!;
-    expect(stopRow.encrypted).toBe(false);
-    expect(stopRow.alias).toBe("Central");
-    const stopEp = stopRow.endpoint as {
-      kind: string;
-      stopId: string;
-      name: string;
-    };
-    expect(stopEp.kind).toBe("stop");
-    expect(stopEp.stopId).toBe("S-42");
-    expect(stopEp.name).toBe("Central");
+    const homeSave = (await saveById("fav-home"))!;
+    expect(homeSave.origin).toMatchObject({ kind: "geocoded", label: "Dom", lat: 54.35 });
+    expect(homeSave.placeType).toBe("home");
 
-    const placeRow = rows.find((r) => r.id === "fav-place")!;
-    expect(placeRow.encrypted).toBe(false);
-    const placeEp = placeRow.endpoint as {
-      kind: string;
-      provider: string;
-      label: string;
-    };
-    expect(placeEp.kind).toBe("geocoded");
-    expect(placeEp.provider).toBe("legacy-favorite");
-    expect(placeEp.label).toBe("Rynek");
+    const stopSave = (await saveById("fav-stop"))!;
+    expect(stopSave.alias).toBe("Central");
+    expect(stopSave.origin).toMatchObject({ kind: "stop", stopId: "S-42", name: "Central" });
+
+    const placeSave = (await saveById("fav-place"))!;
+    expect(placeSave.origin).toMatchObject({
+      kind: "geocoded",
+      provider: "legacy-favorite",
+      label: "Rynek",
+    });
   });
 
   it("clears the legacy key only after all writes succeed", async () => {
-    seedLegacyFavorites([home(), stopFav()]);
+    await seedLegacyFavorites([home(), stopFav()]);
     await migrateFavoritesToSaves();
     expect(localStorage.getItem(LEGACY_FAVORITES_KEY)).toBeNull();
   });
 
   it("is idempotent: second run is a no-op", async () => {
-    seedLegacyFavorites([home()]);
+    await seedLegacyFavorites([home()]);
     const first = await migrateFavoritesToSaves();
     expect(first.migrated).toBe(1);
     expect(first.legacyCleared).toBe(true);
@@ -183,22 +157,16 @@ describe("migrateFavoritesToSaves", () => {
   });
 
   it("leaves legacy key intact on mid-write failure", async () => {
-    seedLegacyFavorites([home(), work(), stopFav()]);
-    const originalPut = db.savedLocations.put.bind(db.savedLocations);
+    await seedLegacyFavorites([home(), work(), stopFav()]);
+    const originalEncrypt = crypto.subtle.encrypt.bind(crypto.subtle);
     let callCount = 0;
     const spy = vi
-      .spyOn(db.savedLocations, "put")
-      .mockImplementation(((
-        ...args: Parameters<typeof originalPut>
-      ) => {
+      .spyOn(crypto.subtle, "encrypt")
+      .mockImplementation((...args: Parameters<SubtleCrypto["encrypt"]>) => {
         callCount += 1;
-        if (callCount === 2) {
-          return Promise.reject(
-            new Error("simulated write failure"),
-          ) as ReturnType<typeof originalPut>;
-        }
-        return originalPut(...args);
-      }) as typeof originalPut);
+        if (callCount === 2) return Promise.reject(new Error("simulated write failure"));
+        return originalEncrypt(...args);
+      });
 
     await expect(migrateFavoritesToSaves()).rejects.toThrow(
       "simulated write failure",
@@ -207,39 +175,52 @@ describe("migrateFavoritesToSaves", () => {
     spy.mockRestore();
   });
 
+  it("keeps the sealed source when saves could only be kept for this session", async () => {
+    await seedLegacyFavorites([home()]);
+    localStorage.removeItem("ptn-personal-storage");
+    const { usePersonalStorageStatus } = await import("./personalStorage.ts");
+    usePersonalStorageStatus.setState({ migration: "failed" });
+    const result = await migrateFavoritesToSaves();
+    expect(result.legacyCleared).toBe(false);
+    expect(await db.savedLocations.count()).toBe(0);
+  });
+
   it("preserves FavoritePlace.id on the SavedRecord", async () => {
-    seedLegacyFavorites([home({ id: "abc-123" })]);
+    await seedLegacyFavorites([home({ id: "abc-123" })]);
     await migrateFavoritesToSaves();
-    const row = await db.savedLocations.get("abc-123");
-    expect(row).not.toBeUndefined();
+    expect(await db.savedLocations.get("abc-123")).not.toBeUndefined();
+    expect((await saveById("abc-123"))?.alias).toBe("Dom");
   });
 
   it("parses createdAt ISO into savedAt epoch ms", async () => {
-    seedLegacyFavorites([
+    await seedLegacyFavorites([
       placeFav({ id: "epoch-1", createdAt: "2026-01-04T10:00:00.000Z" }),
     ]);
     await migrateFavoritesToSaves();
-    const row = (await db.savedLocations.get("epoch-1"))!;
-    expect(row.savedAt).toBe(Date.parse("2026-01-04T10:00:00.000Z"));
+    const save = (await saveById("epoch-1"))!;
+    expect(save.savedAt).toBe(Date.parse("2026-01-04T10:00:00.000Z"));
   });
 
   it("accepts the force opt even when flag is off", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: false });
-    seedLegacyFavorites([stopFav()]);
+    await seedLegacyFavorites([stopFav()]);
     const result = await migrateFavoritesToSaves({ force: true });
     expect(result.skipped).toBe(false);
     expect(result.migrated).toBe(1);
   });
 
   it("is a no-op when legacy envelope is malformed JSON", async () => {
-    localStorage.setItem(LEGACY_FAVORITES_KEY, "not json");
+    localStorage.setItem(
+      LEGACY_FAVORITES_KEY,
+      await sealString("not json", await getOrCreateInstallKey()),
+    );
     const result = await migrateFavoritesToSaves();
     expect(result.migrated).toBe(0);
     expect(result.legacyCleared).toBe(false);
   });
 
   it("is a no-op when favorites array is empty", async () => {
-    seedLegacyFavorites([]);
+    await seedLegacyFavorites([]);
     const result = await migrateFavoritesToSaves();
     expect(result.migrated).toBe(0);
     expect(result.legacyCleared).toBe(false);

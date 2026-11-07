@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { Stop, TransportMode } from "@pt/shared";
 import { useDepartures } from "../../hooks/useDepartures.ts";
 import { useFavoritesStore } from "../../stores/favoritesStore.ts";
+import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
@@ -25,6 +26,9 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   const [height, setHeight] = useState<SheetHeight>("half");
   const { departures, loading, error } = useDepartures(stop.id, true, 24, { hedge: true });
   const { favorites, addFavorite, removeFavorite } = useFavoritesStore();
+  // Favorites are sealed and load asynchronously; editing before they load
+  // would replace the stored list.
+  const favoritesLoaded = usePersistHydrated(useFavoritesStore.persist);
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const { t } = useTranslation();
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -98,6 +102,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, [onClose]);
 
   function toggleFavorite() {
+    if (!favoritesLoaded) return;
     if (isFavorite) {
       const fav = favorites.find((f) => f.stopId === stop.id && f.cityId === activeCityId);
       if (fav) removeFavorite(fav.id);
@@ -163,7 +168,9 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
         <div className="flex items-center gap-1 ml-2">
           <button
             onClick={toggleFavorite}
-            className="p-2 rounded-full hover:bg-surface-overlay"
+            disabled={!favoritesLoaded}
+            aria-busy={!favoritesLoaded}
+            className="p-2 rounded-full hover:bg-surface-overlay disabled:opacity-50"
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
           >
             <Icon

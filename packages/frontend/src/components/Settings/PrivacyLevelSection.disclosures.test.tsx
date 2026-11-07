@@ -12,7 +12,7 @@ import { PrivacyLevelSection } from "./PrivacyLevelSection.tsx";
 /** disclosure text -> the control (axis or network flow) it must be attached to */
 const ATTACHED: { needle: RegExp; axisTitle: string; flowGroup?: string }[] = [
   { needle: /Shareable URLs can carry coordinates/i, axisTitle: "URL share & deep links" },
-  { needle: /per-install encryption key|sealed with a per-install key/i, axisTitle: "Recent locations" },
+  { needle: /per-install key/i, axisTitle: "Recent locations" },
   { needle: /coordinate saved into recents is snapped/i, axisTitle: "Map tap precision" },
   { needle: /Geocoder providers are tried in order/i, axisTitle: "Provider fallback" },
   { needle: /internal error reports are buffered/i, axisTitle: "Error reporting" },

@@ -12,8 +12,8 @@ import { PrivacyLevelSection } from "./PrivacyLevelSection.tsx";
 // `privacy.disclosure.installKey` is the discriminator: its value in
 // privacy.json genuinely differs from the fallback hard-coded at the call
 // site, so only a real namespace load can produce the JSON text.
-const JSON_ONLY = /sealed with a per-install key/i;
-const FALLBACK_ONLY = /will be generated on first use \(M8\)/i;
+const JSON_ONLY = /per-install key generated in this browser profile/i;
+const FALLBACK_ONLY = /per-install key kept in this browser\./i;
 
 describe("PrivacyLevelSection opts into the lazy privacy namespace", () => {
   test("renders namespace copy, not the inline fallback", async () => {

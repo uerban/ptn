@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createSealedJSONStorage } from "../services/sealedLocalStorage.ts";
 import type { LatLon } from "@pt/shared";
 
 export type DelayCategory =
@@ -62,6 +63,8 @@ export const useDelayReportStore = create<DelayReportState>()(
     }),
     {
       name: "ptn-delay-reports",
+      // Personal records: sealed with the install key, hydrated asynchronously.
+      storage: createSealedJSONStorage(),
     },
   ),
 );

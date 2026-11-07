@@ -7,6 +7,7 @@ import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { IOSInstallPrompt } from "./IOSInstallPrompt.tsx";
 import { BackendStatus } from "./BackendStatus.tsx";
 import { GeocoderStatusChip } from "./GeocoderStatusChip.tsx";
+import { PersonalStorageNotice } from "../Privacy/PersonalStorageNotice.tsx";
 import { Icon } from "../Icon.tsx";
 
 export function Layout() {
@@ -34,6 +35,7 @@ export function Layout() {
       )}
       {isOnline && <BackendStatus />}
       <GeocoderStatusChip />
+      {!fitSearchPicker && <PersonalStorageNotice />}
 
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-hidden relative">
         <Outlet />

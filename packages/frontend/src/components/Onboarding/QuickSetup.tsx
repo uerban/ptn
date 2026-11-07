@@ -243,6 +243,7 @@ export function QuickSetup(props: QuickSetupProps) {
       </div>
 
       <p className="text-sm text-fg-muted">{text("setup.changeLater")}</p>
+      <p className="text-sm text-fg-muted">{text("setup.personalEncrypted")}</p>
       {props.busy && (
         <p role="status" className="text-sm text-fg">
           {text("setup.starting")}

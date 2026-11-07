@@ -35,14 +35,14 @@ async function seedUserRows(): Promise<void> {
     endpoint: { kind: "stop", stopId: "s1", name: "Stop", lat: 1, lon: 2 },
     usedAt: 1,
     usedAsOrigin: true,
-  });
+  } as never);
   await db.savedLocations.put({
     id: "saved",
     endpoint: { kind: "stop", stopId: "s1", name: "Stop", lat: 1, lon: 2 },
     alias: "Home",
     savedAt: 1,
     encrypted: false,
-  });
+  } as never);
   await db.usageStats.put({ stopId: "s1", tapCount: 1, lastTapped: 1 });
 }
 

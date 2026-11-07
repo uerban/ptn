@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { loadStopUsage } from "../../src/services/stopUsage.ts";
+import { resetPersonalStorage } from "../../src/test-helpers/personalStorage.ts";
 import { useStopStore } from "../../src/stores/stopStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { db } from "../../src/db/index.ts";
@@ -12,6 +14,7 @@ describe("StopStore", () => {
   beforeEach(async () => {
     await db.delete();
     await db.open();
+    await resetPersonalStorage();
     useStopStore.getState().reset();
     localStorage.setItem(
       PRIVACY_DATA_MIGRATION_KEY,
@@ -64,7 +67,7 @@ describe("StopStore", () => {
     const store = useStopStore.getState();
     await store.recordTap("s1");
     await store.recordTap("s1");
-    const stat = await db.usageStats.get("s1");
+    const stat = (await loadStopUsage(["s1"])).get("s1");
     expect(stat?.tapCount).toBe(2);
   });
 
@@ -73,7 +76,7 @@ describe("StopStore", () => {
       .getState()
       .setChoice("personalization", "unset");
     await useStopStore.getState().recordTap("s1");
-    expect(await db.usageStats.count()).toBe(0);
+    expect(await db.personalUsage.count()).toBe(0);
   });
 
   it("computes preload priority score", async () => {

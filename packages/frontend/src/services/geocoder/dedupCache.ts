@@ -14,6 +14,7 @@ import {
 import {
   InstallKeyError,
   getOrCreateInstallKey,
+  isInstallKeyDurable,
 } from "../installKey.ts";
 import { getPolicy } from "../../stores/privacyStore.ts";
 import { reportError } from "../errorReporter.ts";
@@ -99,6 +100,8 @@ export async function writeDedupEntry(
     }
     throw e;
   }
+  // A key that is lost on reload would leave rows nobody can read again.
+  if (!isInstallKeyDurable()) return;
 
   const sealed = await encrypt(candidates, key);
   const now = opts.now ? opts.now() : Date.now();

@@ -342,17 +342,17 @@ async function seedRow(name: PtnTableName): Promise<void> {
     case "recentLocations":
       return void (await db.recentLocations.put({
         id: "rl1",
-        endpoint: { lat: 0, lon: 0 } as never,
-        usedAt: Date.now(),
-        usedAsOrigin: false,
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
       }));
     case "savedLocations":
       return void (await db.savedLocations.put({
         id: "sv1",
-        endpoint: { lat: 0, lon: 0 } as never,
-        alias: "Home",
-        savedAt: Date.now(),
-        encrypted: false,
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
+      }));
+    case "personalUsage":
+      return void (await db.personalUsage.put({
+        id: "pu1",
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
       }));
     case "installKey":
       // Constructing a real CryptoKey is impractical in this env. The

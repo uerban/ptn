@@ -20,12 +20,15 @@ import { stopDedupSweep } from "./geocoder/dedupCache.ts";
 import { osrmClient } from "./osrmWasm.ts";
 import { walkGraphClient } from "./walkGraphClient.ts";
 import { clearWalkRouteCache } from "./walkRouteCache.ts";
+import { clearPersonal } from "./personalStorage.ts";
+import { removeSealedItem } from "./sealedLocalStorage.ts";
 import { stopRecentsSweep } from "./recents.ts";
 import { stopStopUsageSweep } from "./stopUsage.ts";
 import {
   clearLocalReportsData,
   clearPersonalizationData,
   clearRecentsData,
+  clearSearchCacheData,
   clearViewportData,
 } from "./optionalStorageData.ts";
 
@@ -111,9 +114,9 @@ async function runEveryCleanup(
 async function clearSavedPlacesData(
   storage: Pick<Storage, "removeItem"> | undefined = globalThis.localStorage,
 ): Promise<void> {
-  await db.savedLocations.clear();
+  await clearPersonal("savedLocations");
   useFavoritesStore.setState({ favorites: [] });
-  storage?.removeItem(LEGACY_FAVORITES_KEY);
+  removeSealedItem(LEGACY_FAVORITES_KEY, storage);
 }
 
 /** Deletes rider-created history while preserving settings and public downloads. */
@@ -126,6 +129,7 @@ export async function deletePersonalHistory(
     clearPersonalizationData,
     () => clearLocalReportsData(storage),
     () => clearViewportData(storage),
+    clearSearchCacheData,
   ]);
 }
 

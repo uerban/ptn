@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
 import { Link } from "react-router-dom";
 import { useTranslation } from "../../i18n/index.ts";
@@ -9,12 +9,8 @@ import {
 } from "../../stores/settingsStore.ts";
 import { useServerNow } from "../../hooks/useServerNow.ts";
 import { useRetainRoutes } from "../../hooks/useLiveRt.ts";
-import {
-  defaultSensitiveForAxis,
-  isSensitiveToggleAvailable,
-  saveRoutePair,
-} from "../../services/saves.ts";
-import { usePolicy } from "../../stores/privacyStore.ts";
+import { saveRoutePair } from "../../services/saves.ts";
+import { SavedStorageNote } from "../Privacy/PersonalStorageNotice.tsx";
 import { reportError } from "../../services/errorReporter.ts";
 import { EngineFailureNotice } from "./EngineFailureNotice.tsx";
 import { TransitousPanel, type TransitousPanelProps } from "./TransitousPanel.tsx";
@@ -101,7 +97,6 @@ export function RouteResults({
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const policy = usePolicy();
   const variant = useSettingsStore((s) => s.routeSearchVariant);
   // Resolved pre-stop buffer in seconds (profile default unless user override is set).
   const bufferSeconds = useSettingsStore(selectPreStopBufferSeconds);
@@ -121,15 +116,7 @@ export function RouteResults({
       return routeId ? [routeId] : [];
     }),
   );
-  const showSensitiveToggle = isSensitiveToggleAvailable(
-    policy.savesEncryption,
-  );
-  const [sensitive, setSensitive] = useState<boolean>(() =>
-    defaultSensitiveForAxis(policy.savesEncryption),
-  );
-  useEffect(() => {
-    setSensitive(defaultSensitiveForAxis(policy.savesEncryption));
-  }, [policy.savesEncryption]);
+  const [savedDurably, setSavedDurably] = useState(true);
 
   const canSavePair = Boolean(origin && destination) && itineraries.length > 0;
 
@@ -144,12 +131,8 @@ export function RouteResults({
               "",
             ) ?? "")
           : "";
-      await saveRoutePair({
-        origin,
-        destination,
-        alias,
-        ...(showSensitiveToggle ? { sensitive } : {}),
-      });
+      const { stored } = await saveRoutePair({ origin, destination, alias });
+      setSavedDurably(stored === "stored");
       setSaveState("saved");
     } catch (err) {
       // Causes vary — crypto OperationError (install key missing), IDB
@@ -160,12 +143,11 @@ export function RouteResults({
           surface: "routeResults.savePair",
           originKind: origin.kind,
           destKind: destination.kind,
-          sensitive: showSensitiveToggle ? sensitive : undefined,
         },
       });
       setSaveState("error");
     }
-  }, [origin, destination, t, showSensitiveToggle, sensitive]);
+  }, [origin, destination, t]);
 
   // US-037: arrow-key convenience only. This surface used to declare
   // role="listbox" here and attribute-mutate role="option" + a roving
@@ -308,23 +290,6 @@ export function RouteResults({
 
       {canSavePair && (
         <div className="px-3 pt-1 pb-2 space-y-2">
-          {showSensitiveToggle && (
-            <label className="flex items-center gap-2 text-xs text-fg-muted">
-              <input
-                type="checkbox"
-                data-testid="save-pair-sensitive"
-                checked={sensitive}
-                onChange={(e) => setSensitive(e.target.checked)}
-                disabled={saveState === "saving" || saveState === "saved"}
-              />
-              <span>
-                {t(
-                  "search.save_pair_sensitive",
-                  "Sensitive — encrypt this save",
-                )}
-              </span>
-            </label>
-          )}
           <button
             type="button"
             onClick={handleSavePair}
@@ -341,6 +306,7 @@ export function RouteResults({
                   ? t("search.save_pair_error", "Couldn't save — try again")
                   : t("search.save_pair", "Save this pair")}
           </button>
+          {saveState === "saved" && <SavedStorageNote durable={savedDurably} />}
         </div>
       )}
 

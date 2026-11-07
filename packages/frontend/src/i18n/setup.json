@@ -62,6 +62,7 @@
   "setup.customize.askDescription": "Scheduled information remains usable. Each online feature asks when you first use it.",
   "setup.customize.continue": "Continue",
   "setup.changeLater": "You can change every choice in Settings, with an explanation of each option. Changing a choice affects future requests only.",
+  "setup.personalEncrypted": "Saved places and history are encrypted on this device.",
   "setup.storageUnavailable": "This browser is not letting the app store settings. Your choices apply until you close the app, and setup will appear again next time.",
   "setup.starting": "Starting…",
   "setup.saveFailed": "Your choices could not be applied. Try again."

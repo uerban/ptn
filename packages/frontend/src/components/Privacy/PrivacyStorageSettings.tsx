@@ -1,5 +1,6 @@
 import { useTranslation } from "../../i18n/index.ts";
 import { OptionalStorageChoice } from "./OptionalStorageChoice.tsx";
+import { PersonalStorageDetail, PersonalStorageNotice } from "./PersonalStorageNotice.tsx";
 
 export function PrivacyStorageSettings() {
   const { t } = useTranslation();
@@ -14,6 +15,8 @@ export function PrivacyStorageSettings() {
           "PTN works without these. If you enable one, its data stays in this browser and you can stop and delete it at any time.",
         )}
       </p>
+      <PersonalStorageDetail />
+      <PersonalStorageNotice showProgress />
       <div className="space-y-3">
         <OptionalStorageChoice
           category="recents"

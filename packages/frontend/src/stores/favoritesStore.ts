@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createSealedJSONStorage } from "../services/sealedLocalStorage.ts";
 import type { FavoritePlace } from "@pt/shared";
 
 interface FavoritesState {
@@ -56,6 +57,8 @@ export const useFavoritesStore = create<FavoritesState>()(
     }),
     {
       name: "ptn-favorites",
+      // Personal records: sealed with the install key, hydrated asynchronously.
+      storage: createSealedJSONStorage(),
       merge: (persisted, current) => {
         const stored = persisted as Partial<FavoritesState> | undefined;
         if (!stored?.favorites) {

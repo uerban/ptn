@@ -33,11 +33,28 @@ describe("ptn database", () => {
 describe("schema declaration", () => {
   it("adds downloaded-city storage in version 2 without changing the version-1 schema", () => {
     const decls = migrationCoordinator.declaredMigrations();
-    expect(decls).toHaveLength(2);
-    const {offlineCities, offlineTransfers, ...originalStores} = STORES;
-    expect(decls[0]).toMatchObject({id: "ptn", version: 1, stores: originalStores});
+    expect(decls).toHaveLength(3);
+    const {offlineCities, offlineTransfers, personalUsage, ...current} = STORES;
+    expect(personalUsage).toBe("id");
+    expect(decls[0]).toMatchObject({id: "ptn", version: 1});
+    expect(decls[0].stores).not.toHaveProperty("personalUsage");
+    // Tables other than the personal ones keep their version-1 schema.
+    const {recentLocations, savedLocations, usageStats, ...unchanged} = current;
+    expect(decls[0].stores).toEqual({
+      ...unchanged,
+      usageStats: "stopId, lastTapped",
+      recentLocations: "id, usedAt",
+      savedLocations: "id, savedAt",
+    });
     expect(decls[1]).toMatchObject({id: "offline-city-packages", version: 2, stores: {offlineCities, offlineTransfers}});
     expect(decls[0].upgrade).toBeUndefined();
+    // Personal tables lose their plaintext time indexes in version 3.
+    expect(decls[2]).toMatchObject({
+      id: "personal-encrypted-storage",
+      version: 3,
+      stores: {personalUsage: "id", recentLocations, savedLocations, usageStats},
+    });
+    expect([recentLocations, savedLocations, usageStats]).toEqual(["id", "id", "stopId"]);
   });
 
   it("classifies every declared table in TABLE_KIND", () => {

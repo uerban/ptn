@@ -27,6 +27,7 @@ import { useBikeShareStore } from "../stores/bikeShareStore.ts";
 import { useMapTapStore } from "../stores/mapTapStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { useFavoritesStore } from "../stores/favoritesStore.ts";
+import { afterPersistHydration } from "../hooks/usePersistHydrated.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { useRtStore } from "../stores/rtStore.ts";
 import { autoDetectScheduleMode, useSettingsStore } from "../stores/settingsStore.ts";
@@ -433,9 +434,13 @@ export function HomePage() {
   }, [selectedBikeStationId, cancelLineLoad]);
 
   // Migrate legacy favorites (no cityId) to the active city on mount
-  useEffect(() => {
-    useFavoritesStore.getState().migrateLegacyFavorites(activeCity.id);
-  }, [activeCity.id]);
+  useEffect(
+    () =>
+      afterPersistHydration(useFavoritesStore.persist, () =>
+        useFavoritesStore.getState().migrateLegacyFavorites(activeCity.id),
+      ),
+    [activeCity.id],
+  );
 
   // GTFS data lifecycle (reset-on-switch vs defer-on-initial-load).
   const cityId = useCityStore((s) => s.activeCity.id);

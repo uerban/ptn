@@ -125,7 +125,7 @@ describe("PrivacyLevelSection", () => {
       screen.getByText(/Shareable URLs can carry coordinates/i),
     ).toBeDefined();
     expect(
-      screen.getByText(/per-install encryption key/i),
+      screen.getByText(/per-install key/i),
     ).toBeDefined();
     expect(
       screen.getByText(/area-of-interest tiles from the PTN backend/i),

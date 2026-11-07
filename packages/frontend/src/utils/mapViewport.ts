@@ -1,7 +1,7 @@
 import type { PrivacyPolicy, StopWithLines } from "@pt/shared";
 import { isOptionalStorageEnabledNow } from "../services/privacyChoices.ts";
 import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
-import { MAP_VIEWPORT_STORAGE_KEY } from "../services/privacyStorageKeys.ts";
+import { mapViewportItem } from "../services/sealedLocalStorage.ts";
 import { haversineDistance } from "./geo.ts";
 
 export { MAP_VIEWPORT_STORAGE_KEY } from "../services/privacyStorageKeys.ts";
@@ -38,12 +38,10 @@ const MODE_RANK: Record<PrivacyPolicy["viewportPersistence"], number> = {
   off: 4,
 };
 
+// The stored area is sealed with the install key; `mapViewportItem` holds the
+// decrypted copy loaded at start-up so the map can read it synchronously.
 function clearStoredViewport(): void {
-  try {
-    globalThis.localStorage?.removeItem(MAP_VIEWPORT_STORAGE_KEY);
-  } catch {
-    // Storage access can fail in private mode; the caller still fails closed.
-  }
+  mapViewportItem.remove();
 }
 
 function isPersistedMode(value: unknown): value is PersistedViewportMode {
@@ -112,7 +110,7 @@ export function enforceStoredViewportPolicy(): void {
     return;
   }
   try {
-    const raw = globalThis.localStorage?.getItem(MAP_VIEWPORT_STORAGE_KEY);
+    const raw = mapViewportItem.get();
     if (!raw) return;
     const parsed = parseStoredViewport(raw);
     if (!parsed || MODE_RANK[storedMode(parsed)] < MODE_RANK[required]) {
@@ -134,7 +132,7 @@ export function loadViewport(): SavedViewport | null {
     return null;
   }
   try {
-    const raw = globalThis.localStorage?.getItem(MAP_VIEWPORT_STORAGE_KEY);
+    const raw = mapViewportItem.get();
     if (!raw) return null;
     const v = parseStoredViewport(raw);
     if (!v || MODE_RANK[storedMode(v)] < MODE_RANK[required]) {
@@ -226,17 +224,8 @@ export function saveViewport(
     privacyMode: mode,
     version: 1,
   };
-  try {
-    const storage = globalThis.localStorage;
-    if (!storage) return false;
-    storage.setItem(
-      MAP_VIEWPORT_STORAGE_KEY,
-      JSON.stringify(persisted),
-    );
-    return true;
-  } catch {
-    return false;
-  }
+  mapViewportItem.set(JSON.stringify(persisted));
+  return true;
 }
 
 // Privacy-level changes are synchronous in the store. This subscription makes

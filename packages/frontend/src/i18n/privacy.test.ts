@@ -50,9 +50,8 @@ describe("privacy i18n namespace", () => {
 
   test("enum axis values all have option.<value> copy", () => {
     // recentsEncryption is an enum axis used as a canary — make sure its
-    // five option keys exist.
+    // option keys exist.
     const options: Array<PrivacyPolicy["recentsEncryption"]> = [
-      "plaintext",
       "encrypted",
       "encrypted-30d",
       "encrypted-7d",
@@ -64,6 +63,34 @@ describe("privacy i18n namespace", () => {
         `privacy.axis.recentsEncryption.option.${opt}`,
       );
     }
+  });
+
+  test("no option offers storing personal data unencrypted", () => {
+    for (const key of [
+      "privacy.axis.recentsEncryption.option.plaintext",
+      "privacy.axis.savesEncryption.option.opt-in",
+      "privacy.axis.savesEncryption.option.default",
+    ]) {
+      expect(enPrivacy).not.toHaveProperty(key);
+    }
+  });
+
+  test("encryption copy does not overstate protection", () => {
+    const storageCopy = Object.entries(enPrivacy as Record<string, string>)
+      .filter(([k]) => k.startsWith("privacy.storage.") || k === "privacy.disclosure.installKey")
+      .map(([, v]) => v);
+    expect(storageCopy.length).toBeGreaterThan(5);
+    for (const copy of storageCopy) {
+      expect(copy).not.toMatch(/\b(secure|safe|vault|locked)\b/i);
+    }
+    expect(enPrivacy).toHaveProperty(
+      "privacy.storage.encryptedShort",
+      "Saved places and history are encrypted on this device.",
+    );
+    expect(enPrivacy).toHaveProperty(
+      "privacy.storage.encryptedDetail",
+      "This makes them hard to read by looking through the browser's stored data. Anyone who can use this browser profile can still open the app and see them, so delete them if you share this device.",
+    );
   });
 
   test("Privacy Center enum axes have copy for every option", () => {

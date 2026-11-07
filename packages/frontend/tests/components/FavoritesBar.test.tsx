@@ -5,13 +5,9 @@ import { FavoritesBar } from "../../src/components/Favorites/FavoritesBar.tsx";
 import { useFavoritesStore } from "../../src/stores/favoritesStore.ts";
 import { useSettingsStore } from "../../src/stores/settingsStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
-import { db, type SavedLocationRecord } from "../../src/db/index.ts";
-import { encrypt } from "../../src/services/cryptoBox.ts";
-import {
-  getOrCreateInstallKey,
-  __resetInstallKeyCacheForTests,
-} from "../../src/services/installKey.ts";
-import { __resetDegradedModeForTests } from "../../src/services/installKeyDegrade.ts";
+import { db } from "../../src/db/index.ts";
+import { restoreSave } from "../../src/services/saves.ts";
+import { resetPersonalStorage } from "../../src/test-helpers/personalStorage.ts";
 
 function makeFavorite(overrides: Partial<FavoritePlace> = {}): FavoritePlace {
   return {
@@ -26,24 +22,22 @@ function makeFavorite(overrides: Partial<FavoritePlace> = {}): FavoritePlace {
   };
 }
 
-function plaintextSaved(
+function seedSave(
   id: string,
   alias: string,
   endpoint: BaseEndpoint,
   savedAt: number,
-): SavedLocationRecord {
-  return { id, alias, savedAt, encrypted: false, endpoint };
+  placeType?: FavoritePlace["type"],
+) {
+  return restoreSave(id, { origin: endpoint, alias, savedAt, placeType });
 }
 
 describe("FavoritesBar", () => {
   beforeEach(async () => {
+    await resetPersonalStorage();
+    await useFavoritesStore.persist.rehydrate();
     useFavoritesStore.setState({ favorites: [] });
     useSettingsStore.setState({ enableFavoritesMigration: false });
-    if (!db.isOpen()) await db.open();
-    await db.savedLocations.clear();
-    await db.installKey.clear();
-    __resetInstallKeyCacheForTests();
-    __resetDegradedModeForTests();
   });
 
   it("reads from favoritesStore when flag is OFF", () => {
@@ -55,10 +49,20 @@ describe("FavoritesBar", () => {
     expect(screen.getByText("Legacy Home")).not.toBeNull();
   });
 
+  it("shows a loading placeholder until sealed favorites are decrypted", () => {
+    vi.spyOn(useFavoritesStore.persist, "hasHydrated").mockReturnValue(false);
+    useFavoritesStore.setState({
+      favorites: [makeFavorite({ name: "Not Yet" })],
+    });
+    render(<FavoritesBar onFavoriteClick={vi.fn()} />);
+    expect(screen.getByTestId("favorites-loading")).not.toBeNull();
+    expect(screen.queryByText("Not Yet")).toBeNull();
+    vi.restoreAllMocks();
+  });
+
   it("ignores savedLocations when flag is OFF", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: false });
-    await db.savedLocations.put(
-      plaintextSaved(
+    await seedSave(
         "s-1",
         "Shadow Saved",
         {
@@ -70,16 +74,14 @@ describe("FavoritesBar", () => {
           confidence: 1,
         },
         1,
-      ),
     );
     render(<FavoritesBar onFavoriteClick={vi.fn()} />);
     expect(screen.queryByText("Shadow Saved")).toBeNull();
   });
 
-  it("reads from savedLocations when flag is ON (plaintext)", async () => {
+  it("reads sealed savedLocations when flag is ON", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: true });
-    await db.savedLocations.put(
-      plaintextSaved(
+    await seedSave(
         "s-1",
         "Rynek",
         {
@@ -91,7 +93,6 @@ describe("FavoritesBar", () => {
           confidence: 1,
         },
         1000,
-      ),
     );
     const onClick = vi.fn();
     render(<FavoritesBar onFavoriteClick={onClick} />);
@@ -106,29 +107,23 @@ describe("FavoritesBar", () => {
     expect(arg.stopId).toBeUndefined();
   });
 
-  it("reads and decrypts encrypted savedLocations when flag is ON", async () => {
+  it("keeps the kind of a migrated favorite (home)", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: true });
-    const key = await getOrCreateInstallKey();
-    const endpoint: BaseEndpoint = {
-      kind: "geocoded",
-      lat: 54.35,
-      lon: 18.65,
-      label: "Dom",
-      provider: "bundled",
-      confidence: 1,
-    };
-    const sealed = await encrypt(endpoint, key);
-    await db.savedLocations.put({
-      id: "s-home",
-      alias: "Dom",
-      savedAt: 2000,
-      encrypted: true,
-      endpoint: sealed,
-    });
-    render(<FavoritesBar onFavoriteClick={vi.fn()} />);
+    await seedSave(
+      "s-home",
+      "Dom",
+      { kind: "geocoded", lat: 54.35, lon: 18.65, label: "Dom", provider: "bundled", confidence: 1 },
+      2000,
+      "home",
+    );
+    expect(await db.savedLocations.count()).toBe(1);
+    const onClick = vi.fn();
+    render(<FavoritesBar onFavoriteClick={onClick} />);
     await waitFor(() => {
       expect(screen.getByText("Dom")).not.toBeNull();
     });
+    fireEvent.click(screen.getByText("Dom"));
+    expect((onClick.mock.calls[0][0] as FavoritePlace).type).toBe("home");
   });
 
   it("renders nothing when savedLocations is empty and flag ON", async () => {
@@ -141,13 +136,11 @@ describe("FavoritesBar", () => {
 
   it("maps stop-kind endpoints back to stopId for the callback", async () => {
     useSettingsStore.setState({ enableFavoritesMigration: true });
-    await db.savedLocations.put(
-      plaintextSaved(
+    await seedSave(
         "s-stop",
         "Central",
         { kind: "stop", stopId: "S-42", name: "Central", lat: 54.37, lon: 18.67 },
         3000,
-      ),
     );
     const onClick = vi.fn();
     render(<FavoritesBar onFavoriteClick={onClick} />);

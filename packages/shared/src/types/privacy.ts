@@ -29,16 +29,17 @@ export const PRIVACY_LEVELS: readonly PrivacyLevel[] = [
 ] as const;
 
 export interface PrivacyPolicy {
+  /** Personal records are always encrypted when persisted; levels only
+   * choose retention or keeping them for the session alone. */
   recentsEncryption:
-    | "plaintext"
     | "encrypted"
     | "encrypted-30d"
     | "encrypted-7d"
     | "ram-only"
     | "off";
+  /** Saves are always encrypted; stricter values also withhold export and
+   * sharing. */
   savesEncryption:
-    | "opt-in"
-    | "default"
     | "always"
     | "always-no-export"
     | "always-no-share";
@@ -229,8 +230,8 @@ export function legacyEffectiveNetworkPolicy(
 
 export const LEVEL_FLOORS: Record<PrivacyLevel, ProtectionPolicy> = {
   baseline: {
-    recentsEncryption: "plaintext",
-    savesEncryption: "opt-in",
+    recentsEncryption: "encrypted",
+    savesEncryption: "always",
     mapTapPersistedPrecision: "raw",
     mapTapSnapRadiusMeters: 0,
     m10CoarsenGridFloorMeters: 0,
@@ -247,7 +248,7 @@ export const LEVEL_FLOORS: Record<PrivacyLevel, ProtectionPolicy> = {
   },
   standard: {
     recentsEncryption: "encrypted",
-    savesEncryption: "default",
+    savesEncryption: "always",
     mapTapPersistedPrecision: "snap-centroid",
     mapTapSnapRadiusMeters: 25,
     m10CoarsenGridFloorMeters: 25,
@@ -329,7 +330,6 @@ export const AXIS_STRICTNESS_ORDER: {
   recentsEncryption: {
     kind: "enum",
     values: [
-      "plaintext",
       "encrypted",
       "encrypted-30d",
       "encrypted-7d",
@@ -340,8 +340,6 @@ export const AXIS_STRICTNESS_ORDER: {
   savesEncryption: {
     kind: "enum",
     values: [
-      "opt-in",
-      "default",
       "always",
       "always-no-export",
       "always-no-share",

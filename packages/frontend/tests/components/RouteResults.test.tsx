@@ -6,11 +6,12 @@ import "fake-indexeddb/auto";
 import { RouteResults } from "../../src/components/RouteResults/RouteResults.tsx";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
 import { db } from "../../src/db/index.ts";
+import { listSaves } from "../../src/services/saves.ts";
 import {
-  __resetInstallKeyCacheForTests,
-} from "../../src/services/installKey.ts";
-import { __resetDegradedModeForTests } from "../../src/services/installKeyDegrade.ts";
-import { __clearRamStoreForTests } from "../../src/services/cryptoBox.ts";
+  findLeaks,
+  rawTableText,
+  resetPersonalStorage,
+} from "../../src/test-helpers/personalStorage.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
 
 function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
@@ -408,12 +409,7 @@ describe("RouteResults — Save this pair", () => {
   };
 
   beforeEach(async () => {
-    if (!db.isOpen()) await db.open();
-    await db.savedLocations.clear();
-    await db.installKey.clear();
-    __clearRamStoreForTests();
-    __resetInstallKeyCacheForTests();
-    __resetDegradedModeForTests();
+    await resetPersonalStorage();
     usePrivacyStore.getState().reset();
     vi.spyOn(window, "prompt").mockReturnValue("");
   });
@@ -501,8 +497,8 @@ describe("RouteResults — Save this pair", () => {
     await waitFor(async () => {
       expect(await db.savedLocations.count()).toBe(1);
     });
-    const rows = await db.savedLocations.toArray();
-    expect(rows[0]!.destinationEndpoint).toBeDefined();
+    const [save] = await listSaves();
+    expect(save!.destination).toEqual(destination);
     await waitFor(() => {
       expect(saveBtn).toBeDisabled();
     });
@@ -525,14 +521,32 @@ describe("RouteResults — Save this pair", () => {
     await waitFor(async () => {
       expect(await db.savedLocations.count()).toBe(1);
     });
-    const rows = await db.savedLocations.toArray();
-    expect(rows[0]!.alias).toBe("Home → Work");
+    const [save] = await listSaves();
+    expect(save!.alias).toBe("Home → Work");
   });
 
-  it("shows the sensitive checkbox at Baseline, unchecked by default", async () => {
-    await usePrivacyStore.getState().setLevel("baseline", {
-      confirm: () => true,
-    });
+  it("offers no per-save encryption switch at any level", async () => {
+    for (const level of ["baseline", "standard", "hardened"] as const) {
+      await usePrivacyStore.getState().setLevel(level, { confirm: () => true });
+      const view = render(
+        <BrowserRouter>
+          <RouteResults
+            itineraries={[makeItinerary()]}
+            onSelect={() => {}}
+            origin={origin}
+            destination={destination}
+          />
+        </BrowserRouter>,
+      );
+      expect(screen.queryByTestId("save-pair-sensitive")).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it("stores the pair sealed at Baseline and says so after saving", async () => {
+    await usePrivacyStore.getState().setLevel("baseline", { confirm: () => true });
+    vi.spyOn(window, "prompt").mockReturnValue("Clinic");
     render(
       <BrowserRouter>
         <RouteResults
@@ -543,87 +557,15 @@ describe("RouteResults — Save this pair", () => {
         />
       </BrowserRouter>,
     );
-    const box = screen.getByTestId("save-pair-sensitive") as HTMLInputElement;
-    expect(box).toBeInTheDocument();
-    expect(box.checked).toBe(false);
-  });
-
-  it("shows the sensitive checkbox at Standard, checked by default", () => {
-    // Standard is the default level after reset().
-    render(
-      <BrowserRouter>
-        <RouteResults
-          itineraries={[makeItinerary()]}
-          onSelect={() => {}}
-          origin={origin}
-          destination={destination}
-        />
-      </BrowserRouter>,
-    );
-    const box = screen.getByTestId("save-pair-sensitive") as HTMLInputElement;
-    expect(box).toBeInTheDocument();
-    expect(box.checked).toBe(true);
-  });
-
-  it("hides the sensitive checkbox at Hardened (axis forces encryption)", async () => {
-    await usePrivacyStore.getState().setLevel("hardened");
-    render(
-      <BrowserRouter>
-        <RouteResults
-          itineraries={[makeItinerary()]}
-          onSelect={() => {}}
-          origin={origin}
-          destination={destination}
-        />
-      </BrowserRouter>,
-    );
-    expect(screen.queryByTestId("save-pair-sensitive")).not.toBeInTheDocument();
-  });
-
-  it("writes an encrypted row when sensitive is checked at Baseline", async () => {
-    await usePrivacyStore.getState().setLevel("baseline", {
-      confirm: () => true,
-    });
-    render(
-      <BrowserRouter>
-        <RouteResults
-          itineraries={[makeItinerary()]}
-          onSelect={() => {}}
-          origin={origin}
-          destination={destination}
-        />
-      </BrowserRouter>,
-    );
-    fireEvent.click(screen.getByTestId("save-pair-sensitive"));
     fireEvent.click(screen.getByRole("button", { name: /save this pair/i }));
     await waitFor(async () => {
       expect(await db.savedLocations.count()).toBe(1);
     });
-    const row = (await db.savedLocations.toArray())[0]!;
-    expect(row.encrypted).toBe(true);
-    expect(JSON.stringify(row)).not.toContain("Origin Stop");
-  });
-
-  it("writes a plaintext row when sensitive is unchecked at Standard", async () => {
-    render(
-      <BrowserRouter>
-        <RouteResults
-          itineraries={[makeItinerary()]}
-          onSelect={() => {}}
-          origin={origin}
-          destination={destination}
-        />
-      </BrowserRouter>,
+    const raw = await rawTableText("savedLocations");
+    expect(findLeaks(raw, ["Origin Stop", "Dest Stop", "Clinic"])).toEqual([]);
+    expect(await screen.findByTestId("saved-storage-note")).toHaveTextContent(
+      "Saved places and history are encrypted on this device.",
     );
-    fireEvent.click(screen.getByTestId("save-pair-sensitive"));
-    fireEvent.click(screen.getByRole("button", { name: /save this pair/i }));
-    await waitFor(async () => {
-      expect(await db.savedLocations.count()).toBe(1);
-    });
-    const row = (await db.savedLocations.toArray())[0]!;
-    expect(row.encrypted).toBe(false);
-    expect(row.endpoint).toEqual(origin);
-    expect(row.destinationEndpoint).toEqual(destination);
   });
 });
 

@@ -1,8 +1,7 @@
-import type { PrivacyLevel } from "@pt/shared";
-
 /**
- * Failure modes for install-key acquisition. Each represents a distinct
- * runtime degradation:
+ * Reasons the install key cannot back durable encrypted storage this session.
+ * Every mode means the same thing to personal-data writers: keep records in
+ * memory for the session and write nothing to storage.
  *
  * - `no-crypto`           — WebCrypto `generateKey` rejected (algorithm
  *                           unsupported / SubtleCrypto absent). No encryption
@@ -12,13 +11,21 @@ import type { PrivacyLevel } from "@pt/shared";
  *                           only in memory and is lost on reload.
  * - `no-structured-clone` — Browser refused to structured-clone a
  *                           non-extractable CryptoKey into IndexedDB
- *                           (DataCloneError). Same effect as `no-persist`:
- *                           usable now, lost on reload.
+ *                           (DataCloneError). Same effect as `no-persist`.
+ * - `read-failed`         — Reading the stored key failed. The stored key is
+ *                           left untouched (replacing it would make every
+ *                           existing record unreadable) and the read is
+ *                           retried later.
+ * - `key-unreadable`      — A key row exists but does not hold a usable key.
+ *                           It is never replaced automatically; only deleting
+ *                           the personal data it protected starts over.
  */
 export type DegradedMode =
   | "no-crypto"
   | "no-persist"
-  | "no-structured-clone";
+  | "no-structured-clone"
+  | "read-failed"
+  | "key-unreadable";
 
 let currentMode: DegradedMode | null = null;
 const listeners = new Set<(mode: DegradedMode | null) => void>();
@@ -41,39 +48,6 @@ export function subscribeDegradedMode(
     listeners.delete(fn);
   };
 }
-
-/**
- * Effective tier for callers that asked for `"encrypted"` writes when the
- * install key is unavailable. Baseline / Standard fall back to plaintext;
- * higher levels keep `"encrypted"` (the call will throw, and the UI surfaces
- * the warning) so we never silently downgrade a Hardened+ user.
- */
-export function fallbackTierForLevel(
-  level: PrivacyLevel,
-  mode: DegradedMode | null,
-): "encrypted" | "plaintext" {
-  if (mode !== "no-crypto") return "encrypted";
-  return level === "baseline" || level === "standard"
-    ? "plaintext"
-    : "encrypted";
-}
-
-/**
- * Whether the current user level should see a visible "encryption
- * unavailable — privacy level fallback applied." warning. Hardened and above
- * have requested encryption guarantees we cannot meet; lower levels run on
- * plaintext anyway so a warning would only add noise.
- */
-export function shouldWarnAtLevel(
-  level: PrivacyLevel,
-  mode: DegradedMode | null = currentMode,
-): boolean {
-  if (!mode) return false;
-  return level !== "baseline" && level !== "standard";
-}
-
-/** i18n-key surfaced by the warning banner. */
-export const DEGRADED_WARNING_I18N_KEY = "privacy.installKey.degradedWarning";
 
 /** Test-only: clears mode + listeners between vitest runs. */
 export function __resetDegradedModeForTests(): void {
