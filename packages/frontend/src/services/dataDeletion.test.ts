@@ -128,6 +128,27 @@ describe("privacy data deletion boundaries", () => {
     expect(await getStoredWalkGraph("oslo")).toBeUndefined();
   });
 
+  it("complete reset clears network decisions and the setup record, so setup runs next launch", async () => {
+    localStorage.setItem("ptn-onboarding", JSON.stringify({ version: 1 }));
+    localStorage.setItem("ptn-network-decisions", JSON.stringify({ state: { decisions: {} }, version: 1 }));
+    localStorage.setItem("ptn-realtime-availability", "{}");
+    await resetPtnCompletely({
+      localStorage,
+      sessionStorage,
+      cacheStorage: fakeCaches([]).storage,
+      stopRuntime: async () => {},
+      resetMemory: () => {},
+      reload: () => {},
+    });
+    expect(localStorage.getItem("ptn-onboarding")).toBeNull();
+    expect(localStorage.getItem("ptn-network-decisions")).toBeNull();
+    const { classifyInstallation } = await import("./installClassifier.ts");
+    const result = classifyInstallation(localStorage);
+    expect(result.status).toBe("classified");
+    if (result.status === "classified") expect(result.record.install.kind).toBe("new");
+    localStorage.clear();
+  });
+
   it("complete reset removes only PTN keys/caches, deletes the DB, and reloads", async () => {
     await seedUserRows();
     localStorage.setItem("ptn-settings", "owned");

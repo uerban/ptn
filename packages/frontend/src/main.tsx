@@ -7,17 +7,22 @@ async function start(): Promise<void> {
   // classification reads.
   try { classifyInstallation(); } catch { /* Storage unavailable: setup runs on session state. */ }
   // Production always attempts backend discovery, including legacy deployments.
+  // A failed discovery leaves the catalog empty; the setup shell then offers
+  // cities whose data is on this device, or a way to try again.
   const cities = import.meta.env.DEV
     ? (await import("./config/cities.ts")).getAvailableCities()
-    : await discoverCities();
+    : await discoverCities().catch(() => []);
   const {installCityCatalog} = await import("./config/cities.ts");
-  installCityCatalog(cities);
-  // Register the app shell while the first-launch picker is displayed too.
+  if (cities.length) installCityCatalog(cities);
+  // Register the app shell while setup is displayed too. The precache holds
+  // the app shell only; map-only assets are fetched when Map is chosen.
   if (import.meta.env.PROD && "serviceWorker" in navigator) {
     void navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
-  const {chooseInitialCity} = await import("./chooseInitialCity.ts");
-  await chooseInitialCity(cities, catalogWasCached);
+  // Nothing optional may start before setup is complete: appMain (time sync,
+  // geocoder boot, POI sync, live data) is imported only after the gate.
+  const {runStartupGate} = await import("./setup/startupGate.ts");
+  await runStartupGate({cities, catalogWasCached});
   await import("./appMain.tsx");
 }
 

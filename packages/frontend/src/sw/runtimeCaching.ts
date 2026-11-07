@@ -6,6 +6,8 @@
  * Rule order:
  *   0. lazy locale + privacy chunks — CacheFirst (kept out of the precache;
  *        see precache.ts. Must stay CacheFirst or they break offline)
+ *   0b. map-only chunk, worker and glyphs — CacheFirst (kept out of the
+ *        precache so Text mode never downloads them)
  *   1. /version     — NetworkOnly  (deploy-skew surface)
  *   1b. /health*    — NetworkOnly  (liveness surface; a replayed 200 hides an
  *        outage for as long as the entry lives)
@@ -60,6 +62,24 @@ export const runtimeCaching = [
         // Eleven locales plus their privacy overlays, with room for one
         // deploy's worth of superseded hashes before the LRU starts evicting.
         maxEntries: 60,
+        maxAgeSeconds: 60 * 60 * 24 * 90,
+      },
+      cacheableResponse: { statuses: [0, 200] },
+    },
+  },
+  {
+    // Map-only assets are excluded from the precache (precache.ts) so Text
+    // mode never downloads them. Choosing Map fetches them once; this rule
+    // keeps them for offline use. Anchored on the exact chunk names and the
+    // bundled glyph directory.
+    urlPattern:
+      /\/(?:assets\/(?:vendor-map|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
+    handler: "CacheFirst" as const,
+    options: {
+      cacheName: "map-assets",
+      expiration: {
+        // One deploy's chunk, worker and glyph ranges, plus superseded hashes.
+        maxEntries: 16,
         maxAgeSeconds: 60 * 60 * 24 * 90,
       },
       cacheableResponse: { statuses: [0, 200] },
