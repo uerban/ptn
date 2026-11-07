@@ -217,9 +217,21 @@ test.describe("M10 v2: no plaintext dedup entries at any level @mock-api", () =>
       expect(row!.ctUtf8).not.toContain(QUERY);
       expect(row!.ctUtf8).not.toContain("Gdansk, Pomerania, Poland");
       expect(row!.ctUtf8).not.toContain("display_name");
-      // The queryHash is a SHA-256 hex (64 chars); it is a one-way derivative
-      // of the plaintext query + coarsened coord and is not itself PII.
+      // The queryHash is an HMAC-SHA-256 hex (64 chars) under a per-install
+      // key, so a guessed query cannot be hashed to confirm it: it must not
+      // equal an unkeyed SHA-256 of the same input.
       expect(row!.queryHash).toMatch(/^[0-9a-f]{64}$/);
+      const unkeyed = await page.evaluate(
+        async ({ query, gridMeters, lat, lon, providerId }) => {
+          const payload = JSON.stringify({ query, lat, lon, gridMeters, providerId });
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+          return Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        },
+        { query: QUERY, gridMeters: row!.gridMeters, lat: HINT.lat, lon: HINT.lon, providerId: row!.providerId },
+      );
+      expect(row!.queryHash).not.toBe(unkeyed);
     });
   }
 
