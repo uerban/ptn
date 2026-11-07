@@ -114,9 +114,10 @@ export const runtimeCaching = [
       // entries in the old cache inert.
       cacheName: "api-stops-cache-v1",
       networkTimeoutSeconds: 5,
+      // Entries name the stops the rider looked at: kept briefly and few.
       expiration: {
-        maxEntries: 50,
-        maxAgeSeconds: 86400,
+        maxEntries: 20,
+        maxAgeSeconds: 60 * 60,
       },
     },
   },
@@ -126,9 +127,10 @@ export const runtimeCaching = [
     options: {
       cacheName: "api-departures-cache",
       networkTimeoutSeconds: 3,
+      // Entries name the stops the rider looked at: kept briefly and few.
       expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 300,
+        maxEntries: 20,
+        maxAgeSeconds: 120,
       },
     },
   },
@@ -212,9 +214,11 @@ export const runtimeCaching = [
     handler: "CacheFirst" as const,
     options: {
       cacheName: "carto-tiles",
+      // Tiles show which areas the rider viewed; the offline map does not
+      // depend on them, so they are kept for two days only.
       expiration: {
-        maxEntries: 400,
-        maxAgeSeconds: 60 * 60 * 24 * 14,
+        maxEntries: 300,
+        maxAgeSeconds: 60 * 60 * 24 * 2,
       },
       cacheableResponse: { statuses: [0, 200] },
     },
