@@ -280,6 +280,11 @@ pub fn to_tiny_http(resp: Resp) -> ResponseBox {
                 }
             }
         }
+        Resp::WithHeaders { inner, headers } => headers
+            .iter()
+            .fold(to_tiny_http(*inner), |r, (name, value)| {
+                r.with_header(hdr(name, value))
+            }),
         Resp::PoiTile {
             status,
             content_type,
@@ -549,6 +554,28 @@ mod tests {
     #[test]
     fn bundle_hash_header_is_the_wire_literal_both_planes_emit() {
         assert_eq!(BUNDLE_HASH_HEADER, "X-PT-Bundle-Hash");
+    }
+
+    #[test]
+    fn with_headers_adds_headers_and_keeps_the_inner_response() {
+        let inner = Resp::CachedBytes {
+            status: 200,
+            body: ByteBody::Raw(Arc::from(&b"{}"[..])),
+            content_type: "application/json",
+            cache_control: "no-cache",
+            etag: Some("\"e\"".to_string()),
+            gzipped: false,
+        };
+        let resp = to_tiny_http(Resp::WithHeaders {
+            inner: Box::new(inner),
+            headers: vec![("X-PT-Realtime", String::new()), ("X-Extra", "a, b".into())],
+        });
+        assert_eq!(resp.status_code().0, 200);
+        assert_eq!(header_value(&resp, "ETag").as_deref(), Some("\"e\""));
+        assert_eq!(header_value(&resp, "X-PT-Realtime").as_deref(), Some(""));
+        assert_eq!(header_value(&resp, "X-Extra").as_deref(), Some("a, b"));
+        let (_, body) = raw_response(resp, false);
+        assert_eq!(body, b"{}");
     }
 
     fn raw_response(resp: ResponseBox, head: bool) -> (String, Vec<u8>) {

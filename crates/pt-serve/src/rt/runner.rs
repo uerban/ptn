@@ -27,7 +27,7 @@
 use crate::bundle::Generation;
 use crate::ops::config::LogFormat;
 use crate::ops::log::{log_event, Level};
-use crate::rt::poller::{FeedStatus, RtPoller};
+use crate::rt::poller::{FeedPayload, FeedPoller, FeedStatus, RtPoller};
 use crate::rt::resolve::resolve_time_predictions;
 use crate::rt::state::{RtSnapshot, RtState};
 use pt_shared::clock::Clock;
@@ -35,7 +35,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-fn now_ms(clock: &dyn Clock) -> u64 {
+pub(crate) fn now_ms(clock: &dyn Clock) -> u64 {
     clock
         .now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -60,8 +60,8 @@ pub const BROKEN_BODY_RETRY_DELAY: Duration = Duration::from_secs(1);
 /// `retry_delay`, so a feed caught mid-rewrite still updates this cycle. The
 /// failed first attempt is never published: health becomes visible per cycle.
 /// A transport error is not retried: a timeout has already cost up to 15 s.
-fn fetch_and_apply(
-    poller: &mut RtPoller,
+pub(crate) fn fetch_and_apply<P: FeedPayload>(
+    poller: &mut FeedPoller<P>,
     url: &str,
     clock: &dyn Clock,
     log_format: LogFormat,
@@ -88,8 +88,8 @@ fn fetch_and_apply(
 }
 
 /// One fetch, applied. True when bytes arrived but did not parse.
-fn fetch_once(
-    poller: &mut RtPoller,
+fn fetch_once<P: FeedPayload>(
+    poller: &mut FeedPoller<P>,
     url: &str,
     clock: &dyn Clock,
     log_format: LogFormat,
@@ -148,9 +148,8 @@ pub fn run_cycle(
     );
 }
 
-/// The loop shell. Fixed-rate: each tick sleeps only the remainder of
-/// `interval` after the cycle's own duration, in ≤ 500 ms slices so a
-/// pending shutdown is observed promptly (mirrors `reload::poll`).
+/// The TripUpdates poll loop: [`run_cycle`] at a fixed rate
+/// ([`run_fixed_rate`]).
 // Two of the eight are the injected seams (`fetch`, `current_gen`).
 #[allow(clippy::too_many_arguments)]
 pub fn run_rt_poll_loop(
@@ -163,6 +162,23 @@ pub fn run_rt_poll_loop(
     mut fetch: impl FnMut(&str) -> Result<Vec<u8>, String>,
     current_gen: impl Fn() -> Option<Arc<Generation>>,
 ) {
+    run_fixed_rate(interval, &shutdown, || {
+        run_cycle(
+            &mut poller,
+            &state,
+            clock.as_ref(),
+            log_format,
+            &mut fetch,
+            &current_gen,
+        )
+    });
+}
+
+/// Fixed-rate loop shell shared by the RT poll threads: the first `cycle`
+/// runs immediately, then each tick sleeps only the remainder of `interval`
+/// after the cycle's own duration, in ≤ 500 ms slices so a pending shutdown
+/// is observed promptly (mirrors `reload::poll`).
+pub(crate) fn run_fixed_rate(interval: Duration, shutdown: &AtomicBool, mut cycle: impl FnMut()) {
     // Config validation rejects 0, but a struct-literal test config can still
     // produce it; return rather than hot-spin (mirrors reload::poll's guard).
     if interval.is_zero() {
@@ -173,14 +189,7 @@ pub fn run_rt_poll_loop(
             return;
         }
         let started = Instant::now();
-        run_cycle(
-            &mut poller,
-            &state,
-            clock.as_ref(),
-            log_format,
-            &mut fetch,
-            &current_gen,
-        );
+        cycle();
         let mut remaining = interval.saturating_sub(started.elapsed());
         while !remaining.is_zero() {
             if shutdown.load(Ordering::SeqCst) {

@@ -22,6 +22,9 @@
 //!            + (rt_urls nonempty) * (RT_POLLER_PROCESS_FIXED_BYTES
 //!                + rt_url_count * RT_POLLER_ASSUMED_MAX_ENTRIES_PER_FEED
 //!                    * RT_POLLER_SNAPSHOT_ENTRY_BYTES_ASSUMED)
+//!            + (alerts_urls nonempty) * (ALERTS_POLLER_PROCESS_FIXED_BYTES
+//!                + alerts_url_count * MAX_FEED_TEXT_BYTES
+//!                    * ALERTS_FEED_TEXT_RSS_FACTOR_ASSUMED)
 //! ```
 //!
 //! `schedule_tile_cache_max_bytes` reserves for the schedule-tile response
@@ -175,6 +178,21 @@ pub const RT_POLLER_SNAPSHOT_ENTRY_BYTES_ASSUMED: u64 = 1024;
 /// why the number is deliberately far above observation rather than near it.
 pub const RT_POLLER_ASSUMED_MAX_ENTRIES_PER_FEED: u64 = 4096;
 
+/// Fixed resident cost of the ServiceAlerts poll thread, charged once when
+/// any alerts feed is configured: its touched stack plus the HTTP/TLS code
+/// pages. Taken from [`RT_POLLER_PROCESS_FIXED_BYTES`], the same work on
+/// another thread; charged again when both pollers run, which only errs on
+/// the reserving side.
+pub const ALERTS_POLLER_PROCESS_FIXED_BYTES: u64 = RT_POLLER_PROCESS_FIXED_BYTES;
+
+/// Copies of one feed's kept strings, bounded by
+/// [`crate::rt::alerts::MAX_FEED_TEXT_BYTES`], that can be resident at once:
+/// the feed's last good alerts, the next body's alerts while it parses, the
+/// cycle's merged clone, and the serialised reply (JSON escaping and field
+/// names on top of the text). Assumed, not measured: alert feeds are small
+/// next to the cap, so the cap is the reservation.
+pub const ALERTS_FEED_TEXT_RSS_FACTOR_ASSUMED: u64 = 4;
+
 /// Parsed-heap multiplier over one bundle's decompressed JSON byte cap.
 /// `PoiEntry` owns strings and alias maps in addition to the source bytes
 /// represented on the wire, so this must exceed 1x: JSON length is not
@@ -282,6 +300,25 @@ fn rt_poller_term(cfg: &ServerConfig) -> u64 {
     )
 }
 
+/// Alert feeds the alerts poller will run, parsed as `AlertsPoller` parses
+/// them.
+fn alerts_poller_feed_count(cfg: &ServerConfig) -> u64 {
+    cfg.alerts_urls().len() as u64
+}
+
+/// Gated like [`rt_poller_term`]: no alerts feed, no thread, nothing held.
+fn alerts_poller_term(cfg: &ServerConfig) -> u64 {
+    let feeds = alerts_poller_feed_count(cfg);
+    if feeds == 0 {
+        return 0;
+    }
+    ALERTS_POLLER_PROCESS_FIXED_BYTES.saturating_add(
+        feeds
+            .saturating_mul(crate::rt::alerts::MAX_FEED_TEXT_BYTES as u64)
+            .saturating_mul(ALERTS_FEED_TEXT_RSS_FACTOR_ASSUMED),
+    )
+}
+
 /// Response-cache reservation, gated on `poi_bundle_dir` for the same reason.
 fn poi_tile_response_cache_term(cfg: &ServerConfig) -> u64 {
     if cfg.poi_bundle_dir.is_none() {
@@ -322,6 +359,7 @@ pub fn estimate_rss(cfg: &ServerConfig, payload: u64, transfers: u64) -> u64 {
         .saturating_add(poi_tile_response_cache_term(cfg))
         .saturating_add(poi_brotli_scratch_term(cfg))
         .saturating_add(rt_poller_term(cfg))
+        .saturating_add(alerts_poller_term(cfg))
 }
 
 /// Outcome of a [`enforce`] call. The accept arm is a unit type so
@@ -380,6 +418,8 @@ pub struct RssBreakdown {
     pub rt_poller_assumed_max_entries_per_feed: u64,
     pub rt_poller_snapshot_entry_bytes: u64,
     pub rt_poller_term_bytes: u64,
+    pub alerts_poller_feed_count: u64,
+    pub alerts_poller_term_bytes: u64,
 }
 
 impl RssBreakdown {
@@ -387,7 +427,7 @@ impl RssBreakdown {
     /// dragging serde derives over a struct only used in stderr logs.
     pub fn to_json(&self) -> String {
         format!(
-            "{{\"payloadBytes\":{},\"transfersBytes\":{},\"payloadFactor\":{},\"payloadTermBytes\":{},\"processFixedOverheadBytes\":{},\"workerPoolSize\":{},\"auxiliaryWorkerCount\":{},\"loopbackWorkerCount\":{},\"totalWorkerCount\":{},\"perWorkerOverheadBytes\":{},\"workersTermBytes\":{},\"scheduleTileCacheMaxBytes\":{},\"rtTileMembershipCacheTermBytes\":{},\"rtTileResponseCacheTermBytes\":{},\"poiBundleMaxDecodedBytes\":{},\"poiCityEntriesCacheMaxBytes\":{},\"poiCityEntriesRssFactor\":{},\"poiCityEntriesCacheTermBytes\":{},\"poiTileCacheMaxBytes\":{},\"poiTileCacheTermBytes\":{},\"poiBrotliBuildConcurrency\":{},\"poiBrotliScratchBytesPerBuild\":{},\"poiBrotliScratchTermBytes\":{},\"rtPollerFeedCount\":{},\"rtPollerProcessFixedBytes\":{},\"rtPollerAssumedMaxEntriesPerFeed\":{},\"rtPollerSnapshotEntryBytes\":{},\"rtPollerTermBytes\":{}}}",
+            "{{\"payloadBytes\":{},\"transfersBytes\":{},\"payloadFactor\":{},\"payloadTermBytes\":{},\"processFixedOverheadBytes\":{},\"workerPoolSize\":{},\"auxiliaryWorkerCount\":{},\"loopbackWorkerCount\":{},\"totalWorkerCount\":{},\"perWorkerOverheadBytes\":{},\"workersTermBytes\":{},\"scheduleTileCacheMaxBytes\":{},\"rtTileMembershipCacheTermBytes\":{},\"rtTileResponseCacheTermBytes\":{},\"poiBundleMaxDecodedBytes\":{},\"poiCityEntriesCacheMaxBytes\":{},\"poiCityEntriesRssFactor\":{},\"poiCityEntriesCacheTermBytes\":{},\"poiTileCacheMaxBytes\":{},\"poiTileCacheTermBytes\":{},\"poiBrotliBuildConcurrency\":{},\"poiBrotliScratchBytesPerBuild\":{},\"poiBrotliScratchTermBytes\":{},\"rtPollerFeedCount\":{},\"rtPollerProcessFixedBytes\":{},\"rtPollerAssumedMaxEntriesPerFeed\":{},\"rtPollerSnapshotEntryBytes\":{},\"rtPollerTermBytes\":{},\"alertsPollerFeedCount\":{},\"alertsPollerTermBytes\":{}}}",
             self.payload_bytes,
             self.transfers_bytes,
             self.payload_factor,
@@ -416,6 +456,8 @@ impl RssBreakdown {
             self.rt_poller_assumed_max_entries_per_feed,
             self.rt_poller_snapshot_entry_bytes,
             self.rt_poller_term_bytes,
+            self.alerts_poller_feed_count,
+            self.alerts_poller_term_bytes,
         )
     }
 }
@@ -473,6 +515,8 @@ pub fn enforce(cfg: &ServerConfig, payload: u64, transfers: u64) -> RssDecision 
             rt_poller_assumed_max_entries_per_feed: RT_POLLER_ASSUMED_MAX_ENTRIES_PER_FEED,
             rt_poller_snapshot_entry_bytes: RT_POLLER_SNAPSHOT_ENTRY_BYTES_ASSUMED,
             rt_poller_term_bytes: rt_poller_term(cfg),
+            alerts_poller_feed_count: alerts_poller_feed_count(cfg),
+            alerts_poller_term_bytes: alerts_poller_term(cfg),
         }),
     }
 }
@@ -514,6 +558,8 @@ mod tests {
             reload_poll_interval_secs: 0,
             rt_trip_updates_urls: String::new(),
             rt_poll_interval_ms: 12_000,
+            rt_service_alerts_urls: String::new(),
+            rt_service_alerts_poll_interval_ms: 60_000,
             schedule_tile_cache_max_bytes: 16 * 1024 * 1024,
             rt_tile_membership_cache_max_entries: 4096,
             rt_tile_response_cache_max_entries: 4096,
@@ -558,6 +604,22 @@ mod tests {
         assert_eq!(poi_city_entries_cache_term(&c), 0);
         assert_eq!(poi_tile_response_cache_term(&c), 0);
         assert_eq!(poi_brotli_scratch_term(&c), 0);
+    }
+
+    #[test]
+    fn alerts_poller_is_reserved_only_when_configured() {
+        let mut c = cfg();
+        assert_eq!(alerts_poller_term(&c), 0);
+        let base = estimate_rss(&c, 0, 0);
+        c.rt_service_alerts_urls = "https://a.test/alerts.pb, ,https://b.test/alerts.pb".into();
+        assert_eq!(alerts_poller_feed_count(&c), 2);
+        let per_feed =
+            crate::rt::alerts::MAX_FEED_TEXT_BYTES as u64 * ALERTS_FEED_TEXT_RSS_FACTOR_ASSUMED;
+        assert_eq!(
+            alerts_poller_term(&c),
+            ALERTS_POLLER_PROCESS_FIXED_BYTES + 2 * per_feed
+        );
+        assert_eq!(estimate_rss(&c, 0, 0) - base, alerts_poller_term(&c));
     }
 
     #[test]

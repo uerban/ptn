@@ -238,6 +238,23 @@ pub struct ServerConfig {
     #[arg(long, env = "PT_SERVE_RT_POLL_INTERVAL_MS", default_value_t = 12_000)]
     pub rt_poll_interval_ms: u64,
 
+    /// Comma-separated GTFS-RT ServiceAlerts feed URLs, parsed like
+    /// [`Self::rt_trip_updates_urls`]. Empty (the default) disables alerts:
+    /// no poll thread, `GET /api/<city>/alerts` answers 404, and the
+    /// `X-PT-Realtime` manifest header does not list `alerts`.
+    #[arg(long, env = "PT_SERVE_RT_SERVICE_ALERTS_URLS", default_value = "")]
+    pub rt_service_alerts_urls: String,
+
+    /// ServiceAlerts poll cadence in milliseconds. Alerts change on the scale
+    /// of minutes, so the default is slower than the TripUpdates cadence.
+    /// Must be ≥ 1 (enforced in `validate()`).
+    #[arg(
+        long,
+        env = "PT_SERVE_RT_SERVICE_ALERTS_POLL_INTERVAL_MS",
+        default_value_t = 60_000
+    )]
+    pub rt_service_alerts_poll_interval_ms: u64,
+
     /// Byte budget for the schedule-tile response cache
     /// (`ops/tile_cache.rs`), default 16 MiB (matches Node's hardcoded
     /// `TileLruCache` budget). Unlike Node, this is configurable: the
@@ -420,6 +437,10 @@ pub enum ConfigError {
         "rt-poll-interval-ms / PT_SERVE_RT_POLL_INTERVAL_MS must be >= 1 (a zero interval would hot-spin the poll thread)"
     )]
     RtPollIntervalMsZero,
+    #[error(
+        "rt-service-alerts-poll-interval-ms / PT_SERVE_RT_SERVICE_ALERTS_POLL_INTERVAL_MS must be >= 1 (a zero interval would hot-spin the poll thread)"
+    )]
+    AlertsPollIntervalMsZero,
     #[error("city_slug must be non-empty")]
     CitySlugEmpty,
     #[error("data_root {0:?} does not exist or is not a directory")]
@@ -464,6 +485,9 @@ impl ServerConfig {
         }
         if self.rt_poll_interval_ms == 0 {
             return Err(ConfigError::RtPollIntervalMsZero);
+        }
+        if self.rt_service_alerts_poll_interval_ms == 0 {
+            return Err(ConfigError::AlertsPollIntervalMsZero);
         }
         if self.city_slug.is_empty() {
             return Err(ConfigError::CitySlugEmpty);
@@ -532,13 +556,38 @@ impl ServerConfig {
     /// empties. Never yields empty strings, so `RtPoller::new`'s
     /// `EmptyStringInUrls` arm is unreachable from config-driven callers.
     pub fn rt_urls(&self) -> Vec<String> {
-        self.rt_trip_updates_urls
-            .split(',')
-            .map(str::trim)
-            .filter(|u| !u.is_empty())
-            .map(str::to_string)
-            .collect()
+        split_feed_urls(&self.rt_trip_updates_urls)
     }
+
+    /// ServiceAlerts feed URLs, split exactly like [`Self::rt_urls`].
+    pub fn alerts_urls(&self) -> Vec<String> {
+        split_feed_urls(&self.rt_service_alerts_urls)
+    }
+
+    /// The `X-PT-Realtime` manifest header value: the GTFS-RT kinds this
+    /// process is configured to serve, as a comma-separated list in the
+    /// canonical order of `REALTIME_KINDS`
+    /// (`packages/shared/src/types/scheduleTile.ts`), or empty. Configuration
+    /// is fixed for the process lifetime, so callers compute it once.
+    pub fn realtime_header_value(&self) -> String {
+        let mut kinds = Vec::new();
+        if !self.rt_urls().is_empty() {
+            kinds.push("departures");
+        }
+        if !self.alerts_urls().is_empty() {
+            kinds.push("alerts");
+        }
+        kinds.join(", ")
+    }
+}
+
+/// Split a comma-separated feed URL list: trim each entry, drop empties.
+fn split_feed_urls(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// Touch-and-delete a sentinel file inside `dir`. Surfaces filesystem-level
@@ -748,6 +797,50 @@ mod tests {
             Err(ConfigError::RtPollIntervalMsZero) => {}
             other => panic!("expected RtPollIntervalMsZero, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn alerts_urls_default_empty_and_split_like_rt_urls() {
+        use clap::Parser;
+        let mut c = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert_eq!(c.rt_service_alerts_urls, "");
+        assert!(c.alerts_urls().is_empty());
+        assert_eq!(c.rt_service_alerts_poll_interval_ms, 60_000);
+        c.rt_service_alerts_urls = " http://a.test/alerts.pb ,, http://b.test/x.pb ".to_string();
+        assert_eq!(
+            c.alerts_urls(),
+            vec![
+                "http://a.test/alerts.pb".to_string(),
+                "http://b.test/x.pb".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn alerts_poll_interval_rejects_zero() {
+        use clap::Parser;
+        let mut a = base_args();
+        a.push("--rt-service-alerts-poll-interval-ms".into());
+        a.push("0".into());
+        let mut cfg =
+            ServerConfig::try_parse_from(a).expect("clap accepts 0; validate() is the gate");
+        match cfg.validate() {
+            Err(ConfigError::AlertsPollIntervalMsZero) => {}
+            other => panic!("expected AlertsPollIntervalMsZero, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn realtime_header_lists_configured_kinds_in_canonical_order() {
+        use clap::Parser;
+        let mut c = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert_eq!(c.realtime_header_value(), "");
+        c.rt_service_alerts_urls = "http://a.test/alerts.pb".to_string();
+        assert_eq!(c.realtime_header_value(), "alerts");
+        c.rt_trip_updates_urls = "http://a.test/tu.pb".to_string();
+        assert_eq!(c.realtime_header_value(), "departures, alerts");
+        c.rt_service_alerts_urls = " , ".to_string();
+        assert_eq!(c.realtime_header_value(), "departures");
     }
 
     #[test]

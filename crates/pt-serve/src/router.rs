@@ -73,6 +73,10 @@ pub enum Route {
     /// before proxying to Node; the real client contract carries it, see
     /// `packages/frontend/src/services/api.ts` `fetchManifest`).
     GtfsManifest,
+    /// GET /api/<city>/alerts — the city's GTFS-RT service alerts. City-wide
+    /// on purpose: no stop or route parameters, so the request discloses
+    /// only the city. Public listeners only.
+    ServiceAlerts,
     /// GET /api/<city>/gtfs/schedule-tile/<bundleHash>/<tileSize>/<tileCoords>.
     /// Node parity: `packages/backend/src/routes/scheduleTile.ts`, mounted
     /// internally at `/api/gtfs/schedule-tile/...` (nginx strips the city
@@ -391,6 +395,7 @@ pub fn resolve(method: &str, path: &str, city: &str, listener: ListenerKind) -> 
                 ("GET", "stops/all") => Route::StopsAll,
                 ("GET", "stops/nearby") => Route::StopsNearby,
                 ("GET", "gtfs/manifest") => Route::GtfsManifest,
+                ("GET", "alerts") => Route::ServiceAlerts,
                 ("GET", t) if t.starts_with("gtfs/shapes/") => {
                     let artifact = &t["gtfs/shapes/".len()..];
                     // single non-empty segment, length-capped (a sha256-hex
@@ -1094,6 +1099,43 @@ mod tests {
             ),
             Route::NotFound
         );
+    }
+
+    #[test]
+    fn service_alerts_route_is_public_city_wide_and_get_only() {
+        let r = |method, path, listener| resolve(method, path, "vilnius", listener);
+        assert_eq!(
+            r("GET", "/api/vilnius/alerts", ListenerKind::Public),
+            Route::ServiceAlerts
+        );
+        // The query string is ignored: the route takes no parameters.
+        assert_eq!(
+            r("GET", "/api/vilnius/alerts?stop=S1", ListenerKind::Public),
+            Route::ServiceAlerts
+        );
+        assert_eq!(
+            r("GET", "/api/vilnius/alerts/S1", ListenerKind::Public),
+            Route::NotFound
+        );
+        assert_eq!(
+            r("GET", "/api/krakow/alerts", ListenerKind::Public),
+            Route::WrongCity
+        );
+        assert_eq!(
+            r("POST", "/api/vilnius/alerts", ListenerKind::Public),
+            Route::NotFound
+        );
+        assert_eq!(
+            r("DELETE", "/api/vilnius/alerts", ListenerKind::Public),
+            Route::MethodNotAllowed
+        );
+        for listener in [ListenerKind::Loopback, ListenerKind::Auxiliary] {
+            assert_eq!(
+                r("GET", "/api/vilnius/alerts", listener),
+                Route::NotFound,
+                "{listener:?}"
+            );
+        }
     }
 
     #[test]

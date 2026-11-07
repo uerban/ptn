@@ -464,6 +464,53 @@ fn main() {
                 );
             }
 
+            // GTFS-RT ServiceAlerts poll thread: same fetch, retry and
+            // loop shell as TripUpdates, on its own cadence, publishing the
+            // pre-built /api/<city>/alerts reply into ctx.alerts.
+            if ctx.alerts.enabled() {
+                let urls = ctx.config.alerts_urls();
+                let feed_count = urls.len();
+                let poller = pt_serve::rt::alerts_state::AlertsPoller::new(urls)
+                    .expect("alerts_urls() yields non-empty, no-empty-string urls");
+                let alerts_state = Arc::clone(&ctx.alerts);
+                let alerts_clock: Arc<dyn Clock> = Arc::clone(&clock);
+                let alerts_shutdown = Arc::clone(&shutdown);
+                let alerts_log_format = ctx.config.log_format;
+                let alerts_interval =
+                    Duration::from_millis(ctx.config.rt_service_alerts_poll_interval_ms);
+                let city = ctx.config.city_slug.clone();
+                let agent = pt_serve::rt::fetch::rt_agent();
+                let alerts_ctx = Arc::clone(&ctx);
+                std::thread::Builder::new()
+                    .name("pt-serve-alerts-poll".into())
+                    .spawn(move || {
+                        pt_serve::rt::alerts_state::run_alerts_poll_loop(
+                            poller,
+                            alerts_state,
+                            city,
+                            alerts_clock,
+                            alerts_log_format,
+                            alerts_interval,
+                            alerts_shutdown,
+                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url),
+                            move || Some(alerts_ctx.current_generation()),
+                        )
+                    })
+                    .expect("spawn alerts-poll thread");
+                log_event(
+                    ctx.config.log_format,
+                    LogLevel::Info,
+                    "alerts_poll_thread_armed",
+                    &[
+                        ("feeds", &feed_count.to_string()),
+                        (
+                            "interval_ms",
+                            &ctx.config.rt_service_alerts_poll_interval_ms.to_string(),
+                        ),
+                    ],
+                );
+            }
+
             Some(shutdown)
         }
         Err(e) => {

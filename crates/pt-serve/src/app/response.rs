@@ -180,6 +180,13 @@ pub enum Resp {
         /// carry no `Vary`). `schedule_tile` never sets this to `true`.
         vary_accept_encoding: bool,
     },
+    /// Any other response plus extra headers, appended after the inner
+    /// response's own. Used by `/gtfs/manifest` for `X-PT-Realtime`, so its
+    /// body and ETag come from the unchanged inner response.
+    WithHeaders {
+        inner: Box<Resp>,
+        headers: Vec<(&'static str, String)>,
+    },
     /// Byte or JSON-error response for the poi-tile route. Distinct from
     /// [`Resp::WithBundleHash`]: no `X-PT-Bundle-Hash` (POI bundles carry
     /// no GTFS bundle-hash concept) and no `Vary: Accept-Encoding` (Node's

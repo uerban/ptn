@@ -194,6 +194,8 @@ pub fn default_test_config(data_root: PathBuf) -> ServerConfig {
         reload_poll_interval_secs: 0,
         rt_trip_updates_urls: String::new(),
         rt_poll_interval_ms: 12_000,
+        rt_service_alerts_urls: String::new(),
+        rt_service_alerts_poll_interval_ms: 60_000,
         schedule_tile_cache_max_bytes: 16 * 1024 * 1024,
         rt_tile_membership_cache_max_entries: 4096,
         rt_tile_response_cache_max_entries: 4096,
