@@ -1,0 +1,80 @@
+{
+  "scope": "Local implementation acceptance; release promotion and physical-device validation remain separate.",
+  "performanceSourceCommit": "aa80383",
+  "laterChange": "Settings ownership copy and locale strings only; 117 affected tests pass after this change.",
+  "checks": [
+    {
+      "command": "vitest run --maxWorkers=4",
+      "files": 405,
+      "passed": 4616,
+      "existingSkipped": 1
+    },
+    {
+      "command": "pnpm test:tz",
+      "zones": {
+        "America/New_York": {
+          "passed": 30,
+          "conditionalSkipped": 14
+        },
+        "Europe/Vilnius": {
+          "passed": 32,
+          "conditionalSkipped": 12
+        }
+      }
+    },
+    {
+      "command": "vitest run src/components/Settings tests/pages/Settings.test.tsx",
+      "files": 20,
+      "passed": 117
+    },
+    {
+      "command": "tsc -b; eslint src; check-pt-wasm-pkg-web.mjs; check-i18n-parity.mjs; vite build; precompress-dist.mjs",
+      "result": "passed"
+    },
+    {
+      "command": "playwright: legacy-city-shapes, stop-fade, urban-badge-continuity, privacy-nearby; pr-chromium + pr-webkit",
+      "passed": 10,
+      "note": "Fresh Vite server; prior HMR-contaminated harness run failed four source-import checks."
+    },
+    {
+      "command": "playwright: offline + offline-city-pins; offline project",
+      "passed": 4,
+      "apiActuallyOffline": true
+    },
+    {
+      "command": "playwright: wasm-engine-coldstart; fast + real CDP throttle",
+      "passed": 2,
+      "projectSpecificSkipped": 2,
+      "evidence": "engine-coldstart-summary.json"
+    },
+    {
+      "command": "pwa-city-upgrade.cjs",
+      "result": "passed",
+      "evidence": "pwa-upgrade-summary.json"
+    },
+    {
+      "command": "city-switch.cjs --repeat=100 + summarize-city-switch.cjs",
+      "result": "passed",
+      "evidence": [
+        "final-sustained-summary.json",
+        "final-oslo-sustained-summary.json"
+      ]
+    },
+    {
+      "command": "city-cold-replays.cjs",
+      "samples": 10,
+      "result": "passed",
+      "evidence": "cold-replays-summary.json"
+    },
+    {
+      "command": "city-switch.cjs --pan --pan-zooms=12,14.5,16 --pan-modes=all,urban",
+      "result": "passed",
+      "evidence": "final-pan-zoom-matrix.json"
+    },
+    {
+      "command": "city-switch.cjs --repeat=16 --cities=vilnius,krakow,tricity,tbilisi,oslo,riga,tallinn,warsaw --allow-empty",
+      "result": "passed",
+      "evidence": "eight-city-replay-summary.json"
+    }
+  ]
+}

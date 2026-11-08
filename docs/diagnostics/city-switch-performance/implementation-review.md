@@ -2,9 +2,10 @@
 
 Worktree: `ptn-perf-investigation`; branch: `investigate/city-switch-performance`.
 Base: `rework/transit-packs-v0.1.3`, `e4420d996b66b97593db7aedd8474cc521f220eb`.
-Status: persistent work-in-progress snapshot; large-city warm gate remains open.
+Status: implementation, review and local acceptance checks complete.
+Logical commits are pushed to the investigation branch; no deployment is included.
 The implementation, browser regressions and evidence are committed separately
-on the investigation branch for a remote snapshot. The original product
+on the investigation branch and pushed to `uerban`. The original product
 checkout and ops worktree are unchanged; other repositories need no changes.
 
 ## Findings and resulting behavior
@@ -21,7 +22,9 @@ backend-status display. Live staging performance remains unmeasured here.
 The selected city now identifies an independently stored city. Verified raw
 artifacts are retained by city/publication, one decoded context is active, and
 readers validate captured city/generation/epoch after asynchronous work. Worker
-decode feeds the index directly. Optional persistence starts after readiness;
+decode feeds the index directly. A single empty standby worker avoids repeated
+module startup; used workers terminate, and obsolete decodes abort. Optional
+persistence starts after readiness;
 the modern path performs no six-table projection copy or duplicate full API
 stop-cache write. API enrichment remains in memory, with an atomic durable
 snapshot retained for API-only fallback. Selection and reset do no disk clears.
@@ -34,7 +37,11 @@ transport modes and general/accessibility/privacy preferences remain global.
 City defaults are derived without changing global intent.
 
 Urban entry shows names/dots before qualified activity. Recent valid verdicts
-survive refresh; pending/unavailable and authoritative empty are separate.
+survive refresh and city revisits without renewing their resolution timestamps.
+Inactive histories share a 4,000-stop budget with the active viewport, with at
+most eight inactive contexts; active viewport coverage takes priority. Reuse
+requires the same minute, publication, city, catalog, timezone and lookahead.
+Pending/unavailable and authoritative empty are separate.
 Publication identity gates new tile activity, while grouped reads share fetch
 and decode work with bounded concurrency and LRU(2).
 
@@ -61,12 +68,13 @@ performance clocks and fixed transit responses. These are desktop observations.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Warm p95, 100 alternating arrivals | Vilnius stable cards 506 ms; Krakow 988 ms; every activity sweep complete, zero fixture misses | `final-sustained-summary.json` |
-| Cold p95, ten fresh contexts, local work after verified acquisition | Index 529 ms; activity 752 ms; stable cards 1,693 ms | `cold-replays-summary.json` |
+| Warm p95, 100 alternating arrivals | Vilnius stable cards 289 ms; Krakow 780 ms; every activity sweep complete, zero fixture misses | `final-sustained-summary.json` |
+| Large-city warm p95, 100 alternating arrivals | Oslo index/activity/stable cards 798/824/988 ms; every sweep complete, zero fixture misses | `final-oslo-sustained-summary.json` |
+| Cold p95, ten fresh contexts, local work after verified acquisition | Index 532 ms; activity 772 ms; stable cards 1,653 ms | `cold-replays-summary.json` |
 | Metadata, 100 empty/8-legacy/8-indexed probes per engine | Zero payload reads; Chromium p95 0.2 ms, WebKit 1 ms; no eight-city increment | `metadata-discovery-summary.json` |
 | Heap under sustained switching | Bounded last-20 ranges per city; raw memo ≤2 generations/24 MiB; no inactive decoded-city memo | `final-sustained-summary.json` |
-| Dot/label/card zoom × all/urban pan | All six cases 17.9–18.3 ms p95; no long tasks or fixture misses | `final-pan-zoom-matrix.json` |
-| Planner cold start, fast and real CPU throttle | Final built check pending; previous checkpoint passed | `engine-coldstart-summary.json` |
+| Dot/label/card zoom × all/urban pan | All six cases 16.8–17.6 ms p95; no long tasks or fixture misses | `final-pan-zoom-matrix.json` |
+| Planner cold start, fast and real CPU throttle | Total p95 21/44 ms; all component budgets pass | `engine-coldstart-summary.json` |
 
 The matched 0/1/8 retained-city comparisons remove the old projection
 transaction. Krakow improved from roughly 18 seconds to 1.3–1.4 seconds; Oslo
@@ -77,11 +85,13 @@ See `fixed-feed-matrix.json`, `oslo-fixed-feed-matrix.json` and
 
 ## Correctness and review
 
-- Current source: **404 unit files, 4,608 passed, one existing skipped case**;
+- Current source: **405 unit files, 4,616 passed, one existing skipped case**;
   NY/Vilnius suites pass 30/32 tests with their existing zone-conditional skips.
   Typecheck, source lint, WASM package check, i18n check, production build,
   precompression and optimized diagnostic build pass.
-- Chromium/WebKit map and privacy cases pass. The expanded real-map fade
+- All ten Chromium/WebKit map and privacy cases pass on a fresh Vite server.
+  A prior HMR-contaminated source harness observed duplicate store identities;
+  restarting Vite resolved it without a product change. The expanded real-map fade
   harness covers visible-dot/card/label edges, offscreen buffer removal,
   pan-out/back, reactivation without remount, reduced motion, city replacement,
   actual unchanged refresh, and zero badge-only source writes.
@@ -95,9 +105,11 @@ See `fixed-feed-matrix.json`, `oslo-fixed-feed-matrix.json` and
   counted once, and unknown legacy owners are preserved conservatively.
 - Actual interrupted v2→v7 upgrades and retry preserve data in Chromium/WebKit
   without upgrade payload reads. Unchanged v2 readers reopen v7 without
-  destructive recovery. Final built Workbox/offline replay is pending.
+  destructive recovery. Final built Workbox update preserves saves and packages
+  with an old reader held open; all four real offline reload/routing cases pass.
 - All eight deployed catalogs pass captured and deterministic two-visit replay
-  coverage; final rendering-source replay is pending. Overnight Tbilisi can
+  coverage on the final map/activation source; all 16 visits complete without
+  fixture misses. Overnight Tbilisi can
   legitimately have no urban cards, with 25 viewport stops fully resolved.
 
 Review also fixed a retained first-context listener, stale A→B→A preload
@@ -111,16 +123,33 @@ This review links current acceptance artifacts; other captures preserve
 investigation checkpoints. Remaining staging/physical-device checks belong to
 the manual release sequence and later PR aggregation. No deployment is included.
 
-## Snapshot checkpoint and remaining work
+## Final warm-gate follow-up
 
-The final eight-city replay completes all 16 visits with zero fixture misses.
-The additional 100-switch Vilnius/Oslo run completes all activity/stability
-checks and keeps memory bounded, but **does not meet the provisional one-second
-warm gate**. Oslo index/activity/stable-card p95 is 1065/1342/1379 ms.
-See `oslo-sustained-summary.json`. The main remaining cost is worker decode plus
-initial display/activity work, rather than the removed projection transaction.
+`final-oslo-sustained-summary.json` records a fresh 100-switch run after bounded
+activity-history reuse, empty-worker prewarming and removal of the redundant
+200 ms wait after a terminal map event. Vilnius index/activity/stable-card p95
+is 257/279/316 ms; Oslo is 798/824/988 ms. Every activity sweep completes, every
+500 ms stability observation is confirmed, and there are zero fixture misses.
+Oslo last-20 observed heap ranges from 209.7 to 211.7 MB. The warm gate passes.
+The historical failed checkpoint below is retained as investigation evidence.
+
+## Earlier snapshot checkpoint
+
+At the earlier checkpoint, the additional 100-switch Vilnius/Oslo run
+completed all activity/stability checks and kept memory bounded, but **did not
+meet the provisional one-second warm gate**. Oslo index/activity/stable-card p95 is 1065/1342/1379 ms.
+See `oslo-sustained-summary.json`. The remaining cost at that checkpoint was worker decode plus initial
+display/activity work, rather than the removed projection transaction.
 Do not treat the passing Vilnius/Krakow gate as universal city coverage.
 
-Remaining: finish the large-city performance work and final built offline,
-worker-update and engine checks. The user requested this remote snapshot while
-work remains in progress; it is not release acceptance.
+## Final acceptance
+
+Final built offline, worker-update and engine checks pass. The six-case pan
+matrix passes at 16.8–17.6 ms p95 with no long tasks; final
+eight-city replay completes all 16 visits. Release promotion remains separate.
+
+Settings now explains app-wide versus city ownership; the accessibility palette
+is labelled for all cities and custom mode colours name the current city. All
+11 locale files have the new copy. The final copy-only adjustment passes 117
+settings tests in 20 files, typecheck, lint, i18n parity, build and precompression.
+The map/activation source used by the numerical reports is unchanged by this copy.

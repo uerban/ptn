@@ -12,50 +12,50 @@
     "vilnius": {
       "samples": 50,
       "indexMs": {
-        "p50": 432.60000002384186,
-        "p95": 442.5,
-        "max": 460.80000001192093
+        "p50": 220,
+        "p95": 231,
+        "max": 254.5
       },
       "authoritativeActivityMs": {
-        "p50": 459.89999997615814,
-        "p95": 469.80000001192093,
-        "max": 489.80000001192093
+        "p50": 236.80000001192093,
+        "p95": 247.60000002384186,
+        "max": 285.10000002384186
       },
       "lastCardChangeMs": {
-        "p50": 495.19999998807907,
-        "p95": 506,
-        "max": 526.3000000119209
+        "p50": 279.5,
+        "p95": 289,
+        "max": 321.5
       },
       "allActivityComplete": true,
       "allStabilityWindowsConfirmed": true,
       "last20HeapBytes": {
-        "min": 125351644,
-        "max": 125602456
+        "min": 125008440,
+        "max": 125261256
       },
       "observedSlowStopCacheWrites": 0
     },
     "krakow": {
       "samples": 50,
       "indexMs": {
-        "p50": 768,
-        "p95": 783.2000000476837,
-        "max": 827
+        "p50": 532.9000000357628,
+        "p95": 577.1999999880791,
+        "max": 605.8000000119209
       },
       "authoritativeActivityMs": {
-        "p50": 797.1000000238419,
-        "p95": 812.3000000119209,
-        "max": 863.5999999642372
+        "p50": 551.3000000119209,
+        "p95": 595.6999999880791,
+        "max": 625.1000000238419
       },
       "lastCardChangeMs": {
-        "p50": 961.5,
-        "p95": 988.3000000119209,
-        "max": 1014.2999999523163
+        "p50": 731,
+        "p95": 780.5,
+        "max": 798.6999999880791
       },
       "allActivityComplete": true,
       "allStabilityWindowsConfirmed": true,
       "last20HeapBytes": {
-        "min": 156342528,
-        "max": 158154312
+        "min": 155983120,
+        "max": 157737880
       },
       "observedSlowStopCacheWrites": 0
     }
