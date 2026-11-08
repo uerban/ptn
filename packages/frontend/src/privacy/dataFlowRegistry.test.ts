@@ -29,6 +29,7 @@ describe("dataFlowRegistry", () => {
       "operator.remote-routing",
       "external.remote-routing",
       "operator.client-report",
+      "external.bike-share",
     ]);
     expect(() => validateDataFlowRegistry(DATA_FLOW_REGISTRY)).not.toThrow();
   });
@@ -40,6 +41,16 @@ describe("dataFlowRegistry", () => {
     expect(flow.trigger).toBe("automatic");
     expect(flow.requestFields).toEqual(["city"]);
     expect(flow.data.every((item) => item.recipient === "operator")).toBe(true);
+  });
+
+  it("declares bike share as an explicit, direct request to its operator", () => {
+    const flow = getDataFlow("external.bike-share");
+    expect(flow.destination).toBe("external");
+    expect(flow.networkPath).toBe("direct-external");
+    expect(flow.trigger).toBe("explicit-action");
+    expect(flow.providerKind).toBe("bike-share");
+    expect(flow.requestFields).toEqual(["resource"]);
+    expect(flow.data.every((item) => item.recipient === "provider")).toBe(true);
   });
 
   it("rejects duplicate flow IDs", () => {

@@ -87,6 +87,10 @@ export function OptionalStorageChoice({
     ) : null;
   }
 
+  // A contextual prompt is never offered for something the protection level
+  // forbids; Settings explains that it needs a lower level.
+  if (presentation === "contextual" && !permitted) return null;
+
   function remember(): void {
     setError(null);
     setStatus(t("privacy.optional.enabled_status", "This browser will remember it."));

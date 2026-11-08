@@ -7,6 +7,8 @@ import { getCapability } from "../../privacy/capabilityRegistry.ts";
 import { isFlowAvailable } from "../../privacy/flowGrants.ts";
 import { useNetworkDecisionsStore } from "../../stores/networkDecisionsStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { getDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import { DEFAULT_BASEMAP_PROVIDER } from "../../services/basemapPrivacy.ts";
 import { useTranslation } from "../../i18n/index.ts";
 
@@ -40,6 +42,9 @@ export function NetworkDecisionsSection({
   const decisions = useNetworkDecisionsStore((s) => s.decisions);
   const setDecision = useNetworkDecisionsStore((s) => s.setDecision);
   const placeSearchProvider = useSettingsStore((s) => s.thirdPartyProvider);
+  // Bike share is not a stored decision: its map button asks on each visit.
+  const cityHasBikeShare = useCityStore((s) => !!s.activeCity.sharedMobility?.length);
+  const bikeShare = cityHasBikeShare ? getDataFlow("external.bike-share") : undefined;
 
   const rows: FlowRow[] = [
     { flowId: "operator.realtime" },
@@ -114,6 +119,20 @@ export function NetworkDecisionsSection({
           </div>
         );
       })}
+      {bikeShare && (
+        <div data-flow-group="external.bike-share">
+          <h3 className="text-sm font-semibold text-fg mb-1">
+            {t(bikeShare.nameKey, "Bike share")}
+          </h3>
+          <p className="text-xs text-fg-muted">{t(bikeShare.purposeKey, "")}</p>
+          <p className="mt-1 text-xs text-fg-secondary">
+            {t(
+              "privacy.decisions.perVisit",
+              "Turned on for one visit at a time with the Bikes button on the map; never on when the app starts.",
+            )}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

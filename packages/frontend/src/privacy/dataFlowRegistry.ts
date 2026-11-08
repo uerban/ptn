@@ -366,6 +366,36 @@ const RAW_DATA_FLOW_REGISTRY: PrivacyDataFlowDescriptor[] = [
     },
     inactiveStatus: "not-shared",
   },
+  {
+    // Live bike-share stations (GBFS), fetched straight from the city's
+    // bike-share operator. Not a stored decision: the Bikes button on the map
+    // turns it on for the current visit only, and nothing is requested until
+    // it is pressed. The requests name the operator's public feeds; the
+    // viewer's position is never sent.
+    id: "external.bike-share",
+    nameKey: "privacy.flow.external.bikeShare.name",
+    purposeKey: "privacy.flow.external.bikeShare.purpose",
+    destination: "external",
+    networkPath: "direct-external",
+    trigger: "explicit-action",
+    data: [
+      ...PROVIDER_NETWORK_METADATA,
+      {
+        category: "transit-resource",
+        precision: "public-id",
+        recipient: "provider",
+      },
+    ],
+    requestFields: ["resource"],
+    controls: { policyAxes: [], settingKeys: [] },
+    retention: {
+      device: "none",
+      operator: "none",
+      provider: "provider-policy",
+    },
+    providerKind: "bike-share",
+    inactiveStatus: "not-shared",
+  },
 ];
 
 export function validateDataFlowRegistry(
