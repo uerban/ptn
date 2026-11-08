@@ -1,5 +1,5 @@
 import { liveLocation } from "../services/liveLocation.ts";
-import { requestNotificationPermission } from "../services/tripNotifications.ts";
+import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
 import { excludedRouteIdsForGroups, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -11,7 +11,6 @@ import { useTranslation } from "../i18n/index.ts";
 import { searchResultSubtext } from "../services/searchResultSubtext.ts";
 import { pluralize } from "../i18n/plurals.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
-import { useGuidanceStore } from "../stores/guidanceStore.ts";
 import { useRoutingStore } from "../stores/routingStore.ts";
 import { StaleWasmInitError } from "../services/raptorWasm.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
@@ -304,6 +303,7 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const tripStart = useTripStart(useCallback(() => navigate("/"), [navigate]));
   const [searchParams] = useSearchParams();
   const { location: userLocation, loading: locating, error: locationError } = useGeolocation();
   const requestedGpsField = useRef<"from" | "to" | null>(null);
@@ -1282,10 +1282,7 @@ export function SearchPage() {
   }, []);
 
   function handleItinerarySelect(itinerary: Itinerary) {
-    liveLocation.request("navigation");
-    if (useSettingsStore.getState().tripNotificationsEnabled) void requestNotificationPermission();
-    useGuidanceStore.getState().startNavigation(itinerary);
-    navigate("/");
+    tripStart.request(itinerary);
   }
 
   function handleSwap() {
@@ -1709,6 +1706,7 @@ export function SearchPage() {
           normalResults
         )}
       </div>
+      {tripStart.dialog}
     </div>
   );
 }
