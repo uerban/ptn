@@ -4,6 +4,10 @@
 // anywhere; results go to test-results/perf-metrics/onboarding-journeys.json
 // and the test log so two builds can be compared on the same machine.
 //
+// Measurement only: the journeys must complete, but no time, request or byte
+// budget fails the test. Timings on shared CI runners vary too much for a
+// fixed limit; compare the recorded numbers between builds instead.
+//
 //   E2E_BASE_URL=http://localhost:5180 npx playwright test --project=perf \
 //     e2e/perf/onboarding-journeys.spec.ts
 //

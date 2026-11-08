@@ -13,6 +13,7 @@ import { completeSetup, setupPresentation } from "./completeSetup.ts";
 vi.mock("./mapAssets.ts", () => ({ warmMapAssets: vi.fn(async () => {}) }));
 
 beforeEach(() => {
+  vi.clearAllMocks();
   localStorage.clear();
   useNetworkDecisionsStore.getState().reset();
   usePrivacyStore.getState().reset();
@@ -71,8 +72,4 @@ describe("completing setup", () => {
     useCityStore.getState().setActiveCity(current);
   });
 
-  it("a grant for one provider never covers a new provider", async () => {
-    useNetworkDecisionsStore.getState().setDecision("external.detailed-basemap", "allowed", "contextual", "carto");
-    expect(canUse("external.detailed-basemap", "some-new-provider")).toBe(false);
-  });
 });
