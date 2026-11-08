@@ -1,5 +1,11 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import type { CityConfig } from "../../config/cities.ts";
+import {
+  buildCityList,
+  groupsHolding,
+  regionNamer,
+  type CityNode,
+} from "../../setup/cityList.ts";
 import { isCityOpenable } from "../../setup/startupPlan.ts";
 import type { SetupText } from "../../setup/setupStrings.ts";
 
@@ -12,8 +18,12 @@ export interface CitySelectionProps {
   readonly offline: boolean;
   readonly catalogStatus: CatalogStatus;
   readonly preselectedCityId: string | null;
+  /** Suggested from the device's time zone when no city is known. */
+  readonly suggestedCityId?: string | null;
   readonly busyCityId: string | null;
   readonly text: SetupText;
+  /** UI locale, for country names and sorting. */
+  readonly locale: string;
   readonly formatSize: (bytes: number) => string;
   readonly onSelect: (city: CityConfig) => void;
   readonly onRetry: () => void;
@@ -27,25 +37,50 @@ function citiesAt(cities: readonly CityConfig[], lat: number, lon: number): City
 }
 
 /**
- * Searchable, keyboard-accessible city list: a plain filter input above a
- * list of buttons. No map is loaded here.
+ * Keyboard-accessible city list. Short catalogs are a plain list of buttons;
+ * longer ones add a filter, and long ones group cities by country (and
+ * continent) in collapsed disclosures. No map is loaded here.
  */
 export function CitySelection(props: CitySelectionProps) {
-  const { cities, text, offline, installedCityIds } = props;
+  const { cities, text, offline, installedCityIds, locale } = props;
   const filterId = useId();
   const locateHelpId = useId();
+  const groupIdPrefix = useId();
   const [query, setQuery] = useState("");
-  const [nearbyIds, setNearbyIds] = useState<readonly string[] | null>(null);
+  const [nearbyIds, setNearbyIds] = useState<ReadonlySet<string> | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
+  const currentCityId = props.preselectedCityId ?? props.suggestedCityId ?? null;
+  const suggested = !props.preselectedCityId && !!props.suggestedCityId;
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    return cities.filter(
-      (city) =>
-        (!needle || city.name.toLocaleLowerCase().includes(needle)) &&
-        (!nearbyIds || nearbyIds.includes(city.id)),
-    );
-  }, [cities, query, nearbyIds]);
+  const regionName = useMemo(() => regionNamer(locale), [locale]);
+  const openableCount = useMemo(
+    () => cities.filter((city) => isCityOpenable(city, installedCityIds, offline)).length,
+    [cities, installedCityIds, offline],
+  );
+  const view = useMemo(
+    () =>
+      buildCityList({
+        cities,
+        openableCount,
+        installedCityIds,
+        query,
+        locale,
+        regionName,
+        onlyCityIds: nearbyIds,
+      }),
+    [cities, openableCount, installedCityIds, query, locale, regionName, nearbyIds],
+  );
+  // The group holding the current city starts open; the rest start collapsed.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+    () => new Set(groupsHolding(view.nodes, currentCityId)),
+  );
+  const toggle = (groupId: string) =>
+    setExpanded((open) => {
+      const next = new Set(open);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
 
   const statusFor = (city: CityConfig): string | null => {
     const size = props.downloadedSizes.get(city.id);
@@ -74,7 +109,7 @@ export function CitySelection(props: CitySelectionProps) {
           setLocationStatus("");
           props.onSelect(openable[0]);
         } else if (matches.length) {
-          setNearbyIds(matches.map((c) => c.id));
+          setNearbyIds(new Set(matches.map((c) => c.id)));
           setLocationStatus(text("setup.city.locateSeveral"));
         } else {
           setLocationStatus(text("setup.city.locateNone"));
@@ -82,6 +117,60 @@ export function CitySelection(props: CitySelectionProps) {
       },
       () => setLocationStatus(text("setup.city.locateUnavailable")),
       { timeout: 10_000 },
+    );
+  };
+
+  const renderCity = (city: CityConfig, country: string | null): ReactNode => {
+    const status = statusFor(city);
+    const openable = isCityOpenable(city, installedCityIds, offline);
+    const busy = props.busyCityId === city.id;
+    const current = city.id === currentCityId;
+    const detail = busy
+      ? text("setup.city.preparing", { city: city.name })
+      : current && suggested
+        ? [text("setup.city.suggested"), status].filter(Boolean).join(" · ")
+        : status;
+    return (
+      <li key={city.id}>
+        <button
+          type="button"
+          disabled={!openable || props.busyCityId !== null}
+          aria-current={current ? "true" : undefined}
+          onClick={() => props.onSelect(city)}
+          className="flex w-full min-h-11 flex-col items-start rounded-lg border border-divider bg-surface-raised px-4 py-2 text-left disabled:opacity-60 aria-[current=true]:border-accent"
+        >
+          <span className="text-base font-medium text-fg">
+            {city.name}
+            {country && <span className="font-normal text-fg-secondary"> · {country}</span>}
+          </span>
+          {detail && <span className="text-xs text-fg-muted">{detail}</span>}
+        </button>
+      </li>
+    );
+  };
+
+  const renderNode = (node: CityNode): ReactNode => {
+    if (node.kind === "city") return renderCity(node.city, node.country);
+    const open = expanded.has(node.id);
+    const listId = `${groupIdPrefix}-${node.id}`;
+    return (
+      <li key={node.id}>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => toggle(node.id)}
+          className="flex w-full min-h-11 items-center justify-between gap-3 rounded-lg border border-divider bg-surface px-4 py-2 text-left text-base font-medium text-fg"
+        >
+          <span>{node.label}</span>
+          <span aria-hidden="true" className="text-fg-muted">
+            {open ? "−" : "+"}
+          </span>
+        </button>
+        <ul id={listId} hidden={!open} aria-label={node.label} className="mt-2 flex flex-col gap-2 pl-4">
+          {open && node.children.map(renderNode)}
+        </ul>
+      </li>
     );
   };
 
@@ -143,47 +232,29 @@ export function CitySelection(props: CitySelectionProps) {
         </p>
       </div>
 
-      <label htmlFor={filterId} className="text-sm font-medium text-fg">
-        {text("setup.city.filterLabel")}
-      </label>
-      <input
-        id={filterId}
-        type="search"
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setNearbyIds(null);
-        }}
-        autoComplete="off"
-        className="min-h-11 rounded-lg border border-divider bg-surface-raised px-3 text-base text-fg"
-      />
+      {view.showFilter && (
+        <>
+          <label htmlFor={filterId} className="text-sm font-medium text-fg">
+            {text("setup.city.filterLabel")}
+          </label>
+          <input
+            id={filterId}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setNearbyIds(null);
+            }}
+            autoComplete="off"
+            className="min-h-11 rounded-lg border border-divider bg-surface-raised px-3 text-base text-fg"
+          />
+        </>
+      )}
 
       <ul aria-label={text("setup.city.listLabel")} className="flex flex-col gap-2">
-        {visible.map((city) => {
-          const status = statusFor(city);
-          const openable = isCityOpenable(city, installedCityIds, offline);
-          const busy = props.busyCityId === city.id;
-          return (
-            <li key={city.id}>
-              <button
-                type="button"
-                disabled={!openable || props.busyCityId !== null}
-                aria-current={city.id === props.preselectedCityId ? "true" : undefined}
-                onClick={() => props.onSelect(city)}
-                className="flex w-full min-h-11 flex-col items-start rounded-lg border border-divider bg-surface-raised px-4 py-2 text-left disabled:opacity-60 aria-[current=true]:border-accent"
-              >
-                <span className="text-base font-medium text-fg">{city.name}</span>
-                {(status || busy) && (
-                  <span className="text-xs text-fg-muted">
-                    {busy ? text("setup.city.preparing", { city: city.name }) : status}
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
+        {view.nodes.map(renderNode)}
       </ul>
-      {visible.length === 0 && query && (
+      {view.nodes.length === 0 && query && (
         <p className="text-sm text-fg-muted">{text("setup.city.noMatches", { query })}</p>
       )}
     </section>
