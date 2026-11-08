@@ -25,7 +25,7 @@
     "test:fuzz": "vitest run tests/m10-coarsen-fuzz.test.ts",
     "test:privacy-harness": "playwright test --config=tests/privacy-harness/playwright.config.ts",
     "size": "size-limit",
-    "size:check": "size-limit --limit",
+    "size:check": "size-limit --limit && node scripts/check-text-entry-chunks.mjs",
     "bench": "vitest bench --config vitest.bench.config.ts --run",
     "bench:check": "vitest bench --config vitest.bench.config.ts --run --outputJson tests/benchmarks/.results.json",
     "lhci": "lhci autorun --config=lighthouserc.json"

@@ -18,6 +18,22 @@
     "gzip": true
   },
   {
+    "name": "Text mode start (excludes vendor-map; graph checked by scripts/check-text-entry-chunks.mjs)",
+    "path": [
+      "dist/assets/index-*.js",
+      "dist/assets/walkGraphClient-*.js",
+      "dist/assets/vendor-react-*.js",
+      "dist/assets/vendor-state-*.js",
+      "dist/assets/vendor-db-*.js",
+      "dist/assets/HomeDispatcher-*.js",
+      "dist/assets/TextHome-*.js",
+      "!dist/assets/vendor-map-*.js",
+      "!dist/assets/maplibre-gl-worker-*.js"
+    ],
+    "limit": "100 kB",
+    "gzip": true
+  },
+  {
     "name": "MapLibre chunk (lazy)",
     "path": "dist/assets/vendor-map-*.js",
     "limit": "280 kB",
