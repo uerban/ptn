@@ -12,7 +12,6 @@ import {
   isProtectionAxis,
   PRIVACY_LEVELS,
   sanitizeNetworkDecisions,
-  type LegacyNetworkPolicy,
   type NetworkDecisionMap,
   type OnboardingPresetId,
   type PrivacyLevel,
@@ -25,19 +24,10 @@ export const ONBOARDING_RECORD_VERSION = 1;
 
 export type InstallKind = "new" | "existing";
 
-/** Network behavior an existing installation had before this version. */
-export interface LegacyInstallState {
-  readonly level: PrivacyLevel;
-  readonly network: LegacyNetworkPolicy;
-}
-
 export interface InstallClassification {
   readonly kind: InstallKind;
-  readonly classifiedAt: number;
   /** City to preselect in setup (a stored city without other app state). */
   readonly preselectedCityId?: string;
-  /** Present for existing installations only. */
-  readonly legacy?: LegacyInstallState;
 }
 
 export type StartMode = "map" | "text";
@@ -68,8 +58,6 @@ export interface OnboardingRecord {
   readonly presentation: PresentationChoice | null;
   /** True once the journal reached every preference store. */
   readonly applied: boolean;
-  /** True once the legacy mapping ran; it never runs again. */
-  readonly legacyMigrated: boolean;
   /** Protection overrides carried over from the previous version. */
   readonly legacyOverrides: Partial<ProtectionPolicy>;
   /** Highest What's new entry id the user has seen. */
@@ -183,21 +171,9 @@ function sanitizeInstall(raw: unknown): InstallClassification | undefined {
   if (raw.kind !== "new" && raw.kind !== "existing") return undefined;
   const install: {
     -readonly [K in keyof InstallClassification]: InstallClassification[K];
-  } = {
-    kind: raw.kind,
-    classifiedAt: nonNegativeInt(raw.classifiedAt),
-  };
+  } = { kind: raw.kind };
   if (typeof raw.preselectedCityId === "string" && raw.preselectedCityId) {
     install.preselectedCityId = raw.preselectedCityId;
-  }
-  if (isRecordObject(raw.legacy) && isPrivacyLevel(raw.legacy.level)) {
-    const network = raw.legacy.network;
-    if (isRecordObject(network)) {
-      install.legacy = {
-        level: raw.legacy.level,
-        network: network as unknown as LegacyNetworkPolicy,
-      };
-    }
   }
   return install;
 }
@@ -215,7 +191,6 @@ export function sanitizeOnboardingRecord(raw: unknown): OnboardingRecord | undef
     decisions: sanitizeSetupDecisions(raw.decisions),
     presentation: sanitizePresentation(raw.presentation),
     applied: raw.applied === true,
-    legacyMigrated: raw.legacyMigrated === true,
     legacyOverrides: sanitizeProtectionOverrides(raw.legacyOverrides),
     seenWhatsNew: nonNegativeInt(raw.seenWhatsNew),
     alertsNotNow: nonNegativeInt(raw.alertsNotNow),
@@ -293,7 +268,6 @@ export function newInstallRecord(
     decisions: null,
     presentation: null,
     applied: false,
-    legacyMigrated: false,
     legacyOverrides: {},
     seenWhatsNew: 0,
     alertsNotNow: 0,

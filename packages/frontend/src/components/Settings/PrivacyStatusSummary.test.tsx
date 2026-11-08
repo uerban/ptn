@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { act, cleanup, render as rtlRender, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { I18nProvider } from "../../i18n/I18nProvider.tsx";
 import { PrivacyStatusSummary } from "./PrivacyStatusSummary.tsx";
@@ -92,7 +92,7 @@ describe("NetworkDecisionsSection for an existing installation", () => {
       "ptn-privacy",
       JSON.stringify({ state: { level: "standard", overrides: {} }, version: 0 }),
     );
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     useOnboardingStore.getState().load();
     useNetworkDecisionsStore
       .getState()
@@ -113,5 +113,38 @@ describe("NetworkDecisionsSection for an existing installation", () => {
     rtlRender(<NetworkDecisionsSection />);
     expect(screen.queryByTestId("privacy-update-changes")).toBeNull();
     expect(document.body.textContent).not.toContain("Kept from before the update");
+  });
+});
+
+describe("NetworkDecisionsSection rows", () => {
+  test("a provider row grants and revokes only that provider", () => {
+    usePrivacyStore.getState().setLevel("strict");
+    rtlRender(<NetworkDecisionsSection />);
+    const row = document.querySelector(
+      '[data-flow-group="external.detailed-basemap@carto"]',
+    ) as HTMLElement;
+    fireEvent.click(within(row).getByRole("radio", { name: "On" }));
+    const decisions = () => useNetworkDecisionsStore.getState().decisions;
+    expect(decisions()["external.detailed-basemap@carto"]).toMatchObject({
+      value: "allowed",
+      source: "settings",
+    });
+    expect(decisions()["external.detailed-basemap"]).toBeUndefined();
+    expect(getCurrentLevel()).toBe("strict");
+
+    fireEvent.click(within(row).getByRole("radio", { name: "Off" }));
+    expect(decisions()["external.detailed-basemap@carto"]).toMatchObject({ value: "denied" });
+  });
+
+  test("changing one service leaves the others as they were", () => {
+    allowFlow("operator.realtime");
+    rtlRender(<NetworkDecisionsSection />);
+    const alerts = document.querySelector(
+      '[data-flow-group="operator.service-alerts"]',
+    ) as HTMLElement;
+    fireEvent.click(within(alerts).getByRole("radio", { name: "On" }));
+    const decisions = useNetworkDecisionsStore.getState().decisions;
+    expect(decisions["operator.realtime"]).toMatchObject({ value: "allowed" });
+    expect(decisions["operator.service-alerts"]).toMatchObject({ value: "allowed" });
   });
 });

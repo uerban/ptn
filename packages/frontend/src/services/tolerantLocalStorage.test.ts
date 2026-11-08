@@ -46,17 +46,17 @@ describe("tolerantLocalStorage", () => {
 describe("onboarding record that cannot be stored", () => {
   it("stays readable for this session", () => {
     const storage = refusingStorage();
-    const record = newInstallRecord({ kind: "existing", classifiedAt: 1 });
+    const record = newInstallRecord({ kind: "existing" });
     expect(writeOnboardingRecord(record, storage)).toBe(false);
     expect(readOnboardingRecord(storage)).toEqual({ status: "ok", record });
   });
 
   it("is forgotten once a write succeeds, and never leaks to other storage", () => {
     const storage = refusingStorage();
-    writeOnboardingRecord(newInstallRecord({ kind: "existing", classifiedAt: 1 }), storage);
+    writeOnboardingRecord(newInstallRecord({ kind: "existing" }), storage);
     expect(readOnboardingRecord(localStorage)).toEqual({ status: "missing" });
 
-    const stored = newInstallRecord({ kind: "new", classifiedAt: 2 });
+    const stored = newInstallRecord({ kind: "new" });
     expect(writeOnboardingRecord(stored, localStorage)).toBe(true);
     expect(readOnboardingRecord(localStorage)).toEqual({ status: "ok", record: stored });
   });

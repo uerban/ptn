@@ -21,10 +21,12 @@ const INTERVALS: Record<RtMode, number> = {
  * Live departures, resolved at every poll — the decision can change (also in
  * another tab) while the poller runs. Every live-data surface (guidance,
  * result cards, line preview) polls through here, so this is the one place
- * the decision has to hold.
+ * the decision has to hold. A hidden page never polls: the next tick after
+ * it is shown again polls as usual.
  */
 function pollingAllowed(): boolean {
-  return canUse(REALTIME_FLOW);
+  if (!canUse(REALTIME_FLOW)) return false;
+  return typeof document === "undefined" || document.visibilityState !== "hidden";
 }
 
 export class RtPoller {

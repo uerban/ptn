@@ -44,7 +44,7 @@ beforeEach(() => {
 
 async function completeSetup() {
   const { writeOnboardingRecord, newInstallRecord } = await import("../services/onboardingRecord.ts");
-  writeOnboardingRecord({ ...newInstallRecord({ kind: "existing", classifiedAt: 1 }), applied: true });
+  writeOnboardingRecord({ ...newInstallRecord({ kind: "existing" }), applied: true });
 }
 afterEach(() => vi.unstubAllGlobals());
 
@@ -85,7 +85,7 @@ describe("startup gate", () => {
 
   it("enters directly after setup, offline included, when the city's data is on this device", async () => {
     const { writeOnboardingRecord, newInstallRecord } = await import("../services/onboardingRecord.ts");
-    writeOnboardingRecord({ ...newInstallRecord({ kind: "existing", classifiedAt: 1 }), applied: true });
+    writeOnboardingRecord({ ...newInstallRecord({ kind: "existing" }), applied: true });
     localStorage.setItem("ptn-city", JSON.stringify({ state: { activeCity: { id: "riga" } }, version: 0 }));
     deviceCities.live = new Set(["riga"]);
     vi.stubGlobal("navigator", { ...navigator, onLine: false });

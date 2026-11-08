@@ -147,4 +147,16 @@ describe("RtPoller — the real-time decision", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(callback).not.toHaveBeenCalled();
   });
+
+  it("skips polls while the page is hidden and resumes once it is shown", async () => {
+    allowFlow("operator.realtime");
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    poller.subscribe("r1", vi.fn());
+    poller.start();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(api.fetchRouteRt).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(api.fetchRouteRt).toHaveBeenCalledWith("r1");
+  });
 });

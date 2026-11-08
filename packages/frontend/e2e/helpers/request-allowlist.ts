@@ -3,9 +3,9 @@ import type { Page, Request } from "@playwright/test";
 /**
  * The documented request allowlist: every request the app may make, grouped
  * by the data flow it belongs to. A request is allowed only when its group is
- * active for the profile under test. Unknown same-origin API paths and every
- * other origin are never allowed, so a new endpoint or provider fails these
- * assertions until it is listed here with its flow.
+ * active for the profile under test. Unlisted same-origin paths (API or
+ * static) and every other origin are never allowed, so a new endpoint, file
+ * or provider fails these assertions until it is listed here with its flow.
  *
  * Groups:
  *   shell        app code, styles, fonts, icons, translations, service worker
@@ -90,20 +90,58 @@ export const REQUEST_RULES: readonly Rule[] = [
   },
   {
     group: "shell",
-    description: "The app's own static files.",
-    matches: (u) => !u.pathname.startsWith("/api/"),
+    description:
+      "The app's own static files: page, built code and styles, service worker, web manifest, icons and deployment configuration.",
+    matches: (u) =>
+      /^\/(?:index\.html)?$/.test(u.pathname) ||
+      /^\/assets\//.test(u.pathname) ||
+      /^\/(?:sw\.js|dev-sw\.js|registerSW\.js|workbox-[\w-]+\.js|manifest\.webmanifest|deployment-config\.js|favicon\.svg|og-image\.png|pwa-\d+x\d+\.png)$/.test(
+        u.pathname,
+      ) ||
+      // The dev server serves source modules and dependencies by path.
+      /^\/(?:@vite\/|@vite-plugin-pwa\/|@id\/|@fs\/|@react-refresh$|src\/|node_modules\/)/.test(u.pathname),
   },
 ];
 
-export function classifyAppRequest(rawUrl: string, appOrigin: string): RequestGroup | "external" | "unknown" {
+/**
+ * The group of a request, `external` for another origin, or `unknown` for an
+ * unlisted path on the app origin. A page load (`document`) is the app shell
+ * whatever its path, since the app's routes all serve the same page.
+ */
+export function classifyAppRequest(
+  rawUrl: string,
+  appOrigin: string,
+  resourceType?: string,
+): RequestGroup | "external" | "unknown" {
   const url = new URL(rawUrl, appOrigin);
   if (url.origin !== new URL(appOrigin).origin) return "external";
+  if (resourceType === "document") return "shell";
   return REQUEST_RULES.find((rule) => rule.matches(url))?.group ?? "unknown";
+}
+
+/**
+ * Whether a request may run before setup completes: the app shell, the city
+ * list and the chosen city's manifest (which also says whether the city
+ * publishes live departures and alerts). Nothing else from `transit-data`,
+ * no map files and no other origin.
+ */
+export function isAllowedBeforeSetup(
+  rawUrl: string,
+  appOrigin: string,
+  resourceType?: string,
+): boolean {
+  if (/^(?:data|blob):/.test(rawUrl)) return true;
+  const group = classifyAppRequest(rawUrl, appOrigin, resourceType);
+  if (group === "shell") return true;
+  if (group !== "transit-data") return false;
+  const { pathname } = new URL(rawUrl, appOrigin);
+  return pathname === "/api/cities" || /^\/api\/[a-z0-9-]+\/gtfs\/manifest$/.test(pathname);
 }
 
 export interface RecordedRequest {
   readonly url: string;
   readonly referer: string | undefined;
+  readonly resourceType?: string;
 }
 
 /** Record every http(s) request the page and its workers make. */
@@ -112,7 +150,7 @@ export function recordRequests(page: Page): RecordedRequest[] {
   const onRequest = (request: Request) => {
     const url = request.url();
     if (!/^https?:/.test(url)) return;
-    seen.push({ url, referer: request.headers()["referer"] });
+    seen.push({ url, referer: request.headers()["referer"], resourceType: request.resourceType() });
   };
   page.context().on("request", onRequest);
   return seen;
@@ -126,7 +164,7 @@ export function disallowedRequests(
 ): string[] {
   const allowed = new Set<string>(active);
   return requests
-    .map(({ url }) => ({ url, group: classifyAppRequest(url, appOrigin) }))
+    .map(({ url, resourceType }) => ({ url, group: classifyAppRequest(url, appOrigin, resourceType) }))
     .filter(({ group }) => !allowed.has(group))
     .map(({ url, group }) => `${group} ${url}`);
 }

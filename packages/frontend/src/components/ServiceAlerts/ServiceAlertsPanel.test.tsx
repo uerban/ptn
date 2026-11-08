@@ -106,7 +106,7 @@ beforeEach(() => {
   __resetContextualPromptsForTests();
   __resetAlertsOfferSessionForTests();
   writeOnboardingRecord({
-    ...newInstallRecord({ kind: "new", classifiedAt: 1 }),
+    ...newInstallRecord({ kind: "new" }),
     applied: true,
     seenWhatsNew: LATEST_WHATS_NEW_ID,
   });

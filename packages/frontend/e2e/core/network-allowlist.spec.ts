@@ -124,6 +124,7 @@ test.describe("request allowlist @mock-api", () => {
     const api = requests
       .map(({ url }) => new URL(url).pathname)
       .filter((path) => path.startsWith("/api/"));
+    expect(api).toContain("/api/vilnius/gtfs/manifest");
     for (const path of api) expect(path).toMatch(/^\/api\/(cities|[a-z0-9-]+\/gtfs\/manifest)$/);
   });
 

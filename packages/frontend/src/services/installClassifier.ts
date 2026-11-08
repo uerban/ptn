@@ -20,6 +20,7 @@ import {
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import { PRIVACY_DATA_MIGRATION_KEY } from "./privacyDataMigrationState.ts";
+import { readStoredCityId } from "../utils/cityId.ts";
 import {
   isPrivacyLevel,
   newInstallRecord,
@@ -74,16 +75,6 @@ function hasKey(storage: StorageReader, key: string): boolean {
   } catch {
     return false;
   }
-}
-
-function storedCityId(storage: StorageReader): string | undefined {
-  const state = readPersistedState(storage, "ptn-city");
-  // Current stores keep only the id; older ones kept the whole city.
-  const city = state?.activeCity;
-  const id = typeof state?.currentCityId === "string"
-    ? state.currentCityId
-    : city && typeof city === "object" ? (city as { id?: unknown }).id : undefined;
-  return typeof id === "string" && id ? id : undefined;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -218,26 +209,19 @@ function isExistingInstall(storage: StorageReader): boolean {
   return EXISTING_INSTALL_KEYS.some((key) => hasKey(storage, key));
 }
 
-export type ClassificationResult =
-  | { readonly status: "classified"; readonly record: OnboardingRecord }
-  | { readonly status: "already-classified"; readonly record: OnboardingRecord }
-  | { readonly status: "unavailable" }
-  | { readonly status: "write-failed"; readonly record: OnboardingRecord };
-
 /** Build the record for an installation that has no onboarding record. */
 export function buildClassification(
   storage: StorageReader,
-  now: number,
   previousRecordCorrupt = false,
 ): OnboardingRecord {
-  const preselectedCityId = storedCityId(storage);
+  const preselectedCityId = readStoredCityId(storage);
   // A corrupt record cannot tell a finished legacy migration from a setup in
   // progress (which may already have written ptn-settings). Run setup again
-  // rather than guess: it never grants anything on its own.
+  // rather than guess: it never grants anything on its own, and it never
+  // lowers a stricter stored level.
   if (previousRecordCorrupt || !isExistingInstall(storage)) {
     return newInstallRecord({
       kind: "new",
-      classifiedAt: now,
       ...(preselectedCityId ? { preselectedCityId } : {}),
     });
   }
@@ -246,14 +230,9 @@ export function buildClassification(
   const network = legacyEffectiveNetworkPolicy(level, overrides);
   const flows = mapLegacyNetworkDecisions(network, readLegacySettings(storage));
   return {
-    ...newInstallRecord({
-      kind: "existing",
-      classifiedAt: now,
-      legacy: { level, network },
-    }),
+    ...newInstallRecord({ kind: "existing" }),
     decisions: { preset: null, level: null, flows },
     applied: false,
-    legacyMigrated: true,
     legacyOverrides: carriedOverOverrides(level),
   };
 }
@@ -261,6 +240,8 @@ export function buildClassification(
 /**
  * Classify this installation once. Idempotent: an existing valid record is
  * returned untouched, so a removed carried-over override is never re-added.
+ * Returns the record (kept for this session when storage refuses the write),
+ * or null when storage cannot be read at all.
  */
 export function classifyInstallation(
   storage: Pick<Storage, "getItem" | "setItem"> | undefined = (() => {
@@ -270,17 +251,11 @@ export function classifyInstallation(
       return undefined;
     }
   })(),
-  now: number = Date.now(),
-): ClassificationResult {
+): OnboardingRecord | null {
   const existing = readOnboardingRecord(storage);
-  if (existing.status === "ok") {
-    return { status: "already-classified", record: existing.record };
-  }
-  if (existing.status === "unavailable" || !storage) {
-    return { status: "unavailable" };
-  }
-  const record = buildClassification(storage, now, existing.status === "corrupt");
-  return writeOnboardingRecord(record, storage)
-    ? { status: "classified", record }
-    : { status: "write-failed", record };
+  if (existing.status === "ok") return existing.record;
+  if (existing.status === "unavailable" || !storage) return null;
+  const record = buildClassification(storage, existing.status === "corrupt");
+  writeOnboardingRecord(record, storage);
+  return record;
 }

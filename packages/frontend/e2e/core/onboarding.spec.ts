@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
-import { isAllowedBeforeSetup } from "../../src/setup/bootstrapRequests.ts";
+import { isAllowedBeforeSetup } from "../helpers/request-allowlist";
 
 // A fresh profile must never be prompted for location by setup itself.
 test.use({ permissions: [] });
@@ -28,8 +28,9 @@ test.describe("first-run setup @mock-api", () => {
   });
 
   test("a new profile chooses a city and starts with one preset action", async ({ page }) => {
-    const requests: string[] = [];
-    const record = (request: { url: () => string }) => requests.push(request.url());
+    const requests: { url: string; resourceType: string }[] = [];
+    const record = (request: { url: () => string; resourceType: () => string }) =>
+      requests.push({ url: request.url(), resourceType: request.resourceType() });
     page.on("request", record);
 
     await page.goto("/");
@@ -46,9 +47,11 @@ test.describe("first-run setup @mock-api", () => {
     // Nothing optional, external or map-only before the choice.
     page.off("request", record);
     const origin = new URL(page.url()).origin;
-    const disallowed = requests.filter((url) => !isAllowedBeforeSetup(url, origin));
+    const disallowed = requests
+      .filter(({ url, resourceType }) => !isAllowedBeforeSetup(url, origin, resourceType))
+      .map(({ url }) => url);
     expect(disallowed, "requests made before setup completed").toEqual([]);
-    expect(requests.some((url) => /\/gtfs\/manifest$/.test(url))).toBe(true);
+    expect(requests.some(({ url }) => /\/gtfs\/manifest$/.test(url))).toBe(true);
 
     await page.getByRole("radio", { name: /Text mode/ }).check();
     await page.getByRole("button", { name: "Start with recommended settings" }).click();
@@ -299,12 +302,10 @@ test.describe("existing installations @mock-api", () => {
     await expectInApp(page);
     const onboarding = (await readStorage(page, "ptn-onboarding")) as {
       install: { kind: string };
-      legacyMigrated: boolean;
       applied: boolean;
       seenWhatsNew: number;
     };
     expect(onboarding.install.kind).toBe("existing");
-    expect(onboarding.legacyMigrated).toBe(true);
     expect(onboarding.applied).toBe(true);
     expect(onboarding.seenWhatsNew).toBe(0);
   });

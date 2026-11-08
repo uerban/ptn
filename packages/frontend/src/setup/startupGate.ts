@@ -6,6 +6,7 @@
  */
 import { installCityCatalog, type CityConfig } from "../config/cities.ts";
 import { readOnboardingRecord } from "../services/onboardingRecord.ts";
+import { readStoredCityId } from "../utils/cityId.ts";
 import type { CatalogStatus } from "../components/Onboarding/CitySelection.tsx";
 import { deviceTimeZone, planStartup } from "./startupPlan.ts";
 
@@ -101,15 +102,8 @@ export function restoredCityId(
     }
   })(),
 ): string | null {
-  try {
-    const saved = JSON.parse(storage?.getItem("ptn-city") ?? "null");
-    // Current stores keep only the id; older ones kept the whole city.
-    const rawId: unknown = saved?.state?.currentCityId ?? saved?.state?.activeCity?.id;
-    const id = rawId === "gdansk" ? "tricity" : rawId;
-    return typeof id === "string" && cities.some((city) => city.id === id) ? id : null;
-  } catch {
-    return null;
-  }
+  const id = readStoredCityId(storage);
+  return id !== null && cities.some((city) => city.id === id) ? id : null;
 }
 
 /** A deep link the user opened, or `null` for the home screen. */

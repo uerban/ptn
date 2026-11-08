@@ -13,10 +13,12 @@
 import { create } from "zustand";
 import {
   ONBOARDING_PRESETS,
+  PRIVACY_LEVELS,
   presetDecisions,
   type GuidedNetworkChoice,
   type NetworkDecision,
   type OnboardingPresetId,
+  type PrivacyLevel,
   type ProtectionAxis,
 } from "@pt/shared/privacy";
 import {
@@ -32,14 +34,13 @@ import {
 } from "../services/onboardingRecord.ts";
 import {
   onStorageKeyChange,
-  syncStoreAcrossTabs,
   withMigrationLock,
 } from "../services/crossTab.ts";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
   useNetworkDecisionsStore,
 } from "./networkDecisionsStore.ts";
-import { usePrivacyStore } from "./privacyStore.ts";
+import { getCurrentLevel, usePrivacyStore } from "./privacyStore.ts";
 import { usePrivacyChoicesStore } from "./privacyChoicesStore.ts";
 import { useSettingsStore } from "./settingsStore.ts";
 
@@ -98,7 +99,7 @@ export async function applyJournalToStores(
   // Persisting a store can throw (quota, blocked storage) after its
   // in-memory state changed. Keep going so this session still gets every
   // part of the journal; the record stays authoritative for the next boot.
-  await safely(() => useNetworkDecisionsStore.getState().applyDecisions(flows));
+  await safely(() => useNetworkDecisionsStore.getState().replaceDecisions(flows));
   if (level) await safely(() => usePrivacyStore.getState().setLevel(level));
 
   for (const [axis, value] of Object.entries(record.legacyOverrides)) {
@@ -170,7 +171,9 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
     } else if (read.status === "unavailable") {
       set({ storageAvailable: false });
     } else {
-      set({ storageAvailable: true });
+      // Gone (another tab deleted all data) or unreadable: an older copy in
+      // memory no longer describes this device.
+      set({ record: null, storageAvailable: true });
     }
   },
 
@@ -188,7 +191,7 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
         const read = readOnboardingRecord();
         return read.status === "ok"
           ? read.record
-          : newInstallRecord({ kind: "new", classifiedAt: now });
+          : newInstallRecord({ kind: "new" });
       })();
     const flows: Record<string, NetworkDecision> = {};
     for (const [flowId, value] of Object.entries(
@@ -200,7 +203,7 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
       ...base,
       decisions: {
         preset: input.presetId,
-        level: ONBOARDING_PRESETS[input.presetId].level,
+        level: stricterLevel(ONBOARDING_PRESETS[input.presetId].level, getCurrentLevel()),
         flows,
         ...(input.storageChoices ? { storageChoices: input.storageChoices } : {}),
       },
@@ -243,9 +246,19 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
 }));
 
 /**
+ * Setup never lowers a stricter level already stored on this device (a
+ * record that could not be read sends an existing installation through setup
+ * again); the level can still be lowered in Settings.
+ */
+function stricterLevel(a: PrivacyLevel, b: PrivacyLevel): PrivacyLevel {
+  return PRIVACY_LEVELS.indexOf(a) >= PRIVACY_LEVELS.indexOf(b) ? a : b;
+}
+
+/**
  * Apply `change` to the freshest record: the stored one (another tab may have
- * written since this tab last read it), else the one in memory. When storage
- * refuses the write, the change still holds for this session.
+ * written since this tab last read it), else the one in memory, else a fresh
+ * one. When storage refuses the write, the change still holds for this
+ * session.
  */
 function updateRecord(
   get: () => OnboardingState,
@@ -253,8 +266,8 @@ function updateRecord(
   change: (record: OnboardingRecord) => OnboardingRecord,
 ): void {
   const read = readOnboardingRecord();
-  const current = read.status === "ok" ? read.record : get().record;
-  if (!current) return;
+  const current =
+    read.status === "ok" ? read.record : (get().record ?? newInstallRecord({ kind: "new" }));
   const next = change(current);
   if (!writeOnboardingRecord(next)) set({ record: next });
 }
@@ -268,10 +281,9 @@ onOnboardingRecordWrite((record) => {
  * store rehydrates and the record is re-read. Call once at boot.
  */
 export function installPrivacyStateSync(): () => void {
-  const stopDecisions = syncStoreAcrossTabs(
-    NETWORK_DECISIONS_STORAGE_KEY,
-    useNetworkDecisionsStore,
-  );
+  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, () => {
+    void useNetworkDecisionsStore.persist.rehydrate();
+  });
   const stopRecord = onStorageKeyChange(ONBOARDING_RECORD_KEY, () => {
     useOnboardingStore.getState().load();
   });

@@ -41,26 +41,6 @@ export function onStorageKeyChange(
   return () => target.removeEventListener("storage", listener);
 }
 
-/** Minimal shape of a zustand persist store. */
-export interface RehydratableStore {
-  persist: { rehydrate: () => unknown };
-}
-
-/** Keep a persisted store in step with writes from other tabs. */
-export function syncStoreAcrossTabs(
-  key: string,
-  store: RehydratableStore,
-  target?: StorageEventTarget,
-): () => void {
-  return onStorageKeyChange(
-    key,
-    () => {
-      void store.persist.rehydrate();
-    },
-    target ?? defaultTarget(),
-  );
-}
-
 // --- Migration lock ---------------------------------------------------------
 
 interface LockManagerLike {

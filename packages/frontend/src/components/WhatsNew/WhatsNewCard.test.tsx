@@ -28,9 +28,8 @@ const CITY = "vilnius";
 
 function seed(overrides: Partial<OnboardingRecord> = {}): void {
   writeOnboardingRecord({
-    ...newInstallRecord({ kind: "existing", classifiedAt: 1 }),
+    ...newInstallRecord({ kind: "existing" }),
     applied: true,
-    legacyMigrated: true,
     seenWhatsNew: 0,
     ...overrides,
   });

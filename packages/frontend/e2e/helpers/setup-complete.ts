@@ -40,11 +40,10 @@ export async function seedCompletedSetup(
 ): Promise<void> {
   const record = {
     version: 1,
-    install: { kind: "new", classifiedAt: 1 },
+    install: { kind: "new" },
     decisions: { preset: "recommended", level: null, flows: {} },
     presentation: null,
     applied: true,
-    legacyMigrated: false,
     legacyOverrides: {},
     seenWhatsNew: LATEST_WHATS_NEW_ID,
     alertsNotNow: 0,

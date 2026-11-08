@@ -19,13 +19,13 @@ const city = (id: string, available = true, tz = "Europe/Vilnius"): CityConfig =
   }) as CityConfig;
 
 const cities = [city("vilnius"), city("riga"), city("tallinn", false)];
-const fresh = newInstallRecord({ kind: "new", classifiedAt: 1 });
+const fresh = newInstallRecord({ kind: "new" });
 const done: OnboardingRecord = {
   ...fresh,
   decisions: { preset: "recommended", level: "standard", flows: {} },
   applied: true,
 };
-const existing: OnboardingRecord = newInstallRecord({ kind: "existing", classifiedAt: 1 });
+const existing: OnboardingRecord = newInstallRecord({ kind: "existing" });
 
 function plan(overrides: Partial<StartupInput>) {
   return planStartup({
@@ -46,7 +46,7 @@ describe("startup plan", () => {
 
   it("preselects a stored city and resumes at the second step", () => {
     expect(plan({ savedCityId: "riga" })).toMatchObject({ mode: "full", initialStep: "quick", preselectedCityId: "riga" });
-    const classified = newInstallRecord({ kind: "new", classifiedAt: 1, preselectedCityId: "vilnius" });
+    const classified = newInstallRecord({ kind: "new", preselectedCityId: "vilnius" });
     expect(plan({ record: classified })).toMatchObject({ initialStep: "quick", preselectedCityId: "vilnius" });
   });
 

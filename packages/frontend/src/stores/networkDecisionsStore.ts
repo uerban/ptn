@@ -26,9 +26,10 @@ interface NetworkDecisionsState {
     source: NetworkDecisionSource,
     providerId?: string,
   ) => boolean;
-  /** Write several already-keyed decisions at once (setup journal). Keys
-   * not listed are left untouched. */
-  applyDecisions: (decisions: NetworkDecisionMap) => void;
+  /** Replace every decision with an already-keyed set (setup journal). A
+   * flow the set does not list goes back to "ask first", so committing a
+   * preset never leaves an earlier grant in place. */
+  replaceDecisions: (decisions: NetworkDecisionMap) => void;
   reset: () => void;
 }
 
@@ -57,13 +58,8 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
         });
         return true;
       },
-      applyDecisions: (decisions) =>
-        set((state) => ({
-          decisions: {
-            ...state.decisions,
-            ...sanitizeNetworkDecisions(decisions),
-          },
-        })),
+      replaceDecisions: (decisions) =>
+        set({ decisions: sanitizeNetworkDecisions(decisions) }),
       reset: () => set({ decisions: {} }),
     }),
     {
