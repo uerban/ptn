@@ -269,6 +269,10 @@ class CityAlertsFeed {
       const res = await options.fetch(alertsUrl(this.city), {
         headers,
         signal: controller.signal,
+        // The page URL can name a stop, line or place (`/line/<id>`,
+        // `/search?…`); the request must name only the city.
+        referrerPolicy: "no-referrer",
+        credentials: "omit",
       });
       if (res.status === 304 && this.snapshot.response) {
         outcome = { notModified: true };

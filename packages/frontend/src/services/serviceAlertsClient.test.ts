@@ -130,6 +130,9 @@ describe("serviceAlertsClient gating", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/vilnius/alerts");
     expect((init.headers as Headers).has("If-None-Match")).toBe(false);
+    // Nothing about the page on screen travels with it.
+    expect(init.referrerPolicy).toBe("no-referrer");
+    expect(init.credentials).toBe("omit");
     const snapshot = getServiceAlertsSnapshot(CITY);
     expect(snapshot.status).toBe("ready");
     expect(snapshot.response?.alerts.map((a) => a.id)).toEqual(["a1"]);
