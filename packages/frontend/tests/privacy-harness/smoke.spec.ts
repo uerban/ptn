@@ -54,6 +54,9 @@ test.describe("privacy harness — smoke @mock-api", () => {
     expect(classifyRequest("https://x.example/api/vilnius/raptor-bundle")).toBe(
       "catalog-bundle",
     );
+    expect(classifyRequest("https://x.example/api/vilnius/alerts")).toBe(
+      "service-alerts",
+    );
     expect(
       classifyRequest("https://nominatim.example/reverse?lat=54.6&lon=18.6"),
     ).toBe("reverse-geocode");

@@ -70,6 +70,9 @@ threat-model needs to differentiate:
 - `poi-bundle` — bundled POI dataset downloads (M10/M11)
 - `stops-nearby`, `stops-all`, `departures`, `raptor-data`,
   `color-config`, `health` — known internal API surfaces
+- `service-alerts` — the city-wide alerts request (`/api/<city>/alerts`);
+  `service-alerts.spec.ts` checks it waits for Recommended setup or a grant
+  and names only the city
 - `other` — anything not classified above
 
 When a future milestone introduces a new external surface, add a matcher to

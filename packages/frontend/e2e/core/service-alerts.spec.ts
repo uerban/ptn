@@ -62,10 +62,12 @@ async function seedProfile(
     textMode?: boolean;
     seenWhatsNew?: number;
     install?: "new" | "existing";
+    /** Realtime kinds the city is already known to offer. */
+    kinds?: string[];
   },
 ): Promise<void> {
   await page.addInitScript(
-    ({ decisions, textMode, seenWhatsNew, install }) => {
+    ({ decisions, textMode, seenWhatsNew, install, kinds }) => {
       if (localStorage.getItem("ptn-onboarding")) return;
       localStorage.setItem(
         "ptn-onboarding",
@@ -97,7 +99,7 @@ async function seedProfile(
       );
       localStorage.setItem(
         "ptn-realtime-availability",
-        JSON.stringify({ vilnius: { kinds: ["departures", "alerts"], seenAt: 1 } }),
+        JSON.stringify({ vilnius: { kinds, seenAt: 1 } }),
       );
       if (textMode) {
         localStorage.setItem(
@@ -111,8 +113,26 @@ async function seedProfile(
       textMode: options.textMode ?? false,
       seenWhatsNew: options.seenWhatsNew ?? LATEST_WHATS_NEW_ID,
       install: options.install ?? "new",
+      kinds: options.kinds ?? ["departures", "alerts"],
     },
   );
+}
+
+/** The service alerts choice in Settings. */
+async function alertsSetting(page: Page) {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: /^Advanced/ }).click();
+  return page.getByRole("radiogroup", { name: "Service alerts from the PTN operator" });
+}
+
+/** Text mode: open the departure sheet from the first nearby departure. */
+async function openDepartureSheet(page: Page) {
+  const row = page.getByTestId("nearby-departure").first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
+  const sheet = page.getByTestId("departure-sheet");
+  await expect(sheet).toBeVisible({ timeout: 10_000 });
+  return sheet;
 }
 
 test.describe("Service alerts @mock-api", () => {
@@ -208,5 +228,165 @@ test.describe("Service alerts @mock-api", () => {
     await page.reload();
     await expect(page.getByTestId("nearby-departure").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("whats-new")).toHaveCount(0);
+  });
+
+  test("the map strip marks affected lines", async ({ page }) => {
+    await seedProfile(page, { decisions: RECOMMENDED_DECISIONS });
+    await mockApi(page, { realtime: "departures, alerts" });
+    await serveAlerts(page);
+    await page.goto("/");
+
+    const card = page.locator("[data-testid='eta-card'][aria-label*='Service alert']").first();
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByTestId("service-alert-indicator")).toBeVisible();
+  });
+
+  test("the line view lists the alert for its line", async ({ page }) => {
+    await seedProfile(page, { decisions: RECOMMENDED_DECISIONS, textMode: true });
+    await mockApi(page, { realtime: "departures, alerts" });
+    await serveAlerts(page);
+    await page.goto("/");
+
+    const affected = page.locator("[data-testid='nearby-departure'][aria-label*='Service alert']");
+    await expect(affected.first()).toBeVisible({ timeout: 15_000 });
+    await affected.first().click();
+    const sheet = page.getByTestId("departure-sheet");
+    await expect(sheet).toBeVisible({ timeout: 10_000 });
+    await sheet.getByTestId("view-route-btn").first().click();
+    await expect(page).toHaveURL(/\/line\//, { timeout: 10_000 });
+    const panel = page.locator("[data-testid='service-alerts-panel'][data-surface='line-view']");
+    await expect(panel).toHaveAttribute("data-state", "alerts", { timeout: 15_000 });
+    await expect(panel.getByTestId("service-alert")).toContainText("Line diverted around the old town");
+  });
+
+  test("a first install skips What's new; strict setup offers alerts inline only", async ({ page }) => {
+    await mockApi(page, { setup: "fresh", realtime: "departures, alerts" });
+    const calls = await serveAlerts(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: /^Vilnius/ }).click();
+    await page.getByRole("radio", { name: /Text mode/ }).check();
+    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await expect(page.getByTestId("setup-shell")).toHaveCount(0);
+
+    const sheet = await openDepartureSheet(page);
+    await expect(page.getByTestId("whats-new")).toHaveCount(0);
+    const offer = sheet.getByTestId("service-alerts-offer");
+    await expect(offer).toContainText("Service alerts are available for");
+    await expect(sheet.getByTestId("service-alert")).toHaveCount(0);
+    expect(calls).toEqual([]);
+
+    await offer.getByRole("button", { name: "Turn on" }).click();
+    await expect(sheet.getByTestId("service-alert")).toContainText(
+      "Line diverted around the old town",
+      { timeout: 10_000 },
+    );
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  test("two Not now answers, in What's new and inline, end the asking", async ({ page }) => {
+    await seedProfile(page, { decisions: {}, textMode: true, seenWhatsNew: 0, install: "existing" });
+    await mockApi(page, { realtime: "departures, alerts" });
+    const calls = await serveAlerts(page);
+    await page.goto("/");
+
+    const card = page.getByTestId("whats-new");
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await card.getByRole("button", { name: "Not now" }).click();
+    await card.getByRole("button", { name: "Close what's new" }).click();
+    await expect(card).toHaveCount(0);
+    // The inline row stays away for the rest of this session.
+    let sheet = await openDepartureSheet(page);
+    await expect(sheet.getByTestId("service-alerts-offer")).toHaveCount(0);
+
+    // A later session asks once more, inline.
+    await page.reload();
+    sheet = await openDepartureSheet(page);
+    const offer = sheet.getByTestId("service-alerts-offer");
+    await expect(offer).toBeVisible();
+    await offer.getByRole("button", { name: "Not now" }).click();
+    await expect(offer).toHaveCount(0);
+
+    // And then never again; Settings still has the choice.
+    await page.reload();
+    sheet = await openDepartureSheet(page);
+    await expect(sheet.getByTestId("service-alerts-panel")).toHaveCount(0);
+    await expect(page.getByTestId("whats-new")).toHaveCount(0);
+    expect(calls).toEqual([]);
+    const setting = await alertsSetting(page);
+    await expect(setting.getByRole("radio", { name: "Ask first" })).toBeChecked();
+  });
+
+  test("turning alerts off in another tab stops polling here", async ({ page, context }) => {
+    await page.clock.install();
+    await seedProfile(page, { decisions: RECOMMENDED_DECISIONS, textMode: true });
+    await mockApi(page, { realtime: "departures, alerts" });
+    const calls = await serveAlerts(page);
+    await page.goto("/");
+    const sheet = await openDepartureSheet(page);
+    await expect(sheet.getByTestId("service-alert").first()).toBeVisible({ timeout: 10_000 });
+
+    // Still polling while on: one more request a minute later.
+    const first = calls.length;
+    await page.clock.fastForward(61_000);
+    await expect.poll(() => calls.length, { timeout: 10_000 }).toBeGreaterThan(first);
+
+    const other = await context.newPage();
+    await mockApi(other, { realtime: "departures, alerts" });
+    const setting = await alertsSetting(other);
+    await setting.getByRole("radio", { name: "Off" }).check();
+
+    await expect(sheet.getByTestId("service-alert")).toHaveCount(0, { timeout: 10_000 });
+    const after = calls.length;
+    await page.clock.fastForward(61_000);
+    await page.clock.fastForward(61_000);
+    await page.waitForTimeout(1_000);
+    expect(calls.length).toBe(after);
+  });
+
+  test("a city without alerts says so and asks for none", async ({ page }) => {
+    await seedProfile(page, {
+      decisions: RECOMMENDED_DECISIONS,
+      textMode: true,
+      kinds: ["departures"],
+    });
+    await mockApi(page, { realtime: "departures" });
+    const calls = await serveAlerts(page);
+    await page.goto("/");
+
+    const sheet = await openDepartureSheet(page);
+    const panel = sheet.getByTestId("service-alerts-panel");
+    await expect(panel).toHaveAttribute("data-state", "unavailable");
+    await expect(panel).toContainText("Vilnius does not publish service alerts to this app.");
+    expect(calls).toEqual([]);
+  });
+
+  test("offline keeps the last alerts, marked stale, without a retry loop", async ({ page, context }) => {
+    await page.clock.install();
+    await seedProfile(page, { decisions: RECOMMENDED_DECISIONS, textMode: true });
+    await mockApi(page, { realtime: "departures, alerts" });
+    const calls = await serveAlerts(page);
+    await page.goto("/");
+    const sheet = await openDepartureSheet(page);
+    await expect(sheet.getByTestId("service-alert").first()).toBeVisible({ timeout: 10_000 });
+
+    await context.setOffline(true);
+    await page.route(ALERTS_URL, (route) => route.abort("internetdisconnected"));
+    const before = calls.length;
+    await page.clock.fastForward(61_000);
+    const panel = sheet.getByTestId("service-alerts-panel");
+    await expect(panel).toHaveAttribute("data-state", "stale", { timeout: 10_000 });
+    await expect(panel.getByTestId("service-alerts-status")).toContainText(
+      "Alerts could not be refreshed",
+    );
+    await expect(panel.getByTestId("service-alert")).toContainText("Line diverted around the old town");
+
+    // One attempt per retry interval, not a loop.
+    await page.waitForTimeout(2_000);
+    expect(calls.length - before).toBe(1);
+    await page.clock.fastForward(31_000);
+    await expect.poll(() => calls.length - before, { timeout: 10_000 }).toBe(2);
+    await page.waitForTimeout(1_000);
+    expect(calls.length - before).toBe(2);
+    await expect(panel).toHaveAttribute("data-state", "stale");
   });
 });
