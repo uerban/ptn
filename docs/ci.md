@@ -69,6 +69,8 @@ The initial suite recovers these useful checks from the archive:
   missing Chromium memory instrumentation fails.
 - WASM cold-start p95 component/total budgets, both normal and real CDP CPU-throttled.
 - Production frontend chunk-size budgets and a 250,000-byte gzip WASM budget.
+  `size:check` also walks the static imports of the Text mode start chunks and
+  fails if they reach MapLibre (`scripts/check-text-entry-chunks.mjs`).
 - Native and WASM routing goldens, nonempty native/WASM binding comparisons and
   Rust/TypeScript PTB decoding parity.
 - Native RSS admission and rejection-before-bind process checks.

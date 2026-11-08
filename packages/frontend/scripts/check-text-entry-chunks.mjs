@@ -4,8 +4,9 @@
 // them reaches the `vendor-map` chunk or the MapLibre worker. Dynamic
 // `import()` edges are not followed: those load only when a map opens.
 //
-// Paired with the "Text mode start (no vendor-map)" size-limit entry, which
-// budgets the same chunks; size-limit measures bytes, this checks the graph.
+// Paired with the "Text mode start (excludes vendor-map; ...)" entry in
+// .size-limit.json, which budgets the same chunks; size-limit measures bytes,
+// this checks the graph.
 //
 //   node scripts/check-text-entry-chunks.mjs [dist/assets]
 

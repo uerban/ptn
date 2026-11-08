@@ -102,7 +102,8 @@ cost. Separate observations from proposed release budgets.
 
 ## 2. Make city metadata cheap and protect downloaded data
 
-Primary files: `services/deviceCities.ts`, `chooseInitialCity.ts`,
+Primary files: `services/deviceCities.ts`, `setup/startupGate.ts` (formerly
+`chooseInitialCity.ts`),
 `components/Settings/DeviceCitiesSection.tsx`, `db/index.ts`,
 `db/dataSchemaVersion.ts`, migration and storage-policy modules.
 
