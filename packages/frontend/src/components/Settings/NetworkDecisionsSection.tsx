@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   resolveNetworkDecision,
   type NetworkDecisionValue,
@@ -11,6 +11,7 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import { getDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import { DEFAULT_BASEMAP_PROVIDER } from "../../services/basemapPrivacy.ts";
 import { useTranslation } from "../../i18n/index.ts";
+import { useOnboardingStore } from "../../stores/onboardingStore.ts";
 
 interface FlowRow {
   readonly flowId: string;
@@ -42,6 +43,12 @@ export function NetworkDecisionsSection({
   const decisions = useNetworkDecisionsStore((s) => s.decisions);
   const setDecision = useNetworkDecisionsStore((s) => s.setDecision);
   const placeSearchProvider = useSettingsStore((s) => s.thirdPartyProvider);
+  const record = useOnboardingStore((s) => s.record);
+  const loadRecord = useOnboardingStore((s) => s.load);
+  useEffect(() => {
+    if (!record) loadRecord();
+  }, [record, loadRecord]);
+  const existingInstall = record?.install.kind === "existing";
   // Bike share is not a stored decision: its map button asks on each visit.
   const cityHasBikeShare = useCityStore((s) => !!s.activeCity.sharedMobility?.length);
   const bikeShare = cityHasBikeShare ? getDataFlow("external.bike-share") : undefined;
@@ -72,11 +79,39 @@ export function NetworkDecisionsSection({
           "Each optional service connects only while it is on. Changing one never changes your privacy level or the other services.",
         )}
       </p>
+      {existingInstall && (
+        <div data-testid="privacy-update-changes" className="text-xs text-fg-secondary space-y-1">
+          <h3 className="text-sm font-semibold text-fg">
+            {t("privacy.update.title", "What changed in this update")}
+          </h3>
+          <p>
+            {t(
+              "privacy.update.kept",
+              "Services you already used stay on and are marked “Kept from before the update”.",
+            )}
+          </p>
+          <p>
+            {t(
+              "privacy.update.nearby",
+              "Nearby stops are now found on this device, without asking the server.",
+            )}
+          </p>
+          <p>
+            {t(
+              "privacy.update.alerts",
+              "Service alerts are new and stay off until you turn them on.",
+            )}
+          </p>
+        </div>
+      )}
       {rows.map(({ flowId, providerId }) => {
         const flow = getCapability(flowId)?.dataFlow;
         const name = flow ? t(flow.nameKey, flowId) : flowId;
         const groupId = providerId ? `${flowId}@${providerId}` : flowId;
-        const current = resolveNetworkDecision(decisions, flowId, providerId).value;
+        const resolved = resolveNetworkDecision(decisions, flowId, providerId);
+        const current = resolved.value;
+        const keptFromUpdate = resolved.source === "legacy";
+        const keptId = `network-decision-kept-${groupId}`;
         const detail = details[flowId];
         return (
           <div key={groupId} data-flow-group={groupId}>
@@ -86,15 +121,21 @@ export function NetworkDecisionsSection({
             {flow && (
               <p className="text-xs text-fg-muted mb-2">{t(flow.purposeKey, "")}</p>
             )}
+            {keptFromUpdate && (
+              <p id={keptId} className="text-xs text-fg-muted mb-2">
+                {t("privacy.decision.keptFromUpdate", "Kept from before the update")}
+              </p>
+            )}
             <div
               role="radiogroup"
               aria-label={name}
+              aria-describedby={keptFromUpdate ? keptId : undefined}
               className="bg-surface-raised rounded-xl border border-divider"
             >
               {OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
+                  className="flex items-center justify-between gap-3 px-4 py-3 min-h-11 border-b border-divider last:border-b-0 cursor-pointer"
                 >
                   <span className="text-sm text-fg">{t(option.key, option.fallback)}</span>
                   <input

@@ -133,8 +133,8 @@
   "settings.map_mode_desc": "What the map draws underneath stops and routes. Transit lines and stops are always local.",
   "settings.map_mode_detailed": "Detailed street map",
   "settings.map_mode_detailed_desc": "Street-level detail from {provider}. Your IP address and the map area you look at reach the provider.",
-  "settings.map_mode_micromap": "Offline micromap",
-  "settings.map_mode_micromap_desc": "A tiny city map kept on this device — water, major roads, green areas, district names. No map requests, works in a tunnel.",
+  "settings.map_mode_micromap": "Minimal offline map",
+  "settings.map_mode_micromap_desc": "Kept on this device and shows only {contents}. Side streets, buildings, addresses and points of interest are left out. Makes no map requests.",
   "settings.map_mode_gtfs_only": "Transit corridors only",
   "settings.map_mode_gtfs_only_desc": "No basemap at all: only corridors drawn from GTFS shapes or stop sequences.",
   "settings.map_mode_locked": "Locked by the {level} preset. Lower your privacy level to {minLevel} to use the external map.",
@@ -624,5 +624,11 @@
   "settings.assign_save_error": "Could not assign this saved place. Try again.",
   "settings.saved_places_error": "Could not load saved-place recovery.",
   "settings.all_cities": "All cities",
-  "settings.city_scope_description": "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city."
+  "settings.city_scope_description": "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city.",
+  "settings.map_mode_micromap_absent": "Not available for {city} yet, so transit route shapes are drawn instead.",
+  "settings.micromap_layer_water": "lakes and the sea",
+  "settings.micromap_layer_green": "parks and forests",
+  "settings.micromap_layer_waterways": "rivers and canals",
+  "settings.micromap_layer_roads": "main roads",
+  "settings.micromap_layer_places": "district and place names"
 }

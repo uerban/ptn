@@ -60,14 +60,25 @@ describe("MapModeSection", () => {
     expect(radio(container, "micromap").disabled).toBe(false);
   });
 
+  test("names the minimal offline map and lists what its artifact contains", () => {
+    const { container } = render(<MapModeSection />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Minimal offline map");
+    expect(text).not.toMatch(/micromap/i);
+    for (const part of ["lakes and the sea", "parks and forests", "rivers and canals", "main roads", "district and place names"]) {
+      expect(text).toContain(part);
+    }
+    expect(text).toMatch(/Side streets, buildings, addresses and points of interest are left out/);
+  });
+
   test("explains a demoted detailed preference and offers to allow it", () => {
     useSettingsStore.getState().setMapDetailMode("detailed");
     denyFlow("external.detailed-basemap", "carto");
     const { container, getByRole } = render(<MapModeSection />);
 
-    expect(container.textContent ?? "").toMatch(/micromap is drawn instead/i);
+    expect(container.textContent ?? "").toMatch(/minimal offline map is drawn instead/i);
     fireEvent.click(getByRole("button", { name: /use detailed maps/i }));
     expect(getNetworkDecision("external.detailed-basemap", "carto").value).toBe("allowed");
-    expect(container.textContent ?? "").not.toMatch(/micromap is drawn instead/i);
+    expect(container.textContent ?? "").not.toMatch(/minimal offline map is drawn instead/i);
   });
 });

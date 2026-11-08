@@ -22,11 +22,6 @@ const ATTACHED: { needle: RegExp; axisTitle: string; flowGroup?: string }[] = [
     axisTitle: "Third-party place search",
     flowGroup: "external.place-search@nominatim",
   },
-  {
-    needle: /area-of-interest tiles from the PTN backend/i,
-    axisTitle: "Detailed map",
-    flowGroup: "external.detailed-basemap@carto",
-  },
 ];
 
 describe("per-axis disclosures", () => {
@@ -39,6 +34,14 @@ describe("per-axis disclosures", () => {
     render(<PrivacyLevelSection />);
     const intro = screen.getByText(/stored in this browser/i);
     expect(intro.closest("details")).toBeNull();
+  });
+
+  test("place data traffic is explained with the level, not under a map provider", () => {
+    render(<PrivacyLevelSection />);
+    const details = screen.getByText(/area-of-interest tiles from the PTN backend/i).closest("details");
+    expect(details).not.toBeNull();
+    expect(details?.hasAttribute("open")).toBe(false);
+    expect(details?.closest("[data-flow-group]")).toBeNull();
   });
 
   for (const { needle, axisTitle, flowGroup } of ATTACHED) {
