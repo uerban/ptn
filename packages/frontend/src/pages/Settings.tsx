@@ -16,10 +16,7 @@ import {
   chooseRoutingMode,
   chooseRoutingProvider,
   chooseSearchProvider,
-  isRemoteRoutingAvailable,
-  REMOTE_STOP_SEARCH_FLOW,
 } from "../services/routingAccess.ts";
-import { isFlowAvailable } from "../privacy/flowGrants.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
@@ -152,14 +149,10 @@ export function SettingsPage() {
   // Rounded to the slider's 0.1 km/h step, so the thumb, the label and the
   // screen-reader value agree (wheelchair 0.8 m/s reads 2.9 km/h).
   const walkSpeedKmh = Math.round(walkSpeedMps * 36) / 10;
-  // Options are offered whenever their flow can run; choosing one grants it.
-  const remoteForbidden = !isRemoteRoutingAvailable("operator");
-  const transitousForbidden = !isRemoteRoutingAvailable("transitous");
-  const stopSearchForbidden = !isFlowAvailable(REMOTE_STOP_SEARCH_FLOW);
-  // Availability of the remote routing source — a cached,
-  // fail-closed up/down hint. Distinct from `remoteForbidden`: a mode can be
-  // ALLOWED (user-choice) yet currently DOWN, in which case it stays selectable
-  // but is flagged "currently unavailable".
+  // Every option is offered; choosing a remote one grants its flow.
+  // Availability of the remote routing source — a cached, fail-closed up/down
+  // hint. A remote mode that is currently DOWN stays selectable but is
+  // flagged "currently unavailable".
   const cityId = useCityStore((s) => s.activeCity.id);
   const remoteRoutingAvailable = useRemoteRoutingAvailable(cityId);
 
@@ -269,31 +262,17 @@ export function SettingsPage() {
             className="bg-surface-raised rounded-xl border border-divider"
           >
             {(["local", "remote"] as const).map((provider) => {
-              // "Search online" reaches transitous through the operator proxy, so
-              // it passes the same third-party egress gate as remote routing —
-              // the proxy hop does not exempt it. Local stays selectable so a
-              // user can always withdraw the remote choice, mirroring the
-              // routing-provider list below.
-              const disabled = provider === "remote" && stopSearchForbidden;
               return (
               <label
                 key={provider}
-                className={`flex items-center justify-between gap-3 px-4 py-3
-                  border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                className="flex items-center justify-between gap-3 px-4 py-3
+                  border-b border-divider last:border-b-0 cursor-pointer"
               >
                 <div className="min-w-0">
                   <span className="text-sm text-fg block">
                     {provider === "local"
                       ? t("settings.search_provider_local", "Search this device only")
                       : t("settings.search_provider_remote", "Search online")}
-                    {disabled ? (
-                      <span className="ml-2 text-xs text-fg-muted italic">
-                        {t(
-                          "settings.routing_provider_blocked",
-                          "Off at your privacy level",
-                        )}
-                      </span>
-                    ) : null}
                   </span>
                   <p className="text-xs text-fg-muted">
                     {provider === "local"
@@ -312,7 +291,6 @@ export function SettingsPage() {
                   name="searchProvider"
                   value={provider}
                   checked={searchProvider === provider}
-                  disabled={disabled}
                   onChange={() => chooseSearchProvider(provider satisfies SearchProvider)}
                   className="accent-accent"
                 />
@@ -338,28 +316,18 @@ export function SettingsPage() {
             className="bg-surface-raised rounded-xl border border-divider"
           >
             {ROUTING_MODES.map((mode) => {
-              // Both remote modes are gated by the privacy ceiling; only
-              // `on-device` is always available.
-              const disabled = mode !== "on-device" && remoteForbidden;
               const copy = ROUTING_MODE_COPY[mode];
               return (
                 <label
                   key={mode}
-                  className={`flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
                 >
                   <div className="min-w-0">
                     <span className="text-sm text-fg block">
                       {t(copy.label[0], copy.label[1])}
-                      {disabled && (
-                        <span className="ml-2 text-xs text-fg-muted italic">
-                          {t("settings.routing_source_blocked", "Off at your privacy level")}
-                        </span>
-                      )}
-                      {/* Mutually exclusive with the blocked hint: `disabled` ⇒
-                          privacy-blocked; allowed-but-down ⇒ currently unavailable.
-                          The remote modes stay selectable (a user choice) — this
+                      {/* The remote modes stay selectable (a user choice) — this
                           is a hint, not a gate. */}
-                      {!disabled && mode !== "on-device" && !remoteRoutingAvailable && (
+                      {mode !== "on-device" && !remoteRoutingAvailable && (
                         <span className="ml-2 text-xs text-warning italic" data-testid={`routing-mode-${mode}-unavailable`}>
                           {t("settings.routing_source_unavailable", "Server unavailable right now")}
                         </span>
@@ -374,7 +342,6 @@ export function SettingsPage() {
                     data-testid={`routing-mode-${mode}`}
                     checked={routingMode === mode}
                     onChange={() => chooseRoutingMode(mode satisfies RoutingMode)}
-                    disabled={disabled}
                     className="accent-accent"
                   />
                 </label>
@@ -394,27 +361,16 @@ export function SettingsPage() {
           >
             {REMOTE_ROUTING_PROVIDERS.map((providerId) => {
               const isTransitous = providerId === "transitous";
-              // Operator is always selectable so a user can withdraw the
-              // third-party provider even while all remote routing is inert.
-              const disabled = isTransitous && transitousForbidden;
               return (
                 <label
                   key={providerId}
-                  className={`flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                  className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
                 >
                   <span className="flex flex-col gap-1">
                     <span className="text-sm text-fg">
                       {isTransitous
                         ? TRANSITOUS_PROVIDER.name
                         : t("settings.routing_provider_operator", "PTN operator")}
-                      {disabled ? (
-                        <span className="ml-2 text-xs text-fg-muted italic">
-                          {t(
-                            "settings.routing_provider_blocked",
-                            "Off at your privacy level",
-                          )}
-                        </span>
-                      ) : null}
                     </span>
                     <span className="text-xs text-fg-muted">
                       {isTransitous
@@ -453,7 +409,6 @@ export function SettingsPage() {
                         providerId satisfies RemoteRoutingProvider,
                       )
                     }
-                    disabled={disabled}
                     className="accent-accent mt-1"
                   />
                 </label>

@@ -4,7 +4,7 @@ import {
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
-import { getCapability } from "../../privacy/capabilityRegistry.ts";
+import { findDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import { useNetworkDecisionsStore } from "../../stores/networkDecisionsStore.ts";
 import { usePolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
 
@@ -64,7 +64,7 @@ export function PrivacyStatusSummary() {
     .filter(([, decision]) => decision.value === "allowed")
     .map(([key]) => {
       const [flowId] = key.split("@");
-      const flow = getCapability(flowId)?.dataFlow;
+      const flow = findDataFlow(flowId);
       return flow ? t(flow.nameKey, flowId) : flowId;
     });
   const uniqueServices = [...new Set(servicesOn)];

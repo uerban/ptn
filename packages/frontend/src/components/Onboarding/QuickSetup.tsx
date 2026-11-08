@@ -1,10 +1,22 @@
 import { useId, useState } from "react";
-import type { GuidedNetworkChoice, OnboardingPresetId } from "@pt/shared/privacy";
+import {
+  presetDecisions,
+  type GuidedNetworkChoice,
+  type OnboardingPresetId,
+} from "@pt/shared/privacy";
 import type { RealtimeKind } from "@pt/shared/schedule-tile";
 import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
-import { describePreset } from "../../services/onboardingPresets.ts";
+import { findDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import type { StartMode } from "../../services/onboardingRecord.ts";
 import type { SetupStringKey, SetupText } from "../../setup/setupStrings.ts";
+
+/** The flows Recommended turns on, with their shared descriptions. */
+const RECOMMENDED_FLOWS = Object.entries(presetDecisions("recommended")).flatMap(
+  ([flowId, value]) => {
+    const flow = value === "allowed" ? findDataFlow(flowId) : undefined;
+    return flow ? [flow] : [];
+  },
+);
 
 export interface QuickSetupChoice {
   readonly presetId: OnboardingPresetId;
@@ -61,7 +73,6 @@ export function QuickSetup(props: QuickSetupProps) {
   };
   const [customizing, setCustomizing] = useState(false);
   const [guided, setGuided] = useState<GuidedNetworkChoice | null>(null);
-  const recommendedFlows = describePreset("recommended").allowedFlows;
 
   return (
     <section aria-labelledby={ids.heading} className="flex flex-col gap-4">
@@ -144,15 +155,13 @@ export function QuickSetup(props: QuickSetupProps) {
           <p>{text("setup.recommended.detailsIntro")}</p>
           {privacyReady && (
             <ul className="mt-1 list-disc pl-5">
-              {recommendedFlows.map((flow) =>
-                flow.dataFlow ? (
-                  <li key={flow.flowId}>
-                    <span className="font-medium text-fg">{t(flow.dataFlow.nameKey)}</span>
-                    {": "}
-                    {t(flow.dataFlow.purposeKey)}
-                  </li>
-                ) : null,
-              )}
+              {RECOMMENDED_FLOWS.map((flow) => (
+                <li key={flow.id}>
+                  <span className="font-medium text-fg">{t(flow.nameKey)}</span>
+                  {": "}
+                  {t(flow.purposeKey)}
+                </li>
+              ))}
             </ul>
           )}
         </details>

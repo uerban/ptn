@@ -11,12 +11,13 @@
  * stops late results.
  */
 import {
+  isNecessaryFlow,
   resolveNetworkDecision,
   type CapabilityFlowId,
   type ResolvedNetworkDecision,
 } from "@pt/shared/privacy";
 import { useNetworkDecisionsStore } from "../stores/networkDecisionsStore.ts";
-import { getCapability, hardConstraintsPass } from "./capabilityRegistry.ts";
+import { hardConstraintsPass, isKnownFlow } from "./capabilityRegistry.ts";
 
 export function getNetworkDecision(
   flowId: CapabilityFlowId | string,
@@ -33,10 +34,9 @@ export function canUse(
   flowId: CapabilityFlowId | string,
   providerId?: string,
 ): boolean {
-  const capability = getCapability(flowId);
-  if (!capability) return false;
+  if (!isKnownFlow(flowId)) return false;
   if (!hardConstraintsPass(flowId, providerId)) return false;
-  if (capability.necessary) return true;
+  if (isNecessaryFlow(flowId)) return true;
   return getNetworkDecision(flowId, providerId).value === "allowed";
 }
 

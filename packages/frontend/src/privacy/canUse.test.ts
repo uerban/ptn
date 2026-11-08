@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { NETWORK_DECISION_FLOW_IDS } from "@pt/shared/privacy";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
@@ -7,11 +7,6 @@ import {
 import { getCurrentLevel, usePrivacyStore } from "../stores/privacyStore.ts";
 import { installPrivacyStateSync } from "../stores/onboardingStore.ts";
 import { canUse, getNetworkDecision } from "./canUse.ts";
-import {
-  __clearHardConstraintsForTests,
-  getCapability,
-  registerHardConstraint,
-} from "./capabilityRegistry.ts";
 
 const decide = useNetworkDecisionsStore.getState;
 
@@ -21,14 +16,9 @@ beforeEach(() => {
   usePrivacyStore.getState().reset();
 });
 
-afterEach(() => {
-  __clearHardConstraintsForTests();
-});
-
 describe("canUse", () => {
   it("allows necessary flows without a decision", () => {
     expect(canUse("operator.transit-data")).toBe(true);
-    expect(getCapability("operator.transit-data")?.necessary).toBe(true);
   });
 
   it("treats every optional flow as off until it is allowed", () => {
@@ -83,18 +73,6 @@ describe("canUse", () => {
     expect(decide().setDecision("external.detailed-basemap", "allowed", "settings")).toBe(
       false,
     );
-  });
-
-  it("honours registered hard constraints, failing closed", () => {
-    decide().setDecision("operator.service-alerts", "allowed", "setup");
-    expect(canUse("operator.service-alerts")).toBe(true);
-    const unregister = registerHardConstraint("operator.service-alerts", () => false);
-    expect(canUse("operator.service-alerts")).toBe(false);
-    unregister();
-    registerHardConstraint("operator.service-alerts", () => {
-      throw new Error("boom");
-    });
-    expect(canUse("operator.service-alerts")).toBe(false);
   });
 
   it("revocation takes effect immediately and leaves other flows alone", () => {

@@ -3,12 +3,11 @@ import {
   resolveNetworkDecision,
   type NetworkDecisionValue,
 } from "@pt/shared/privacy";
-import { getCapability } from "../../privacy/capabilityRegistry.ts";
 import { isFlowAvailable } from "../../privacy/flowGrants.ts";
 import { useNetworkDecisionsStore } from "../../stores/networkDecisionsStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
-import { getDataFlow } from "../../privacy/dataFlowRegistry.ts";
+import { findDataFlow, getDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import { DEFAULT_BASEMAP_PROVIDER } from "../../services/basemapPrivacy.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { useOnboardingStore } from "../../stores/onboardingStore.ts";
@@ -105,7 +104,7 @@ export function NetworkDecisionsSection({
         </div>
       )}
       {rows.map(({ flowId, providerId }) => {
-        const flow = getCapability(flowId)?.dataFlow;
+        const flow = findDataFlow(flowId);
         const name = flow ? t(flow.nameKey, flowId) : flowId;
         const groupId = providerId ? `${flowId}@${providerId}` : flowId;
         const resolved = resolveNetworkDecision(decisions, flowId, providerId);

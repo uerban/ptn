@@ -10,7 +10,7 @@ import {
   usePresentationText,
   type PresentationStringKey,
 } from "../../i18n/presentationStrings.ts";
-import { getCapability } from "../../privacy/capabilityRegistry.ts";
+import { findDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import {
   answerContextualPrompt,
   type ContextualAnswer,
@@ -65,7 +65,7 @@ export function FlowDisclosure({
   const decision = useNetworkDecisionsStore(
     (s) => resolveNetworkDecision(s.decisions, flowId, providerId).value,
   );
-  const flow = getCapability(flowId)?.dataFlow;
+  const flow = findDataFlow(flowId);
 
   const answer = (value: ContextualAnswer) => {
     answerContextualPrompt(value, flowId, surface, providerId);
