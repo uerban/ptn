@@ -180,6 +180,8 @@ describe("runPersonalStorageMigration", () => {
   });
 
   it("moves the city of legacy records inside the sealed payload", async () => {
+    // No city is known: rows without one stay untagged.
+    localStorage.removeItem("ptn-city");
     await db.recentLocations.put({
       id: "stop:S-77",
       endpoint: stop,
@@ -208,6 +210,31 @@ describe("runPersonalStorageMigration", () => {
     expect(usage.map((u) => u.value)).toEqual([expect.objectContaining({ stopId: "S-77", cityId: "vilnius" })]);
     const recents = await listPersonal<{ cityId?: string }>("recentLocations");
     expect(recents.map((r) => r.value.cityId ?? null).sort()).toEqual(["vilnius", null].sort());
+  });
+
+  it("tags records without a city with the city selected at migration time", async () => {
+    // An older store kept the whole city, under its former id.
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { activeCity: { id: "gdansk" } }, version: 0 }));
+    await db.recentLocations.bulkPut([
+      { id: "stop:S-77", endpoint: stop, usedAt: 1_700_000_000_000, cityId: "vilnius" },
+      { id: "stop:S-88", endpoint: { ...stop, stopId: "S-88" }, usedAt: 1_700_000_000_001 },
+    ] as never);
+    await db.savedLocations.bulkPut([
+      { id: "home", endpoint: stop, alias: "Home", savedAt: 1 },
+      { id: "work", endpoint: stop, alias: "Work", savedAt: 2, cityId: "paris" },
+    ] as never);
+
+    expect(await runPersonalStorageMigration({ cacheStorage: null, lock: NO_LOCK })).toBe("migrated");
+
+    const recents = await listPersonal<{ endpoint: BaseEndpoint; cityId?: string }>("recentLocations");
+    expect(Object.fromEntries(recents.map((r) => [(r.value.endpoint as { stopId: string }).stopId, r.value.cityId])))
+      .toEqual({ "S-77": "vilnius", "S-88": "tricity" });
+    const saves = await listPersonal<{ alias: string; cityId?: string }>("savedLocations");
+    expect(Object.fromEntries(saves.map((r) => [r.value.alias, r.value.cityId]))).toEqual({
+      Home: "tricity",
+      Work: "paris",
+    });
+    localStorage.removeItem("ptn-city");
   });
 
   it("drops the geocoder dedup cache and purges activity caches only", async () => {
