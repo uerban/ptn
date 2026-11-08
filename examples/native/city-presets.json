@@ -1,6 +1,7 @@
 [
   {
     "id": "vilnius",
+    "countryCode": "LT",
     "name": "Vilnius",
     "center": {
       "lat": 54.6872,
@@ -28,6 +29,7 @@
   },
   {
     "id": "tricity",
+    "countryCode": "PL",
     "name": "Trójmiasto",
     "center": {
       "lat": 54.352,
@@ -49,6 +51,7 @@
   },
   {
     "id": "krakow",
+    "countryCode": "PL",
     "name": "Krakow",
     "center": {
       "lat": 50.0647,
@@ -65,6 +68,7 @@
   },
   {
     "id": "paris",
+    "countryCode": "FR",
     "name": "Paris",
     "center": {
       "lat": 48.8566,
@@ -81,6 +85,7 @@
   },
   {
     "id": "oslo",
+    "countryCode": "NO",
     "name": "Oslo",
     "center": {
       "lat": 59.9139,
@@ -97,6 +102,7 @@
   },
   {
     "id": "tbilisi",
+    "countryCode": "GE",
     "routeGroups": [
       {
         "id": "bus",

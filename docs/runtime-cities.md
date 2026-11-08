@@ -34,7 +34,8 @@ Multi-city deployment generators can call `catalog.publish_catalog` with all
 accepted city configurations. Keep internal addresses, keys and feed
 credentials outside the public descriptor.
 
-Optional public metadata includes `transitSources`, `routeGroups`,
+Optional public metadata includes `countryCode` (ISO 3166-1 alpha-2, shown
+next to the city name during setup), `transitSources`, `routeGroups`,
 `defaultExcludedModes`, `poiFetchMode`, `poiCityIds` and `sharedMobility`.
 These are explicitly validated by the client. Schema-2 cities do not inherit
 hidden behavior based on a compiled city ID. GBFS requests still require the
