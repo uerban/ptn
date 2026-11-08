@@ -1,0 +1,12 @@
+{
+  "scenario": "Four one-second pans at zoom 16 with all stops, fixed transit replay, native GPU",
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "frames": 244,
+  "p95Ms": 16.80000000000109,
+  "maxMs": 17.699999999999818,
+  "panLongTasks": [],
+  "fixtureMisses": 0
+}

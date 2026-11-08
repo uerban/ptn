@@ -1,0 +1,11 @@
+{
+  "scenario": "Prior Workbox worker updated to candidate with a v2 reader open; real app upgrades schema and prior reader reopens",
+  "priorConnectionClosed": true,
+  "versionChanges": 1,
+  "recovered": false,
+  "nativeVersion": 70,
+  "savedPreserved": true,
+  "packagePreserved": true,
+  "legacyMetadata": true,
+  "newRecordPreserved": true
+}

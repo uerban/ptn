@@ -1,0 +1,51 @@
+{
+  "scenario": "optimized VITE_E2E build, twenty alternating pan-to-city jumps, fixed transit bodies and Date, source-preset discovery fixture",
+  "renderer": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMisses": 0,
+  "caveats": [
+    "Pan-to-city detection includes the existing 500 ms debounce.",
+    "Card settlement observes nonempty DOM content unchanged for 500 ms; it does not prove authoritative activity.",
+    "Capture predates module-scope city subscription callback fix.",
+    "CPU profiler and diagnostic observers enabled; external map assets remain live.",
+    "Ten samples per city; modest post-GC drift requires longer final-source follow-up."
+  ],
+  "cities": {
+    "vilnius": {
+      "samples": 10,
+      "arrivalToIndexReadyP50Ms": 1063.800000011921,
+      "arrivalToIndexReadyP95Ms": 1258.800000011921,
+      "postGcUsedHeapBytes": [
+        134417184,
+        135385632,
+        135676472,
+        136061844,
+        136301844,
+        136662636,
+        136803756,
+        137187892,
+        137554632,
+        137614572
+      ]
+    },
+    "krakow": {
+      "samples": 10,
+      "arrivalToIndexReadyP50Ms": 1758.7000000476837,
+      "arrivalToIndexReadyP95Ms": 2565.2999999523163,
+      "postGcUsedHeapBytes": [
+        147516584,
+        148076516,
+        148332496,
+        148702788,
+        149014148,
+        149265792,
+        149497408,
+        149988444,
+        150146472,
+        150206568
+      ]
+    }
+  }
+}

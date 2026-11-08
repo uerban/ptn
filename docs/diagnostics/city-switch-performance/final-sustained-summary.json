@@ -1,0 +1,74 @@
+{
+  "workload": "100 alternating city arrivals, native clocks, identical replayed transit bytes",
+  "percentileMethod": "nearest rank",
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMode": "replay",
+  "fixtureMisses": 0,
+  "switches": 100,
+  "cities": {
+    "vilnius": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 432.60000002384186,
+        "p95": 442.5,
+        "max": 460.80000001192093
+      },
+      "authoritativeActivityMs": {
+        "p50": 459.89999997615814,
+        "p95": 469.80000001192093,
+        "max": 489.80000001192093
+      },
+      "lastCardChangeMs": {
+        "p50": 495.19999998807907,
+        "p95": 506,
+        "max": 526.3000000119209
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 125351644,
+        "max": 125602456
+      },
+      "observedSlowStopCacheWrites": 0
+    },
+    "krakow": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 768,
+        "p95": 783.2000000476837,
+        "max": 827
+      },
+      "authoritativeActivityMs": {
+        "p50": 797.1000000238419,
+        "p95": 812.3000000119209,
+        "max": 863.5999999642372
+      },
+      "lastCardChangeMs": {
+        "p50": 961.5,
+        "p95": 988.3000000119209,
+        "max": 1014.2999999523163
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 156342528,
+        "max": 158154312
+      },
+      "observedSlowStopCacheWrites": 0
+    }
+  },
+  "warmGate": {
+    "limitMs": 1000,
+    "valid": true,
+    "passed": true
+  },
+  "panFrames": {
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "limits": "Synthetic arrivals on the reference desktop; does not establish live staging or phone performance. Heap ranges are observations, not a universal leak proof. API write count includes only transactions at least 20 ms."
+}

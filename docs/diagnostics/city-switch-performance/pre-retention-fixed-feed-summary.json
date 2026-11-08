@@ -1,0 +1,14 @@
+{
+  "revision": "626d490613b7936358585fd8ab6149888ddd6a0a",
+  "relation": "Parent of multi-city-cache introduction 2d801f6",
+  "scenario": "Fresh profile, zero retained cities, Vilnius-to-Krakow arrival using the identical /tmp/ptn-fixed-api-v2 transit responses",
+  "historicalBuild": "Own frozen-lockfile dependencies, shared TS build and offline release WASM build; source exported read-only into a disposable directory",
+  "arrivalToIndexMs": 18195.900000035763,
+  "projectionWriteMs": 15569.800000011921,
+  "fixtureMisses": 0,
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "limits": "Single native-GPU source-revision observation, not a p95 or a reconstruction of the pre-public deployed browser/storage environment."
+}
