@@ -37,7 +37,7 @@ describe("poiIndex + poiSyncMeta tables", () => {
   it("opens with both tables present", async () => {
     const { db } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(8);
     expect(db.poiIndex).toBeDefined();
     expect(db.poiSyncMeta).toBeDefined();
     expect(await db.poiIndex.count()).toBe(0);

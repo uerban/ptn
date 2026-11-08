@@ -540,5 +540,7 @@
   "walk.turn.right": "Pagriezieties pa labi",
   "walk.turn.sharp_left": "Veikt asu pagriezienu pa kreisi",
   "walk.turn.sharp_right": "Pagriezieties pa labi",
-  "walk.turn.u_turn": "Apgriezties"
+  "walk.turn.u_turn": "Apgriezties",
+  "settings.all_cities": "Visas pilsētas",
+  "settings.city_scope_description": "Vispārīgie iestatījumi attiecas uz visām pilsētām. Saglabātās vietas, maršrutu grupas un pielāgotās transporta krāsas tiek saglabātas katrai pilsētai atsevišķi."
 }

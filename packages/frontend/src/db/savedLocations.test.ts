@@ -35,7 +35,7 @@ describe("savedLocations table schema", () => {
   it("opens with the savedLocations table keyed by id and no other index", async () => {
     const { db } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(8);
     expect(db.savedLocations.schema.primKey.keyPath).toBe("id");
     expect(db.savedLocations.schema.indexes).toEqual([]);
     expect(await db.savedLocations.count()).toBe(0);

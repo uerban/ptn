@@ -4,10 +4,13 @@ import {
   listPersonal,
   newPersonalId,
   putPersonal,
+  putPersonalMany,
   resolvePersonalRows,
   type PersonalEntry,
   type PersonalWriteResult,
 } from "./personalStorage.ts";
+import { useCityStore } from "../stores/cityStore.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 
 const TABLE = "savedLocations";
 
@@ -24,10 +27,16 @@ export interface SavePayload {
   pinColor?: string;
   /** Kind of a save migrated from favorites (home, work, ...). */
   placeType?: FavoritePlace["type"];
+  /**
+   * City that owns the save, sealed with the rest of the payload. Absent on
+   * legacy saves whose city has not been established.
+   */
+  cityId?: string;
 }
 
 export interface ResolvedSave {
   id: string;
+  cityId?: string;
   alias: string;
   origin: BaseEndpoint;
   destination?: BaseEndpoint;
@@ -82,6 +91,11 @@ export interface SaveOptions {
   id?: string;
 }
 
+/** True when a save belongs to `cityId`, accepting historical city aliases. */
+export function saveBelongsToCity(save: { cityId?: string }, cityId: string): boolean {
+  return !!save.cityId && canonicalCityId(save.cityId) === canonicalCityId(cityId);
+}
+
 export interface SaveResult {
   save: ResolvedSave;
   /** `session` when the save is kept only until the app closes. */
@@ -133,6 +147,8 @@ async function writeSave(
   },
   opts: SaveOptions & { savedAt?: number },
 ): Promise<SaveResult> {
+  // Capture ownership before encryption yields to a possible city switch.
+  const cityId = canonicalCityId(useCityStore.getState().activeCity.id);
   const id = opts.id ?? newPersonalId();
   const payload: SavePayload = {
     origin: input.origin,
@@ -140,9 +156,20 @@ async function writeSave(
     alias: (input.alias ?? "").trim(),
     savedAt: opts.savedAt ?? (opts.now ? opts.now() : Date.now()),
     ...(input.placeType !== undefined ? { placeType: input.placeType } : {}),
+    cityId,
   };
   const stored = await putPersonal(TABLE, id, payload);
   return { save: toResolved({ id, value: payload, durable: stored === "stored" }), stored };
+}
+
+/** Writes saves that already have ids and times, all or none (migrations). */
+export async function restoreSaves(
+  saves: readonly { id: string; payload: SavePayload }[],
+): Promise<PersonalWriteResult> {
+  return putPersonalMany(
+    TABLE,
+    saves.map(({ id, payload }) => ({ id, value: payload })),
+  );
 }
 
 /** Writes a save that already has an id and time (used by migrations). */
@@ -168,6 +195,7 @@ function toResolved(entry: PersonalEntry<SavePayload>): ResolvedSave {
   const v = entry.value;
   return {
     id: entry.id,
+    ...(v.cityId !== undefined ? { cityId: v.cityId } : {}),
     alias: v.alias,
     origin: v.origin,
     ...(v.destination !== undefined ? { destination: v.destination } : {}),
@@ -188,6 +216,29 @@ function resolveEntries(entries: PersonalEntry<unknown>[]): ResolvedSave[] {
 /** Every readable save, newest first. */
 export async function listSaves(): Promise<ResolvedSave[]> {
   return resolveEntries(await listPersonal<unknown>(TABLE));
+}
+
+/**
+ * Readable saves owned by `cityId`, newest first. Ownership is sealed, so
+ * every save is decrypted and then filtered.
+ */
+export async function listCitySaves(cityId: string): Promise<ResolvedSave[]> {
+  return (await listSaves()).filter((save) => saveBelongsToCity(save, cityId));
+}
+
+/**
+ * Explicit recovery action for a legacy save without a city. A save that
+ * already has an owner is never relabelled.
+ */
+export async function assignSaveCity(id: string, cityId: string): Promise<void> {
+  const entry = (await listPersonal<unknown>(TABLE)).find((e) => e.id === id);
+  if (!entry || !isSavePayload(entry.value) || entry.value.cityId) return;
+  await putPersonal<SavePayload>(
+    TABLE,
+    id,
+    { ...entry.value, cityId: canonicalCityId(cityId) },
+    { sessionOnly: !entry.durable },
+  );
 }
 
 /**

@@ -13,12 +13,14 @@ import { scheduleIdle, cancelIdle } from "../utils/idle.ts";
  *
  *  - Real city switch: unsubscribe RT and reset() so the previous city's
  *    index can't answer queries, then re-init promptly.
- *  - Initial load: nothing on first draw needs the RAPTOR index (urban-mode
- *    filtering fails open until it's ready; the search and line pages
- *    self-init on navigation, and the nearby-stops list is fed reactively
- *    from `db.stopGroups`), so we DON'T reset — that would wipe the warm
- *    GTFS cache and force a network re-sync — and we defer the multi-MB
- *    bundle decode + index build to idle so the map/stops/list paint first.
+ *  - Initial load: keep a matching resident context and defer bundle decode
+ *    and index construction to idle so the map/stops/list paint first. Search
+ *    and line pages can self-init on navigation. Initial urban cards withhold
+ *    badges until qualified activity arrives.
+ *
+ * Reset invalidates resident handles and cancels their generation; it does not
+ * clear city artifacts or legacy projection storage. Fallback readers enforce
+ * city ownership, so disk maintenance need not delay the next activation.
  *
  * The switch decision keys off the STORE's `loadedCityId` (the city whose
  * data is actually resident), NOT a per-mount ref. A per-mount ref starts
@@ -40,8 +42,11 @@ export function useCityGtfsLifecycle(cityId: string): void {
 
     if (isCitySwitch) {
       useRtStore.getState().unsubscribeAll();
-      void gtfs.reset().then(() => gtfs.init(cityId));
-      return;
+      let cancelled = false;
+      void gtfs.reset().then(() => {
+        if (!cancelled) return gtfs.init(cityId);
+      }).catch(error => console.warn("City activation failed:", error));
+      return () => { cancelled = true; };
     }
 
     const handle = scheduleIdle(() => {

@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   nearestSegmentTangent,
   deriveSide,
   pairKey,
   deriveStopHints,
+  deriveStopHintsAsync,
   polylinesServingStop,
 } from "../../src/components/Map/cardBearing.ts";
 
@@ -311,5 +312,40 @@ describe("deriveStopHints", () => {
     // pushed north/south away from an along-road sibling.
     expect(hints.get(south.id)?.side?.x).toBeGreaterThan(0.9);
     expect(hints.get(north.id)?.side?.x).toBeGreaterThan(0.9);
+  });
+});
+
+
+describe("incremental stop hints", () => {
+  const stops = [
+    {id: "a", name: "Pair", location: {lat: 54.7, lon: 25.2}},
+    {id: "b", name: "Pair", location: {lat: 54.7001, lon: 25.2}},
+    {id: "c", name: "Other", location: {lat: 54.71, lon: 25.21}},
+  ];
+  const shapes = new Map(stops.map(stop => [stop.id, [[
+    {lat: 54.70005, lon: 25.19}, {lat: 54.70005, lon: 25.22},
+  ]]]));
+
+  it("preserves full physical-group geometry while yielding to pending work", async () => {
+    let clock = 0;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock += 5);
+    try {
+      let yielded = false;
+      setTimeout(() => { yielded = true; }, 0);
+      const result = await deriveStopHintsAsync(stops, shapes, new AbortController().signal);
+      expect(yielded).toBe(true);
+      expect(result).toEqual(deriveStopHints(stops, shapes));
+    } finally { now.mockRestore(); }
+  });
+
+  it("cancels a stale city between geometry batches without returning partial hints", async () => {
+    let clock = 0;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock += 5);
+    const abort = new AbortController();
+    try {
+      setTimeout(() => abort.abort(), 0);
+      await expect(deriveStopHintsAsync(stops, shapes, abort.signal)).rejects.toMatchObject({name: "AbortError"});
+      await expect(deriveStopHintsAsync(stops, shapes, abort.signal)).rejects.toMatchObject({name: "AbortError"});
+    } finally { now.mockRestore(); }
   });
 });

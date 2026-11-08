@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { useBadgeActivityStore } from "../../src/stores/badgeActivityStore.ts";
 import { useMapViewportStore } from "../../src/stores/mapViewportStore.ts";
 import { useStopStore } from "../../src/stores/stopStore.ts";
@@ -17,10 +17,23 @@ function nowPlusMinsSecs(mins: number): number {
   return now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds() + mins * 60;
 }
 
+const badgeCity = vi.hoisted(() => ({ id: "city-a" }));
+const badgeGeneration = vi.hoisted(() => ({id: "catalog-a" as string | null}));
+const badgePublication = vi.hoisted(() => ({id: "h"}));
+const refreshCatalog = vi.hoisted(() => vi.fn());
+vi.mock("../../src/stores/gtfsDataStore.ts", () => ({useGtfsDataStore: {getState: () => ({
+  syncing: false, refreshing: false, loadedCityId: badgeCity.id, refresh: refreshCatalog,
+})}}));
+vi.mock("../../src/services/cityData.ts", () => ({
+  useCityDataStore: (selector: (s: unknown) => unknown) => selector({active: badgeGeneration.id
+    ? {token: {cityId: badgeCity.id, generationId: badgeGeneration.id},
+      artifact: {generation: {generationId: badgePublication.id, bundleSha256: badgeGeneration.id}}} : null}),
+}));
+
 // Pin the feed tz so the window framing is runner-independent.
 vi.mock("../../src/stores/cityStore.ts", () => ({
-  useCityStore: (selector: (s: { activeCity: { tz: string } }) => unknown) =>
-    selector({ activeCity: { tz: "UTC" } }),
+  useCityStore: (selector: (s: { activeCity: { id: string; tz: string } }) => unknown) =>
+    selector({ activeCity: { id: badgeCity.id, tz: "UTC" } }),
 }));
 
 const {
@@ -38,6 +51,7 @@ const {
 
 vi.mock("../../src/services/scheduleTileReadPath.ts", () => ({
   resolveDecodedTileForStop: resolveDecodedTileForStopMock,
+  resolveTileCoordsForLatLon: (_m: unknown, lat: number) => lat < 1.5 ? "1_1" : lat < 1.8 ? "2_2" : "3_3",
   warmManifest: warmManifestMock,
   currentManifest: currentManifestMock,
   currentBundleHash: currentBundleHashMock,
@@ -67,6 +81,10 @@ function okResultForS(stopId: string): unknown {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  badgeCity.id = "city-a";
+  badgeGeneration.id = "catalog-a";
+  badgePublication.id = "h";
+  refreshCatalog.mockResolvedValue(undefined);
   warmManifestMock.mockResolvedValue(undefined);
   currentManifestMock.mockReturnValue(SHARED_MANIFEST);
   currentBundleHashMock.mockReturnValue("h");
@@ -84,12 +102,73 @@ beforeEach(() => {
 });
 
 describe("useViewportBadgeActivity", () => {
+  it("rejects a manifest from another publication and requests one catalog refresh", async () => {
+    badgePublication.id = "older-publication";
+    const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+    const hook = renderHook(() => useViewportBadgeActivity());
+    await vi.waitFor(() => expect(refreshCatalog).toHaveBeenCalledExactlyOnceWith("city-a"));
+    expect(resolveDecodedTileForStopMock).not.toHaveBeenCalled();
+    expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("unavailable");
+    act(() => useMapViewportStore.getState().setViewport({north: 90, south: 0, east: 90, west: 0}, 16));
+    await vi.waitFor(() => expect(warmManifestMock).toHaveBeenCalledTimes(2));
+    expect(refreshCatalog).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("holds resolved badges while a newer manifest waits for its catalog", async () => {
+    const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+    const hook = renderHook(() => useViewportBadgeActivity());
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    const ready = useBadgeActivityStore.getState().byStop.get("S");
+    resolveDecodedTileForStopMock.mockClear();
+    currentBundleHashMock.mockReturnValue("new-publication");
+    act(() => useMapViewportStore.getState().setViewport({north: 90, south: 0, east: 90, west: 0}, 16));
+    await vi.waitFor(() => expect(refreshCatalog).toHaveBeenCalledOnce());
+    expect(useBadgeActivityStore.getState().byStop.get("S")).toBe(ready);
+    expect(resolveDecodedTileForStopMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("waits for the initial catalog and preserves badges when that generation is unchanged", async () => {
+    badgeGeneration.id = null;
+    const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+    const hook = renderHook(() => useViewportBadgeActivity());
+    expect(resolveDecodedTileForStopMock).not.toHaveBeenCalled();
+    expect(warmManifestMock).not.toHaveBeenCalled();
+    badgeGeneration.id = "catalog-a";
+    hook.rerender();
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    const ready = useBadgeActivityStore.getState().byStop.get("S");
+    hook.rerender();
+    expect(useBadgeActivityStore.getState().byStop.get("S")).toBe(ready);
+    expect(warmManifestMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("rejects a late verdict after a same-city catalog generation replacement", async () => {
+    let finish!: (value: unknown) => void;
+    resolveDecodedTileForStopMock.mockReturnValueOnce(new Promise(resolve => {finish = resolve;}));
+    const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+    const hook = renderHook(() => useViewportBadgeActivity());
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledOnce());
+    resolveDecodedTileForStopMock.mockResolvedValueOnce({state: "unavailable"});
+    badgeGeneration.id = "catalog-b";
+    hook.rerender();
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("unavailable"));
+    finish(okResultForS("S"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("unavailable");
+    expect(useBadgeActivityStore.getState().context).toContain("catalog-b");
+    hook.unmount();
+  });
+
   it("computes ready activity for in-viewport stops only", async () => {
     const { useViewportBadgeActivity } = await import("../../src/hooks/useViewportBadgeActivity.ts");
     renderHook(() => useViewportBadgeActivity());
     await vi.waitFor(() => {
       const a = useBadgeActivityStore.getState().byStop.get("S");
-      expect(a).toEqual({ state: "ready", routeIds: new Set(["R1"]) });
+      expect(a).toMatchObject({ state: "ready", routeIds: new Set(["R1"]), publicationId: "h", windowStart: expect.any(Number) });
     });
     expect(useBadgeActivityStore.getState().byStop.has("FAR")).toBe(false);
   });
@@ -175,4 +254,88 @@ it("does not restart the sweep when stop identity churns without membership chan
       expect(resolveDecodedTileForStopMock.mock.calls.length).toBeGreaterThan(callsAfterFirstRound);
     });
   });
+});
+
+
+it("recomputes on a same-timezone city switch and ignores the old city's late result", async () => {
+  const { useViewportBadgeActivity } = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  let finishOld!: (value: unknown) => void;
+  resolveDecodedTileForStopMock.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }));
+  const { rerender, unmount } = renderHook(() => useViewportBadgeActivity());
+  await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledTimes(1));
+  badgeCity.id = "city-b";
+  resolveDecodedTileForStopMock.mockResolvedValue({ state: "unavailable" });
+  rerender();
+  await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toEqual({ state: "unavailable" }));
+  finishOld(okResultForS("S"));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(useBadgeActivityStore.getState().byStop.get("S")).toEqual({ state: "unavailable" });
+  unmount();
+});
+
+
+it("bounds tile groups to two workers and publishes a completed group before slower neighbors", async () => {
+  const { useViewportBadgeActivity } = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  useStopStore.setState({ stops: [1, 1.6, 1.9].map((lat, i) => ({
+    id: `S${i + 1}`, name: "Stop", location: { lat, lon: 1 }, lines: [],
+  })) } as never);
+  const finishes = new Map<string, (value: unknown) => void>();
+  resolveDecodedTileForStopMock.mockImplementation(id => new Promise(resolve => { finishes.set(id, resolve); }));
+  const { unmount } = renderHook(() => useViewportBadgeActivity());
+  await vi.waitFor(() => expect(finishes.size).toBe(2));
+  expect(finishes.has("S3")).toBe(false);
+  finishes.get("S1")!({ state: "unavailable" });
+  await vi.waitFor(() => expect(finishes.has("S3")).toBe(true));
+  expect(useBadgeActivityStore.getState().byStop.get("S1")?.state).toBe("unavailable");
+  expect(useBadgeActivityStore.getState().byStop.get("S2")?.state).toBe("loading");
+  finishes.get("S2")!({ state: "unavailable" });
+  finishes.get("S3")!({ state: "unavailable" });
+  await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S3")?.state).toBe("unavailable"));
+  unmount();
+});
+
+
+it("reuses a qualified verdict after A to B to A in the same publication and minute", async () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Math.floor(new Date().getTime() / 60000) * 60000 + 1000);
+  const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  const hook = renderHook(() => useViewportBadgeActivity());
+  try {
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    const original = useBadgeActivityStore.getState().byStop.get("S");
+    const originalTime = useBadgeActivityStore.getState().resolvedAt.get("S");
+    badgeCity.id = "city-b";
+    hook.rerender();
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    resolveDecodedTileForStopMock.mockClear();
+    badgeCity.id = "city-a";
+    hook.rerender();
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toBe(original));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolveDecodedTileForStopMock).not.toHaveBeenCalled();
+    expect(useBadgeActivityStore.getState().resolvedAt.get("S")).toBe(originalTime);
+  } finally {hook.unmount(); clock.mockRestore();}
+});
+
+it("recomputes recent activity after the minute or publication changes", async () => {
+  let now = Math.floor(new Date().getTime() / 60000) * 60000 + 1000;
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+  const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  const hook = renderHook(() => useViewportBadgeActivity());
+  try {
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    resolveDecodedTileForStopMock.mockClear();
+    now += 60000;
+    act(() => useMapViewportStore.getState().setViewport({north: 90, south: 0, east: 90, west: 0}, 16));
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledWith("S", undefined, expect.anything()));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toMatchObject({windowStart: Math.floor(now / 60000) * 60000}));
+    resolveDecodedTileForStopMock.mockClear();
+    badgePublication.id = "new-publication";
+    currentBundleHashMock.mockReturnValue(badgePublication.id);
+    currentManifestMock.mockReturnValue({...SHARED_MANIFEST, bundleHash: badgePublication.id});
+    hook.rerender();
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledWith("S", undefined, expect.anything()));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toMatchObject({publicationId: "new-publication"}));
+  } finally {hook.unmount(); clock.mockRestore();}
 });

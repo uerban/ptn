@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { BaseEndpoint, RecentRef } from "@pt/shared";
 import { db } from "../db/index.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import {
   MAX_RECENTS,
   RECENTS_SWEEP_INTERVAL_MS,
@@ -280,5 +281,44 @@ describe("listRecents", () => {
     expect(out.map((r) => r.kind)).toEqual(["recent", "recent"]);
     expect(out[0]!.base).toEqual(geocodedEndpoint);
     expect(out[1]!.base).toEqual(stopEndpoint);
+  });
+});
+
+describe("per-city recents", () => {
+  it("keeps same-endpoint city recents independent through cache reuse, reloads and privacy tier changes", async () => {
+    const original = useCityStore.getState().activeCity;
+    try {
+      useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+      const pending = recordRecent(stopEndpoint, {usedAsOrigin: true});
+      useCityStore.setState({activeCity: {...original, id: "krakow"}});
+      await pending;
+      expect(await listRecents()).toEqual([]);
+      await recordRecent({...stopEndpoint, name: "Other city stop"}, {usedAsOrigin: false});
+      expect((await listRecents())[0]?.base).toMatchObject({name: "Other city stop"});
+      useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+      expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+      await migrateRecentsForLevelChange("hardened", "paranoid");
+      usePrivacyStore.setState({level: "paranoid"});
+      expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+      await migrateRecentsForLevelChange("paranoid", "hardened");
+      usePrivacyStore.setState({level: "hardened"});
+      db.close();
+      await db.open();
+      reload();
+      expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+      // Two sealed rows; neither city nor endpoint is readable at rest.
+      const rows = await db.recentLocations.toArray();
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => Object.keys(row).sort().join() === "id,sealed")).toBe(true);
+      expect(findLeaks(await rawTableText("recentLocations"), ["vilnius", "krakow", ...SENSITIVE])).toEqual([]);
+    } finally { useCityStore.setState({activeCity: original}); }
+  });
+
+  it("never lists a legacy recent without a city", async () => {
+    await putPersonal("recentLocations", crypto.randomUUID(), {
+      endpoint: stopEndpoint, usedAt: 5, usedAsOrigin: true,
+    });
+    expect(await listRecents()).toEqual([]);
+    expect(await countRecents()).toBe(1);
   });
 });

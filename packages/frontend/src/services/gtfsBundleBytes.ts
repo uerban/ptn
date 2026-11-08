@@ -260,19 +260,31 @@ async function touchValidated(
 // for different cities don't conflate.
 const inFlight = new Map<string, Promise<FetchPtbBytesResult>>();
 
-export async function fetchPtbBytes(cityId: string): Promise<FetchPtbBytesResult> {
-  const ongoing = inFlight.get(cityId);
+export interface FetchPtbBytesOptions {
+  cached?: FetchPtbBytesResult;
+  /** Artifact activation owns durability separately from byte acquisition. */
+  persist?: boolean;
+}
+
+export async function fetchPtbBytes(cityId: string, options: FetchPtbBytesOptions = {}): Promise<FetchPtbBytesResult> {
+  const key = JSON.stringify([cityId, options.persist !== false, options.cached?.etag,
+    options.cached?.transfersArtifact?.hash, options.cached?.cityTzIana]);
+  const ongoing = inFlight.get(key);
   if (ongoing) return ongoing;
-  const promise = doFetchPtbBytes(cityId).finally(() => {
-    inFlight.delete(cityId);
+  const promise = doFetchPtbBytes(cityId, options).finally(() => {
+    inFlight.delete(key);
   });
-  inFlight.set(cityId, promise);
+  inFlight.set(key, promise);
   return promise;
 }
 
-async function doFetchPtbBytes(cityId: string): Promise<FetchPtbBytesResult> {
+async function doFetchPtbBytes(cityId: string, options: FetchPtbBytesOptions): Promise<FetchPtbBytesResult> {
   const apiUrl = `/api/${cityId}/raptor-bundle`;
-  const cached = await db.ptbBytes.get(cityId);
+  const cached: PtbBytesRecord | undefined = options.cached ? {
+    cityId, bytes: options.cached.bytes, etag: options.cached.etag,
+    cityTzIana: options.cached.cityTzIana, transfersArtifact: options.cached.transfersArtifact,
+    firstStoredAt: Date.now(), lastValidatedAt: 0, ...windowProvenanceFields(options.cached.bytes),
+  } : await db.ptbBytes.get(cityId);
 
   let res: Response;
   try {
@@ -305,7 +317,7 @@ async function doFetchPtbBytes(cityId: string): Promise<FetchPtbBytesResult> {
       const transfersArtifact = parsedTransfersArtifact
         ?? (capable ? undefined : cached.transfersArtifact);
       const cityTzIana = readCityTzIana(res.headers) ?? cached.cityTzIana;
-      await touchValidated(cityId, cached, cityTzIana, transfersArtifact);
+      if (options.persist !== false) await touchValidated(cityId, cached, cityTzIana, transfersArtifact);
       // Only a capable server's answer is authoritative — a preserved cached
       // manifest leaves the state indeterminate.
       return {
@@ -373,7 +385,7 @@ async function doFetchPtbBytes(cityId: string): Promise<FetchPtbBytesResult> {
   // capable server's 200 authoritatively resolves the transfer state.
   const transfersArtifact = readTransfersArtifactHeaders(res.headers);
   const transfersResolved = hasTransfersProvenanceCapability(res.headers);
-  if (await shouldWriteShapes()) {
+  if (options.persist !== false && await shouldWriteShapes()) {
     await persistFreshBytes(cityId, bytes, etag, cityTzIana, transfersArtifact);
   }
 

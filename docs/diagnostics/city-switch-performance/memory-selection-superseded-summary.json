@@ -1,0 +1,44 @@
+{
+  "status": "superseded; warm acceptance failed",
+  "switches": 100,
+  "completeActivity": 100,
+  "fixtureMisses": [
+    "/api/vilnius/gtfs/schedule-tile/afbc9e1f3f65ab73e12d14fa0e6ff9aae1235966e03e4e92ebfdca184a395d1b/6km/270_1014"
+  ],
+  "cities": {
+    "vilnius": {
+      "readyMs": {
+        "p50": 440.60000002384186,
+        "p95": 2534.899999976158,
+        "max": 3716
+      },
+      "activityReadyMs": {
+        "p50": 474.30000001192093,
+        "p95": 2568.699999988079,
+        "max": 3747.5
+      },
+      "lastCardChangeMs": {
+        "p50": 509.10000002384186,
+        "p95": 2602.899999976158,
+        "max": 3782.199999988079
+      }
+    },
+    "krakow": {
+      "readyMs": {
+        "p50": 793.0999999642372,
+        "p95": 887.2000000476837,
+        "max": 5114.199999988079
+      },
+      "activityReadyMs": {
+        "p50": 827.4000000357628,
+        "p95": 922.4000000357628,
+        "max": 5145.699999988079
+      },
+      "lastCardChangeMs": {
+        "p50": 869.8999999761581,
+        "p95": 990.2000000476837,
+        "max": 5187.799999952316
+      }
+    }
+  }
+}

@@ -4,79 +4,44 @@ import { useStopStore } from "../stores/stopStore.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
+import {useCityDataStore} from "../services/cityData.ts";
 import {
   resolveActivityWindow,
   stopActivityDecidable,
   stopMaybeActive,
 } from "../services/hasUpcomingDeparture.ts";
-import { useBadgeActivityStore } from "../stores/badgeActivityStore.ts";
+import { useBadgeActivityStore, badgeActivityContext, BADGE_ACTIVITY_HOLD_MS } from "../stores/badgeActivityStore.ts";
 
 const FILTER_TICK_MS = 60_000;
 
 /**
- * Loading-state policy for a carded stop whose tile activity hasn't resolved. "hold" → render
- * the stop with empty badges (name-only) until activity lands; "delay" → omit the stop until
- * resolved. Default "hold".
- */
-const LOADING_POLICY: "hold" | "delay" = "hold";
-
-/**
- * The list of stops to actually render on the map.
- *
- * Source of truth is `useStopStore` — the preloader keeps the full city
- * set cached there regardless of urban mode. Toggling urban mode just
- * changes how the list is derived on the render path, not what's stored.
- *
- * Behaviour:
- *   - urban mode OFF → all cached stops, untouched.
- *   - urban mode ON but the RAPTOR index isn't ready yet → all cached
- *     stops, untouched. The filter needs the timetable to answer "might
- *     this stop be active" questions; failing-open until ready is better
- *     UX than hiding everything.
- *   - urban mode ON + index ready → visibility comes from `stopMaybeActive`.
- *     For a PATTERN-COVERED stop (production per-pattern wire: every served
- *     stop — see `stopActivityDecidable`) that answer reads real
- *     pattern-column times, so it is authoritative CITY-WIDE — independent
- *     of zoom level and of which viewports the tile sweep has covered.
- *     Serviceless stops drop here at any zoom; there is no state to lose on
- *     pan/zoom (the blip regression). For an UNCOVERED stop (PatternMode.Off
- *     index, or a per-route wire's return-only stop) the answer is
- *     fail-open: a stop whose activity the index cannot determine stays
- *     visible. Each kept stop's badge lines come from the
- *     schedule-tile-sourced `badgeActivityStore` (the sheet's own engine, so
- *     badges can't diverge from the sheet):
- *       - "ready" (non-empty) → narrow `lines` to that route set (identity
- *                         preserved when nothing is removed).
- *       - "ready" (EMPTY)     → pattern-covered stop: badges narrow to none
- *                         (name-only card; the stop is index-active, so the
- *                         empty verdict is generation skew — hiding on it
- *                         would re-couple visibility to zoom). Uncovered
- *                         stop: the tile is the only serviceless authority →
- *                         hide the stop entirely (dot + card); this is what
- *                         keeps the night map from flooding with serviceless
- *                         return-only stops.
- *       - "loading"     → hold badges per `LOADING_POLICY` (default render
- *                         name-only with empty `lines`).
- *       - "unavailable" / no entry → fail open to the full `lines`.
- *
- * Ticks every minute so the visibility edge cases (a stop whose last
- * in-window trip just rolled out) refresh without user interaction.
+ * Urban stop visibility comes from the resident timetable; badge route sets
+ * come from schedule tiles. Pending or unavailable tile activity renders names
+ * and dots without speculative full-route badges. Refreshing the timetable
+ * does not suspend an already valid visibility or badge verdict.
  */
 export function useVisibleStops(): StopWithLines[] {
   const stops = useStopStore((s) => s.stops);
+  const stopCityId = useStopStore((s) => s.cityId);
   const urbanMode = useSettingsStore((s) => s.urbanMode);
   const urbanLookaheadHours = useSettingsStore((s) => s.urbanLookaheadHours);
-  const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
-  const syncing = useGtfsDataStore((s) => s.syncing);
+  const residentIndex = useGtfsDataStore((s) => s.raptorIndex);
+  const residentCityId = useGtfsDataStore((s) => s.loadedCityId);
   // Feed timezone for the active city — threaded into `stopMaybeActive` so a
   // cross-tz device places "now" on the city's wall clock (and thus the
   // correct service day) rather than its own. Without it, a foreign device
   // near its local midnight filters the wrong day's stops while the results
   // list below renders the correct day — an invisible split.
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const raptorIndex = residentCityId != null && residentCityId !== cityId ? null : residentIndex;
   const feedTz = useCityStore((s) => s.activeCity.tz);
   // Per-stop badge activity sourced from schedule tiles by
   // `useViewportBadgeActivity`. Read here so the memo re-runs when it changes.
   const activityByStop = useBadgeActivityStore((s) => s.byStop);
+  const resolvedAt = useBadgeActivityStore((s) => s.resolvedAt);
+  const activityContext = useBadgeActivityStore((s) => s.context);
+  const generationId = useCityDataStore(s => s.active?.token.cityId === cityId ? (s.active.artifact?.generation.bundleSha256 ?? s.active.token.generationId) : null);
+  const expectedContext = badgeActivityContext(cityId, urbanLookaheadHours, feedTz, generationId);
 
   // Minute-bucketed tick — `now` is memoized so pure re-renders don't
   // invalidate the filter. Using `Math.floor(Date.now() / 60_000)` as the
@@ -104,8 +69,9 @@ export function useVisibleStops(): StopWithLines[] {
   // stop-set / index / minute-tick changes; the tile-sourced narrowing lives
   // in the cheap stage-2 memo below.
   const indexVisible = useMemo(() => {
+    if (stopCityId != null && stopCityId !== cityId) return [];
     if (!urbanMode) return stops;
-    if (!raptorIndex || syncing) return stops;
+    if (!raptorIndex) return stops;
 
     const now = new Date(minuteBucket * FILTER_TICK_MS);
     // Resolve the activity window ONCE per memo run: it depends only on
@@ -123,17 +89,20 @@ export function useVisibleStops(): StopWithLines[] {
     return stops.filter((stop) =>
       stopMaybeActive(stop.id, now, urbanLookaheadHours, raptorIndex, feedTz, activityWindow),
     );
-  }, [stops, urbanMode, urbanLookaheadHours, raptorIndex, syncing, minuteBucket, feedTz]);
+  }, [stops, stopCityId, cityId, urbanMode, urbanLookaheadHours, raptorIndex, minuteBucket, feedTz]);
 
   // Stage 2 — tile-sourced badge narrowing. O(visible) Map lookups + line
   // filters; this is the only part that re-runs when the badge sweep settles.
   return useMemo(() => {
     if (!urbanMode) return indexVisible;
-    if (!raptorIndex || syncing) return indexVisible;
 
     const visible: StopWithLines[] = [];
     for (const stop of indexVisible) {
-      const activity = activityByStop.get(stop.id);
+      const matchesContext = activityContext === null || activityContext === expectedContext;
+      const age = minuteBucket * FILTER_TICK_MS - (resolvedAt.get(stop.id) ?? 0);
+      const activity = matchesContext && age < BADGE_ACTIVITY_HOLD_MS
+        ? activityByStop.get(stop.id)
+        : undefined;
 
       // UNCOVERED-stop tile-authoritative serviceless hide: when the index
       // cannot decide the stop (`stopMaybeActive` fails open on the
@@ -152,7 +121,7 @@ export function useVisibleStops(): StopWithLines[] {
         activity &&
         activity.state === "ready" &&
         activity.routeIds.size === 0 &&
-        !stopActivityDecidable(stop.id, raptorIndex)
+        (!raptorIndex || !stopActivityDecidable(stop.id, raptorIndex))
       ) continue;
 
       // Stops cached without an enriched `lines` array (e.g. nearby-stops
@@ -163,15 +132,9 @@ export function useVisibleStops(): StopWithLines[] {
         continue;
       }
 
-      // No entry or explicitly unavailable → fail open to full lines.
-      if (!activity || activity.state === "unavailable") {
-        visible.push(stop);
-        continue;
-      }
-      if (activity.state === "loading") {
-        // Tile activity hasn't resolved yet. Default policy holds the stop
-        // with empty badges (name-only) so the card doesn't blink away.
-        if (LOADING_POLICY === "delay") continue;
+      // A pending or failed read cannot establish which routes run soon.
+      // Keep the name/dot while withholding speculative badges.
+      if (!activity || activity.state !== "ready") {
         visible.push({ ...stop, lines: [] });
         continue;
       }
@@ -186,5 +149,5 @@ export function useVisibleStops(): StopWithLines[] {
       else visible.push({ ...stop, lines: filtered });
     }
     return visible;
-  }, [indexVisible, urbanMode, raptorIndex, syncing, activityByStop]);
+  }, [indexVisible, urbanMode, raptorIndex, activityByStop, activityContext, expectedContext, resolvedAt, minuteBucket]);
 }

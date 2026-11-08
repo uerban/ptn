@@ -6,11 +6,11 @@ import { REF_URL, REF_FIXED_TIME } from "./route-overlay-refUrl.ts";
  * shapes-artifact fetch failure.
 
  *
- * When `/gtfs/shapes/shapes-*.json` returns 404, `gtfsSync` clears every
- * trip's `shapeId` and reports a single `shapes artifact`-flavoured error
- * via `errorReporter.reportError`. The transit leg must still commit (the
- * overlay renders at the intermediate tier), and exactly one matching
- * error must land in the console.
+ * When `/gtfs/shapes/shapes-*.json` returns 404, the city keeps its stop
+ * geometry and reports the `shapes artifact` failure on the console (a
+ * warning when the active city's shapes cannot load, an error from the
+ * legacy `gtfsSync` path). The transit leg must still commit (the overlay
+ * renders at the intermediate tier), and the failure must not be swallowed.
  */
 test.describe("RouteOverlay shapes fetch failure @mock-api", () => {
   test.beforeEach(async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe("RouteOverlay shapes fetch failure @mock-api", () => {
 
     const errs: string[] = [];
     page.on("console", (m) => {
-      if (m.type() === "error") errs.push(m.text());
+      if (m.type() === "error" || m.type() === "warning") errs.push(m.text());
     });
 
     await page.goto(REF_URL);

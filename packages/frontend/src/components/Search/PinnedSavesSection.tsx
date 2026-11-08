@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import type { BaseEndpoint } from "@pt/shared";
-import type { ResolvedSave } from "../../services/saves.ts";
+import { saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
 import { useResolvedSaves } from "../../hooks/useResolvedSaves.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
 import { normalizeQuery, nameMatchScore } from "../../services/geocoder/BundledGeocoderAdapter.ts";
 import { useTranslation } from "../../i18n/index.ts";
 
@@ -15,14 +16,26 @@ export interface PinnedSavesSectionProps {
   rowsOverride?: readonly unknown[] | null;
 }
 
-export function PinnedSavesSection({
+export function PinnedSavesSection(props: PinnedSavesSectionProps) {
+  const cityId = useCityStore(s => s.activeCity.id);
+  return <CityPinnedSavesSection key={cityId} {...props} cityId={cityId} />;
+}
+
+function CityPinnedSavesSection({
   onSelect,
   query = "",
   compact = false,
   rowsOverride,
-}: PinnedSavesSectionProps) {
+  cityId,
+}: PinnedSavesSectionProps & {cityId: string}) {
   const { t } = useTranslation();
-  const resolved = useResolvedSaves(rowsOverride);
+  const all = useResolvedSaves(rowsOverride);
+  // Saves belong to the city where they were made; ownership is sealed, so it
+  // is filtered after decrypting.
+  const resolved = useMemo(
+    () => all?.filter((save) => saveBelongsToCity(save, cityId)) ?? null,
+    [all, cityId],
+  );
 
   const [expandedQuery, setExpandedQuery] = useState<string | null>(null);
   const normalizedQuery = normalizeQuery(query);

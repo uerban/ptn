@@ -7,7 +7,7 @@ import {
   LEGACY_FAVORITES_KEY,
   migrateFavoritesToSaves,
 } from "./favoritesMigration.ts";
-import { listSaves } from "./saves.ts";
+import { listSaves, restoreSave } from "./saves.ts";
 import { sealString } from "./sealedLocalStorage.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import {
@@ -172,6 +172,7 @@ describe("migrateFavoritesToSaves", () => {
       "simulated write failure",
     );
     expect(localStorage.getItem(LEGACY_FAVORITES_KEY)).not.toBeNull();
+    expect(await db.savedLocations.count()).toBe(0);
     spy.mockRestore();
   });
 
@@ -224,5 +225,35 @@ describe("migrateFavoritesToSaves", () => {
     const result = await migrateFavoritesToSaves();
     expect(result.migrated).toBe(0);
     expect(result.legacyCleared).toBe(false);
+  });
+});
+
+
+describe("migrateFavoritesToSaves city ownership", () => {
+  beforeEach(async () => {
+    await resetPersonalStorage();
+    localStorage.removeItem(LEGACY_FAVORITES_KEY);
+    useSettingsStore.setState({ enableFavoritesMigration: true });
+  });
+
+  it("preserves known legacy city ownership without guessing unassigned cities", async () => {
+    await seedLegacyFavorites([home({ cityId: "gdansk" }), work()]);
+    await migrateFavoritesToSaves({ force: true });
+    expect((await saveById("fav-home"))?.cityId).toBe("tricity");
+    expect((await saveById("fav-work"))?.cityId).toBeUndefined();
+    // Ownership is sealed with the rest of the save.
+    expect(findLeaks(await rawTableText("savedLocations"), ["tricity"])).toEqual([]);
+  });
+
+  it("migration retries preserve an existing save's explicit owner and edits", async () => {
+    await seedLegacyFavorites([home({ cityId: "vilnius" })]);
+    await restoreSave("fav-home", {
+      origin: { kind: "mappoint", lat: 1, lon: 2 },
+      alias: "Edited",
+      savedAt: 10,
+      cityId: "krakow",
+    });
+    expect((await migrateFavoritesToSaves({ force: true })).migrated).toBe(0);
+    expect(await saveById("fav-home")).toMatchObject({ alias: "Edited", savedAt: 10, cityId: "krakow" });
   });
 });

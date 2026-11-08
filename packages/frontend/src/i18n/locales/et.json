@@ -538,5 +538,7 @@
   "walk.turn.right": "Pööra paremale",
   "walk.turn.sharp_left": "Pöörake järsult vasakule",
   "walk.turn.sharp_right": "Pöörake järsult paremale",
-  "walk.turn.u_turn": "Pöörake ümber"
+  "walk.turn.u_turn": "Pöörake ümber",
+  "settings.all_cities": "Kõik linnad",
+  "settings.city_scope_description": "Üldseaded kehtivad kõigis linnades. Salvestatud kohad, liinirühmad ja kohandatud transpordivärvid salvestatakse iga linna jaoks eraldi."
 }

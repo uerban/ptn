@@ -9,8 +9,8 @@ import { rawStorageDump, rowShapes } from "../helpers/raw-storage";
  * wrote (recents keyed by endpoint fingerprint, a saved pair, stop-use
  * counts, favorites and the last map area), boots the app, and asserts that
  * start-up encrypted every record: nothing readable remains in IndexedDB or
- * localStorage, and the rider's saves, recents and favorites are all still
- * there after a reload.
+ * localStorage, and the rider's saves and favorites are still there after a
+ * reload. Recents are kept sealed; without a recorded city they are not listed.
  *
  * Tagged @mock-api: it boots the real app against deterministic fixtures and
  * reads the result through `/src/...` dynamic imports served by Vite.
@@ -147,7 +147,9 @@ test.describe("Migration: personal data is encrypted on upgrade @mock-api", () =
     for (const shape of await rowShapes(page, "savedLocations")) {
       expect(shape).toEqual(["id", "sealed"]);
     }
-    for (const shape of await rowShapes(page, "recentLocations")) {
+    const recentShapes = await rowShapes(page, "recentLocations");
+    expect(recentShapes).toHaveLength(1);
+    for (const shape of recentShapes) {
       expect(shape).toEqual(["id", "sealed"]);
     }
 
@@ -159,7 +161,9 @@ test.describe("Migration: personal data is encrypted on upgrade @mock-api", () =
     const data = await readPersonalData(page);
     expect(data.saves.map((s) => s.alias)).toEqual(["Therapist"]);
     expect(data.saves[0]!.origin.name).toBe("Oliwa Klinika");
-    expect(data.recents.map((r) => r.base.name)).toEqual(["Oliwa Klinika"]);
+    // Recents are listed per city. This version recorded none, so the
+    // converted recent is kept sealed but not offered in any city.
+    expect(data.recents).toEqual([]);
 
     // Still nothing readable after the app ran on the converted data.
     const after = await rawStorageDump(page);

@@ -202,6 +202,7 @@ export function ColorSettings() {
   const highContrastEnabled = useSettingsStore((s) => s.highContrastEnabled);
   const setHighContrastEnabled = useSettingsStore((s) => s.setHighContrastEnabled);
   const cityId = useCityStore((s) => s.activeCity.id);
+  const cityName = useCityStore((s) => s.activeCity.name);
   const modeOverrides = useSettingsStore((s) => s.modeColorOverrides[cityId]) ?? EMPTY_OVERRIDES;
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const setScheme = useSettingsStore((s) => s.setAccessibilityScheme);
@@ -347,7 +348,7 @@ export function ColorSettings() {
       {/* Accessibility Scheme */}
       <section>
         <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-          {t("settings.color_scheme", "Color Scheme")}
+          {t("settings.color_scheme", "Color Scheme")} · {t("settings.all_cities", "All cities")}
         </h2>
         <div className="bg-surface-raised rounded-xl border border-divider">
           {SCHEME_OPTIONS.map((opt) => (
@@ -476,7 +477,7 @@ export function ColorSettings() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
-            {t("settings.mode_colors", "Mode Colors")}
+            {t("settings.mode_colors", "Mode Colors")} · {cityName}
           </h2>
           {hasOverrides && (
             <button

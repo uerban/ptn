@@ -1,5 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+import { seedNetworkDecisions } from "../helpers/setup-complete";
 
 // User's simulated GPS coordinates -- we verify these never appear in requests
 const USER_LAT = 54.68735;
@@ -117,31 +118,54 @@ test.describe("Privacy: nearby stops @mock-api", () => {
     ).toHaveLength(0);
   });
 
-  test("TS-081: map mode sends only the nearest public stop centroid, only on Locate me", async ({
-    page,
-    context,
-  }) => {
+  async function trackNearby(page: Page, context: BrowserContext): Promise<string[]> {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation({
       latitude: USER_LAT,
       longitude: USER_LON,
     });
-
     const nearbyUrls: string[] = [];
     page.on("request", (request) => {
       if (request.url().includes("/stops/nearby")) {
         nearbyUrls.push(request.url());
       }
     });
+    return nearbyUrls;
+  }
 
-    await mockApi(page);
+  async function openMapAt(page: Page): Promise<void> {
     const allStops = page.waitForResponse((response) =>
       response.url().includes("/stops/all"),
     );
     await page.goto("/");
     await allStops;
-    // Passive tracking (preapproved GPS) must never query the server.
     await expect(page.locator(".user-position-marker")).toBeVisible({ timeout: 15_000 });
+  }
+
+  test("TS-081: map mode sends no stop centroid unless that flow is allowed", async ({
+    page,
+    context,
+  }) => {
+    const nearbyUrls = await trackNearby(page, context);
+    await mockApi(page);
+    await openMapAt(page);
+    await page.waitForTimeout(1_500);
+    expect(nearbyUrls).toHaveLength(0);
+    // Locate me alone does not grant the optional flow.
+    await page.locator(".maplibregl-ctrl-geolocate").click();
+    await page.waitForTimeout(1_500);
+    expect(nearbyUrls).toHaveLength(0);
+  });
+
+  test("TS-081: once allowed, map mode sends only the nearest public stop centroid, only on Locate me", async ({
+    page,
+    context,
+  }) => {
+    const nearbyUrls = await trackNearby(page, context);
+    await mockApi(page);
+    await seedNetworkDecisions(page, { "operator.nearby-stop-centroid": "allowed" });
+    await openMapAt(page);
+    // Passive tracking (preapproved GPS) must never query the server.
     await page.waitForTimeout(1_500);
     expect(nearbyUrls).toHaveLength(0);
     // Only an explicit Locate me may send the public stop centroid.

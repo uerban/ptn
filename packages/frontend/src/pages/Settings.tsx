@@ -39,6 +39,8 @@ import {
   type OverthrowLine,
 } from "../components/Settings/overthrow.ts";
 
+const CitySavesSection = lazy(() => import("../components/Settings/CitySavesSection.tsx").then(m => ({default: m.CitySavesSection})));
+
 const AdvancedSettings = lazy(() =>
   import("../components/Settings/AdvancedSettings.tsx").then((m) => ({
     default: m.AdvancedSettings,
@@ -201,6 +203,10 @@ export function SettingsPage() {
         <h1 className="text-xl font-bold text-fg">
           {t("settings.title", "Settings")}
         </h1>
+
+        <p className="text-sm text-fg-muted">
+          {t("settings.city_scope_description", "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city.")}
+        </p>
 
         <GpsSettings />
 
@@ -975,6 +981,10 @@ export function SettingsPage() {
             </ErrorBoundary>
           </>
         )}
+
+        <ErrorBoundary fallback={<p>{t("settings.saved_places_error", "Could not load saved-place recovery.")}</p>}>
+          <Suspense fallback={null}><CitySavesSection /></Suspense>
+        </ErrorBoundary>
 
         {/* About */}
         <section>

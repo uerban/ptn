@@ -146,4 +146,6 @@ function StopMarkerImpl({ name, lines, offset }: StopMarkerProps) {
 // DOM when stop content actually changes. The click target lives on the
 // outer `.stop-marker-container`, so memoization is purely a perf concern;
 // stability is already handled at the outer layer.
-export const StopMarker = memo(StopMarkerImpl);
+export const StopMarker = memo(StopMarkerImpl, (previous, next) =>
+  previous.name === next.name && previous.lines === next.lines &&
+  previous.offset.dx === next.offset.dx && previous.offset.dy === next.offset.dy);

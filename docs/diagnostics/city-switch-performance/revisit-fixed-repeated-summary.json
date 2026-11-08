@@ -1,0 +1,95 @@
+{
+  "scenario": "Optimized VITE_E2E build, 40 alternating geographic city switches after curb-hint batching and preloader revisit fix",
+  "source": "Includes module-scope city listener, publication guard, batched geometry and preloader completed-city invalidation; predates the additional post-fallback hydration city check",
+  "renderer": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMisses": 0,
+  "cpuProfiler": false,
+  "boundedDiagnosticHistory": true,
+  "cities": {
+    "vilnius": {
+      "samples": 20,
+      "arrivalToObservedIndexP50Ms": 1088.1,
+      "arrivalToObservedIndexP95Ms": 1499.7,
+      "arrivalToObservedIndexMaxMs": 1881.3,
+      "arrivalToObservedDomSettlementP50Ms": 1670.8,
+      "arrivalToObservedDomSettlementP95Ms": 2098.1,
+      "postGcUsedHeapBytes": [
+        122347640,
+        123131060,
+        123307640,
+        123443464,
+        123582872,
+        123846572,
+        123807284,
+        124173952,
+        124238508,
+        124306592,
+        124432228,
+        124553376,
+        124575596,
+        124595536,
+        124617748,
+        124821768,
+        124889968,
+        124896772,
+        124951584,
+        125025460
+      ],
+      "stageP50Ms": {
+        "ptn:city:active-projection-clear": 37.9,
+        "ptn:city:catalog-cache-read": 13,
+        "ptn:city:catalog-decode": 130.5,
+        "ptn:city:index-build": 24.7,
+        "ptn:city:catalog-fetch": 47.5
+      }
+    },
+    "krakow": {
+      "samples": 20,
+      "arrivalToObservedIndexP50Ms": 1350,
+      "arrivalToObservedIndexP95Ms": 2221.8,
+      "arrivalToObservedIndexMaxMs": 2394.7,
+      "arrivalToObservedDomSettlementP50Ms": 1950.8,
+      "arrivalToObservedDomSettlementP95Ms": 2824.7,
+      "postGcUsedHeapBytes": [
+        154280296,
+        155624112,
+        154309576,
+        155559080,
+        155446312,
+        156418244,
+        154988224,
+        155347708,
+        155788760,
+        155851432,
+        155937228,
+        155605060,
+        155968612,
+        158246532,
+        158758012,
+        155919596,
+        155599788,
+        157368004,
+        158373756,
+        155609660
+      ],
+      "stageP50Ms": {
+        "ptn:city:active-projection-clear": 12.4,
+        "ptn:city:catalog-cache-read": 315.8,
+        "ptn:city:catalog-decode": 361,
+        "ptn:city:index-build": 77.3,
+        "ptn:city:catalog-fetch": 122.4
+      }
+    }
+  },
+  "caveats": [
+    "20 samples per city on one desktop GPU; not a phone or staging comparison.",
+    "Includes existing 500 ms geographic-switch debounce.",
+    "Observed readiness polls the index completion entry and can include main-thread scheduling delay.",
+    "DOM settlement requires nonempty card content unchanged for 500 ms; it is not authoritative activity confirmation.",
+    "GC samples can include optional geometry still in progress; bounded history reduces measurement retention but does not prove a memory plateau.",
+    "External basemap resources remain live."
+  ]
+}

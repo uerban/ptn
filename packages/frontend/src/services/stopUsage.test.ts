@@ -29,8 +29,10 @@ describe("optional stop-use personalization", () => {
   });
 
   async function seed(rows: { stopId: string; tapCount: number; lastTapped: number }[]) {
+    const { useCityStore } = await import("../stores/cityStore.ts");
+    const cityId = useCityStore.getState().activeCity.id;
     for (const row of rows) {
-      await putPersonal("personalUsage", crypto.randomUUID(), row);
+      await putPersonal("personalUsage", crypto.randomUUID(), { cityId, ...row });
     }
   }
 
@@ -119,5 +121,41 @@ describe("optional stop-use personalization", () => {
     expect(retentionMsForStopUsage("30d")).toBe(30 * DAY_MS);
     expect(retentionMsForStopUsage("7d")).toBe(7 * DAY_MS);
     expect(retentionMsForStopUsage("off")).toBeNull();
+  });
+});
+
+describe("per-city stop use", () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    await resetPersonalStorage();
+    localStorage.setItem(PRIVACY_DATA_MIGRATION_KEY, PRIVACY_DATA_MIGRATION_VERSION);
+    usePrivacyStore.getState().reset();
+    usePrivacyChoicesStore.getState().setChoice("personalization", "enabled");
+  });
+
+  it("isolates reused stop IDs by captured city and counts concurrent taps atomically", async () => {
+    const {useCityStore} = await import("../stores/cityStore.ts");
+    const original = useCityStore.getState().activeCity;
+    try {
+      useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+      const pending = Promise.all([recordStopUsage("same", () => 100), recordStopUsage("same", () => 100)]);
+      useCityStore.setState({activeCity: {...original, id: "krakow"}});
+      await pending;
+      expect((await loadStopUsage(["same"], () => 100)).size).toBe(0);
+      await recordStopUsage("same", () => 100);
+      expect((await loadStopUsage(["same"], () => 100)).get("same")?.tapCount).toBe(1);
+      useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+      expect((await loadStopUsage(["same"], () => 100)).get("same")?.tapCount).toBe(2);
+      // City ownership is sealed with the rest of the record.
+      expect(await rawTableText("personalUsage")).not.toContain("vilnius");
+      expect(await sweepStopUsage({axis: "off"})).toBe(2);
+      expect(await db.personalUsage.count()).toBe(0);
+    } finally { useCityStore.setState({activeCity: original}); }
+  });
+
+  it("keeps legacy usage without a city out of ranking but under retention", async () => {
+    await putPersonal("personalUsage", crypto.randomUUID(), { stopId: "legacy", tapCount: 3, lastTapped: 100 });
+    expect((await loadStopUsage(["legacy"], () => 100)).size).toBe(0);
+    expect(await sweepStopUsage({axis: "off"})).toBe(1);
   });
 });

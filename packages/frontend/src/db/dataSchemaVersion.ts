@@ -23,7 +23,10 @@ import { PATTERN_MODE, PatternMode } from "@pt/shared/raptor";
  *
  * Tables marked `"user-owned"` in `TABLE_KIND` are deliberately
  * preserved across bumps — installKey, recentLocations, savedLocations,
- * usageStats. Adding a new table to `db/index.ts` requires classifying
+ * usageStats. Explicit downloads and their shared transfer bytes are classified
+ * as `retained-download` and also survive cache-contract changes. Their format
+ * compatibility is checked by the download reader, not by deleting them.
+ * Adding a new table to `db/index.ts` requires classifying
  * it in `TABLE_KIND`, so the wipe set stays in sync automatically.
  */
 export const DATA_SCHEMA_VERSION = 1;

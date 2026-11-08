@@ -19,7 +19,7 @@ export async function clearViewportData(
 export async function clearPersonalizationData(): Promise<void> {
   await clearPersonal("personalUsage");
   // Rows from before stop use was sealed, if a conversion is still pending.
-  await db.usageStats.clear();
+  await Promise.all([db.usageStats.clear(), db.cityUsageStats.clear()]);
 }
 
 export async function clearLocalReportsData(

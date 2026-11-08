@@ -1,3 +1,6 @@
+import {useGtfsDataStore} from "./gtfsDataStore.ts";
+import {cityDataWrite} from "../services/cityDataWrite.ts";
+import { captureCityData, useCityDataStore } from "../services/cityData.ts";
 import { create } from "zustand";
 import { db } from "../db/index.ts";
 import { useCityStore } from "./cityStore.ts";
@@ -40,10 +43,11 @@ interface ApiStop {
 interface StopState {
   stops: StopWithLines[];
   hydrated: boolean;
+  cityId: string | null;
 
   hydrate: () => Promise<void>;
   overlayBundleStops: () => Promise<void>;
-  upsertStops: (stops: ApiStop[], opts?: { isStale?: () => boolean }) => Promise<void>;
+  upsertStops: (stops: ApiStop[], opts?: { isStale?: () => boolean; cityId?: string }) => Promise<void>;
   recordTap: (stopId: string) => Promise<void>;
   getPreloadScore: (stopId: string) => Promise<number>;
   reset: () => void;
@@ -61,13 +65,27 @@ function linesEqual(a: LineInfo[] | undefined, b: LineInfo[] | undefined): boole
   );
 }
 
-// Tracks the in-flight db.stops.clear() so upsertStops can wait for it
-// before writing, preventing a late-resolving clear from wiping new data.
-// reset() owns lifecycle: it sets the promise and clears it via .finally()
-// once the clear settles. upsertStops MUST NOT null this itself — two
-// concurrent upsert callers would both null after their await, leaving a
-// third upsert that arrives mid-clear with no gate to wait on.
-let clearingDb: Promise<void> | null = null;
+// Reset cancels pending optional cache writes without opening a disk clear.
+let stopCacheAbort = new AbortController();
+
+/** IndexedDB writes to a different store can still delay catalog reads at
+ * the browser's backing store. Do not start this optional snapshot while the
+ * selected catalog is being activated. Reset releases the waiter immediately. */
+async function waitForActivation(signal: AbortSignal): Promise<void> {
+  if (signal.aborted || !useGtfsDataStore.getState().syncing) return;
+  await new Promise<void>(resolve => {
+    const finish = () => {
+      unsubscribe();
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const unsubscribe = useGtfsDataStore.subscribe(state => {
+      if (!state.syncing) finish();
+    });
+    signal.addEventListener("abort", finish, {once: true});
+    if (signal.aborted || !useGtfsDataStore.getState().syncing) finish();
+  });
+}
 
 /**
  * Per-stop badge lines derived from the PTB bundle's own route membership
@@ -105,10 +123,9 @@ interface BundleRoute {
 
 /**
  * The offline stop floor: the active city's stops as the RAPTOR bundle sees
- * them. Returns null when there is no bundle, or when the resident bundle
- * belongs to another city — `gtfsSyncMeta.cityId` is the only record of which
- * city `db.gtfsStops` was written for, and a city switch clears it lazily
- * (gtfsSync), so an unguarded read would paint city A's stops onto city B.
+ * them. The captured city context validates each async read; legacy projection
+ * fallback requires matching metadata. Foreign rows never become the new
+ * city's stop floor while activation is pending.
  */
 async function readBundleStops(): Promise<{
   stops: { id: string; name: string; lat: number; lon: number }[];
@@ -117,15 +134,16 @@ async function readBundleStops(): Promise<{
   lastSynced: number;
 } | null> {
   const cityId = useCityStore.getState().activeCity.id;
-  const meta = await db.gtfsSyncMeta.get("current");
-  if (!meta || meta.cityId !== cityId) return null;
+  const data = captureCityData(cityId);
+  const meta = await data.gtfsSyncMeta.get("current");
+  if (!meta) return null;
   const [stops, routes] = await Promise.all([
-    db.gtfsStops.toArray(),
-    db.gtfsRoutes.toArray(),
+    data.gtfsStops.toArray(),
+    data.gtfsRoutes.toArray(),
   ]);
   // A city switch between the guard above and here would make both reads the
   // wrong city's — re-check before handing the rows back.
-  if (useCityStore.getState().activeCity.id !== cityId) return null;
+  data.assertCurrent();
   if (stops.length === 0) return null;
   return {
     stops,
@@ -176,9 +194,13 @@ async function mergeBundleFloor(current: StopWithLines[]): Promise<StopWithLines
 export const useStopStore = create<StopState>((set, get) => ({
   stops: [],
   hydrated: false,
+  cityId: null,
 
   async hydrate() {
-    const cached = await db.stops.toArray();
+    const signal = stopCacheAbort.signal;
+    const cityId = useCityStore.getState().activeCity.id;
+    const cached = await db.stops.filter(stop => stop.cityId === cityId).toArray();
+    if (signal.aborted || useCityStore.getState().activeCity.id !== cityId) return;
 
     // Recovery scope: hydrate reads IDB unconditionally. If a prior session's
     // `upsertStops` call updated memory but its `bulkPut` failed (quota,
@@ -212,11 +234,13 @@ export const useStopStore = create<StopState>((set, get) => ({
     if (stops.length === 0 || stripped.size > 0) {
       try {
         const merged = await mergeBundleFloor(stops);
+        if (signal.aborted || useCityStore.getState().activeCity.id !== cityId) return;
         if (merged) {
-          set({ stops: merged, hydrated: true });
+          set({ stops: merged, hydrated: true, cityId });
           return;
         }
       } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
         // The floor is best-effort: a bundle read failure must not stop the
         // cached server snapshot from rendering.
         reportError(e instanceof Error ? e : new Error(String(e)), {
@@ -225,38 +249,39 @@ export const useStopStore = create<StopState>((set, get) => ({
       }
     }
 
-    set({ stops, hydrated: true });
+    if (signal.aborted || useCityStore.getState().activeCity.id !== cityId) return;
+    set({ stops, hydrated: true, cityId });
   },
 
   /**
    * Paint the bundle floor over whatever is in the store right now. Called by
-   * `useStopPreloader` once /stops/all has exhausted its retries: the map
-   * would otherwise stay empty for the rest of the session while the very
-   * same stops sit in IndexedDB backing the RAPTOR index.
+   * `useStopPreloader` when the local catalog arrives or API retries fail.
+   * Local stops can render without waiting for the API retry backoff.
    */
   async overlayBundleStops() {
+    const signal = stopCacheAbort.signal;
+    const previousStops = get().stops;
+    const cityId = useCityStore.getState().activeCity.id;
     try {
-      const merged = await mergeBundleFloor(get().stops);
-      if (merged) set({ stops: merged });
+      const existing = get().cityId === cityId ? get().stops : [];
+      const merged = await mergeBundleFloor(existing);
+      if (signal.aborted || useCityStore.getState().activeCity.id !== cityId) return;
+      // A newer API snapshot wins over an older asynchronous bundle floor.
+      if (get().stops !== previousStops && get().cityId === cityId) return;
+      if (merged) set({ stops: merged, cityId });
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
       reportError(e instanceof Error ? e : new Error(String(e)), {
         context: { where: "stopStore.overlayBundleStops" },
       });
     }
   },
 
-  async upsertStops(newStops: ApiStop[], opts?: { isStale?: () => boolean }) {
-    // Wait on (but don't clear) an in-flight reset. The reference is captured
-    // locally so two concurrent upserts both await the SAME promise without
-    // racing to null the shared slot — see `clearingDb` comment for the
-    // failure mode that prompted this. reset() owns the null via .finally().
-    const pendingClear = clearingDb;
-    if (pendingClear) await pendingClear;
-    // Re-check staleness after the await: the caller's effect may have been
-    // cleaned up (city switch, location change) while we awaited a clear.
-    // Without this, an in-flight upsert for city A can land its data into
-    // city B's empty store after reset() ran.
-    if (opts?.isStale?.()) return;
+  async upsertStops(newStops: ApiStop[], opts?: { isStale?: () => boolean; cityId?: string }) {
+    const cityId = opts?.cityId ?? useCityStore.getState().activeCity.id;
+    const signal = stopCacheAbort.signal;
+    const isStale = () => signal.aborted || opts?.isStale?.() || useCityStore.getState().activeCity.id !== cityId;
+    if (isStale()) return;
     const now = Date.now();
     const withLocation = newStops.filter(
       (s) => s.location || (s.lat != null && s.lon != null)
@@ -271,6 +296,7 @@ export const useStopStore = create<StopState>((set, get) => ({
       }));
       return {
         id: s.id,
+        cityId,
         name: s.name,
         location: s.location ?? { lat: s.lat!, lon: s.lon! },
         parentStationId: s.parentStationId,
@@ -280,7 +306,7 @@ export const useStopStore = create<StopState>((set, get) => ({
       };
     });
 
-    const existing = get().stops;
+    const existing = get().cityId === cityId ? get().stops : [];
     const existingMap = new Map(existing.map((s) => [s.id, s]));
     for (const r of records) {
       existingMap.set(r.id, { ...r });
@@ -310,8 +336,15 @@ export const useStopStore = create<StopState>((set, get) => ({
     // /stops/all payload while accepting smaller /stops/nearby payloads)
     // must not leave the map showing only nearby stops for the whole session.
     if (meaningfulChange) {
-      set({ stops: merged });
+      set({ stops: merged, cityId });
     }
+    await waitForActivation(signal);
+    if (isStale()) return;
+    // The verified catalog already owns offline stop/route data. Persisting
+    // a second full API projection on every visit duplicates that data and
+    // can stall the next city's artifact reads. API display enrichment stays
+    // in memory; only API-only fallback sessions need this legacy snapshot.
+    if (useCityDataStore.getState().active?.token.cityId === cityId) return;
     // Quota pre-flight: on iOS PWAs that are near storage quota, attempting
     // a multi-MB bulkPut wastes IDB churn and surfaces a generic
     // QuotaExceededError. Skipping early gives a clearer telemetry signal
@@ -327,8 +360,19 @@ export const useStopStore = create<StopState>((set, get) => ({
       });
     } else {
       try {
-        await db.stops.bulkPut(records);
+        if (isStale()) return;
+        await cityDataWrite([db.stops], signal, async () => {
+          const previous = await db.stops.toCollection().first();
+          if (isStale()) throw new DOMException("Stop cache changed", "AbortError");
+          // Keep one bounded API snapshot. Replace a foreign snapshot together
+          // with the new rows, after memory has already painted, never on selection.
+          if (previous && previous.cityId !== cityId) await db.stops.clear();
+          if (isStale()) throw new DOMException("Stop cache changed", "AbortError");
+          await db.stops.bulkPut(records);
+          if (isStale()) throw new DOMException("Stop cache changed", "AbortError");
+        });
       } catch (e) {
+        if (isStale()) return;
         reportError(e instanceof Error ? e : new Error(String(e)), {
           context: {
             where: "stopStore.upsertStops.bulkPut",
@@ -337,14 +381,9 @@ export const useStopStore = create<StopState>((set, get) => ({
         });
       }
     }
-    // Final staleness check: a city switch can land between set() and the
-    // end of the bulkPut await. If the caller is now stale, our in-memory
-    // write needs to be undone — reset() has already flushed state to [],
-    // but our set above just re-populated it with the prior city's stops.
-    // Re-call reset to restore the cleared state. Idempotent if not stale.
-    if (opts?.isStale?.()) {
-      get().reset();
-    }
+    // No post-write reset: it could erase a newer city's already-installed
+    // memory. Every memory write above was synchronous under the captured city;
+    // stale disk rows carry their owner and cannot be read as another city.
   },
 
   async recordTap(stopId: string) {
@@ -365,17 +404,12 @@ export const useStopStore = create<StopState>((set, get) => ({
   },
 
   reset() {
-    // Clear IndexedDB so stale cross-city stops don't rehydrate.
-    // Keep hydrated: true so the hydrate effect doesn't re-run and
-    // reload the (now-clearing) DB — the preloader's loadAll will
-    // repopulate from the correct city's API.
-    // .finally clears the slot exactly when the clear settles, so a third
-    // upsertStops arriving mid-clear still has a gate to await; the prior
-    // "first awaiter nulls it" pattern dropped the gate for everyone else.
-    const clearPromise = db.stops.clear() as unknown as Promise<void>;
-    clearingDb = clearPromise.finally(() => {
-      if (clearingDb === clearPromise) clearingDb = null;
-    });
-    set({ stops: [], hydrated: true });
+    stopCacheAbort.abort();
+    stopCacheAbort = new AbortController();
+    // Owned disk rows remain available until optional replacement succeeds.
+    // Readers reject foreign owners; selection itself does no IndexedDB work.
+    set({ stops: [], hydrated: true, cityId: useCityStore.getState().activeCity.id });
   },
 }));
+
+if (import.meta.hot) import.meta.hot.dispose(() => stopCacheAbort.abort());

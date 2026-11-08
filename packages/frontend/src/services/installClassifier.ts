@@ -77,8 +77,12 @@ function hasKey(storage: StorageReader, key: string): boolean {
 }
 
 function storedCityId(storage: StorageReader): string | undefined {
-  const city = readPersistedState(storage, "ptn-city")?.activeCity;
-  const id = city && typeof city === "object" ? (city as { id?: unknown }).id : undefined;
+  const state = readPersistedState(storage, "ptn-city");
+  // Current stores keep only the id; older ones kept the whole city.
+  const city = state?.activeCity;
+  const id = typeof state?.currentCityId === "string"
+    ? state.currentCityId
+    : city && typeof city === "object" ? (city as { id?: unknown }).id : undefined;
   return typeof id === "string" && id ? id : undefined;
 }
 

@@ -2,14 +2,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CityConfig } from "../config/cities.ts";
 
 const showSetupShell = vi.fn(async () => {});
-const deviceCities = { records: [] as { cityId: string; city: CityConfig; sizeBytes: number }[], live: new Set<string>() };
+const deviceCities = {
+  records: [] as { cityId: string; city: CityConfig; sizeBytes: number }[],
+  live: new Set<string>(),
+  listCalls: 0,
+  liveCalls: [] as string[],
+};
 
 vi.mock("../components/Onboarding/mountSetupShell.tsx", () => ({ showSetupShell }));
 vi.mock("../db/migrationRunner.ts", () => ({ ensureDbReady: async () => {} }));
 vi.mock("../db/dataSchemaVersion.ts", () => ({ ensureDataSchemaUpToDate: async () => ({ kind: "ok" }) }));
 vi.mock("../services/deviceCities.ts", () => ({
-  listDeviceCities: async () => deviceCities.records,
-  hasLiveDeviceCity: async (id: string) => deviceCities.live.has(id),
+  listDeviceCities: async () => {
+    deviceCities.listCalls += 1;
+    return deviceCities.records;
+  },
+  hasLiveDeviceCity: async (id: string) => {
+    deviceCities.liveCalls.push(id);
+    return deviceCities.live.has(id);
+  },
 }));
 
 const city = (id: string): CityConfig =>
@@ -27,7 +38,14 @@ beforeEach(() => {
   showSetupShell.mockClear();
   deviceCities.records = [];
   deviceCities.live = new Set();
+  deviceCities.listCalls = 0;
+  deviceCities.liveCalls = [];
 });
+
+async function completeSetup() {
+  const { writeOnboardingRecord, newInstallRecord } = await import("../services/onboardingRecord.ts");
+  writeOnboardingRecord({ ...newInstallRecord({ kind: "existing", classifiedAt: 1 }), applied: true });
+}
 afterEach(() => vi.unstubAllGlobals());
 
 describe("startup gate", () => {
@@ -76,5 +94,38 @@ describe("startup gate", () => {
     expect(showSetupShell).not.toHaveBeenCalled();
     const { useCityStore } = await import("../stores/cityStore.ts");
     expect(useCityStore.getState().activeCity.id).toBe("riga");
+  });
+
+  it("reads the id-only stored city and historical aliases", async () => {
+    const { restoredCityId } = await import("./startupGate.ts");
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { currentCityId: "riga" } }));
+    expect(restoredCityId([city("riga")])).toBe("riga");
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { activeCity: { id: "gdansk" } } }));
+    expect(restoredCityId([city("vilnius"), city("tricity")])).toBe("tricity");
+    expect(restoredCityId([city("vilnius")])).toBeNull();
+  });
+
+  it("enters an online returning rider's city without reading downloaded or live city data", async () => {
+    await completeSetup();
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { currentCityId: "riga" } }));
+    const { runStartupGate } = await import("./startupGate.ts");
+    await runStartupGate({ cities: [city("vilnius"), city("riga")], catalogWasCached: true });
+    expect(showSetupShell).not.toHaveBeenCalled();
+    expect(deviceCities.listCalls).toBe(0);
+    expect(deviceCities.liveCalls).toEqual([]);
+    const { useCityStore } = await import("../stores/cityStore.ts");
+    expect(useCityStore.getState().activeCity.id).toBe("riga");
+  });
+
+  it("offline, checks only the stored city before entering it", async () => {
+    await completeSetup();
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { currentCityId: "riga" } }));
+    deviceCities.live = new Set(["riga"]);
+    vi.stubGlobal("navigator", { ...navigator, onLine: false });
+    const { runStartupGate } = await import("./startupGate.ts");
+    await runStartupGate({ cities: [city("vilnius"), city("riga")], catalogWasCached: true });
+    expect(showSetupShell).not.toHaveBeenCalled();
+    expect(deviceCities.listCalls).toBe(1);
+    expect(deviceCities.liveCalls).toEqual(["riga"]);
   });
 });

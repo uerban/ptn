@@ -1,0 +1,32 @@
+{
+  "olderRevision": "e4420d996b66b97593db7aedd8474cc521f220eb",
+  "seededSchemaVersion": 7,
+  "olderDeclaredSchemaVersion": 2,
+  "browsers": [
+    {
+      "browser": "chromium",
+      "declaredVersion": 2,
+      "nativeVersion": 70,
+      "versionChanges": 1,
+      "oldConnectionClosed": true,
+      "recovered": false,
+      "savedPreserved": true,
+      "artifactPreserved": true,
+      "shapePreserved": true,
+      "inventoryPreserved": true
+    },
+    {
+      "browser": "webkit",
+      "declaredVersion": 2,
+      "nativeVersion": 70,
+      "versionChanges": 1,
+      "oldConnectionClosed": true,
+      "recovered": false,
+      "savedPreserved": true,
+      "artifactPreserved": true,
+      "shapePreserved": true,
+      "inventoryPreserved": true
+    }
+  ],
+  "scope": "Isolated profiles: older open connection closes on versionchange; unchanged base ensureDbReady reopens schema v7 without destructive recovery. Old and new sentinels survive. Does not establish every service-worker update or interrupted-upgrade scenario."
+}

@@ -17,6 +17,7 @@
 import type { BaseEndpoint } from "@pt/shared";
 import {
   db,
+  type CityUsageStatRecord,
   type RecentLocationRecord,
   type SavedLocationRecord,
   type UsageStatRecord,
@@ -49,6 +50,12 @@ import { isPrivacyDataMigrationComplete } from "./privacyDataMigrationState.ts";
 import type { RecentPayload } from "./recents.ts";
 import type { SavePayload } from "./saves.ts";
 import { isSealedValue, openSealedString, sealString } from "./sealedLocalStorage.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
+
+/** A legacy row's city, moved inside the sealed payload. */
+function legacyCity(cityId: unknown): { cityId?: string } {
+  return typeof cityId === "string" && cityId ? { cityId: canonicalCityId(cityId) } : {};
+}
 
 /** localStorage values holding personal state, sealed by this migration. */
 export const SEALED_LOCAL_STORAGE_KEYS: readonly string[] = [
@@ -176,6 +183,7 @@ async function convertRecents(key: CryptoKey, opts: PersonalStorageMigrationOpti
         endpoint: await openLegacy<BaseEndpoint>(legacy.endpoint, key),
         usedAt: typeof legacy.usedAt === "number" ? legacy.usedAt : 0,
         usedAsOrigin: legacy.usedAsOrigin === true,
+        ...legacyCity(legacy.cityId),
       };
     } catch {
       value = { unreadableLegacy: true, row: toSealable(legacy) };
@@ -213,6 +221,7 @@ async function convertSaves(key: CryptoKey, opts: PersonalStorageMigrationOption
         alias,
         savedAt: typeof legacy.savedAt === "number" ? legacy.savedAt : 0,
         ...(legacy.pinColor !== undefined ? { pinColor: legacy.pinColor } : {}),
+        ...legacyCity(legacy.cityId),
       };
     } catch {
       value = { unreadableLegacy: true, row: toSealable(legacy) };
@@ -240,6 +249,25 @@ async function convertUsage(key: CryptoKey, opts: PersonalStorageMigrationOption
     await db.transaction("rw", db.usageStats, db.personalUsage, async () => {
       await db.personalUsage.put(sealed);
       await db.usageStats.delete(legacy.stopId);
+    });
+    opts.onRecordConverted?.("usageStats");
+  }
+  // Per-city rows: the city and stop move inside the ciphertext.
+  const cityRows = (await db.cityUsageStats.toArray()) as CityUsageStatRecord[];
+  for (const legacy of cityRows) {
+    const sealed = await sealVerified(
+      newPersonalId(),
+      {
+        stopId: legacy.stopId,
+        ...legacyCity(legacy.cityId),
+        tapCount: typeof legacy.tapCount === "number" ? legacy.tapCount : 0,
+        lastTapped: typeof legacy.lastTapped === "number" ? legacy.lastTapped : 0,
+      },
+      key,
+    );
+    await db.transaction("rw", db.cityUsageStats, db.personalUsage, async () => {
+      await db.personalUsage.put(sealed);
+      await db.cityUsageStats.delete(legacy.id);
     });
     opts.onRecordConverted?.("usageStats");
   }
@@ -277,6 +305,7 @@ async function hasLegacyData(storage: MigrationStorage): Promise<boolean> {
     if (rows.some((row) => !isSealedRow(row))) return true;
   }
   if ((await db.usageStats.count()) > 0) return true;
+  if ((await db.cityUsageStats.count()) > 0) return true;
   return SEALED_LOCAL_STORAGE_KEYS.some((name) => {
     const raw = readItem(storage, name);
     return raw !== null && !isSealedValue(raw);

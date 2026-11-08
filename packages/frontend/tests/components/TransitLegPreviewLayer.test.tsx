@@ -8,8 +8,8 @@ const raptorIndexReturn: {
   value: { routes: { id: string; stopIds: string[] }[]; routeIdToIdx: Map<string, number> } | null;
 } = { value: null };
 
-vi.mock("dexie-react-hooks", () => ({
-  useLiveQuery: (_query: () => unknown) => liveQueryReturn.value,
+vi.mock("../../src/hooks/useCityDataQuery.ts", () => ({
+  useCityDataQuery: (_query: () => unknown) => liveQueryReturn.value,
 }));
 vi.mock("../../src/stores/gtfsDataStore.ts", () => ({
   useGtfsDataStore: (selector: (s: { raptorIndex: unknown }) => unknown) =>

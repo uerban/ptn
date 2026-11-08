@@ -7,7 +7,8 @@ import {
   nearestPointOnSegment,
   progressAlongLine,
 } from "../utils/geo.ts";
-import { db } from "../db/index.ts";
+import { captureCityData, useCityDataStore } from "../services/cityData.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import { decodePolyline } from "../utils/polyline.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
 import { useRtStore } from "../stores/rtStore.ts";
@@ -245,6 +246,8 @@ export function computeRideProgress(
  * to the leg's endpoints.
  */
 function useRideStops(leg: Leg | undefined): RideStop[] | null | "loading" {
+  const cityId = useCityStore(state => state.activeCity.id);
+  const revision = useCityDataStore(state => state.revision);
   const ids =
     leg &&
     leg.patternStopIds &&
@@ -253,7 +256,8 @@ function useRideStops(leg: Leg | undefined): RideStop[] | null | "loading" {
     leg.alightStopIdx > leg.boardStopIdx
       ? leg.patternStopIds.slice(leg.boardStopIdx, leg.alightStopIdx + 1)
       : null;
-  const key = ids ? ids.join("|") : "";
+  const idsKey = ids ? ids.join("|") : "";
+  const key = idsKey ? JSON.stringify([cityId, revision, idsKey]) : "";
   const [loaded, setLoaded] = useState<{ key: string; stops: RideStop[] | null }>({
     key: "",
     stops: null,
@@ -262,8 +266,8 @@ function useRideStops(leg: Leg | undefined): RideStop[] | null | "loading" {
   useEffect(() => {
     if (!key) return;
     let cancelled = false;
-    db.gtfsStops
-      .bulkGet(key.split("|"))
+    captureCityData(cityId).gtfsStops
+      .bulkGet(idsKey.split("|"))
       .then((rows) => {
         if (cancelled) return;
         const complete = rows.every((r) => r !== undefined);
@@ -280,7 +284,7 @@ function useRideStops(leg: Leg | undefined): RideStop[] | null | "loading" {
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, cityId, idsKey]);
 
   if (!key) return null;
   return loaded.key === key ? loaded.stops : "loading";

@@ -1,6 +1,7 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "../../src/db/index.ts";
 import { buildRaptorIndex, hydrate, rawFromBundle } from "../../src/services/raptorIndex.ts";
 import { activeRouteIdsAtStop } from "../../src/services/hasUpcomingDeparture.ts";
@@ -18,6 +19,7 @@ const FREQUENCIES_FIXTURE = resolve(
 beforeEach(async () => {
   await db.delete();
   await db.open();
+  await seedLegacyCityProjection();
 
   await db.gtfsRoutes.bulkPut([
     { id: "r1", shortName: "1", mode: "BUS", color: "FF0000", textColor: "FFFFFF", stopIds: ["s1", "s2", "s3"] },
@@ -196,6 +198,7 @@ describe("buildRaptorIndex — gtfsBundle blob path", () => {
   beforeEach(async () => {
     await db.delete();
     await db.open();
+    await seedLegacyCityProjection();
   });
 
   it("hydrates RaptorIndex from the blob when present", async () => {
@@ -700,4 +703,21 @@ describe("hydrate() — two-model split (Tasks 4-6)", () => {
     expect(nd!.isApproximate).toBe(false);
     expect(nd!.headsign).toBe("B");
   });
+});
+
+
+it("builds directly from an already decoded catalog without touching stored projections or blobs", async () => {
+  const cityId = useCityStore.getState().activeCity.id;
+  const wire: RaptorBundleWire = {meta: {cityId, generatedAt: "2026-11-07", cityTzIana: "Europe/Vilnius"},
+    stops: [{id: "direct", name: "Direct", lat: 1, lon: 2}], calendar: [],
+    routes: [{id: "direct-route", shortName: "D", mode: "BUS", stopIds: ["direct"], trips: []}]};
+  const blob = vi.spyOn(db.gtfsBundle, "get").mockRejectedValue(new Error("blob must not be read"));
+  const stops = vi.spyOn(db.gtfsStops, "toArray").mockRejectedValue(new Error("projection must not be read"));
+  try {
+    const index = await buildRaptorIndex({cityId, wire});
+    expect(index.routes[0]?.id).toBe("direct-route");
+    expect(index.cityTzIana).toBe("Europe/Vilnius");
+    expect(blob).not.toHaveBeenCalled();
+    expect(stops).not.toHaveBeenCalled();
+  } finally { blob.mockRestore(); stops.mockRestore(); }
 });

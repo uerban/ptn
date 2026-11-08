@@ -37,10 +37,12 @@ vi.mock("./api.ts", async (importActual) => {
   };
 });
 
+const city = vi.hoisted(() => ({ id: "paris" }));
+
 // cityStore mock — provides activeCity.tz used by departuresForStop (K3).
 vi.mock("../stores/cityStore.ts", () => ({
   useCityStore: {
-    getState: () => ({ activeCity: { tz: "Europe/Paris" } }),
+    getState: () => ({ activeCity: { id: city.id, tz: "Europe/Paris" } }),
   },
 }));
 
@@ -53,14 +55,14 @@ const getDecodedTileMock =
       opts?: { onTileDownloadStart?: () => void },
     ) => Promise<{ tile: DecodedScheduleTile; bytesDownloaded: number } | { fetchResult: FetchScheduleTileResult }>
   >();
-const pruneToBundleHashMock = vi.fn<(hash: string) => Promise<void>>(() => Promise.resolve());
+const pruneToBundleHashMock = vi.fn<(hash: string, previousHash?: string) => Promise<void>>(() => Promise.resolve());
 const ensureUnderBudgetMock = vi.fn<() => Promise<void>>(() => Promise.resolve());
 vi.mock("./scheduleTileCache.ts", () => ({
   getDecodedTile: (h: string, s: string, c: string, o?: { onTileDownloadStart?: () => void }) => {
     o?.onTileDownloadStart?.();
     return getDecodedTileMock(h, s, c, o);
   },
-  pruneToBundleHash: (h: string) => pruneToBundleHashMock(h),
+  pruneToBundleHash: (h: string, previous?: string) => pruneToBundleHashMock(h, previous),
   ensureUnderBudget: () => ensureUnderBudgetMock(),
 }));
 
@@ -169,10 +171,11 @@ function okTile(tile: DecodedScheduleTile): { tile: DecodedScheduleTile; bytesDo
 }
 
 async function seedStopInStops(id: string, lat: number, lon: number): Promise<void> {
-  await db.stops.put({ id, name: id, location: { lat, lon }, lastSeen: Date.now() });
+  await db.stops.put({ id, cityId: city.id, name: id, location: { lat, lon }, lastSeen: Date.now() });
 }
 
 async function seedStopInGtfsStops(id: string, lat: number, lon: number): Promise<void> {
+  await db.gtfsSyncMeta.put({id: "current", cityId: city.id, etag: "fixture", generationId: "fixture", generatedAt: "2026-11-07", lastSynced: 1});
   await db.gtfsStops.put({ id, name: id, lat, lon });
 }
 
@@ -183,6 +186,7 @@ async function clearStops(): Promise<void> {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  city.id = "paris";
   // Real-time updates allowed unless a case says otherwise (persisted, so
   // freshly imported modules see it too).
   resetFlows();
@@ -488,7 +492,7 @@ describe("departuresForStop", () => {
     expect(pruneToBundleHashMock).not.toHaveBeenCalled(); // first call: no prior hash
     await departuresForStop({ stopId, now: NOW });
 
-    expect(pruneToBundleHashMock).toHaveBeenCalledWith("h2");
+    expect(pruneToBundleHashMock).toHaveBeenCalledWith("h2", HASH);
   });
 
   // 12 — defaults (R16): limit/lookAhead forwarding
@@ -839,7 +843,7 @@ describe("HEDGE_MS / resolveTileCoordsForLatLon / warmManifest / getters", () =>
     await warmManifest();
     expect(pruneToBundleHashMock).not.toHaveBeenCalled(); // no prior hash
     await warmManifest();
-    expect(pruneToBundleHashMock).toHaveBeenCalledWith("h2");
+    expect(pruneToBundleHashMock).toHaveBeenCalledWith("h2", HASH);
   });
 
   it("warmManifest does not throw when fetchManifest rejects, and leaves getters null", async () => {
@@ -1336,4 +1340,47 @@ describe("departuresForStops (several stops, tile-only)", () => {
       expect(fetchRtTileMock).toHaveBeenCalledTimes(1);
     });
   });
+});
+
+
+it("isolates late city manifest responses and never reuses another city's ETag", async () => {
+  vi.resetModules();
+  const read = await import("./scheduleTileReadPath.ts");
+  let finishA!: (r: FetchManifestResult) => void;
+  fetchManifestMock.mockImplementationOnce(() => new Promise(resolve => { finishA = resolve; }));
+  const a = read.warmManifest();
+  city.id = "krakow";
+  expect(read.currentManifest()).toBeNull();
+  fetchManifestMock.mockResolvedValueOnce(manifestResult("krakow-hash"));
+  await read.warmManifest();
+  expect(fetchManifestMock.mock.calls[1]?.[0]).toBeUndefined();
+  finishA(manifestResult("paris-hash"));
+  await a;
+  expect(read.currentBundleHash()).toBe("krakow-hash");
+  city.id = "paris";
+  expect(read.currentBundleHash()).toBe("paris-hash");
+  expect(pruneToBundleHashMock).not.toHaveBeenCalled();
+});
+
+it("shares simultaneous manifest refreshes for one city", async () => {
+  vi.resetModules();
+  const read = await import("./scheduleTileReadPath.ts");
+  let finish!: (r: FetchManifestResult) => void;
+  fetchManifestMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const a = read.warmManifest();
+  const b = read.warmManifest();
+  expect(fetchManifestMock).toHaveBeenCalledTimes(1);
+  finish(manifestResult(HASH));
+  await Promise.all([a, b]);
+  expect(read.currentBundleHash()).toBe(HASH);
+});
+
+
+it("never uses another city's API coordinate cache for a reused stop ID", async () => {
+  vi.resetModules();
+  await db.stops.put({id: "reused", cityId: "other-city", name: "Other", location: PARIS, lastSeen: Date.now()});
+  const {resolveStopLatLon} = await import("./scheduleTileReadPath.ts");
+  expect(await resolveStopLatLon("reused")).toBeNull();
+  await db.stops.put({id: "reused", cityId: city.id, name: "Current", location: {lat: 1, lon: 2}, lastSeen: Date.now()});
+  expect(await resolveStopLatLon("reused")).toEqual({lat: 1, lon: 2});
 });

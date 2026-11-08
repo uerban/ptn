@@ -30,6 +30,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { vi } from "vitest";
+import {createHash} from "node:crypto";
 
 function findRepoRoot(): string {
   let dir = process.cwd();
@@ -53,7 +54,7 @@ const FIXTURE_REL = "packages/shared/src/ptb/__fixtures__/tiny-service-pool.ptb"
 const FIXTURE_BYTES = new Uint8Array(readFileSync(resolve(findRepoRoot(), FIXTURE_REL)));
 
 /** The 64-hex generation id the stubbed `/ready` advertises. */
-export const STUB_GENERATION_ID = "d".repeat(64);
+export const STUB_GENERATION_ID = createHash("sha256").update(FIXTURE_BYTES).digest("hex");
 /** The bundle ETag that pairs with it — `fetchCatalog` requires exactly this. */
 export const STUB_ETAG = `"${STUB_GENERATION_ID}"`;
 

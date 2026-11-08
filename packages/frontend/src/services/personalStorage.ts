@@ -391,6 +391,33 @@ export async function putPersonal<T>(
   return "stored";
 }
 
+/**
+ * Writes several records together: every record is sealed first, then all are
+ * stored in one transaction, so a failure stores none of them.
+ */
+export async function putPersonalMany<T>(
+  table: PersonalTable,
+  entries: readonly { id: string; value: T }[],
+): Promise<PersonalWriteResult> {
+  if (entries.length === 0) return "stored";
+  const key = await durablePersonalKey();
+  if (!key) {
+    for (const { id, value } of entries) sessionTable(table).set(id, value);
+    notifySession();
+    return "session";
+  }
+  const rows = await Promise.all(entries.map(({ id, value }) => sealRow(id, value, key)));
+  invalidateDurableCache();
+  await db.transaction("rw", db.table(table), async () => {
+    await db.table(table).bulkPut(rows);
+  });
+  invalidateDurableCache();
+  let changed = false;
+  for (const { id } of entries) changed = sessionTable(table).delete(id) || changed;
+  if (changed) notifySession();
+  return "stored";
+}
+
 export async function deletePersonal(
   table: PersonalTable,
   ids: readonly string[],

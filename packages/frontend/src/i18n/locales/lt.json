@@ -543,5 +543,7 @@
   "walk.turn.right": "Pasukite į dešinę",
   "walk.turn.sharp_left": "Sukite staigiai į kairę",
   "walk.turn.sharp_right": "Pasukite staigiai į dešinę",
-  "walk.turn.u_turn": "Atsisukti"
+  "walk.turn.u_turn": "Atsisukti",
+  "settings.all_cities": "Visi miestai",
+  "settings.city_scope_description": "Bendrieji nustatymai taikomi visiems miestams. Išsaugotos vietos, maršrutų grupės ir pasirinktos transporto spalvos saugomos kiekvienam miestui atskirai."
 }

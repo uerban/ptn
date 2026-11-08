@@ -1,0 +1,45 @@
+{
+  "scenario": "Actual v2-to-v7 migration aborted during metadata backfill, then retried",
+  "browsers": [
+    {
+      "browser": "chromium",
+      "injected": true,
+      "rejected": true,
+      "versionChanges": 1,
+      "oldClosed": true,
+      "rolledBack": {
+        "version": 20,
+        "addedTableAbsent": true
+      },
+      "retryRecovered": false,
+      "finalVersion": 70,
+      "payloadReads": 0,
+      "savedPreserved": true,
+      "packagePreserved": true,
+      "transferPreserved": true,
+      "legacyMetadata": true,
+      "inventoryPreserved": true,
+      "ownershipIndex": true
+    },
+    {
+      "browser": "webkit",
+      "injected": true,
+      "rejected": true,
+      "versionChanges": 1,
+      "oldClosed": true,
+      "rolledBack": {
+        "version": 20,
+        "addedTableAbsent": true
+      },
+      "retryRecovered": false,
+      "finalVersion": 70,
+      "payloadReads": 0,
+      "savedPreserved": true,
+      "packagePreserved": true,
+      "transferPreserved": true,
+      "legacyMetadata": true,
+      "inventoryPreserved": true,
+      "ownershipIndex": true
+    }
+  ]
+}

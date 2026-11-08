@@ -1,0 +1,60 @@
+{
+  "scenario": "Four one-second native-GPU pans at dot, label and card zooms in all-stops and urban modes",
+  "method": "Recorded public API replay; native clocks; no CPU profiling; one-second settlement before each group",
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMisses": 0,
+  "rows": [
+    {
+      "zoom": 12,
+      "urbanMode": false,
+      "frames": 244,
+      "p95Ms": 17.299999999999272,
+      "maxMs": 17.600000000000364,
+      "longTasks": []
+    },
+    {
+      "zoom": 14.5,
+      "urbanMode": false,
+      "frames": 244,
+      "p95Ms": 16.80000000000109,
+      "maxMs": 17.600000000000364,
+      "longTasks": []
+    },
+    {
+      "zoom": 16,
+      "urbanMode": false,
+      "frames": 244,
+      "p95Ms": 17.30000000000109,
+      "maxMs": 17.600000000002183,
+      "longTasks": []
+    },
+    {
+      "zoom": 12,
+      "urbanMode": true,
+      "frames": 244,
+      "p95Ms": 17.599999999998545,
+      "maxMs": 17.700000000000728,
+      "longTasks": []
+    },
+    {
+      "zoom": 14.5,
+      "urbanMode": true,
+      "frames": 243,
+      "p95Ms": 17.599999999998545,
+      "maxMs": 17.700000000000728,
+      "longTasks": []
+    },
+    {
+      "zoom": 16,
+      "urbanMode": true,
+      "frames": 244,
+      "p95Ms": 17.60000000000582,
+      "maxMs": 17.799999999999272,
+      "longTasks": []
+    }
+  ],
+  "limits": "Reference desktop observation; no physical phone GPU claim."
+}

@@ -4,13 +4,16 @@ import "fake-indexeddb/auto";
 import type { BaseEndpoint } from "@pt/shared";
 import { PinnedSavesSection, type ResolvedSave } from "./PinnedSavesSection.tsx";
 import { restoreSave, saveRoutePair, type SavePayload } from "../../services/saves.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
 import { rawTableText, resetPersonalStorage } from "../../test-helpers/personalStorage.ts";
 
 type SeedSave = Omit<SavePayload, "alias" | "savedAt"> & { id: string; alias: string; savedAt: number };
 
 async function seed(saves: SeedSave[]): Promise<void> {
-  for (const { id, ...payload } of saves) await restoreSave(id, payload);
+  // Saves belong to the city where they were made; default to the active one.
+  const cityId = useCityStore.getState().activeCity.id;
+  for (const { id, ...payload } of saves) await restoreSave(id, { cityId, ...payload });
 }
 
 const stop1: BaseEndpoint = {
@@ -167,5 +170,18 @@ describe("searchable saved places and trips", () => {
     expect(screen.getByRole("listitem").textContent).toContain("Classes");
     view.rerender(<PinnedSavesSection onSelect={vi.fn()} query="no match" />);
     expect(screen.queryByRole("list")).toBeNull();
+  });
+});
+
+describe("per-city saved places", () => {
+  test("shows only the active city's saves, never unassigned ones", async () => {
+    await seed([
+      { id: "here", origin: stop1, alias: "Here", savedAt: 100 },
+      { id: "elsewhere", origin: stop2, alias: "Elsewhere", savedAt: 200, cityId: "elsewhere-city" },
+    ]);
+    await restoreSave("legacy", { origin: home, alias: "Legacy", savedAt: 300 });
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(1));
+    expect(screen.getByRole("listitem").textContent).toContain("Here");
   });
 });

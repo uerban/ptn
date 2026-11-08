@@ -13,6 +13,8 @@ import {
 } from "./personalStorage.ts";
 import { getPolicy, registerLevelChangeListener } from "../stores/privacyStore.ts";
 import { isOptionalStorageEnabledNow } from "./privacyChoices.ts";
+import { useCityStore } from "../stores/cityStore.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 
 export const MAX_RECENTS = 50;
 
@@ -29,13 +31,28 @@ export interface RecentPayload {
   endpoint: BaseEndpoint;
   usedAt: number;
   usedAsOrigin: boolean;
+  /**
+   * City where the recent was used, sealed with the rest of the payload.
+   * Absent on legacy recents, which are never listed for any city.
+   */
+  cityId?: string;
 }
 
 // Decrypted snapshot cache (hot-path: listRecents runs per keystroke). Invalidated
 // by every mutation (recordRecent / clearRecents / migrateRecentsForLevelChange).
-let _recentsCache: RecentRef[] | null = null;
+let _recentsCache: { cityId: string; axis: PrivacyPolicy["recentsEncryption"]; values: RecentRef[] } | null = null;
+let recentsRevision = 0;
 function invalidateRecentsCache(): void {
   _recentsCache = null;
+  recentsRevision++;
+}
+
+function activeCityId(): string {
+  return canonicalCityId(useCityStore.getState().activeCity.id);
+}
+
+function recentInCity(value: RecentPayload, cityId: string): boolean {
+  return !!value.cityId && canonicalCityId(value.cityId) === cityId;
 }
 
 /** `encrypted`: sealed in IndexedDB. `ram-only`: this session only. */
@@ -127,9 +144,16 @@ export async function recordRecent(
   if (opts.tier === undefined && axis === "off") return; // Off: never record
   const tier = opts.tier ?? tierForRecentsAxis(axis);
   const now = opts.now ? opts.now() : Date.now();
+  // Capture ownership before decryption yields to a possible city switch.
+  const cityId = activeCityId();
   const fingerprint = endpointFingerprint(endpoint);
 
-  const entries = await listRecentEntries();
+  // Identical endpoints collapse per city; the LRU cap is per city too.
+  const entries = (await listRecentEntries()).filter((e) =>
+    recentInCity(e.value, cityId),
+  );
+  // Recheck consent after waiting for storage.
+  if (!isOptionalStorageEnabledNow("recents")) return;
   const existing = entries.find(
     (e) => endpointFingerprint(e.value.endpoint) === fingerprint,
   );
@@ -138,6 +162,7 @@ export async function recordRecent(
     endpoint,
     usedAt: now,
     usedAsOrigin: opts.usedAsOrigin,
+    cityId,
   };
   invalidateRecentsCache();
   await putPersonal(TABLE, id, payload, {
@@ -167,16 +192,33 @@ export async function listRecents(): Promise<RecentRef[]> {
   if (!isOptionalStorageEnabledNow("recents")) return [];
   const axis = getPolicy().recentsEncryption;
   if (axis === "off") return [];
-  if (_recentsCache) return _recentsCache;
-  const out: RecentRef[] = (await listRecentEntries()).map((e) => ({
-    kind: "recent",
-    base: e.value.endpoint,
-    usedAt: e.value.usedAt,
-    usedAsOrigin: e.value.usedAsOrigin,
-  }));
+  const cityId = activeCityId();
+  if (_recentsCache?.cityId === cityId && _recentsCache.axis === axis) {
+    return _recentsCache.values;
+  }
+  const revision = recentsRevision;
+  // City ownership is sealed: decrypt, then keep the active city's recents.
+  const out: RecentRef[] = (await listRecentEntries())
+    .filter((e) => recentInCity(e.value, cityId))
+    .map((e) => ({
+      kind: "recent",
+      base: e.value.endpoint,
+      usedAt: e.value.usedAt,
+      usedAsOrigin: e.value.usedAsOrigin,
+    }));
   out.sort((a, b) => b.usedAt - a.usedAt);
-  _recentsCache = out.slice(0, RECENTS_LIST_LIMIT);
-  return _recentsCache;
+  // A consent, policy or city change while decrypting discards this result.
+  if (
+    !isOptionalStorageEnabledNow("recents") ||
+    getPolicy().recentsEncryption !== axis ||
+    activeCityId() !== cityId
+  ) {
+    return [];
+  }
+  if (revision !== recentsRevision) return listRecents();
+  const values = out.slice(0, RECENTS_LIST_LIMIT);
+  _recentsCache = { cityId, axis, values };
+  return values;
 }
 
 /**
@@ -288,7 +330,7 @@ export function __clearRamRecentsForTests(): void {
 
 /** Test-only: resets the module-scope listRecents cache. */
 export function __resetRecentsCacheForTests(): void {
-  _recentsCache = null;
+  invalidateRecentsCache();
 }
 
 /** Test-only: this session's recents as a fingerprint→payload map. */

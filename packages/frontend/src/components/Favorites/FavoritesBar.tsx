@@ -4,7 +4,8 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import type { FavoritePlace } from "@pt/shared";
 import { useResolvedSaves } from "../../hooks/useResolvedSaves.ts";
 import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
-import type { ResolvedSave } from "../../services/saves.ts";
+import { saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
+import { canonicalCityId } from "../../utils/cityId.ts";
 
 interface FavoritesBarProps {
   onFavoriteClick: (favorite: FavoritePlace) => void;
@@ -21,8 +22,9 @@ export function FavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   const enableMigration = useSettingsStore(
     (s) => s.enableFavoritesMigration,
   );
+  const cityId = useCityStore(s => s.activeCity.id);
   return enableMigration
-    ? <SavedLocationsBar onFavoriteClick={onFavoriteClick} />
+    ? <SavedLocationsBar key={cityId} cityId={cityId} onFavoriteClick={onFavoriteClick} />
     : <LegacyFavoritesBar onFavoriteClick={onFavoriteClick} />;
 }
 
@@ -31,10 +33,9 @@ function LegacyFavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const loaded = usePersistHydrated(useFavoritesStore.persist);
 
-  // Stop favorites are city-bound; non-stop favorites (home/work/place)
-  // are coordinate-based shortcuts useful from any city.
+  // Every shortcut belongs to a city, including Home/Work and coordinates.
   const cityFavorites = favorites.filter(
-    (f) => f.type !== "stop" || f.cityId === activeCityId
+    (f) => f.cityId && canonicalCityId(f.cityId) === canonicalCityId(activeCityId)
   );
 
   if (!loaded) return <FavoritesLoading />;
@@ -47,11 +48,15 @@ function LegacyFavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   return <FavoritesRow favorites={sorted} onFavoriteClick={onFavoriteClick} />;
 }
 
-function SavedLocationsBar({ onFavoriteClick }: FavoritesBarProps) {
+function SavedLocationsBar({ onFavoriteClick, cityId }: FavoritesBarProps & {cityId: string}) {
   const saves = useResolvedSaves();
   if (saves === null) return <FavoritesLoading />;
-  // Oldest first, as before saves were sealed.
-  const places = [...saves].reverse().map(toFavoritePlace);
+  // This city's single places (not route pairs), oldest first as before saves
+  // were sealed.
+  const places = saves
+    .filter((save) => !save.destination && saveBelongsToCity(save, cityId))
+    .reverse()
+    .map(toFavoritePlace);
   if (places.length === 0) return null;
   return <FavoritesRow favorites={places} onFavoriteClick={onFavoriteClick} />;
 }
@@ -104,6 +109,7 @@ function toFavoritePlace(save: ResolvedSave): FavoritePlace {
     save.placeType ?? (stopId ? "stop" : "place");
   return {
     id: save.id,
+    cityId: save.cityId,
     name: save.alias,
     type,
     location: { lat: endpoint.lat, lon: endpoint.lon },

@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../../src/test-helpers/cityData.ts";
 import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../../../src/db/index.ts";
@@ -15,6 +16,7 @@ describe("readLegSnapshot", () => {
   beforeEach(async () => {
     await db.delete();
     await db.open();
+    await seedLegacyCityProjection();
   });
 
   it("empty DB → all undefined", async () => {

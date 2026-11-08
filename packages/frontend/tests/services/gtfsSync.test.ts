@@ -263,3 +263,33 @@ describe("syncGtfsData", () => {
     ]);
   });
 });
+
+it("rolls back the shared projection when a city sync is superseded after route writes", async () => {
+  const {syncGtfsData} = await import("../../src/services/gtfsSync.ts");
+  await db.gtfsStops.put({id: "old-stop", name: "Old", lat: 1, lon: 2});
+  await db.gtfsRoutes.put({id: "old-route", shortName: "Old", mode: "BUS", stopIds: ["old-stop"]});
+  const controller = new AbortController();
+  const original = db.gtfsRoutes.bulkPut.bind(db.gtfsRoutes);
+  const spy = vi.spyOn(db.gtfsRoutes, "bulkPut").mockImplementation((async (...args: Parameters<typeof original>) => {
+    const result = await original(...args);
+    controller.abort();
+    return result;
+  }) as typeof original);
+  try { await expect(syncGtfsData("vilnius", {signal: controller.signal})).rejects.toThrow(); }
+  finally { spy.mockRestore(); }
+  expect((await db.gtfsRoutes.toArray()).map(route => route.id)).toEqual(["old-route"]);
+  expect((await db.gtfsStops.toArray()).map(stop => stop.id)).toEqual(["old-stop"]);
+  expect(await db.gtfsTrips.count()).toBe(0);
+});
+
+it("resets the shared projection atomically, including stop groups", async () => {
+  const {clearGtfsData} = await import("../../src/services/gtfsSync.ts");
+  await db.gtfsStops.put({id: "old-stop", name: "Old", lat: 1, lon: 2});
+  const spy = vi.spyOn(db.gtfsTrips, "clear").mockRejectedValueOnce(new Error("clear failed"));
+  try { await expect(clearGtfsData()).rejects.toThrow("clear failed"); }
+  finally { spy.mockRestore(); }
+  expect((await db.gtfsStops.toArray()).map(stop => stop.id)).toEqual(["old-stop"]);
+  await clearGtfsData();
+  expect(await db.gtfsStops.count()).toBe(0);
+  expect(await db.stopGroups.count()).toBe(0);
+});

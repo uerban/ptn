@@ -94,7 +94,7 @@ vi.mock("../../src/stores/stopStore.ts", () => ({
 
 vi.mock("../../src/stores/cityStore.ts", () => ({
   useCityStore: Object.assign((sel: any) => sel({ activeCity: { id: "vilnius", name: "Vilnius" } }), {
-    getState: () => ({ setActiveCity: vi.fn() }),
+    getState: () => ({ activeCity: {id: "vilnius", name: "Vilnius"}, setActiveCity: vi.fn() }),
   }),
 }));
 

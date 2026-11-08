@@ -24,6 +24,8 @@ import { clearPersonal } from "./personalStorage.ts";
 import { removeSealedItem } from "./sealedLocalStorage.ts";
 import { stopRecentsSweep } from "./recents.ts";
 import { stopStopUsageSweep } from "./stopUsage.ts";
+import {clearCityArtifactMemory} from "./cityArtifactMemory.ts";
+import {clearTransferArtifactMemory} from "./transfersArtifact.ts";
 import {
   clearLocalReportsData,
   clearPersonalizationData,
@@ -162,9 +164,9 @@ export async function unregisterPtnServiceWorker(
   );
 }
 
-function serverDerivedTableNames(): PtnTableName[] {
+function downloadedTableNames(): PtnTableName[] {
   return (Object.entries(TABLE_KIND) as Array<[PtnTableName, string]>)
-    .filter(([, kind]) => kind === "server-derived")
+    .filter(([, kind]) => kind === "server-derived" || kind === "retained-download")
     .map(([name]) => name);
 }
 
@@ -180,16 +182,19 @@ export interface ClearDownloadedDataOptions {
 export async function clearDownloadedData(
   opts: ClearDownloadedDataOptions = {},
 ): Promise<void> {
+  clearTransferArtifactMemory();
+  clearCityArtifactMemory();
   const stopRuntime =
     opts.stopDownloadedRuntime ??
     (async () => {
       await useGtfsDataStore.getState().reset();
+      useStopStore.getState().reset();
       useStopStore.setState({ stops: [], hydrated: false });
       useBadgeActivityStore.getState().clear();
     });
   await stopRuntime();
   await runEveryCleanup([
-    ...serverDerivedTableNames().map(
+    ...downloadedTableNames().map(
       (name) => () => db.table(name).clear(),
     ),
     async () => {await (await import("./walkGraphStore.ts")).clearWalkGraphStore();},
@@ -210,6 +215,7 @@ function resetInMemoryStores(): void {
     backendAssist: false,
   });
   useRtStore.getState().unsubscribeAll();
+  useStopStore.getState().reset();
   useStopStore.setState({ stops: [], hydrated: false });
   useFavoritesStore.setState({ favorites: [] });
   useDelayReportStore.setState({ reports: [] });

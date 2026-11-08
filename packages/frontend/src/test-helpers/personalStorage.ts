@@ -32,6 +32,7 @@ export async function resetPersonalStorage(
     db.savedLocations.clear(),
     db.personalUsage.clear(),
     db.usageStats.clear(),
+    db.cityUsageStats.clear(),
     db.geocoderDedup.clear(),
   ]);
   __resetInstallKeyCacheForTests();

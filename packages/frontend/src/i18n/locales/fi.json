@@ -539,5 +539,7 @@
   "walk.turn.right": "Käänny oikealle",
   "walk.turn.sharp_left": "Käänny jyrkästi vasemmalle",
   "walk.turn.sharp_right": "Käänny jyrkästi oikealle",
-  "walk.turn.u_turn": "Käänny ympäri"
+  "walk.turn.u_turn": "Käänny ympäri",
+  "settings.all_cities": "Kaikki kaupungit",
+  "settings.city_scope_description": "Yleiset asetukset koskevat kaikkia kaupunkeja. Tallennetut paikat, linjaryhmät ja omat liikennevärit tallennetaan kaupunkikohtaisesti."
 }

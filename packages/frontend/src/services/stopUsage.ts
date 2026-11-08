@@ -13,6 +13,8 @@ import {
   usePrivacyStore,
 } from "../stores/privacyStore.ts";
 import { isOptionalStorageEnabledNow } from "./privacyChoices.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -25,9 +27,18 @@ export interface StopUsageValue {
 
 const TABLE = "personalUsage";
 
-/** One stop's use history, sealed whole (stop ID included) when persisted. */
+/**
+ * One stop's use history in one city, sealed whole (stop and city IDs
+ * included) when persisted. Legacy rows have no city: they keep obeying
+ * retention but never rank stops, since their city is unknown.
+ */
 interface StopUsagePayload extends StopUsageValue {
   stopId: string;
+  cityId?: string;
+}
+
+function inCity(value: StopUsagePayload, cityId: string): boolean {
+  return !!value.cityId && canonicalCityId(value.cityId) === cityId;
 }
 
 function isUsagePayload(value: unknown): value is StopUsagePayload {
@@ -55,16 +66,35 @@ export function retentionMsForStopUsage(
 }
 
 /** Records a stop tap only after both the standing choice and policy allow it. */
-export async function recordStopUsage(
+// Taps are counted one at a time: each reads the sealed rows, then rewrites
+// one, so concurrent taps of a stop must not both start from the same count.
+let recordQueue: Promise<void> = Promise.resolve();
+
+export function recordStopUsage(
   stopId: string,
   now: () => number = Date.now,
 ): Promise<void> {
+  if (!isOptionalStorageEnabledNow("personalization")) return Promise.resolve();
+  // Capture ownership and time at the tap, not when the queue reaches it.
+  const cityId = canonicalCityId(useCityStore.getState().activeCity.id);
+  const lastTapped = now();
+  const run = recordQueue.then(() => recordOne(stopId, cityId, lastTapped));
+  recordQueue = run.catch(() => {});
+  return run;
+}
+
+async function recordOne(stopId: string, cityId: string, lastTapped: number): Promise<void> {
   if (!isOptionalStorageEnabledNow("personalization")) return;
-  const existing = (await listUsage()).find((e) => e.value.stopId === stopId);
+  const existing = (await listUsage()).find(
+    (e) => e.value.stopId === stopId && inCity(e.value, cityId),
+  );
+  // Recheck consent after waiting for storage.
+  if (!isOptionalStorageEnabledNow("personalization")) return;
   await putPersonal<StopUsagePayload>(TABLE, existing?.id ?? newPersonalId(), {
     stopId,
+    cityId,
     tapCount: (existing?.value.tapCount ?? 0) + 1,
-    lastTapped: now(),
+    lastTapped,
   });
 }
 
@@ -75,6 +105,7 @@ export async function recordStopUsage(
 export async function loadStopUsage(
   stopIds: readonly string[],
   now: () => number = Date.now,
+  cityId: string = useCityStore.getState().activeCity.id,
 ): Promise<Map<string, StopUsageValue>> {
   const result = new Map<string, StopUsageValue>();
   if (!isOptionalStorageEnabledNow("personalization")) return result;
@@ -83,9 +114,10 @@ export async function loadStopUsage(
   if (ttl === null) return result;
   const cutoff = now() - ttl;
   const wanted = new Set(stopIds);
+  const city = canonicalCityId(cityId);
   const staleIds: string[] = [];
   for (const { id, value } of await listUsage()) {
-    if (!wanted.has(value.stopId)) continue;
+    if (!wanted.has(value.stopId) || !inCity(value, city)) continue;
     if (value.lastTapped < cutoff) {
       staleIds.push(id);
       continue;

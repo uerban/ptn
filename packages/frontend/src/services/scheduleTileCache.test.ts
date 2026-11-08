@@ -275,6 +275,58 @@ describe("scheduleTileCache", () => {
     });
   });
 
+  it("shares one fetch/decode across concurrent foreground and prewarm readers", async () => {
+    const {mod, db} = await freshModule();
+    const decoder = await import("./brotliDecode.ts");
+    const decode = vi.spyOn(decoder, "decompressBrotli");
+    let finish!: (result: FetchScheduleTileResult) => void;
+    fetchScheduleTileMock.mockImplementation(() => new Promise(resolve => {finish = resolve;}));
+    const firstStart = vi.fn();
+    const secondStart = vi.fn();
+    const first = mod.getDecodedTile(HASH, SIZE, COORD, {prewarm: true, onTileDownloadStart: firstStart});
+    await vi.waitFor(() => expect(firstStart).toHaveBeenCalledOnce());
+    const second = mod.getDecodedTile(HASH, SIZE, COORD, {onTileDownloadStart: secondStart});
+    expect(secondStart).toHaveBeenCalledOnce();
+    const bytes = makeTileBytes();
+    finish({status: 200, bytes, bundleHash: HASH});
+    const [a, b] = await Promise.all([first, second]);
+    expect(fetchScheduleTileMock).toHaveBeenCalledOnce();
+    expect(decode).toHaveBeenCalledOnce();
+    expect("tile" in a && "tile" in b && a.tile === b.tile).toBe(true);
+    expect("tile" in a && a.bytesDownloaded).toBe(bytes.byteLength);
+    expect("tile" in b && b.bytesDownloaded).toBe(0);
+    expect((await db.scheduleTileCache.get(`${HASH}/${SIZE}/${COORD}`))!.loadedAt).toBeGreaterThan(0);
+    decode.mockRestore();
+  });
+
+  it("releases a failed shared request so the next read can retry", async () => {
+    const {mod} = await freshModule();
+    fetchScheduleTileMock.mockRejectedValueOnce(new Error("network"));
+    const result = await Promise.allSettled([
+      mod.getDecodedTile(HASH, SIZE, COORD), mod.getDecodedTile(HASH, SIZE, COORD),
+    ]);
+    expect(result.map(r => r.status)).toEqual(["rejected", "rejected"]);
+    expect(fetchScheduleTileMock).toHaveBeenCalledOnce();
+    fetchScheduleTileMock.mockResolvedValue({status: 200, bytes: makeTileBytes(), bundleHash: HASH});
+    expect("tile" in await mod.getDecodedTile(HASH, SIZE, COORD)).toBe(true);
+    expect(fetchScheduleTileMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares cached decompression without reporting a network download", async () => {
+    const {mod, db} = await freshModule();
+    const decoder = await import("./brotliDecode.ts");
+    const decode = vi.spyOn(decoder, "decompressBrotli");
+    const bytes = makeTileBytes();
+    await db.scheduleTileCache.put({key: `${HASH}/${SIZE}/${COORD}`, compressedBytes: bytes, loadedAt: 0, byteSize: bytes.byteLength});
+    const starts = vi.fn();
+    const results = await Promise.all(Array.from({length: 8}, () => mod.getDecodedTile(HASH, SIZE, COORD, {onTileDownloadStart: starts})));
+    expect(decode).toHaveBeenCalledOnce();
+    expect(starts).not.toHaveBeenCalled();
+    expect(fetchScheduleTileMock).not.toHaveBeenCalled();
+    expect(results.every(r => "tile" in r && r.bytesDownloaded === 0)).toBe(true);
+    decode.mockRestore();
+  });
+
   describe("pruneToBundleHash", () => {
     it("deletes only rows whose key prefix is not `${bundleHash}/`", async () => {
       const { mod, db } = await freshModule();
@@ -290,6 +342,17 @@ describe("scheduleTileCache", () => {
       const remaining = (await db.scheduleTileCache.toArray()).map((r) => r.key).sort();
       expect(remaining).toEqual([`${HASH}/${SIZE}/1_1`, `${HASH}/${SIZE}/1_2`]);
     });
+  });
+
+  it("bundle rollover only removes the superseded bundle and preserves other cities", async () => {
+    const { mod, db } = await freshModule();
+    await db.scheduleTileCache.bulkPut(["old-city-a", "new-city-a", "city-b"].map(hash => ({
+      key: `${hash}/${SIZE}/1_1`, compressedBytes: new ArrayBuffer(8), loadedAt: 1, byteSize: 8,
+    })));
+    await mod.pruneToBundleHash("new-city-a", "old-city-a");
+    expect((await db.scheduleTileCache.toArray()).map(row => row.key).sort()).toEqual([
+      `city-b/${SIZE}/1_1`, `new-city-a/${SIZE}/1_1`,
+    ]);
   });
 
   describe("ensureUnderBudget", () => {

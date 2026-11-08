@@ -1,15 +1,11 @@
-/**
- * [R-fold v4 BLOCKING #8 complement / test-side of BLOCKING #1] The `gtfsDataStore`
- * warm-restart path (`!needsSync` + `!raptorIndex`) must set `bundleCityTzIana` from
- * the rebuilt index, exactly like the fresh-sync path — else a warm start would
- * leave `bundleCityTzIana=null`, the drift guard would read "can't cross-check", and
- * a real config-vs-bundle tz drift would ship undetected. This test drives that warm
- * branch and asserts `bundleCityTzIana` is populated. It lives in `__tz_tests__` so
- * it runs under the non-UTC zones alongside the rendered drift-surface test (#8).
- *
- * `.spec.ts` under `src/__tz_tests__/` → collected ONLY by `vitest.tz.config.ts`.
- */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+/** The agency timezone must survive both network activation and an offline
+ * restart from the verified raw artifact, independent of the device timezone.
+ * Collected only by vitest.tz.config.ts (New York and Vilnius). */
+import {readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+import {URL as NodeURL} from "node:url";
+import {clearCityArtifactMemory} from "../services/cityArtifactMemory.ts";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { db } from "../db/index.ts";
 import type { RoutingBundleData } from "@pt/shared";
 
@@ -47,7 +43,11 @@ vi.mock("../services/ptbCatalogWorkerClient.ts", () => ({
   decodePtbCatalogInWorker: async () => mockData,
 }));
 
-const STUB_GENERATION_ID = "d".repeat(64);
+// Real bytes and matching identity are required by activation's integrity gate.
+const PTB_BYTES = new Uint8Array(readFileSync(new NodeURL("../../../shared/src/ptb/__fixtures__/tiny-service-pool.ptb", import.meta.url)));
+const STUB_GENERATION_ID = createHash("sha256").update(PTB_BYTES).digest("hex");
+vi.mock("../services/osrmWasm.ts", () => ({osrmClient: {init: async () => {}}}));
+vi.mock("../services/wasmLifecycle.ts", () => ({initOrSwapPtRouter: () => new Promise(() => {})}));
 
 /** Serve `/ready` + `/raptor-bundle` — the two halves of a catalog fetch. */
 function installCatalogFetch(cityId = "vilnius"): void {
@@ -67,7 +67,7 @@ function installCatalogFetch(cityId = "vilnius"): void {
       }), { status: 200, headers: { "content-type": "application/json" } });
     }
     if (url.endsWith(`/api/${cityId}/raptor-bundle`)) {
-      return new Response(new Uint8Array([1, 2, 3, 4]) as unknown as BodyInit, {
+      return new Response(PTB_BYTES as unknown as BodyInit, {
         status: 200,
         headers: {
           etag: `"${STUB_GENERATION_ID}"`,
@@ -81,41 +81,44 @@ function installCatalogFetch(cityId = "vilnius"): void {
 }
 
 beforeEach(async () => {
+  const {useGtfsDataStore} = await import("../stores/gtfsDataStore.ts");
+  await useGtfsDataStore.getState().reset();
+  clearCityArtifactMemory();
   installCatalogFetch();
   await db.delete();
   await db.open();
-  const { useGtfsDataStore } = await import("../stores/gtfsDataStore.ts");
-  useGtfsDataStore.setState({
-    raptorIndex: null,
-    loadedCityId: null,
-    syncing: false,
-    error: null,
-    bundleCityTzIana: null,
-  });
+});
+afterEach(async () => {
+  const {useGtfsDataStore} = await import("../stores/gtfsDataStore.ts");
+  await useGtfsDataStore.getState().reset();
+  clearCityArtifactMemory();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
-describe("gtfsDataStore warm path sets bundleCityTzIana", () => {
-  it("fresh sync sets bundleCityTzIana from meta.cityTzIana", async () => {
-    const { useGtfsDataStore } = await import("../stores/gtfsDataStore.ts");
+describe("gtfsDataStore agency timezone", () => {
+  it("sets bundleCityTzIana on verified network activation", async () => {
+    const {useGtfsDataStore} = await import("../stores/gtfsDataStore.ts");
     await useGtfsDataStore.getState().init("vilnius");
+    expect(useGtfsDataStore.getState().error).toBeNull();
     expect(useGtfsDataStore.getState().raptorIndex).not.toBeNull();
     expect(useGtfsDataStore.getState().bundleCityTzIana).toBe(FEED_TZ);
   });
 
-  it("WARM restart (!needsSync + !raptorIndex) re-sets bundleCityTzIana", async () => {
-    const { useGtfsDataStore } = await import("../stores/gtfsDataStore.ts");
-    // 1. Prime: fresh sync populates IndexedDB + the bundle blob.
+  it("restores bundleCityTzIana from durable raw data offline without a fetch", async () => {
+    const {useGtfsDataStore} = await import("../stores/gtfsDataStore.ts");
     await useGtfsDataStore.getState().init("vilnius");
-    expect(useGtfsDataStore.getState().bundleCityTzIana).toBe(FEED_TZ);
+    await vi.waitFor(() => expect(useGtfsDataStore.getState().persistence).toBe("stored"));
+    // Drop all resident catalog/index/raw state; keep only the committed DB.
+    await useGtfsDataStore.getState().reset();
+    clearCityArtifactMemory();
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    vi.mocked(globalThis.fetch).mockClear();
 
-    // 2. Simulate a warm restart: the synced data is still on disk (sync meta is
-    //    fresh → needsSync=false) but the in-memory index is gone (null) and so is
-    //    the tz. This is exactly the `else if (!get().raptorIndex)` branch.
-    useGtfsDataStore.setState({ raptorIndex: null, bundleCityTzIana: null });
-
-    // 3. Re-init: needsSync=false (fresh meta), no raptorIndex → rebuild branch.
     await useGtfsDataStore.getState().init("vilnius");
+    expect(useGtfsDataStore.getState().error).toBeNull();
     expect(useGtfsDataStore.getState().raptorIndex).not.toBeNull();
     expect(useGtfsDataStore.getState().bundleCityTzIana).toBe(FEED_TZ);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

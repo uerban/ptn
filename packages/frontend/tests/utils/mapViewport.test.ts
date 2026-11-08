@@ -66,7 +66,7 @@ describe("mapViewport", () => {
       { location: { lat: 55, lon: 26 } },
     ];
     expect(saveViewport(base, stops)).toBe(true);
-    const raw = JSON.parse(stored()!);
+    const raw = JSON.parse(stored()!).viewports[0];
     expect({ lat: raw.lat, lon: raw.lon }).toEqual(stops[0]!.location);
     expect(raw.privacyMode).toBe("snap-centroid");
   });
@@ -81,7 +81,7 @@ describe("mapViewport", () => {
   it("Hardened and Strict store 50 m and 100 m grid representations", () => {
     usePrivacyStore.setState({ level: "hardened", overrides: {} });
     expect(saveViewport(base)).toBe(true);
-    const fifty = JSON.parse(stored()!);
+    const fifty = JSON.parse(stored()!).viewports[0];
     expect(fifty.privacyMode).toBe("rounded-50m");
     expect({ lat: fifty.lat, lon: fifty.lon }).not.toEqual({
       lat: base.lat,
@@ -90,7 +90,7 @@ describe("mapViewport", () => {
 
     usePrivacyStore.setState({ level: "strict", overrides: {} });
     expect(saveViewport(base)).toBe(true);
-    const hundred = JSON.parse(stored()!);
+    const hundred = JSON.parse(stored()!).viewports[0];
     expect(hundred.privacyMode).toBe("rounded-100m");
   });
 
@@ -155,4 +155,38 @@ describe("mapViewport", () => {
     await mapViewportItem.load();
     expect(loadViewport()).toEqual(exact);
   });
+
+  it("keeps independent city positions through A → B → A and migrates a legacy viewport", () => {
+    store(JSON.stringify(base));
+    const second = {...base, cityId: "krakow", lat: 50.06, lon: 19.94, zoom: 16};
+    expect(saveViewport(second)).toBe(true);
+    expect(loadViewport("vilnius")).toEqual(base);
+    expect(loadViewport("krakow")).toEqual(second);
+    expect(loadViewport("missing")).toBeNull();
+    expect(loadViewport()).toEqual(second);
+  });
+
+  it("applies a stricter global floor to all cities without deleting already-compliant positions", () => {
+    saveViewport(base);
+    saveViewport({...base, cityId: "krakow"});
+    usePrivacyStore.setState({level: "hardened", overrides: {}});
+    expect(loadViewport("vilnius")).toBeNull();
+    expect(loadViewport("krakow")).toBeNull();
+    saveViewport(base);
+    usePrivacyStore.setState({level: "baseline", overrides: {}});
+    saveViewport({...base, cityId: "krakow"});
+    usePrivacyStore.setState({level: "hardened", overrides: {}});
+    expect(loadViewport("vilnius")).not.toBeNull();
+    expect(loadViewport("krakow")).toBeNull();
+  });
+
+  it("removes every city's viewport when persistence is disabled", () => {
+    saveViewport(base);
+    saveViewport({...base, cityId: "krakow"});
+    usePrivacyChoicesStore.getState().setChoice("viewport", "disabled");
+    expect(loadViewport("vilnius")).toBeNull();
+    expect(loadViewport("krakow")).toBeNull();
+    expect(localStorage.getItem(MAP_VIEWPORT_STORAGE_KEY)).toBeNull();
+  });
+
 });

@@ -6,6 +6,7 @@ import {
   canExportSaves,
   canShareSaves,
   deleteSave,
+  listCitySaves,
   listSaves,
   savePlace,
   saveRoutePair,
@@ -13,6 +14,7 @@ import {
 import { __resetInstallKeyCacheForTests } from "./installKey.ts";
 import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
 import { __resetPersonalStorageForTests } from "./personalStorage.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import { usePrivacyStore } from "../stores/privacyStore.ts";
 import {
   findLeaks,
@@ -186,5 +188,25 @@ describe("export/share visibility helpers", () => {
     expect(canShareSaves("always")).toBe(true);
     expect(canShareSaves("always-no-export")).toBe(true);
     expect(canShareSaves("always-no-share")).toBe(false);
+  });
+});
+
+
+describe("save city ownership", () => {
+  it("captures the city before encryption and keeps it sealed", async () => {
+    const original = useCityStore.getState().activeCity;
+    try {
+      useCityStore.setState({ activeCity: { ...original, id: "vilnius" } });
+      const pending = savePlace({ endpoint: origin }, { id: "city-save" });
+      useCityStore.setState({ activeCity: { ...original, id: "krakow" } });
+      const saved = await pending;
+      expect(saved.save.cityId).toBe("vilnius");
+      expect((await listSaves()).find((s) => s.id === "city-save")?.cityId).toBe("vilnius");
+      expect(await listCitySaves("vilnius")).toHaveLength(1);
+      expect(await listCitySaves("krakow")).toHaveLength(0);
+      expect(findLeaks(await rawTableText("savedLocations"), ["vilnius"])).toEqual([]);
+    } finally {
+      useCityStore.setState({ activeCity: original });
+    }
   });
 });

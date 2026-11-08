@@ -15,26 +15,79 @@ export interface StartupGateInput {
   readonly catalogWasCached: boolean;
 }
 
-interface DeviceCities {
-  readonly records: readonly { readonly city: CityConfig; readonly sizeBytes: number }[];
-  readonly installed: ReadonlySet<string>;
+interface DeviceCityRecord {
+  readonly cityId: string;
+  /** Absent on downloads from before download details were listed separately. */
+  readonly city?: CityConfig;
+  readonly sizeBytes?: number;
 }
 
-async function readDeviceCities(cities: readonly CityConfig[]): Promise<DeviceCities> {
+interface DeviceCities {
+  readonly records: readonly DeviceCityRecord[];
+  readonly installed: ReadonlySet<string>;
+  /** False when probing stopped at the first city. */
+  readonly complete: boolean;
+}
+
+async function prepareDb(): Promise<void> {
   try {
     const { ensureDbReady } = await import("../db/migrationRunner.ts");
     await ensureDbReady();
     const { ensureDataSchemaUpToDate } = await import("../db/dataSchemaVersion.ts");
     await ensureDataSchemaUpToDate();
+  } catch {
+    // IndexedDB unavailable: reading device cities below finds none.
+  }
+}
+
+/**
+ * Cities with data on this device. `firstCityId` is probed before the others,
+ * and when its data is present (`stopAtFirst`) the remaining cities are not
+ * probed at all.
+ */
+async function readDeviceCities(
+  cities: readonly CityConfig[],
+  firstCityId: string | null = null,
+  stopAtFirst = false,
+): Promise<DeviceCities> {
+  try {
     const { listDeviceCities, hasLiveDeviceCity } = await import("../services/deviceCities.ts");
     const records = await listDeviceCities();
     const installed = new Set(records.map((record) => record.cityId));
-    for (const city of cities) if (await hasLiveDeviceCity(city.id)) installed.add(city.id);
-    return { records, installed };
+    if (firstCityId && (installed.has(firstCityId) || await hasLiveDeviceCity(firstCityId))) {
+      installed.add(firstCityId);
+      if (stopAtFirst) return { records, installed, complete: false };
+    }
+    for (const city of cities) {
+      if (city.id !== firstCityId && await hasLiveDeviceCity(city.id)) installed.add(city.id);
+    }
+    return { records, installed, complete: true };
   } catch {
     // IndexedDB unavailable: no city data on this device.
-    return { records: [], installed: new Set() };
+    return { records: [], installed: new Set(), complete: true };
   }
+}
+
+/**
+ * City configurations of downloaded cities. Older downloads list only their
+ * id; their configuration is read from the download itself.
+ */
+async function deviceCityConfigs(records: readonly DeviceCityRecord[]): Promise<CityConfig[]> {
+  const out: CityConfig[] = [];
+  for (const record of records) {
+    if (record.city) {
+      out.push(record.city);
+      continue;
+    }
+    try {
+      const { db } = await import("../db/index.ts");
+      const legacy = await db.offlineCities.get(record.cityId);
+      if (legacy?.city) out.push(legacy.city);
+    } catch {
+      // Unreadable download: it cannot be opened without the catalog.
+    }
+  }
+  return out;
 }
 
 /** The stored city choice, when it names a catalog city. */
@@ -50,7 +103,9 @@ export function restoredCityId(
 ): string | null {
   try {
     const saved = JSON.parse(storage?.getItem("ptn-city") ?? "null");
-    const id: unknown = saved?.state?.activeCity?.id;
+    // Current stores keep only the id; older ones kept the whole city.
+    const rawId: unknown = saved?.state?.currentCityId ?? saved?.state?.activeCity?.id;
+    const id = rawId === "gdansk" ? "tricity" : rawId;
     return typeof id === "string" && cities.some((city) => city.id === id) ? id : null;
   } catch {
     return null;
@@ -62,33 +117,54 @@ export function pendingDeepLink(loc: Pick<Location, "pathname" | "search">): str
   return loc.pathname === "/" && !loc.search ? null : `${loc.pathname}${loc.search}`;
 }
 
+async function enterCity(cities: readonly CityConfig[], cityId: string): Promise<void> {
+  const { useCityStore } = await import("../stores/cityStore.ts");
+  useCityStore.getState().setActiveCity(cities.find((city) => city.id === cityId)!);
+}
+
 export async function runStartupGate(input: StartupGateInput): Promise<void> {
-  const device = await readDeviceCities(input.cities);
+  await prepareDb();
+  const read = readOnboardingRecord();
+  const offline = navigator.onLine === false;
+  const record = read.status === "ok" ? read.record : null;
+
+  // A returning rider with a usable city enters without enumerating downloads
+  // or cloning live city data: online, any available catalog city opens;
+  // offline, only the stored city is checked.
+  const savedCityId = input.cities.length ? restoredCityId(input.cities) : null;
+  let quick: DeviceCities | null = null;
+  if (savedCityId) {
+    if (offline) quick = await readDeviceCities(input.cities, savedCityId, true);
+    const plan = planStartup({
+      cities: input.cities,
+      record,
+      savedCityId,
+      installedCityIds: quick?.installed ?? new Set<string>(),
+      offline,
+    });
+    if (plan.kind === "enter") return enterCity(input.cities, plan.cityId);
+  }
+
+  const device = quick?.complete ? quick : await readDeviceCities(input.cities, savedCityId);
   let cities = input.cities;
   let catalogStatus: CatalogStatus = input.catalogWasCached ? "cached" : "fresh";
   if (!cities.length) {
     // Discovery failed with nothing cached: cities with data on this device
     // can still be opened.
-    cities = device.records.map((record) => record.city);
+    cities = await deviceCityConfigs(device.records);
     catalogStatus = cities.length ? "device-only" : "failed";
     if (cities.length) installCityCatalog(cities);
   }
 
-  const read = readOnboardingRecord();
-  const offline = navigator.onLine === false;
   const plan = planStartup({
     cities,
-    record: read.status === "ok" ? read.record : null,
+    record,
     savedCityId: restoredCityId(cities),
     installedCityIds: device.installed,
     offline,
   });
 
-  if (plan.kind === "enter") {
-    const { useCityStore } = await import("../stores/cityStore.ts");
-    useCityStore.getState().setActiveCity(cities.find((city) => city.id === plan.cityId)!);
-    return;
-  }
+  if (plan.kind === "enter") return enterCity(cities, plan.cityId);
 
   const { showSetupShell } = await import("../components/Onboarding/mountSetupShell.tsx");
   await showSetupShell({
@@ -96,7 +172,9 @@ export async function runStartupGate(input: StartupGateInput): Promise<void> {
     initialStep: plan.initialStep,
     preselectedCityId: plan.preselectedCityId,
     cities,
-    downloadedSizes: new Map(device.records.map((r) => [r.city.id, r.sizeBytes])),
+    downloadedSizes: new Map(
+      device.records.flatMap((r) => (r.sizeBytes === undefined ? [] : [[r.cityId, r.sizeBytes] as const])),
+    ),
     installedCityIds: device.installed,
     offline,
     catalogStatus,

@@ -1,3 +1,4 @@
+import { useCityStore } from "../stores/cityStore.ts";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { Departure } from "@pt/shared";
 import { REALTIME_POLL_INTERVAL_MS } from "@pt/shared/constants";
@@ -40,6 +41,7 @@ export function useDepartures(
   lookAheadHours?: number,
   opts?: UseDeparturesOpts,
 ): UseDeparturesResult {
+  const cityId = useCityStore(state => state.activeCity.id);
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,9 @@ export function useDepartures(
   // never come here and keep their list. (`prevStopId` is the stop the state
   // above belongs to: React's "adjusting state when a prop changes".)
   const [prevStopId, setPrevStopId] = useState(stopId);
-  if (prevStopId !== stopId) {
+  const [prevCityId, setPrevCityId] = useState(cityId);
+  if (prevStopId !== stopId || prevCityId !== cityId) {
+    setPrevCityId(cityId);
     setPrevStopId(stopId);
     setSettledStopId(null);
     setDepartures([]);
@@ -83,8 +87,10 @@ export function useDepartures(
   // for the old stop. A fetch or poll of a stop no longer on screen (an
   // interval or `refresh` from before the change) starts nothing.
   const shownStopRef = useRef(stopId);
+  const shownCityRef = useRef(cityId);
   useLayoutEffect(() => {
     shownStopRef.current = stopId;
+    shownCityRef.current = cityId;
     return () => {
       ++latestTokenRef.current;
       ++latestFgTokenRef.current;
@@ -93,17 +99,17 @@ export function useDepartures(
         hedgeTimerRef.current = null;
       }
     };
-  }, [stopId]);
+  }, [stopId, cityId]);
 
   const fetchDepartures = useCallback(async (background = false) => {
-    if (!stopId || stopId !== shownStopRef.current) return;
+    if (!stopId || stopId !== shownStopRef.current || cityId !== shownCityRef.current) return;
     // J11: bump BEFORE the first await so every path carries the current token.
     const token = ++latestTokenRef.current;
     const foreground = !background;
     // fg-only token: only bumped (and only checked) for foreground fetches.
     const fgToken = foreground ? ++latestFgTokenRef.current : 0;
     // `fresh` guards DATA writes — applies to both fg and bg fetches.
-    const fresh = () => token === latestTokenRef.current;
+    const fresh = () => token === latestTokenRef.current && cityId === useCityStore.getState().activeCity.id;
     // `freshFg` guards LOADING/ERROR state — only foreground can own those.
     const freshFg = () => foreground && fgToken === latestFgTokenRef.current;
 
@@ -163,6 +169,7 @@ export function useDepartures(
         // J3/G9: dynamic import keeps the Dexie/brotli read-path graph out of the
         // eager entry chunk. The factory is NOT invoked at module load time.
         const { departuresForStop } = await import("../services/scheduleTileReadPath.ts");
+        if (!fresh()) return;
         // The hedge fires ONLY on a signalled cache MISS (cold download). Warm
         // opens (memo/IDB hits) never call onTileDownloadStart → never hit
         // the backend. ETA cards / background polls never arm it.
@@ -200,12 +207,13 @@ export function useDepartures(
           // unavailable | stop_not_in_tile — fall through to api.getDepartures if allowed.
           reportTelemetry("schedule_tile_fallback", { stopId, reason: r.state });
         } catch {
+          if (!fresh()) return;
           // Any throw from the tile path — fall through to api.getDepartures if allowed.
           clearHedge();
           reportTelemetry("schedule_tile_fallback", { stopId, reason: "throw" });
         }
         // If the hedge already rendered the legacy result, we're done.
-        if (rendered) return;
+        if (!fresh() || rendered) return;
         // Privacy gate: when the backend departures call is disallowed (e.g. paranoid level),
         // serve empty rather than leaking the exact stop identity.
         if (!allowBackend) {
@@ -232,7 +240,7 @@ export function useDepartures(
         setLoading(false);
       }
     }
-  }, [stopId, lookAheadHours, hedgeWanted]);
+  }, [stopId, cityId, lookAheadHours, hedgeWanted]);
 
   // Initial fetch
   useEffect(() => {

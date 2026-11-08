@@ -1,0 +1,74 @@
+{
+  "workload": "100 alternating city arrivals, native clocks, identical replayed transit bytes",
+  "percentileMethod": "nearest rank",
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMode": "replay",
+  "fixtureMisses": 0,
+  "switches": 100,
+  "cities": {
+    "vilnius": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 220,
+        "p95": 231,
+        "max": 254.5
+      },
+      "authoritativeActivityMs": {
+        "p50": 236.80000001192093,
+        "p95": 247.60000002384186,
+        "max": 285.10000002384186
+      },
+      "lastCardChangeMs": {
+        "p50": 279.5,
+        "p95": 289,
+        "max": 321.5
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 125008440,
+        "max": 125261256
+      },
+      "observedSlowStopCacheWrites": 0
+    },
+    "krakow": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 532.9000000357628,
+        "p95": 577.1999999880791,
+        "max": 605.8000000119209
+      },
+      "authoritativeActivityMs": {
+        "p50": 551.3000000119209,
+        "p95": 595.6999999880791,
+        "max": 625.1000000238419
+      },
+      "lastCardChangeMs": {
+        "p50": 731,
+        "p95": 780.5,
+        "max": 798.6999999880791
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 155983120,
+        "max": 157737880
+      },
+      "observedSlowStopCacheWrites": 0
+    }
+  },
+  "warmGate": {
+    "limitMs": 1000,
+    "valid": true,
+    "passed": true
+  },
+  "panFrames": {
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "limits": "Synthetic arrivals on the reference desktop; does not establish live staging or phone performance. Heap ranges are observations, not a universal leak proof. API write count includes only transactions at least 20 ms."
+}

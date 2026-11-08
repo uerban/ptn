@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import type { BaseEndpoint, FavoritePlace } from "@pt/shared";
 import { FavoritesBar } from "../../src/components/Favorites/FavoritesBar.tsx";
 import { useFavoritesStore } from "../../src/stores/favoritesStore.ts";
@@ -29,7 +29,10 @@ function seedSave(
   savedAt: number,
   placeType?: FavoritePlace["type"],
 ) {
-  return restoreSave(id, { origin: endpoint, alias, savedAt, placeType });
+  return restoreSave(id, {
+    origin: endpoint, alias, savedAt, placeType,
+    cityId: useCityStore.getState().activeCity.id,
+  });
 }
 
 describe("FavoritesBar", () => {
@@ -152,4 +155,37 @@ describe("FavoritesBar", () => {
     expect(arg.stopId).toBe("S-42");
     expect(arg.type).toBe("stop");
   });
+  it("shows only the selected city's places and clears old results before the next city decrypts", async () => {
+    useSettingsStore.setState({enableFavoritesMigration: true});
+    const original = useCityStore.getState().activeCity;
+    try {
+      useCityStore.setState({activeCity: {...original, id: "city-a"}});
+      const endpoint: BaseEndpoint = {kind: "mappoint", lat: 1, lon: 2};
+      await restoreSave("a", {origin: endpoint, alias: "A Home", savedAt: 1, cityId: "city-a"});
+      await restoreSave("b", {origin: endpoint, alias: "B Home", savedAt: 1, cityId: "city-b"});
+      await restoreSave("unknown", {origin: endpoint, alias: "Unknown Home", savedAt: 1});
+      render(<FavoritesBar onFavoriteClick={vi.fn()} />);
+      await screen.findByText("A Home");
+      expect(screen.queryByText("B Home")).toBeNull();
+      expect(screen.queryByText("Unknown Home")).toBeNull();
+      act(() => useCityStore.setState({activeCity: {...original, id: "city-b"}}));
+      expect(screen.queryByText("A Home")).toBeNull();
+      await screen.findByText("B Home");
+    } finally { act(() => useCityStore.setState({activeCity: original})); }
+  });
+
+  it("keeps Home/Work/place legacy shortcuts city-bound and leaves unassigned records for recovery", () => {
+    const cityId = useCityStore.getState().activeCity.id;
+    useFavoritesStore.setState({favorites: [
+      makeFavorite({id: "a", name: "Current Home", cityId}),
+      makeFavorite({id: "b", name: "Other Work", type: "work", cityId: "other"}),
+      makeFavorite({id: "c", name: "Unknown Place", type: "place", cityId: undefined}),
+    ]});
+    render(<FavoritesBar onFavoriteClick={vi.fn()} />);
+    expect(screen.getByText("Current Home")).not.toBeNull();
+    expect(screen.queryByText("Other Work")).toBeNull();
+    expect(screen.queryByText("Unknown Place")).toBeNull();
+    expect(useFavoritesStore.getState().favorites).toHaveLength(3);
+  });
+
 });

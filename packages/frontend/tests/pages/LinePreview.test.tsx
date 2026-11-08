@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -56,6 +57,7 @@ describe("LinePreviewPage", () => {
   beforeEach(async () => {
     if (!db.isOpen()) await db.open();
     await db.gtfsRoutes.clear();
+    await seedLegacyCityProjection();
     await db.gtfsRoutes.add({
       id: "route-42",
       shortName: "42",
@@ -88,6 +90,7 @@ describe("LinePreviewPage", () => {
 
   it("renders 'Line not found' when the route is absent in Dexie", async () => {
     await db.gtfsRoutes.clear();
+    await seedLegacyCityProjection();
     renderLinePreview("missing-id");
     await waitFor(() => {
       expect(screen.getByText(/line not found/i)).toBeInTheDocument();

@@ -1,0 +1,293 @@
+{
+  "scenario": "Final-source eight-city captured-data replay, two visits per city",
+  "citySequence": [
+    "vilnius",
+    "krakow",
+    "tricity",
+    "tbilisi",
+    "oslo",
+    "riga",
+    "tallinn",
+    "warsaw"
+  ],
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMisses": 0,
+  "samples": [
+    {
+      "iteration": 0,
+      "cityId": "vilnius",
+      "readyMs": 277.5999999642372,
+      "activityReadyMs": 302.0999999642372,
+      "activity": {
+        "cityId": "vilnius",
+        "outcome": "complete",
+        "ready": 21,
+        "requested": 21,
+        "reused": 0
+      },
+      "lastCardChangeMs": 338.19999998807907,
+      "observedStableMs": 860.3999999761581,
+      "cardCount": 11,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 1,
+      "cityId": "krakow",
+      "readyMs": 592.8999999761581,
+      "activityReadyMs": 611.0999999642372,
+      "activity": {
+        "cityId": "krakow",
+        "outcome": "complete",
+        "ready": 48,
+        "requested": 48,
+        "reused": 48
+      },
+      "lastCardChangeMs": 790.5,
+      "observedStableMs": 1313.699999988079,
+      "cardCount": 23,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 2,
+      "cityId": "tricity",
+      "readyMs": 1382.5,
+      "activityReadyMs": 1682.9000000357628,
+      "activity": {
+        "cityId": "tricity",
+        "outcome": "complete",
+        "ready": 54,
+        "requested": 54,
+        "reused": 0
+      },
+      "lastCardChangeMs": 1715.7000000476837,
+      "observedStableMs": 2216.400000035763,
+      "cardCount": 19,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 3,
+      "cityId": "tbilisi",
+      "readyMs": 651.6000000238419,
+      "activityReadyMs": 796.8000000119209,
+      "activity": {
+        "cityId": "tbilisi",
+        "outcome": "complete",
+        "ready": 25,
+        "requested": 25,
+        "reused": 0
+      },
+      "lastCardChangeMs": 817.9000000357628,
+      "observedStableMs": 1340.2000000476837,
+      "cardCount": 0,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 4,
+      "cityId": "oslo",
+      "readyMs": 1025.800000011921,
+      "activityReadyMs": 1308,
+      "activity": {
+        "cityId": "oslo",
+        "outcome": "complete",
+        "ready": 82,
+        "requested": 82,
+        "reused": 0
+      },
+      "lastCardChangeMs": 1333.8999999761581,
+      "observedStableMs": 1857.6000000238419,
+      "cardCount": 37,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 5,
+      "cityId": "riga",
+      "readyMs": 302.60000002384186,
+      "activityReadyMs": 421.7000000476837,
+      "activity": {
+        "cityId": "riga",
+        "outcome": "complete",
+        "ready": 31,
+        "requested": 31,
+        "reused": 0
+      },
+      "lastCardChangeMs": 461.80000001192093,
+      "observedStableMs": 985.6000000238419,
+      "cardCount": 4,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 6,
+      "cityId": "tallinn",
+      "readyMs": 300.9000000357628,
+      "activityReadyMs": 403.10000002384186,
+      "activity": {
+        "cityId": "tallinn",
+        "outcome": "complete",
+        "ready": 61,
+        "requested": 61,
+        "reused": 0
+      },
+      "lastCardChangeMs": 541.8000000119209,
+      "observedStableMs": 1064.9000000357628,
+      "cardCount": 15,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 7,
+      "cityId": "warsaw",
+      "readyMs": 877.3000000119209,
+      "activityReadyMs": 1279.6000000238419,
+      "activity": {
+        "cityId": "warsaw",
+        "outcome": "complete",
+        "ready": 72,
+        "requested": 72,
+        "reused": 0
+      },
+      "lastCardChangeMs": 1284.199999988079,
+      "observedStableMs": 1809.300000011921,
+      "cardCount": 40,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 8,
+      "cityId": "vilnius",
+      "readyMs": 280.80000001192093,
+      "activityReadyMs": 320.69999998807907,
+      "activity": {
+        "cityId": "vilnius",
+        "outcome": "complete",
+        "ready": 21,
+        "requested": 21,
+        "reused": 21
+      },
+      "lastCardChangeMs": 382.19999998807907,
+      "observedStableMs": 905.6000000238419,
+      "cardCount": 11,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 9,
+      "cityId": "krakow",
+      "readyMs": 558.0999999642372,
+      "activityReadyMs": 587.1999999880791,
+      "activity": {
+        "cityId": "krakow",
+        "outcome": "complete",
+        "ready": 48,
+        "requested": 48,
+        "reused": 48
+      },
+      "lastCardChangeMs": 778.8999999761581,
+      "observedStableMs": 1300.699999988079,
+      "cardCount": 23,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 10,
+      "cityId": "tricity",
+      "readyMs": 1470.199999988079,
+      "activityReadyMs": 1500.699999988079,
+      "activity": {
+        "cityId": "tricity",
+        "outcome": "complete",
+        "ready": 54,
+        "requested": 54,
+        "reused": 54
+      },
+      "lastCardChangeMs": 1696.8999999761581,
+      "observedStableMs": 2222.600000023842,
+      "cardCount": 19,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 11,
+      "cityId": "tbilisi",
+      "readyMs": 584.3000000119209,
+      "activityReadyMs": 648.0999999642372,
+      "activity": {
+        "cityId": "tbilisi",
+        "outcome": "complete",
+        "ready": 25,
+        "requested": 25,
+        "reused": 25
+      },
+      "lastCardChangeMs": 786.1999999880791,
+      "observedStableMs": 1309.5,
+      "cardCount": 0,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 12,
+      "cityId": "oslo",
+      "readyMs": 852.8999999761581,
+      "activityReadyMs": 884.8000000119209,
+      "activity": {
+        "cityId": "oslo",
+        "outcome": "complete",
+        "ready": 82,
+        "requested": 82,
+        "reused": 82
+      },
+      "lastCardChangeMs": 1074.5,
+      "observedStableMs": 1601,
+      "cardCount": 38,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 13,
+      "cityId": "riga",
+      "readyMs": 232.5999999642372,
+      "activityReadyMs": 278.30000001192093,
+      "activity": {
+        "cityId": "riga",
+        "outcome": "complete",
+        "ready": 31,
+        "requested": 31,
+        "reused": 31
+      },
+      "lastCardChangeMs": 309.69999998807907,
+      "observedStableMs": 834.8000000119209,
+      "cardCount": 4,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 14,
+      "cityId": "tallinn",
+      "readyMs": 288.39999997615814,
+      "activityReadyMs": 326.5999999642372,
+      "activity": {
+        "cityId": "tallinn",
+        "outcome": "complete",
+        "ready": 61,
+        "requested": 61,
+        "reused": 61
+      },
+      "lastCardChangeMs": 535.0999999642372,
+      "observedStableMs": 1060.0999999642372,
+      "cardCount": 15,
+      "stabilityWindowMs": 500
+    },
+    {
+      "iteration": 15,
+      "cityId": "warsaw",
+      "readyMs": 770.3999999761581,
+      "activityReadyMs": 808.5999999642372,
+      "activity": {
+        "cityId": "warsaw",
+        "outcome": "complete",
+        "ready": 72,
+        "requested": 72,
+        "reused": 72
+      },
+      "lastCardChangeMs": 1017.6999999880791,
+      "observedStableMs": 1539,
+      "cardCount": 40,
+      "stabilityWindowMs": 500
+    }
+  ],
+  "limits": "Two visits per city establish functional coverage, not per-city p95. Overnight Tbilisi may have no active urban cards."
+}

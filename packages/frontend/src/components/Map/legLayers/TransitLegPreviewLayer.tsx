@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCityDataQuery } from "../../../hooks/useCityDataQuery.ts";
 import type * as maplibregl from "maplibre-gl";
 import type { Leg, LegStatus } from "@pt/shared";
 import { useGtfsDataStore } from "../../../stores/gtfsDataStore.ts";
-import { db } from "../../../db/index.ts";
 
 interface Props {
   map: maplibregl.Map;
@@ -96,10 +95,10 @@ export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
   // key (`pre|post`) anyway so the live-query never aliases two different
   // (pre, post) tuples that happen to share one ID.
   const neighbourKey = `${preStopId ?? ""}|${postStopId ?? ""}`;
-  const neighbours = useLiveQuery(
-    async () => {
+  const neighbours = useCityDataQuery(
+    async (data) => {
       if (neighbourIds.length === 0) return [];
-      return db.gtfsStops.bulkGet(neighbourIds);
+      return data.gtfsStops.bulkGet(neighbourIds);
     },
     [neighbourKey],
   );

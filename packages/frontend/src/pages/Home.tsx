@@ -26,8 +26,6 @@ import { BikeShareStationSheet } from "../components/Map/BikeShareStationSheet.t
 import { useBikeShareStore } from "../stores/bikeShareStore.ts";
 import { useMapTapStore } from "../stores/mapTapStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { useFavoritesStore } from "../stores/favoritesStore.ts";
-import { afterPersistHydration } from "../hooks/usePersistHydrated.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
@@ -274,8 +272,8 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
 
   // Clear popup, sheet, and cached stops when city *actually changes*
   // so stale stop data doesn't fetch departures from the wrong backend.
-  // Use a ref to skip the initial mount — reset() clears IndexedDB which
-  // would destroy the persisted cache before it can be reused.
+  // Skip the initial mount so hydration can reuse the owned API snapshot.
+  // Reset only invalidates memory and pending writes; it does not clear disk.
   const prevCityRef = useRef(activeCity.id);
   useEffect(() => {
     if (prevCityRef.current === activeCity.id) return;
@@ -312,15 +310,6 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
     setSheetStop(null);
     useMapTapStore.getState().clear();
   }, [selectedBikeStationId, cancelLineLoad]);
-
-  // Migrate legacy favorites (no cityId) to the active city on mount
-  useEffect(
-    () =>
-      afterPersistHydration(useFavoritesStore.persist, () =>
-        useFavoritesStore.getState().migrateLegacyFavorites(activeCity.id),
-      ),
-    [activeCity.id],
-  );
 
   // GTFS data lifecycle (reset-on-switch vs defer-on-initial-load).
   const cityId = useCityStore((s) => s.activeCity.id);
@@ -433,6 +422,7 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
       <div className="flex-1 relative">
         <TransitMap
           stops={stops}
+          geometryStops={allStops}
           onStopClick={handleStopClick}
           onMapClick={handleMapClick}
           onMapReady={handleMapReady}

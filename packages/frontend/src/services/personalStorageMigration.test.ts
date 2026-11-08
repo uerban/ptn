@@ -7,8 +7,10 @@ import { getOrCreateInstallKey } from "./installKey.ts";
 import {
   PERSONAL_STORAGE_MARKER_KEY,
   isPersonalStorageMigrated,
+  listPersonal,
   putPersonal,
   usePersonalStorageStatus,
+  whenPersonalStorageSettled,
 } from "./personalStorage.ts";
 import {
   ACTIVITY_CACHE_PREFIXES,
@@ -22,6 +24,7 @@ import { readSealedItem } from "./sealedLocalStorage.ts";
 import { LEGACY_FAVORITES_KEY } from "./favoritesMigration.ts";
 import { DELAY_REPORTS_STORAGE_KEY, MAP_VIEWPORT_STORAGE_KEY } from "./privacyStorageKeys.ts";
 import { usePrivacyChoicesStore } from "../stores/privacyChoicesStore.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import {
   findLeaks,
   rawLocalStorageText,
@@ -94,6 +97,7 @@ async function seedLegacy(): Promise<void> {
     endpoint: stop,
     usedAt: 1_700_000_000_000,
     usedAsOrigin: true,
+    cityId: useCityStore.getState().activeCity.id,
   } as never);
   await db.savedLocations.bulkPut([
     { id: "plain", endpoint: stop, alias: "Classes", savedAt: 1_700_000_000_000 },
@@ -122,6 +126,10 @@ async function rawEverything(): Promise<string> {
 }
 
 beforeEach(async () => {
+  // Stores hydrating at import time may have started a lazy run; let it finish
+  // so it cannot mark the device converted after the reset below.
+  usePersonalStorageStatus.setState({ migration: "failed" });
+  await whenPersonalStorageSettled();
   await resetPersonalStorage({ migrated: false });
   usePrivacyChoicesStore.getState().setChoice("recents", "enabled");
   __resetRecentsCacheForTests();
@@ -169,6 +177,37 @@ describe("runPersonalStorageMigration", () => {
     expect(await readSealedItem(LEGACY_FAVORITES_KEY)).toBe(FAVORITES);
     expect(await readSealedItem(MAP_VIEWPORT_STORAGE_KEY)).toBe(VIEWPORT);
     expect(await readSealedItem(DELAY_REPORTS_STORAGE_KEY)).toBe(REPORTS);
+  });
+
+  it("moves the city of legacy records inside the sealed payload", async () => {
+    await db.recentLocations.put({
+      id: "stop:S-77",
+      endpoint: stop,
+      usedAt: 1_700_000_000_000,
+      cityId: "vilnius",
+    } as never);
+    await db.recentLocations.put({
+      id: "stop:S-88",
+      endpoint: { ...stop, stopId: "S-88" },
+      usedAt: 1_700_000_000_001,
+    } as never);
+    await db.cityUsageStats.put({
+      id: "vilnius:S-77",
+      cityId: "vilnius",
+      stopId: "S-77",
+      tapCount: 2,
+      lastTapped: 1_700_000_000_000,
+    } as never);
+
+    expect(await runPersonalStorageMigration({ cacheStorage: null, lock: NO_LOCK })).toBe("migrated");
+
+    expect(await db.cityUsageStats.count()).toBe(0);
+    const raw = (await Promise.all(["recentLocations", "personalUsage"].map(rawTableText))).join("\n");
+    expect(findLeaks(raw, ["vilnius", "S-77", "S-88"])).toEqual([]);
+    const usage = await listPersonal<{ stopId: string; cityId?: string }>("personalUsage");
+    expect(usage.map((u) => u.value)).toEqual([expect.objectContaining({ stopId: "S-77", cityId: "vilnius" })]);
+    const recents = await listPersonal<{ cityId?: string }>("recentLocations");
+    expect(recents.map((r) => r.value.cityId ?? null).sort()).toEqual(["vilnius", null].sort());
   });
 
   it("drops the geocoder dedup cache and purges activity caches only", async () => {
