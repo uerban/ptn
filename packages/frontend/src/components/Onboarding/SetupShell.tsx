@@ -124,8 +124,12 @@ export function SetupShell(props: SetupShellProps) {
 
   const selectCity = async (next: CityConfig) => {
     setBusyCityId(next.id);
+    setError(null);
     try {
       await chooseSetupCity(next, { offline: props.offline });
+    } catch {
+      setError(text("setup.city.openFailed"));
+      return;
     } finally {
       setBusyCityId(null);
     }
@@ -142,6 +146,7 @@ export function SetupShell(props: SetupShellProps) {
   // chosen for the user (the only one offered, or a stored choice) opens the
   // city step in place, so Change city never leaves the app.
   const changeCity = () => {
+    setError(null);
     const current = readHistoryState();
     if (current.step === "quick" && current.fromCity) {
       history.back();
@@ -216,21 +221,28 @@ export function SetupShell(props: SetupShellProps) {
             text={text}
           />
         ) : (
-          <CitySelection
-            cities={props.cities}
-            downloadedSizes={props.downloadedSizes}
-            installedCityIds={props.installedCityIds}
-            offline={props.offline}
-            catalogStatus={props.catalogStatus}
-            preselectedCityId={city?.id ?? props.preselectedCityId}
-            suggestedCityId={props.suggestedCityId ?? null}
-            locale={locale}
-            busyCityId={busyCityId}
-            text={text}
-            formatSize={formatSize}
-            onSelect={(next) => void selectCity(next)}
-            onRetry={() => globalThis.location.reload()}
-          />
+          <>
+            {error && (
+              <p role="alert" className="text-sm text-fg">
+                {error}
+              </p>
+            )}
+            <CitySelection
+              cities={props.cities}
+              downloadedSizes={props.downloadedSizes}
+              installedCityIds={props.installedCityIds}
+              offline={props.offline}
+              catalogStatus={props.catalogStatus}
+              preselectedCityId={city?.id ?? props.preselectedCityId}
+              suggestedCityId={props.suggestedCityId ?? null}
+              locale={locale}
+              busyCityId={busyCityId}
+              text={text}
+              formatSize={formatSize}
+              onSelect={(next) => void selectCity(next)}
+              onRetry={() => globalThis.location.reload()}
+            />
+          </>
         )}
         <LanguagePicker />
       </div>

@@ -64,6 +64,30 @@ async function instrument(page: Page, location: PermissionState, notification: P
         constructor() {}
       }
       Object.defineProperty(window, "Notification", { value: StubNotification, configurable: true });
+
+      // The Permissions API reports the same states, so code that checks it
+      // before asking sees what the prompts would answer.
+      const permissions = navigator.permissions;
+      if (permissions) {
+        const query = permissions.query.bind(permissions);
+        permissions.query = (descriptor: PermissionDescriptor) => {
+          const state =
+            descriptor.name === "geolocation"
+              ? location
+              : descriptor.name === "notifications"
+                ? notification
+                : null;
+          if (state === null) return query(descriptor);
+          return Promise.resolve({
+            name: descriptor.name,
+            state,
+            onchange: null,
+            addEventListener() {},
+            removeEventListener() {},
+            dispatchEvent: () => false,
+          } as unknown as PermissionStatus);
+        };
+      }
     },
     { location, notification },
   );

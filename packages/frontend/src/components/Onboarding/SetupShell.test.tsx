@@ -64,6 +64,22 @@ describe("SetupShell", () => {
     back.mockRestore();
   });
 
+  it("stays on the city step with a message when the city cannot be opened", async () => {
+    setup.chooseSetupCity.mockRejectedValueOnce(new Error("offline"));
+    renderShell();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Riga/ }));
+    });
+    expect(screen.getByRole("heading", { name: CITY })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toMatch(/could not be opened/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Riga/ }));
+    });
+    expect(screen.getByRole("heading", { name: QUICK })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("goes back to the city step it came from", async () => {
     const back = vi.spyOn(history, "back").mockImplementation(() => {});
     renderShell();

@@ -1,4 +1,10 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import type { PrivacyRequestField } from "@pt/shared";
 import {
@@ -40,10 +46,12 @@ export interface FlowDisclosureProps {
  * purpose, recipient and request contents come from the data-flow registry,
  * so this, onboarding and Settings describe the same flow the same way.
  *
- * Opened only by a deliberate action, so it takes focus. **Allow** grants
+ * Opened only by a deliberate action, so it takes focus: the prompt itself,
+ * never the Allow button, so a stray Enter grants nothing. **Allow** grants
  * exactly this flow (and provider); **Not now** leaves it unset; **Don't ask
  * again** records `denied` and is not offered again once the flow is denied.
- * Escape answers **Not now**.
+ * Escape answers **Not now**: anywhere on the page for the modal dialog,
+ * which also keeps Tab inside itself; within the prompt for the inline one.
  */
 export function FlowDisclosure({
   flowId,
@@ -61,7 +69,7 @@ export function FlowDisclosure({
   const privacyReady = usePrivacyNamespace();
   const headingId = useId();
   const bodyId = useId();
-  const allowRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLElement & HTMLDivElement>(null);
   const decision = useNetworkDecisionsStore(
     (s) => resolveNetworkDecision(s.decisions, flowId, providerId).value,
   );
@@ -77,18 +85,29 @@ export function FlowDisclosure({
   });
 
   useEffect(() => {
-    allowRef.current?.focus();
-    // Capture phase on window, so Escape closes this prompt and not the
+    containerRef.current?.focus();
+    if (variant !== "dialog") return;
+    // Capture phase on window, so Escape closes this modal prompt and not the
     // sheet or page underneath it.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      answerRef.current("not-now");
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        answerRef.current("not-now");
+      } else if (e.key === "Tab") {
+        keepFocusInside(containerRef.current, e);
+      }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+  }, [variant]);
+
+  const onInlineKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    answer("not-now");
+  };
 
   const recipient =
     flow?.destination === "operator"
@@ -147,7 +166,6 @@ export function FlowDisclosure({
           {text("flow.notNow")}
         </button>
         <button
-          ref={allowRef}
           type="button"
           onClick={() => answer("allowed")}
           className="min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold"
@@ -161,6 +179,9 @@ export function FlowDisclosure({
   if (variant === "inline") {
     return (
       <section
+        ref={containerRef}
+        tabIndex={-1}
+        onKeyDown={onInlineKeyDown}
         aria-labelledby={headingId}
         aria-describedby={bodyId}
         data-testid="flow-disclosure"
@@ -176,6 +197,8 @@ export function FlowDisclosure({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
       <div
+        ref={containerRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
@@ -189,4 +212,24 @@ export function FlowDisclosure({
     </div>,
     document.body,
   );
+}
+
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Wrap Tab and Shift+Tab around the dialog's own controls. */
+function keepFocusInside(container: HTMLElement | null, e: KeyboardEvent): void {
+  if (!container) return;
+  const focusable = [...container.querySelectorAll<HTMLElement>(FOCUSABLE)];
+  if (focusable.length === 0) return;
+  const first = focusable[0]!;
+  const last = focusable[focusable.length - 1]!;
+  const active = document.activeElement;
+  const inside = active instanceof Node && container.contains(active);
+  if (e.shiftKey && (!inside || active === first || active === container)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (!inside || active === last)) {
+    e.preventDefault();
+    first.focus();
+  }
 }

@@ -15,6 +15,7 @@
   "setup.city.catalogDeviceOnly": "The list of cities could not be loaded. Showing only cities whose transit data is on this device.",
   "setup.city.catalogFailed": "The list of cities could not be loaded and no city's transit data is on this device yet.",
   "setup.city.catalogFailedNext": "Check your connection, then try again.",
+  "setup.city.openFailed": "This city could not be opened. Check your connection, then try again.",
   "setup.city.retry": "Try again",
   "setup.city.locate": "Use my location",
   "setup.city.locateExplain": "Your location is used on this device only, to suggest a nearby city. Your browser asks for permission first.",
