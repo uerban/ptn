@@ -155,6 +155,12 @@ interface MockApiOptions {
    * for specs that drive setup themselves.
    */
   setup?: "complete" | "fresh";
+  /**
+   * `X-PT-Realtime` value on manifest responses: the realtime kinds the city
+   * offers (`"departures, alerts"`). Absent sends no header, which the client
+   * records as "no realtime kinds".
+   */
+  realtime?: string;
 }
 
 /**
@@ -304,7 +310,11 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
         status: 200,
         contentType: "application/json",
         // The read path reads the bundle hash from this header, not the body.
-        headers: { "X-PT-Bundle-Hash": FIXTURE_BUNDLE_HASH, etag: `"${FIXTURE_BUNDLE_HASH}"` },
+        headers: {
+          "X-PT-Bundle-Hash": FIXTURE_BUNDLE_HASH,
+          etag: `"${FIXTURE_BUNDLE_HASH}"`,
+          ...(options.realtime !== undefined ? { "X-PT-Realtime": options.realtime } : {}),
+        },
         body: JSON.stringify(buildFixtureManifest()),
       })
     );
