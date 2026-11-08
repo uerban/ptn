@@ -69,6 +69,7 @@ test("urban cards start name-only and retain resolved badges during a slow refre
       if (previous?.state === "ready") useBadgeActivityStore.getState().set("s1", {
         ...previous, windowStart: (previous.windowStart ?? 0) - 60_000,
       });
+      probe.publications = 0;
       // Expand from a single-stop view to restart the real viewport sweep.
       (window as any).__ptnMap.jumpTo({center: [25.2797, 54.6872], zoom: 17});
     }, FIXTURE_BUNDLE_HASH);
