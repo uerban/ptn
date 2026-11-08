@@ -562,6 +562,7 @@ export function HomePage() {
       <div className="flex-1 relative">
         <TransitMap
           stops={stops}
+          geometryStops={allStops}
           onStopClick={handleStopClick}
           onMapClick={handleMapClick}
           onMapReady={handleMapReady}
