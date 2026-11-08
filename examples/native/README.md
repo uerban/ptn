@@ -150,6 +150,21 @@ apply. A local-CA TLS test does not prove that your public DNS, firewall, or
 ACME issuance works; check the final public URL with a normal browser and
 `curl --fail https://transit.example.org/api/vilnius/ready` without bypassing TLS.
 
+The Caddyfile sends `Referrer-Policy: strict-origin`, because page addresses
+can name stops, lines and coordinates. If you serve the web archive through a
+different proxy, set the same header there so those addresses are never
+forwarded to other sites.
+
+## Live departures and service alerts
+
+`tripUpdatesURL` enables live departure times from a GTFS-RT TripUpdates feed.
+`serviceAlertsURL` (optional) enables service alerts from a GTFS-RT
+ServiceAlerts feed; the server polls it once a minute. Without it the alerts
+endpoint answers 404 and the app does not offer alerts for the city. Both
+accept a comma-separated list of URLs and are not supported with multi-feed
+recipes. The app asks the server for live times or alerts only after the
+rider turns that service on.
+
 ## Updates and restart
 
 Run `refresh` hourly using the same configuration. For a foreground process:
@@ -172,7 +187,7 @@ the initial example; those need separate lifecycle validation before shipping.
 
 The host publishes its configured city descriptor at `/api/cities`; the web
 archive discovers it before starting transit services. There is no default
-city: first launch offers a world map and optional location lookup.
+city: first launch offers a city list and optional location lookup.
 
 `refresh` and `serve` write the catalog and city-specific proxy configuration
 to `<stateDirectory>/public-config/`. To generate them without downloading or
@@ -183,9 +198,10 @@ command with your configured state directory when necessary.
 
 For a custom city, set `city`, `timezone`, and `cityMetadata` with `name`,
 `center` and `bbox`. Known entries in `city-presets.json` are optional
-onboarding presets, not a restriction on supported cities. Optional credits,
-route groups, excluded modes, POI mode and shared mobility can be supplied
-explicitly in the metadata. Feed and signed OSM data still need to be prepared
+onboarding presets, not a restriction on supported cities. Optional
+`countryCode` (ISO 3166-1 alpha-2, used to group and label cities in the
+setup list), credits, route groups, excluded modes, POI mode and shared
+mobility can be supplied explicitly in the metadata. Feed and signed OSM data still need to be prepared
 for the configured city; this does not make the reference Vilnius OSM builder
 a generic city builder.
 
