@@ -13,8 +13,12 @@ test("urban cards start name-only and retain resolved badges during a slow refre
   await mockApi(page, {catalogShapes: "absent", catalogNow: serviceTime});
   await page.addInitScript(() => {
     (window as any).__tileDecodeCount = 0;
+    (window as any).__activitySweeps = 0;
     new PerformanceObserver(list => {
-      for (const entry of list.getEntries()) if (entry.name === "ptn:city:tile-decode") (window as any).__tileDecodeCount++;
+      for (const entry of list.getEntries()) {
+        if (entry.name === "ptn:city:tile-decode") (window as any).__tileDecodeCount++;
+        if (entry.name === "ptn:city:badge-activity") (window as any).__activitySweeps++;
+      }
     }).observe({entryTypes: ["measure"]});
   });
   let release!: () => void;
@@ -60,6 +64,11 @@ test("urban cards start name-only and retain resolved badges during a slow refre
       });
       probe.dispose = () => {observer.disconnect(); unsubscribe();};
       await pruneToBundleHash("0".repeat(64), hash);
+      // Force a new activity window while preserving the last valid presentation.
+      const previous = useBadgeActivityStore.getState().byStop.get("s1");
+      if (previous?.state === "ready") useBadgeActivityStore.getState().set("s1", {
+        ...previous, windowStart: (previous.windowStart ?? 0) - 60_000,
+      });
       // Expand from a single-stop view to restart the real viewport sweep.
       (window as any).__ptnMap.jumpTo({center: [25.2797, 54.6872], zoom: 17});
     }, FIXTURE_BUNDLE_HASH);
@@ -78,10 +87,11 @@ test("urban cards start name-only and retain resolved badges during a slow refre
     }));
     const settledRequests = requests;
     // Both warm viewport sweeps use the same already decoded tile.
-    for (const [index, zoom] of [20, 17].entries()) {
+    for (const zoom of [20, 17]) {
+      const sweeps = await page.evaluate(() => (window as any).__activitySweeps);
       await page.evaluate(zoom => (window as any).__ptnMap.jumpTo({zoom}), zoom);
-      await expect.poll(() => page.evaluate(() => (window as any).__badgeContinuity.publications))
-        .toBeGreaterThan(settled.publications + index);
+      await expect.poll(() => page.evaluate(() => (window as any).__activitySweeps)).toBeGreaterThan(sweeps);
+      expect(await page.evaluate(() => (window as any).__badgeContinuity.publications)).toBe(settled.publications);
     }
     expect(requests).toBe(settledRequests);
     expect(await page.evaluate(() => (window as any).__tileDecodeCount)).toBe(settled.decodes);

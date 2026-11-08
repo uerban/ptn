@@ -168,7 +168,7 @@ describe("useViewportBadgeActivity", () => {
     renderHook(() => useViewportBadgeActivity());
     await vi.waitFor(() => {
       const a = useBadgeActivityStore.getState().byStop.get("S");
-      expect(a).toEqual({ state: "ready", routeIds: new Set(["R1"]) });
+      expect(a).toMatchObject({ state: "ready", routeIds: new Set(["R1"]), publicationId: "h", windowStart: expect.any(Number) });
     });
     expect(useBadgeActivityStore.getState().byStop.has("FAR")).toBe(false);
   });
@@ -292,4 +292,50 @@ it("bounds tile groups to two workers and publishes a completed group before slo
   finishes.get("S3")!({ state: "unavailable" });
   await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S3")?.state).toBe("unavailable"));
   unmount();
+});
+
+
+it("reuses a qualified verdict after A to B to A in the same publication and minute", async () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Math.floor(new Date().getTime() / 60000) * 60000 + 1000);
+  const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  const hook = renderHook(() => useViewportBadgeActivity());
+  try {
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    const original = useBadgeActivityStore.getState().byStop.get("S");
+    const originalTime = useBadgeActivityStore.getState().resolvedAt.get("S");
+    badgeCity.id = "city-b";
+    hook.rerender();
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    resolveDecodedTileForStopMock.mockClear();
+    badgeCity.id = "city-a";
+    hook.rerender();
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toBe(original));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolveDecodedTileForStopMock).not.toHaveBeenCalled();
+    expect(useBadgeActivityStore.getState().resolvedAt.get("S")).toBe(originalTime);
+  } finally {hook.unmount(); clock.mockRestore();}
+});
+
+it("recomputes recent activity after the minute or publication changes", async () => {
+  let now = Math.floor(new Date().getTime() / 60000) * 60000 + 1000;
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+  const {useViewportBadgeActivity} = await import("../../src/hooks/useViewportBadgeActivity.ts");
+  const hook = renderHook(() => useViewportBadgeActivity());
+  try {
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")?.state).toBe("ready"));
+    resolveDecodedTileForStopMock.mockClear();
+    now += 60000;
+    act(() => useMapViewportStore.getState().setViewport({north: 90, south: 0, east: 90, west: 0}, 16));
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledWith("S", undefined, expect.anything()));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toMatchObject({windowStart: Math.floor(now / 60000) * 60000}));
+    resolveDecodedTileForStopMock.mockClear();
+    badgePublication.id = "new-publication";
+    currentBundleHashMock.mockReturnValue(badgePublication.id);
+    currentManifestMock.mockReturnValue({...SHARED_MANIFEST, bundleHash: badgePublication.id});
+    hook.rerender();
+    await vi.waitFor(() => expect(resolveDecodedTileForStopMock).toHaveBeenCalledWith("S", undefined, expect.anything()));
+    await vi.waitFor(() => expect(useBadgeActivityStore.getState().byStop.get("S")).toMatchObject({publicationId: "new-publication"}));
+  } finally {hook.unmount(); clock.mockRestore();}
 });

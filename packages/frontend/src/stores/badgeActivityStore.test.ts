@@ -65,3 +65,40 @@ it("retains nearby pan history within budget and prioritizes the current viewpor
   store.retainViewport(new Set(["c"]), 2);
   expect(useBadgeActivityStore.getState().byStop.has("a")).toBe(true);
 });
+
+
+it("restores isolated city history without renewing timestamps and expires it", () => {
+  let now = 100000;
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+  try {
+    const store = useBadgeActivityStore.getState();
+    store.activateContext("a");
+    store.set("S", {state: "ready", routeIds: new Set(["A"])});
+    store.activateContext("b");
+    store.set("S", {state: "ready", routeIds: new Set(["B"])});
+    now += 1000;
+    store.activateContext("a");
+    expect(useBadgeActivityStore.getState().byStop.get("S")).toEqual({state: "ready", routeIds: new Set(["A"])});
+    expect(useBadgeActivityStore.getState().resolvedAt.get("S")).toBe(100000);
+    store.activateContext("b");
+    now += 120000;
+    store.activateContext("a");
+    expect(useBadgeActivityStore.getState().byStop.size).toBe(0);
+  } finally {clock.mockRestore();}
+});
+
+it("bounds inactive city histories and clears them with downloaded runtime data", () => {
+  const store = useBadgeActivityStore.getState();
+  for (let city = 0; city < 10; city++) {
+    store.activateContext(String(city));
+    store.setMany(Array.from({length: 600}, (_, i) => [String(i), {state: "ready" as const, routeIds: new Set<string>()}]));
+  }
+  store.activateContext("0");
+  expect(useBadgeActivityStore.getState().byStop.size).toBe(0);
+  store.activateContext("8");
+  expect(useBadgeActivityStore.getState().byStop.size).toBe(600);
+  store.activateContext("other");
+  store.clear();
+  store.activateContext("8");
+  expect(useBadgeActivityStore.getState().byStop.size).toBe(0);
+});

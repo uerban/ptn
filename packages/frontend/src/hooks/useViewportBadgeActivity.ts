@@ -8,7 +8,7 @@ import { useCityStore } from "../stores/cityStore.ts";
 import {useCityDataStore} from "../services/cityData.ts";
 import {useGtfsDataStore} from "../stores/gtfsDataStore.ts";
 import { useMapViewportStore, type MapViewportBounds } from "../stores/mapViewportStore.ts";
-import { useBadgeActivityStore, badgeActivityContext, type BadgeActivity } from "../stores/badgeActivityStore.ts";
+import { useBadgeActivityStore, badgeActivityContext, BADGE_ACTIVITY_HOLD_MS, type BadgeActivity } from "../stores/badgeActivityStore.ts";
 import { resolveDecodedTileForStop, warmManifest, currentManifest, currentBundleHash, resolveTileCoordsForLatLon } from "../services/scheduleTileReadPath.ts";
 
 const TICK_MS = 60_000;
@@ -104,6 +104,7 @@ export function useViewportBadgeActivity(): void {
     async function compute() {
       const started = performance.now();
       let readyCount = 0;
+      let reusedCount = 0;
       const now = new Date(tick() * TICK_MS);
       // Mark stops we have NO prior entry for as loading — ONE batched write so a
       // known stop is never blanked (no blink) and we don't re-render per stop.
@@ -146,7 +147,16 @@ export function useViewportBadgeActivity(): void {
       // two groups active matches the decoded memo budget and avoids walking
       // an interleaved stop-ID list that repeatedly decodes evicted tiles.
       const groups = new Map<string, StopWithLines[]>();
+      const qualified = useBadgeActivityStore.getState();
       for (const stop of inViewStops) {
+        const previous = qualified.byStop.get(stop.id);
+        const age = Date.now() - (qualified.resolvedAt.get(stop.id) ?? 0);
+        if (previous?.state === "ready" && previous.windowStart === now.getTime() &&
+            previous.publicationId === publicationId && age >= 0 && age < BADGE_ACTIVITY_HOLD_MS) {
+          readyCount++;
+          reusedCount++;
+          continue;
+        }
         const key = resolveTileCoordsForLatLon(manifest, stop.location.lat, stop.location.lon) ?? "unresolved";
         const group = groups.get(key) ?? [];
         group.push(stop);
@@ -165,7 +175,8 @@ export function useViewportBadgeActivity(): void {
             try {
               const r = await resolveDecodedTileForStop(stop.id, undefined, shared);
               activity = r.state === "ok"
-                ? { state: "ready", routeIds: activeRouteIdsFromTile({ tile: r.tile, stopId: stop.id, now, lookAheadHours, tz }) }
+                ? { state: "ready", routeIds: activeRouteIdsFromTile({ tile: r.tile, stopId: stop.id, now, lookAheadHours, tz }),
+                    windowStart: now.getTime(), publicationId }
                 : { state: "unavailable" };
             } catch { activity = { state: "unavailable" }; }
             if (activity.state === "ready") readyCount++;
@@ -185,7 +196,7 @@ export function useViewportBadgeActivity(): void {
       performance.clearMeasures(name);
       performance.measure(name, {start: started, end: performance.now(), detail: {
         cityId, outcome: readyCount === inViewStops.length ? "complete" : "partial",
-        ready: readyCount, requested: inViewStops.length,
+        ready: readyCount, requested: inViewStops.length, reused: reusedCount,
       }});
     }
 

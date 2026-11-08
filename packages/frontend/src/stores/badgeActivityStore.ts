@@ -17,7 +17,7 @@ export const BADGE_ACTIVITY_HOLD_MS = 120_000;
 
 export type BadgeActivity =
   | { state: "loading" }
-  | { state: "ready"; routeIds: ReadonlySet<string> }
+  | { state: "ready"; routeIds: ReadonlySet<string>; windowStart?: number; publicationId?: string | null }
   | { state: "unavailable" };
 
 interface BadgeActivityState {
@@ -32,12 +32,42 @@ interface BadgeActivityState {
   clear: () => void;
 }
 
+interface RecentContext {byStop: Map<string, BadgeActivity>; resolvedAt: Map<string, number>}
+const recentContexts = new Map<string, RecentContext>();
+const HISTORY_LIMIT = 4_000;
+function trimContexts(activeSize: number): void {
+  let total = [...recentContexts.values()].reduce((sum, row) => sum + row.byStop.size, 0);
+  for (const [key, row] of recentContexts) {
+    if (recentContexts.size <= 8 && total <= Math.max(0, HISTORY_LIMIT - activeSize)) break;
+    recentContexts.delete(key);
+    total -= row.byStop.size;
+  }
+}
+function recentSnapshot(byStop: Map<string, BadgeActivity>, resolvedAt: Map<string, number>, now: number): RecentContext {
+  const entries = [...byStop].filter(([id, activity]) => activity.state === "ready" && resolvedAt.has(id) &&
+    now - resolvedAt.get(id)! >= 0 && now - resolvedAt.get(id)! < BADGE_ACTIVITY_HOLD_MS);
+  return {byStop: new Map(entries), resolvedAt: new Map(entries.map(([id]) => [id, resolvedAt.get(id)!]))};
+}
+
 export const useBadgeActivityStore = create<BadgeActivityState>()((set, get) => ({
   byStop: new Map(),
   context: null,
   resolvedAt: new Map(),
   activateContext: (context) => {
-    if (get().context !== context) set({ context, byStop: new Map(), resolvedAt: new Map() });
+    const current = get();
+    if (current.context === context) return;
+    const now = Date.now();
+    if (current.context) {
+      const snapshot = recentSnapshot(current.byStop, current.resolvedAt, now);
+      recentContexts.delete(current.context);
+      if (snapshot.byStop.size) recentContexts.set(current.context, snapshot);
+    }
+    const saved = recentContexts.get(context);
+    recentContexts.delete(context);
+    const restored = saved ? recentSnapshot(saved.byStop, saved.resolvedAt, now)
+      : {byStop: new Map<string, BadgeActivity>(), resolvedAt: new Map<string, number>()};
+    trimContexts(restored.byStop.size);
+    set({context, ...restored});
   },
   set: (stopId, activity) => {
     const next = new Map(get().byStop);
@@ -45,6 +75,7 @@ export const useBadgeActivityStore = create<BadgeActivityState>()((set, get) => 
     const resolvedAt = new Map(get().resolvedAt);
     if (activity.state === "ready") resolvedAt.set(stopId, Date.now());
     else resolvedAt.delete(stopId);
+    trimContexts(next.size);
     set({ byStop: next, resolvedAt });
   },
   setMany: (entries, context) => {
@@ -63,6 +94,7 @@ export const useBadgeActivityStore = create<BadgeActivityState>()((set, get) => 
       if (a.state === "ready") resolvedAt.set(id, now);
       else resolvedAt.delete(id);
     }
+    trimContexts(next.size);
     set({ byStop: next, resolvedAt });
   },
   retainViewport: (keep, limit = 4_000) => {
@@ -84,7 +116,10 @@ export const useBadgeActivityStore = create<BadgeActivityState>()((set, get) => 
     }
     if (changed) set({ byStop: next, resolvedAt: new Map([...get().resolvedAt].filter(([id]) => keep.has(id))) });
   },
-  clear: () => set({ byStop: new Map(), context: null, resolvedAt: new Map() }),
+  clear: () => {
+    recentContexts.clear();
+    set({ byStop: new Map(), context: null, resolvedAt: new Map() });
+  },
 }));
 
 
