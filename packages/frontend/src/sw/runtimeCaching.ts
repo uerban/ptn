@@ -73,12 +73,12 @@ export const runtimeCaching = [
     // keeps them for offline use. Anchored on the exact chunk names and the
     // bundled glyph directory.
     urlPattern:
-      /\/(?:assets\/(?:vendor-map|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
+      /\/(?:assets\/(?:vendor-map|maplibre|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
     handler: "CacheFirst" as const,
     options: {
       cacheName: "map-assets",
       expiration: {
-        // One deploy's chunk, worker and glyph ranges, plus superseded hashes.
+        // One deploy's map chunks, worker and glyph ranges, plus superseded hashes.
         maxEntries: 16,
         maxAgeSeconds: 60 * 60 * 24 * 90,
       },

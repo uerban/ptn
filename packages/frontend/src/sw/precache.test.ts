@@ -65,6 +65,7 @@ describe("precache exclusions", () => {
     expect(MAP_ONLY_PRECACHE_IGNORES.every((g) => precacheGlobIgnores.includes(g))).toBe(true);
     for (const url of [
       "/assets/vendor-map-BkggAV4a.js",
+      "/assets/maplibre-CIQPymL2.js",
       "/assets/maplibre-gl-worker-Cx9_a1Zq.js",
       "/glyphs/Open%20Sans%20Regular/0-255.pbf",
       "/glyphs/Open%20Sans%20Regular/256-511.pbf",
