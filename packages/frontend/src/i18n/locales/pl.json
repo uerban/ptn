@@ -529,5 +529,7 @@
   "walk.turn.right": "Skręć w prawo",
   "walk.turn.sharp_left": "Skręć ostro w lewo",
   "walk.turn.sharp_right": "Skręć ostro w prawo",
-  "walk.turn.u_turn": "Zmiana kierunku"
+  "walk.turn.u_turn": "Zmiana kierunku",
+  "settings.all_cities": "Wszystkie miasta",
+  "settings.city_scope_description": "Ustawienia ogólne dotyczą wszystkich miast. Zapisane miejsca, grupy linii i własne kolory transportu są zapisywane osobno dla każdego miasta."
 }

@@ -536,5 +536,7 @@
   "walk.turn.right": "Sväng höger",
   "walk.turn.sharp_left": "Sväng skarpt åt vänster",
   "walk.turn.sharp_right": "Sväng skarpt höger",
-  "walk.turn.u_turn": "Vänd om"
+  "walk.turn.u_turn": "Vänd om",
+  "settings.all_cities": "Alla städer",
+  "settings.city_scope_description": "Allmänna inställningar gäller alla städer. Sparade platser, linjegrupper och egna trafikfärger sparas separat för varje stad."
 }

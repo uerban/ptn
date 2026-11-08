@@ -536,5 +536,7 @@
   "walk.turn.right": "Sving til høyre",
   "walk.turn.sharp_left": "Sving skarpt til venstre",
   "walk.turn.sharp_right": "Sving skarpt til høyre",
-  "walk.turn.u_turn": "Snu"
+  "walk.turn.u_turn": "Snu",
+  "settings.all_cities": "Alle byer",
+  "settings.city_scope_description": "Generelle innstillinger gjelder alle byer. Lagrede steder, linjegrupper og egne transportfarger lagres separat for hver by."
 }

@@ -197,6 +197,10 @@ export function SettingsPage() {
           {t("settings.title", "Settings")}
         </h1>
 
+        <p className="text-sm text-fg-muted">
+          {t("settings.city_scope_description", "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city.")}
+        </p>
+
         <GpsSettings />
 
         {/* Theme */}

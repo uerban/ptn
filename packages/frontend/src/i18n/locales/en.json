@@ -622,5 +622,7 @@
   "settings.saved_place": "Saved place",
   "settings.no_unassigned_saves": "No unassigned saved places.",
   "settings.assign_save_error": "Could not assign this saved place. Try again.",
-  "settings.saved_places_error": "Could not load saved-place recovery."
+  "settings.saved_places_error": "Could not load saved-place recovery.",
+  "settings.all_cities": "All cities",
+  "settings.city_scope_description": "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city."
 }
