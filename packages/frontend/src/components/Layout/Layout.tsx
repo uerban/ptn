@@ -9,6 +9,7 @@ import { BackendStatus } from "./BackendStatus.tsx";
 import { GeocoderStatusChip } from "./GeocoderStatusChip.tsx";
 import { PersonalStorageNotice } from "../Privacy/PersonalStorageNotice.tsx";
 import { Icon } from "../Icon.tsx";
+import { usePresentationText } from "../../i18n/presentationStrings.ts";
 
 export function Layout() {
   const [fitSearchPicker, setFitSearchPicker] = useState(false);
@@ -16,6 +17,7 @@ export function Layout() {
   const isOnline = useConnectivity();
   const { t } = useTranslation();
   const scheduleMode = useSettingsStore((s) => s.scheduleMode);
+  const presentationText = usePresentationText();
 
   return (
     <SearchPickerLayoutContext.Provider value={setFitSearchPicker}>
@@ -54,7 +56,7 @@ export function Layout() {
           }
         >
           <Icon name={scheduleMode ? "clock" : "map"} size={24} />
-          <span>{scheduleMode ? t("nav.schedule", "Schedule") : t("nav.map", "Map")}</span>
+          <span>{scheduleMode ? presentationText("presentation.navText") : t("nav.map", "Map")}</span>
         </NavLink>
         <NavLink
           to="/search"

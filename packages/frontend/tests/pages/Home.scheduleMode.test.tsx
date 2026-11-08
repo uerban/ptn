@@ -1,14 +1,15 @@
 vi.mock("../../src/services/liveLocation.ts", () => ({ liveLocation: { request: vi.fn() } }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 /**
- * Regression tests ensuring that when scheduleMode is false (the default),
- * the Home page renders the map view and NOT ScheduleHome — and that
- * switching INTO schedule-only mode disables the bike-share store, so the
- * 60 s operator poll never keeps running with the map (and the layer's only
- * off control) unmounted.
+ * The home route's dispatcher: Map mode renders the map surface and never
+ * Text mode's; Text mode renders the text surface and keeps the map module
+ * unmounted until a temporary map (`?view=map`) asks for it. Leaving the
+ * map (switching to Text mode, navigating away) disables the bike-share
+ * store, so the 60 s operator poll never keeps running with the map (and the
+ * layer's only off control) unmounted.
  */
 
 // Mutable so individual tests can flip the mode and rerender.
@@ -18,9 +19,9 @@ const lineClickState = vi.hoisted(() => ({
   cancel: vi.fn(),
 }));
 
-// ScheduleHome mock — renders a sentinel so we can detect its presence
-vi.mock("../../src/pages/ScheduleHome.tsx", () => ({
-  ScheduleHome: () => <div data-testid="schedule-home-sentinel">ScheduleHome</div>,
+// TextHome mock — renders a sentinel so we can detect its presence
+vi.mock("../../src/pages/TextHome.tsx", () => ({
+  TextHome: () => <div data-testid="text-home-sentinel">TextHome</div>,
 }));
 
 // Map and heavy map dependencies
@@ -146,8 +147,13 @@ vi.mock("../../src/stores/lineViewStore.ts", () => ({
 
 // settingsStore — key mock: scheduleMode read from the mutable hoisted state
 vi.mock("../../src/stores/settingsStore.ts", () => ({
-  useSettingsStore: (sel: any) => sel({ scheduleMode: settingsState.scheduleMode }),
-  autoDetectScheduleMode: vi.fn(),
+  useSettingsStore: Object.assign((sel: any) => sel({ scheduleMode: settingsState.scheduleMode }), {
+    getState: () => ({
+      setScheduleMode: (enabled: boolean) => {
+        settingsState.scheduleMode = enabled;
+      },
+    }),
+  }),
 }));
 
 vi.mock("../../src/hooks/useStopPreloader.ts", () => ({
@@ -210,82 +216,88 @@ vi.mock("@pt/shared", async (importOriginal) => {
   };
 });
 
-describe("Home – map mode (scheduleMode: false)", () => {
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+async function renderDispatcher(entry = "/") {
+  const { HomeDispatcher } = await import("../../src/pages/HomeDispatcher.tsx");
+  const ui = () => (
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/" element={<><HomeDispatcher /><LocationProbe /></>} />
+      </Routes>
+    </MemoryRouter>
+  );
+  const view = render(ui());
+  return { ...view, rerenderDispatcher: () => view.rerender(ui()) };
+}
+
+describe("Home dispatcher – Map mode (scheduleMode: false)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     settingsState.scheduleMode = false;
   });
 
-  it("does NOT render ScheduleHome when scheduleMode is false", async () => {
-    const { HomePage } = await import("../../src/pages/Home.tsx");
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.queryByTestId("schedule-home-sentinel")).toBeNull();
+  it("renders the TransitMap and not the text surface", async () => {
+    await renderDispatcher();
+    expect(await screen.findByTestId("transit-map")).toBeTruthy();
+    expect(screen.queryByTestId("text-home-sentinel")).toBeNull();
   });
 
-  it("renders the TransitMap when scheduleMode is false", async () => {
-    const { HomePage } = await import("../../src/pages/Home.tsx");
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByTestId("transit-map")).toBeTruthy();
+  it("ignores ?view=map: the map is the starting view already", async () => {
+    await renderDispatcher("/?view=map");
+    expect(await screen.findByTestId("transit-map")).toBeTruthy();
+    expect(screen.queryByTestId("back-to-text-btn")).toBeNull();
+    expect(screen.getByTestId("show-schedule-btn")).toBeTruthy();
   });
 });
 
-describe("Home – schedule-only mode disables bike-share polling", () => {
+describe("Home dispatcher – Text mode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    settingsState.scheduleMode = true;
+  });
+
+  it("renders the text surface without mounting the map", async () => {
+    await renderDispatcher();
+    expect(await screen.findByTestId("text-home-sentinel")).toBeTruthy();
+    expect(screen.queryByTestId("transit-map")).toBeNull();
+  });
+
+  it("opens a temporary map from ?view=map and Back to text returns without changing the starting view", async () => {
+    await renderDispatcher("/?view=map");
+    expect(await screen.findByTestId("transit-map")).toBeTruthy();
+    act(() => screen.getByTestId("back-to-text-btn").click());
+    expect(await screen.findByTestId("text-home-sentinel")).toBeTruthy();
+    expect(screen.getByTestId("location").textContent).toBe("/");
+    expect(settingsState.scheduleMode).toBe(true);
+  });
+});
+
+describe("Home dispatcher – switching to Text mode disables bike-share polling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     settingsState.scheduleMode = false;
   });
 
-  it("switching to schedule-only mode disables the bike-share store", async () => {
-    const { HomePage } = await import("../../src/pages/Home.tsx");
+  it("switching to Text mode unmounts the map and disables the bike-share store", async () => {
     const { useBikeShareStore } = await import("../../src/stores/bikeShareStore.ts");
     // Real store, forced into the enabled state a user's opt-in tap set up.
     useBikeShareStore.setState({ enabled: true });
 
-    const view = render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
+    const view = await renderDispatcher();
+    await screen.findByTestId("transit-map");
     // Map view leaves the user's opt-in alone.
     expect(useBikeShareStore.getState().enabled).toBe(true);
 
-    settingsState.scheduleMode = true;
-    // Fresh element: an identical reference would let React bail out of the
-    // re-render entirely and never re-read the settings selector.
-    view.rerender(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
+    act(() => screen.getByTestId("show-schedule-btn").click());
+    view.rerenderDispatcher();
 
-    // ScheduleHome took over the page — and the store was disabled with it,
-    // so the 60 s third-party poll cannot keep running headless.
-    expect(screen.getByTestId("schedule-home-sentinel")).toBeTruthy();
-    expect(useBikeShareStore.getState().enabled).toBe(false);
-  });
-
-  it("mounting straight into schedule-only mode leaves the store disabled", async () => {
-    settingsState.scheduleMode = true;
-    const { HomePage } = await import("../../src/pages/Home.tsx");
-    const { useBikeShareStore } = await import("../../src/stores/bikeShareStore.ts");
-    useBikeShareStore.setState({ enabled: true }); // e.g. stale from a hot reload
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
+    // The text surface took over the page — and the store was disabled with
+    // the map, so the 60 s third-party poll cannot keep running headless.
+    expect(await screen.findByTestId("text-home-sentinel")).toBeTruthy();
     expect(useBikeShareStore.getState().enabled).toBe(false);
   });
 });

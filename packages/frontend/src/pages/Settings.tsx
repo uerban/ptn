@@ -24,6 +24,7 @@ import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability
 import { useCityStore } from "../stores/cityStore.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
 import { useTranslation } from "../i18n/index.ts";
+import { usePresentationText } from "../i18n/presentationStrings.ts";
 import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
 import { LanguagePicker } from "../components/Settings/LanguagePicker.tsx";
 import { MapModeSection } from "../components/Settings/MapModeSection.tsx";
@@ -125,6 +126,7 @@ const WALK_SPEED_KMH_MAX = 10.8;
 
 export function SettingsPage() {
   const { t } = useTranslation();
+  const presentationText = usePresentationText();
   const {
     theme, setTheme,
     departuresPerLine, setDeparturesPerLine,
@@ -484,8 +486,10 @@ export function SettingsPage() {
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
             <div className="flex items-center justify-between py-3 border-b border-divider">
               <div>
-                <span id="settings-schedule-mode-label" className="text-sm text-fg">{t("settings.schedule_mode", "Schedule-only mode")}</span>
-                <p id="settings-schedule-mode-desc" className="text-xs text-fg-muted">{t("settings.schedule_mode_desc", "Text-based view without map — faster on slow connections, works with screen readers")}</p>
+                <span id="settings-schedule-mode-label" className="text-sm text-fg">{presentationText("presentation.settingsLabel")}</span>
+                <p id="settings-schedule-mode-desc" className="text-xs text-fg-muted">
+                  {presentationText("presentation.settingsDescription")} {presentationText("presentation.settingsVisionNote")}
+                </p>
               </div>
               <button
                 role="switch"

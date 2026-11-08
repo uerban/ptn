@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/index.ts";
@@ -7,7 +7,6 @@ import type { Stop } from "@pt/shared";
 import { useGeolocation } from "../hooks/useGeolocation.ts";
 import { useLineClick } from "../hooks/useLineClick.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
 import { FavoritesBar } from "../components/Favorites/FavoritesBar.tsx";
 import { DepartureSheet } from "../components/DepartureSheet/DepartureSheet.tsx";
@@ -15,12 +14,21 @@ import { NearbyStopsList } from "../components/Schedule/NearbyStopsList.tsx";
 import { useTranslation } from "../i18n/index.ts";
 import type { FavoritePlace } from "@pt/shared";
 import { Icon } from "../components/Icon.tsx";
+import { usePresentationText } from "../i18n/presentationStrings.ts";
 
 const FIRST_LAUNCH_KEY = "ptn-schedule-seen";
 
-export function ScheduleHome() {
+export interface ScheduleHomeProps {
+  /** Show map: opens the temporary map without changing the starting view. */
+  onShowMap: () => void;
+  /** Nearby departures above the stop list; receives the departure-sheet opener. */
+  renderNearbyDepartures?: (showStop: (stop: Stop) => void) => ReactNode;
+}
+
+export function ScheduleHome({ onShowMap, renderNearbyDepartures }: ScheduleHomeProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const text = usePresentationText();
   const activeCity = useCityStore((s) => s.activeCity);
   const cityId = activeCity.id;
 
@@ -88,7 +96,7 @@ export function ScheduleHome() {
   );
 
   return (
-    <main aria-label={t("schedule.main", "Schedule view")} className="flex flex-col h-full bg-surface overflow-hidden">
+    <main aria-label={text("presentation.textMode")} className="flex flex-col h-full bg-surface overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 pt-safe-top pt-4 pb-3 border-b border-divider bg-surface-raised">
         <span className="text-base font-semibold text-fg" data-testid="city-name">
@@ -105,7 +113,8 @@ export function ScheduleHome() {
           </button>
           <button
             type="button"
-            onClick={() => useSettingsStore.getState().setScheduleMode(false)}
+            onClick={onShowMap}
+            data-return-focus="show-map"
             className="p-2 rounded-lg border border-divider hover:bg-surface-overlay"
             aria-label={t("schedule.show_map", "Show map")}
             title={t("schedule.show_map", "Show map")}
@@ -158,6 +167,8 @@ export function ScheduleHome() {
         <nav aria-label={t("schedule.favorites", "Favorites")}>
           <FavoritesBar onFavoriteClick={handleFavoriteClick} />
         </nav>
+
+        {renderNearbyDepartures?.(setSelectedStop)}
 
         {/* Nearby stops */}
         <section aria-label={t("schedule.nearby", "Nearby stops")}>

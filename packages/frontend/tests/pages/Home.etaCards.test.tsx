@@ -17,7 +17,6 @@ import type { NearbyDirections, UseNearbyDirectionsArgs } from "../../src/hooks/
 // ─── Mutable mock state ──────────────────────────────────────────────────────
 
 const settingsState = vi.hoisted(() => ({
-  scheduleMode: false,
   etaCardsEnabled: true,
   etaCardsLayout: "rows",
   startupLocate: false,
@@ -93,10 +92,6 @@ vi.mock("../../src/hooks/useVisibleStops.ts", () => ({
 
 vi.mock("../../src/hooks/useViewportBadgeActivity.ts", () => ({
   useViewportBadgeActivity: () => undefined,
-}));
-
-vi.mock("../../src/pages/ScheduleHome.tsx", () => ({
-  ScheduleHome: () => <div data-testid="schedule-home-sentinel">ScheduleHome</div>,
 }));
 
 vi.mock("../../src/components/Map/TransitMap.tsx", () => ({
@@ -203,7 +198,6 @@ vi.mock("../../src/stores/lineViewStore.ts", () => ({
 
 vi.mock("../../src/stores/settingsStore.ts", () => ({
   useSettingsStore: (sel: any) => sel(settingsState),
-  autoDetectScheduleMode: vi.fn(),
 }));
 
 vi.mock("../../src/hooks/useStopPreloader.ts", () => ({ useStopPreloader: () => undefined }));
@@ -344,7 +338,6 @@ function rtRequests(): string[] {
 beforeEach(() => {
   locationState.snapshot = { ...locationState.snapshot, position: null };
   vi.clearAllMocks();
-  settingsState.scheduleMode = false;
   settingsState.etaCardsEnabled = true;
   settingsState.etaCardsLayout = "rows";
   guidanceState.phase = "idle";
@@ -510,17 +503,6 @@ describe("Home – ETA strip", () => {
       geolocate(USER);
       expect(lastHookArgs().enabled).toBe(false);
       expect(screen.queryByTestId("eta-cards")).toBeNull();
-    });
-
-    it("in schedule mode, although the last GPS fix is still known", () => {
-      const view = renderHome();
-      geolocate(USER);
-      expect(lastHookArgs().enabled).toBe(true);
-
-      settingsState.scheduleMode = true;
-      rerenderHome(view);
-      expect(screen.getByTestId("schedule-home-sentinel")).toBeTruthy();
-      expect(lastHookArgs()).toEqual({ enabled: false, position: USER, visibleStops: [S, R] });
     });
   });
 });

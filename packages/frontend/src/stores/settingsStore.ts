@@ -128,6 +128,7 @@ interface SettingsState {
   maxPopupLines: number;
   urbanMode: boolean;
   urbanLookaheadHours: number;
+  /** The starting view is Text mode (the persisted name predates the term). */
   scheduleMode: boolean;
   accessibilityScheme: AccessibilityScheme;
   highContrastEnabled: boolean;
@@ -786,31 +787,6 @@ function applyA11yScheme(scheme: AccessibilityScheme) {
 
 function applyVariant(variant: RouteSearchVariant, mobility: MobilityProfile) {
   document.documentElement.setAttribute("data-variant", effectiveVariant(variant, mobility));
-}
-
-/** Auto-enable schedule mode on slow connections (2G/slow-2G) */
-export function autoDetectScheduleMode(): void {
-  const conn = (navigator as Navigator & {
-    connection?: { effectiveType?: string; saveData?: boolean };
-  }).connection;
-  if (!conn) return; // Safari/Firefox don't support Network Information API
-  // Only auto-enable if the user hasn't explicitly toggled schedule mode
-  const state = useSettingsStore.getState();
-  if (state.scheduleMode) return; // Already enabled, don't override
-  // Check if user has ever explicitly set this preference
-  try {
-    const stored = localStorage.getItem("ptn-settings");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed?.state?.scheduleMode !== undefined) return; // User has set an explicit preference
-    }
-  } catch {
-    // If we can't read localStorage, skip auto-detection
-    return;
-  }
-  if (conn.effectiveType === "2g" || conn.effectiveType === "slow-2g" || conn.saveData === true) {
-    useSettingsStore.getState().setScheduleMode(true);
-  }
 }
 
 // Apply theme and accessibility scheme on load

@@ -29,9 +29,7 @@ import { useCityStore } from "../stores/cityStore.ts";
 import { useFavoritesStore } from "../stores/favoritesStore.ts";
 import { afterPersistHydration } from "../hooks/usePersistHydrated.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
-import { useRtStore } from "../stores/rtStore.ts";
-import { autoDetectScheduleMode, useSettingsStore } from "../stores/settingsStore.ts";
-import { ScheduleHome } from "./ScheduleHome.tsx";
+import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
 import { useLineViewStore } from "../stores/lineViewStore.ts";
 import { useLineClick } from "../hooks/useLineClick.ts";
@@ -42,21 +40,17 @@ import { RiderModePrompt } from "../components/Guidance/RiderModePrompt.tsx";
 import { RouteOverlay } from "../components/Map/RouteOverlay.tsx";
 import { UserPositionMarker } from "../components/Map/UserPositionMarker.tsx";
 import { TransferBadge } from "../components/Map/TransferBadge.tsx";
-import { liveLocation } from "../services/liveLocation.ts";
 import { useWatchPosition } from "../hooks/useWatchPosition.ts";
 import { useDeviceHeading } from "../hooks/useDeviceHeading.ts";
-import { useGuidanceLegProgress } from "../hooks/useGuidanceLegProgress.ts";
-import { useRiderModeDetection } from "../hooks/useRiderModeDetection.ts";
 import { useMapGuidance } from "../hooks/useMapGuidance.ts";
-import { useRiderDashboardData } from "../hooks/useRiderDashboardData.ts";
 import { findStopContextCandidates } from "../hooks/useRiderModeDetection.ts";
-import { useTripNotifications } from "../hooks/useTripNotifications.ts";
+import { useGuidanceSession } from "../components/Guidance/GuidanceSession.tsx";
+import { TextModeButton } from "../presentation/TextModeButton.tsx";
 import { GuidanceAlerts } from "../components/Guidance/GuidanceAlerts.tsx";
 import { ETACards, type EtaStopInfo } from "../components/Map/ETACards.tsx";
 import { MapObstacle } from "../components/Map/MapObstacle.tsx";
 import { haversineDistance } from "../utils/geo.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
-import { makeGetNextDeparture } from "../services/nextDeparture.ts";
 import type { StopWithLines, FavoritePlace, RiderCandidate, Departure } from "@pt/shared";
 import {
   GTFS_CLIENT_REFRESH_INTERVAL_MS,
@@ -68,10 +62,14 @@ import {
 // while the sheet stays open showing another stop's full timetable.
 // ---------------------------------------------------------------------------
 
-export function HomePage() {
+export interface HomePageProps {
+  /** Set when the map is a temporary view opened from Text mode. */
+  onBackToText?: () => void;
+}
+
+export function HomePage({ onBackToText }: HomePageProps = {}) {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const scheduleMode = useSettingsStore((s) => s.scheduleMode);
 
   // The same foreground position feeds the map, nearby stops, and guidance.
   const watchPos = useWatchPosition(true);
@@ -87,7 +85,7 @@ export function HomePage() {
   // card badges are sourced from the complete tile data (read by useVisibleStops).
   useViewportBadgeActivity();
   // Schedule nearby results stay entirely local, even with foreground GPS.
-  useStopPreloader(scheduleMode ? null : geoPosition, watchPos.requestId);
+  useStopPreloader(geoPosition, watchPos.requestId);
   const activeCity = useCityStore((s) => s.activeCity);
 
   // Map instance is state, not ref, so overlays re-render when the map's
@@ -104,15 +102,8 @@ export function HomePage() {
   const legStatuses = useGuidanceStore((s) => s.legStatuses);
   const currentLegIndex = useGuidanceStore((s) => s.currentLegIndex);
   const isNavigating = guidancePhase !== "idle";
-  useEffect(() => {
-    if (isNavigating) liveLocation.request("navigation");
-  }, [isNavigating]);
 
   const { heading } = useDeviceHeading(isNavigating);
-
-  // Progress tracking and rider mode detection
-  useGuidanceLegProgress(watchPos.position, watchPos.speed);
-  useRiderModeDetection(watchPos.position, watchPos.speed);
 
   // Map guidance (zoom-to-leg, auto-follow, rider bearing)
   const { zoomToLeg } = useMapGuidance(
@@ -137,119 +128,8 @@ export function HomePage() {
     useGuidanceStore.getState().exitRiderMode();
   }, []);
 
-  // --- Rider dashboard data sourcing ---
-  const riderTripId = useGuidanceStore((s) => s.riderTripId);
-  const transitProgress = useGuidanceStore((s) => s.transitProgress);
-  const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
-  const currentLeg = guidanceItinerary?.legs[currentLegIndex] ?? null;
-
-  // Adapt RaptorIndex (array/map structure) to the interface useRiderDashboardData expects
-  const dashboardIndex = useMemo(() => {
-    if (!raptorIndex) return null;
-    return {
-      getRouteStops: (routeId: string) => {
-        const idx = raptorIndex.routeIdToIdx.get(routeId);
-        return idx !== undefined ? raptorIndex.routes[idx].stopIds : [];
-      },
-      getStopName: (stopId: string) => stopId,
-      routesAtStop: (stopId: string) => {
-        const idxs = raptorIndex.routesAtStop.get(stopId);
-        return idxs ? idxs.map((i) => raptorIndex.routes[i].id) : [];
-      },
-      getRouteShortName: (routeId: string) => {
-        const idx = raptorIndex.routeIdToIdx.get(routeId);
-        return idx !== undefined ? raptorIndex.routes[idx].shortName : routeId;
-      },
-    };
-  }, [raptorIndex]);
-
-  // Background trip notifications (no UI — side-effects only)
-  useTripNotifications();
-
-  const userStopIndex = transitProgress
-    ? Math.max(0, (currentLeg?.intermediateStops ?? 0) + 1 - transitProgress.stopsRemaining)
-    : 0;
-
-  // Real RT-aware getNextDeparture for the dashboard. Closes D-018: until
-  // PR D landed we passed `{}` here, so connecting departures fell back
-  // to the static -1 path and were silently filtered out by the
-  // `>= 0` guard in useRiderDashboardData.
-  //
-  // Shape adapter: `makeGetNextDeparture` accepts a deliberately-narrow
-  // `RaptorIndexLite`. The mapping passes through everything the
-  // factory needs from the real RaptorIndex — including per-trip
-  // `headsign` so the dashboard chip can show the *winning* trip's
-  // direction (a route with both inbound and outbound trips would
-  // otherwise always show one direction). The factory uses real
-  // `Date.now()` (default) and derives both the service-day calendar
-  // and midnight-relative seconds internally — no callsite clock
-  // gymnastics required.
-  const rtDashboardAdapter = useMemo(() => {
-    if (!raptorIndex) return {};
-    const liteTrips = (trips: (typeof raptorIndex.routes)[number]["trips"]) =>
-      trips.map((t) => ({
-        tripId: t.tripId,
-        serviceId: t.serviceId,
-        headsign: t.headsign,
-        departureSecs: t.departureSecs,
-        // Key into `frequenciesByTrip` — without it, frequency-based
-        // trips would surface their template clock times as departures.
-        ptbTripIdx: t.ptbTripIdx,
-      }));
-    const liteIndex = {
-      routes: raptorIndex.routes.map((r) => ({
-        id: r.id,
-        shortName: r.shortName,
-        stopIds: r.stopIds,
-        // Forwarded so `findStopIdxInRoute` can fall back to per-direction
-        // patterns at return-only stops on bidirectional routes — without
-        // this, the dashboard would still mask sibling-surface stops.
-        directionPatterns: r.directionPatterns,
-        trips: liteTrips(r.trips),
-      })),
-      routeIdToIdx: raptorIndex.routeIdToIdx,
-      routesAtStop: raptorIndex.routesAtStop,
-      services: raptorIndex.services,
-      // Pattern-exact source (PR #395 follow-up): with these forwarded,
-      // displayed times at pattern-covered stops come from the pattern's
-      // own columns instead of the canonical+positional approximation
-      // (no more `~` at return-direction stops).
-      patterns: raptorIndex.patterns?.map((p) => ({
-        id: p.id,
-        shortName: p.shortName,
-        stopIds: p.stopIds,
-        trips: liteTrips(p.trips),
-      })),
-      patternsAtStop: raptorIndex.patternsAtStop,
-      frequenciesByTrip: raptorIndex.frequenciesByTrip,
-    };
-    const fn = makeGetNextDeparture(
-      liteIndex,
-      {
-        getTripDelay: (tripId: string) =>
-          useRtStore.getState().getTripDelay(tripId),
-        getReceivedAt: (tripId: string) =>
-          useRtStore.getState().getReceivedAt(tripId),
-      },
-      undefined,
-      // Feed tz so a cross-tz device's "now" lands on the city's service day.
-      activeCity.tz,
-    );
-    return { getNextDeparture: fn };
-  }, [raptorIndex, activeCity.tz]);
-
-  const { upcomingStops, connectingDepartures } = useRiderDashboardData(
-    riderTripId,
-    currentLeg?.tripId ?? null,
-    userStopIndex,
-    dashboardIndex,
-    rtDashboardAdapter,
-  );
-
-  // Auto-detect slow connections and enable schedule mode if needed
-  useEffect(() => {
-    autoDetectScheduleMode();
-  }, []);
+  // --- Rider dashboard data (progress tracking runs in GuidanceSessionProvider) ---
+  const { currentLeg, upcomingStops, connectingDepartures } = useGuidanceSession();
 
   // --- Stop-context rider mode prompt ---
   const [stopContextCandidates, setStopContextCandidates] = useState<RiderCandidate[]>([]);
@@ -463,31 +343,24 @@ export function HomePage() {
   const startupLocate = useSettingsStore((s) => s.startupLocate);
 
   // Leaving the map view turns the bike layer off — same session-only
-  // privacy stance as the city-switch disable above. Two ways to leave:
-  // schedule-only mode swaps this page's body for ScheduleHome, and
-  // navigating away (/search, /settings, a line view) unmounts Home
+  // privacy stance as the city-switch disable above. Switching to Text mode
+  // and navigating away (/search, /settings, a line view) both unmount Home
   // entirely. Either way the map, the bike toggle, and the layer are gone,
   // so without the disable the store's 60 s poll would keep hitting the
   // third-party operator with nothing visible on screen and no off control
   // anywhere. The unmount cleanup also means returning to Home always
   // finds the chip OFF: opt-in is per-visit, never an auto-refetch.
-  useEffect(() => {
-    if (scheduleMode) {
-      useBikeShareStore.getState().disable();
-    }
-    return () => {
-      useBikeShareStore.getState().disable();
-    };
-  }, [scheduleMode]);
+  useEffect(() => () => {
+    useBikeShareStore.getState().disable();
+  }, []);
 
   // --- ETA Cards: nearest stop's lines, both directions ---------------------
-  // Off in schedule mode (no map) and while the departure sheet, guidance or a
+  // Off while the departure sheet, guidance or a
   // bike station takes the bottom slot: the hook then fetches nothing, not even
   // the nearest stop. The stop popup, the trip sheet and the line view only
   // hide the strip (below), so it reappears without a refetch.
   const etaEnabled =
     etaCardsEnabled &&
-    !scheduleMode &&
     !isNavigating &&
     !sheetStop &&
     selectedBikeStationId === null;
@@ -522,10 +395,6 @@ export function HomePage() {
     openTrip(departure, stop);
   }, [openTrip]);
 
-  if (scheduleMode) {
-    return <ScheduleHome />;
-  }
-
   return (
     <div className="relative h-full flex flex-col" data-sheet={sheetStop || tripTarget ? "" : undefined}>
       {/* Floating search bar */}
@@ -548,16 +417,7 @@ export function HomePage() {
           </span>
           <ModeToggle />
           <BikeShareToggle />
-          <button
-            type="button"
-            onClick={() => useSettingsStore.getState().setScheduleMode(true)}
-            className="p-2 rounded-lg bg-surface-raised shadow-1 hover:bg-surface-overlay"
-            aria-label={t("home.show_schedule", "Show schedule")}
-            title={t("home.show_schedule", "Show schedule")}
-            data-testid="show-schedule-btn"
-          >
-            <Icon name="clock" className="text-fg-secondary" />
-          </button>
+          <TextModeButton onBackToText={onBackToText} />
         </div>
       </MapObstacle>
 
