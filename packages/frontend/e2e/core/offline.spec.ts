@@ -30,6 +30,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Step 3: Reload -- should serve from cache
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -77,6 +79,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Track any network requests that escape (should be none for routing)
     const networkRequests: string[] = [];
@@ -135,6 +139,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Track network requests to verify no map tiles requested
     const tileRequests: string[] = [];
