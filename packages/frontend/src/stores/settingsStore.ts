@@ -2,6 +2,7 @@ import { toggleRouteGroupSelection, type RouteGroup } from "../services/routeGro
 import { create } from "zustand";
 import { LOOSE_POI_CATEGORIES, sanitizePoiCategories, type LoosePoiCategory } from "../config/poiCategories.ts";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 import type { TransportMode } from "@pt/shared";
 import {
   DEFAULT_URBAN_LOOKAHEAD_HOURS,
@@ -604,6 +605,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "ptn-settings",
+      storage: createTolerantJSONStorage(),
       merge: (persisted, current) => {
         const stored = persisted as Partial<SettingsState> & { accessibilityScheme?: string } | undefined;
         const validThemes: ThemeMode[] = ["light", "dark", "system"];

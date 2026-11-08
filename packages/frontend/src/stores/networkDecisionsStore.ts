@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 import {
   decisionKey,
   NETWORK_DECISIONS_SCHEMA_VERSION,
@@ -67,6 +68,7 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
     }),
     {
       name: NETWORK_DECISIONS_STORAGE_KEY,
+      storage: createTolerantJSONStorage(),
       version: NETWORK_DECISIONS_SCHEMA_VERSION,
       partialize: (state) => ({ decisions: state.decisions }),
       migrate: (persisted) => {

@@ -232,14 +232,23 @@ export function readOnboardingRecord(
   } catch {
     return { status: "unavailable" };
   }
-  if (text === null) return { status: "missing" };
+  const unsaved = unsavedRecords.get(storage);
+  if (text === null) return unsaved ? { status: "ok", record: unsaved } : { status: "missing" };
   try {
     const record = sanitizeOnboardingRecord(JSON.parse(text));
-    return record ? { status: "ok", record } : { status: "corrupt" };
+    if (record) return { status: "ok", record };
   } catch {
-    return { status: "corrupt" };
+    // Unreadable, as below.
   }
+  return unsaved ? { status: "ok", record: unsaved } : { status: "corrupt" };
 }
+
+/**
+ * Records the browser refused to store (storage full or read-only), kept for
+ * this session so a failed write never sends the user back through setup or
+ * blocks the app. They are not stored, so the next launch classifies again.
+ */
+const unsavedRecords = new WeakMap<object, OnboardingRecord>();
 
 /** Persist the whole record with one `setItem`. Returns false on failure. */
 export function writeOnboardingRecord(
@@ -249,7 +258,9 @@ export function writeOnboardingRecord(
   if (!storage) return false;
   try {
     storage.setItem(ONBOARDING_RECORD_KEY, JSON.stringify(record));
+    unsavedRecords.delete(storage);
   } catch {
+    unsavedRecords.set(storage, record);
     return false;
   }
   for (const listener of writeListeners) {

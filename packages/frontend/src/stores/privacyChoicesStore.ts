@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 
 export const OPTIONAL_STORAGE_CATEGORIES = [
   "recents",
@@ -73,6 +74,7 @@ export const usePrivacyChoicesStore = create<PrivacyChoicesState>()(
     }),
     {
       name: "ptn-privacy-choices",
+      storage: createTolerantJSONStorage(),
       version: 1,
       partialize: (state) => ({ choices: state.choices }),
       // No optional category is accepted unless it contains a current

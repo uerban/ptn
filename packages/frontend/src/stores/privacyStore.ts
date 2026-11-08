@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 import {
   AXIS_STRICTNESS_ORDER,
   effectivePolicy,
@@ -197,6 +198,7 @@ export const usePrivacyStore = create<PrivacyState>()(
     }),
     {
       name: "ptn-privacy",
+      storage: createTolerantJSONStorage(),
       // Only `level` and `overrides` persist. `prefetchedCities` stays
       // in-memory per spec ("ephemeral") so every reload re-runs the tile
       // prefetch defense.

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 import { CITIES, type CityConfig, getAvailableCities } from "../config/cities.ts";
 
 // Re-export so existing import paths keep working.
@@ -22,6 +23,7 @@ export const useCityStore = create<CityState>()(
     }),
     {
       name: "ptn-city",
+      storage: createTolerantJSONStorage(),
       // Keep only identity on disk; metadata comes from the current catalog.
       partialize: (state) => ({currentCityId: state.activeCity.id}),
       merge: (persisted, current) => {
