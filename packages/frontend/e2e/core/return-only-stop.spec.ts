@@ -33,7 +33,7 @@ test.describe("Return-only stop on bidirectional route @mock-api", () => {
     await page.goto("/");
 
     await expect(
-      page.locator("main[aria-label='Text mode']"),
+      page.locator("section[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Wait for GTFS sync to populate stopGroups in IndexedDB and the list

@@ -125,7 +125,7 @@ test.describe("Offline behavior @offline", () => {
 
     // Wait for schedule view to render with nearby stops
     await expect(
-      page.locator("main[aria-label='Text mode']"),
+      page.locator("section[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Wait for GTFS data to sync into IndexedDB
@@ -156,7 +156,7 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 4: Schedule view should render from cache
     await expect(
-      page.locator("main[aria-label='Text mode']"),
+      page.locator("section[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Step 5: Nearby stops list should be visible (data from IndexedDB)

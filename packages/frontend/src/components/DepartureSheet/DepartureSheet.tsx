@@ -152,14 +152,15 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
       {/* Drag handle */}
-      <div
+      <button
+        type="button"
         data-testid="sheet-handle"
-        className="flex justify-center pt-2 pb-1 cursor-pointer"
+        className="flex w-full justify-center pt-2 pb-1 min-h-6 cursor-pointer"
         onClick={cycleHeight}
         aria-label={height === "peek" ? "Expand sheet" : height === "half" ? "Expand sheet" : "Collapse sheet"}
       >
-        <div className="w-10 h-1 rounded-full bg-sheet-handle" />
-      </div>
+        <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-sheet-handle" />
+      </button>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-divider">

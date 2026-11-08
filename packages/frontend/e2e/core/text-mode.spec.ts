@@ -52,7 +52,7 @@ test.describe("Text mode @mock-api", () => {
     await startInTextMode(page);
 
     await page.goto("/");
-    await expect(page.locator("main[aria-label='Text mode']")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 10_000 });
 
     await page.goto(`/search?${PTB_MATCHED_STOP_QUERY}`);
     const card = page.getByTestId("itinerary-card").first();
@@ -112,7 +112,7 @@ test.describe("Text mode @mock-api", () => {
     await mockApi(page);
     await startInTextMode(page);
     await page.goto("/");
-    const textMain = page.locator("main[aria-label='Text mode']");
+    const textMain = page.locator("section[aria-label='Text mode']");
     await expect(textMain).toBeVisible({ timeout: 10_000 });
     const showMap = page.getByTestId("show-map-btn");
 
@@ -248,13 +248,13 @@ test.describe("Text mode production build @offline", () => {
     await startInTextMode(page);
 
     await page.goto("/");
-    await expect(page.locator("main[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
     });
     // Second load runs under the service worker's control.
     await page.reload();
-    await expect(page.locator("main[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
     expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
 
     await page.goto(`/search?${PTB_MATCHED_STOP_QUERY}`);

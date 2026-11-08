@@ -904,11 +904,13 @@ export function SettingsPage() {
 
         {/* Advanced toggle */}
         <button
+          type="button"
+          aria-expanded={showAdvanced}
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="w-full py-3 text-sm font-medium text-accent hover:bg-accent/10 rounded-lg transition-colors flex items-center justify-center gap-1"
         >
           {t("settings.advanced", "Advanced")}
-          <span className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`}>▼</span>
+          <span aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${showAdvanced ? "rotate-180" : ""}`}>▼</span>
         </button>
 
         {showAdvanced && (
