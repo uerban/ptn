@@ -7,7 +7,7 @@ import {
   subscribeRealtimeAvailability,
 } from "../../services/realtimeAvailability.ts";
 import type { StartMode } from "../../services/onboardingRecord.ts";
-import { chooseSetupCity, completeSetup } from "../../setup/completeSetup.ts";
+import { activateSetupCity, chooseSetupCity, completeSetup } from "../../setup/completeSetup.ts";
 import { useSetupText } from "../../setup/setupStrings.ts";
 import type { SetupMode } from "../../setup/startupPlan.ts";
 import { CitySelection, type CatalogStatus } from "./CitySelection.tsx";
@@ -17,6 +17,9 @@ export interface SetupShellProps {
   readonly mode: SetupMode;
   readonly initialStep: "city" | "quick";
   readonly preselectedCityId: string | null;
+  /** Suggested on the city step from the device's time zone; never chosen
+   * on that basis. */
+  readonly suggestedCityId?: string | null;
   readonly cities: readonly CityConfig[];
   readonly downloadedSizes: ReadonlyMap<string, number>;
   readonly installedCityIds: ReadonlySet<string>;
@@ -35,6 +38,8 @@ type Step = "city" | "quick";
 interface HistorySetupState {
   readonly step?: Step;
   readonly startMode?: StartMode;
+  /** The second step was pushed over a city step in this history. */
+  readonly fromCity?: boolean;
 }
 
 const HISTORY_KEY = "ptnSetup";
@@ -60,7 +65,7 @@ function writeHistoryState(next: HistorySetupState, push = false): void {
 
 export function SetupShell(props: SetupShellProps) {
   const text = useSetupText();
-  const { formattingLocale } = useTranslation();
+  const { formattingLocale, locale } = useTranslation();
   const restored = useMemo(readHistoryState, []);
   const [city, setCity] = useState<CityConfig | null>(
     () => props.cities.find((c) => c.id === props.preselectedCityId) ?? null,
@@ -75,7 +80,6 @@ export function SetupShell(props: SetupShellProps) {
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
-  const pushedQuickStep = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
 
@@ -89,7 +93,6 @@ export function SetupShell(props: SetupShellProps) {
     const onPop = () => {
       const state = readHistoryState();
       setStep(state.step === "quick" && city ? "quick" : "city");
-      pushedQuickStep.current = state.step === "quick";
     };
     globalThis.addEventListener("popstate", onPop);
     return () => globalThis.removeEventListener("popstate", onPop);
@@ -131,13 +134,16 @@ export function SetupShell(props: SetupShellProps) {
       props.onDone();
       return;
     }
-    writeHistoryState({ step: "quick", startMode }, true);
-    pushedQuickStep.current = true;
+    writeHistoryState({ step: "quick", startMode, fromCity: true }, true);
     setStep("quick");
   };
 
+  // Back returns to the city step only when one is behind this entry; a city
+  // chosen for the user (the only one offered, or a stored choice) opens the
+  // city step in place, so Change city never leaves the app.
   const changeCity = () => {
-    if (pushedQuickStep.current) {
+    const current = readHistoryState();
+    if (current.step === "quick" && current.fromCity) {
       history.back();
       return;
     }
@@ -154,6 +160,8 @@ export function SetupShell(props: SetupShellProps) {
     setCommitting(true);
     setError(null);
     try {
+      // A city setup did not ask about is selected only now, with no request.
+      if (city) await activateSetupCity(city);
       await completeSetup({ ...choice, startMode });
     } catch {
       setCommitting(false);
@@ -202,6 +210,7 @@ export function SetupShell(props: SetupShellProps) {
             onStartModeChange={changeStartMode}
             onChoose={(choice) => void choose(choice)}
             onChangeCity={changeCity}
+            downloadsCity={!props.installedCityIds.has(city.id)}
             busy={committing}
             error={error}
             text={text}
@@ -214,6 +223,8 @@ export function SetupShell(props: SetupShellProps) {
             offline={props.offline}
             catalogStatus={props.catalogStatus}
             preselectedCityId={city?.id ?? props.preselectedCityId}
+            suggestedCityId={props.suggestedCityId ?? null}
+            locale={locale}
             busyCityId={busyCityId}
             text={text}
             formatSize={formatSize}

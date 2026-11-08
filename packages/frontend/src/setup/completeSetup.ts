@@ -16,14 +16,21 @@ export async function chooseSetupCity(
   city: CityConfig,
   options: { offline: boolean; waitMs?: number },
 ): Promise<void> {
-  const { useCityStore } = await import("../stores/cityStore.ts");
-  useCityStore.getState().setActiveCity(city);
+  await activateSetupCity(city);
   if (options.offline) return;
   const { warmManifest } = await import("../services/scheduleTileReadPath.ts");
   await Promise.race([
     warmManifest(),
     new Promise<void>((resolve) => setTimeout(resolve, options.waitMs ?? MANIFEST_WAIT_MS)),
   ]);
+}
+
+/** Make `city` the selected city without any request. Setup uses this when it
+ * starts with a city it did not ask about (the only one offered). */
+export async function activateSetupCity(city: CityConfig): Promise<void> {
+  const { useCityStore } = await import("../stores/cityStore.ts");
+  // Always written, so the choice is stored even when it is the default.
+  useCityStore.getState().setActiveCity(city);
 }
 
 /** Presentation written by setup. Both modes use the minimal offline map:

@@ -7,7 +7,7 @@
 import { installCityCatalog, type CityConfig } from "../config/cities.ts";
 import { readOnboardingRecord } from "../services/onboardingRecord.ts";
 import type { CatalogStatus } from "../components/Onboarding/CitySelection.tsx";
-import { planStartup } from "./startupPlan.ts";
+import { deviceTimeZone, planStartup } from "./startupPlan.ts";
 
 export interface StartupGateInput {
   /** The host's catalog; empty when discovery failed without a cached copy. */
@@ -162,6 +162,7 @@ export async function runStartupGate(input: StartupGateInput): Promise<void> {
     savedCityId: restoredCityId(cities),
     installedCityIds: device.installed,
     offline,
+    timeZone: deviceTimeZone(),
   });
 
   if (plan.kind === "enter") return enterCity(cities, plan.cityId);
@@ -171,6 +172,7 @@ export async function runStartupGate(input: StartupGateInput): Promise<void> {
     mode: plan.mode,
     initialStep: plan.initialStep,
     preselectedCityId: plan.preselectedCityId,
+    suggestedCityId: plan.suggestedCityId ?? null,
     cities,
     downloadedSizes: new Map(
       device.records.flatMap((r) => (r.sizeBytes === undefined ? [] : [[r.cityId, r.sizeBytes] as const])),

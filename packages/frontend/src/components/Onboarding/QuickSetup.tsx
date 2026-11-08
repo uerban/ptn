@@ -20,6 +20,8 @@ export interface QuickSetupProps {
   readonly onChoose: (choice: QuickSetupChoice) => void;
   /** Absent when the city cannot be changed from here. */
   readonly onChangeCity?: () => void;
+  /** The city's transit data is not on this device yet, so starting downloads it. */
+  readonly downloadsCity?: boolean;
   readonly busy: boolean;
   readonly error: string | null;
   readonly text: SetupText;
@@ -74,6 +76,11 @@ export function QuickSetup(props: QuickSetupProps) {
           >
             {text("setup.quick.changeCity")}
           </button>
+        )}
+        {props.downloadsCity && (
+          <p className="basis-full text-sm text-fg-secondary">
+            {text("setup.quick.download", { city: cityName })}
+          </p>
         )}
       </div>
 

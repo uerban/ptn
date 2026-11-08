@@ -17,6 +17,8 @@ export interface StartupInput {
   /** Cities whose transit data is on this device (downloaded or cached). */
   readonly installedCityIds: ReadonlySet<string>;
   readonly offline: boolean;
+  /** The device's IANA time zone, used only to suggest a city. */
+  readonly timeZone?: string | null;
 }
 
 export type SetupMode =
@@ -32,6 +34,8 @@ export type StartupPlan =
       readonly mode: SetupMode;
       readonly initialStep: "city" | "quick";
       readonly preselectedCityId: string | null;
+      /** A city suggested on the city step (never chosen on that basis). */
+      readonly suggestedCityId?: string;
     };
 
 /** A city can be opened when the catalog lists it and, offline, when its
@@ -43,6 +47,23 @@ export function isCityOpenable(
 ): boolean {
   if (installedCityIds.has(city.id)) return true;
   return !offline && city.available !== false;
+}
+
+/**
+ * The one openable city whose time zone is the device's, if exactly one
+ * matches. Computed on the device; nothing is requested.
+ */
+export function suggestCityByTimeZone(
+  cities: readonly CityConfig[],
+  timeZone: string | null | undefined,
+  installedCityIds: ReadonlySet<string>,
+  offline: boolean,
+): CityConfig | null {
+  if (!timeZone) return null;
+  const matches = cities.filter(
+    (city) => city.tz === timeZone && isCityOpenable(city, installedCityIds, offline),
+  );
+  return matches.length === 1 ? matches[0]! : null;
 }
 
 export function planStartup(input: StartupInput): StartupPlan {
@@ -66,10 +87,36 @@ export function planStartup(input: StartupInput): StartupPlan {
   // through deletion) is preselected; setup still runs.
   const preselected =
     saved ?? byId(input.record?.install.preselectedCityId);
+  if (preselected && openable(preselected)) {
+    return { kind: "setup", mode: "full", initialStep: "quick", preselectedCityId: preselected.id };
+  }
+  // With only one city to choose from, there is no choice to ask about.
+  const openableCities = input.cities.filter((city) => openable(city));
+  if (openableCities.length === 1) {
+    return {
+      kind: "setup",
+      mode: "full",
+      initialStep: "quick",
+      preselectedCityId: openableCities[0]!.id,
+    };
+  }
+  const suggested = preselected
+    ? null
+    : suggestCityByTimeZone(input.cities, input.timeZone, input.installedCityIds, input.offline);
   return {
     kind: "setup",
     mode: "full",
-    initialStep: preselected && openable(preselected) ? "quick" : "city",
+    initialStep: "city",
     preselectedCityId: preselected?.id ?? null,
+    ...(suggested ? { suggestedCityId: suggested.id } : {}),
   };
+}
+
+/** The device's IANA time zone, or `null` when the runtime does not say. */
+export function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
 }

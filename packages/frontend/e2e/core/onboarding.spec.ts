@@ -33,7 +33,9 @@ test.describe("first-run setup @mock-api", () => {
     page.on("request", record);
 
     await page.goto("/");
-    await expect(page.getByLabel("Find a city")).toBeVisible();
+    // A handful of cities is a plain list: no filter, each with its country.
+    await expect(page.getByRole("button", { name: /^Vilnius · Lithuania/ })).toBeVisible();
+    await expect(page.getByLabel("Find a city")).toHaveCount(0);
     // Map is the disclosed initial selection; Text comes first.
     await chooseCity(page);
     const modes = page.getByRole("radio");
@@ -189,6 +191,98 @@ test.describe("first-run setup @mock-api", () => {
     const vilnius = page.getByRole("button", { name: /^Vilnius/ });
     await expect(vilnius).toBeDisabled();
     await expect(vilnius).toContainText("Needs a connection to download");
+  });
+});
+
+test.describe("compact city choice @mock-api", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockApi(page, { setup: "fresh" });
+  });
+
+  test("a host with one city starts at the second step and can still change city", async ({ page }) => {
+    await page.route("**/deployment-config.js", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: 'globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 1, cities: ["vilnius"]};',
+      }),
+    );
+    const manifests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/gtfs\/manifest$/.test(request.url())) manifests.push(request.url());
+    });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
+    await expect(page.getByText("City: Vilnius")).toBeVisible();
+    await expect(page.getByText("That request reveals the city you chose.", { exact: false })).toBeVisible();
+    // Nothing is fetched to show this step.
+    expect(manifests).toEqual([]);
+
+    // No city step is behind this one: Change city opens it in place.
+    const url = page.url();
+    await page.getByRole("button", { name: "Change city" }).click();
+    await expect(page.getByRole("heading", { name: "Choose your city" })).toBeVisible();
+    expect(page.url()).toBe(url);
+    await chooseCity(page);
+    // Now one is: Change city goes back to it.
+    await page.getByRole("button", { name: "Change city" }).click();
+    await expect(page.getByRole("heading", { name: "Choose your city" })).toBeVisible();
+    await chooseCity(page);
+
+    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await expectInApp(page);
+    const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
+    expect(stored.state.currentCityId).toBe("vilnius");
+  });
+
+  test("the only city is selected when setup completes without visiting the city step", async ({ page }) => {
+    await page.route("**/deployment-config.js", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: 'globalThis.__PTN_DEPLOYMENT__ = {schemaVersion: 1, cities: ["krakow"]};',
+      }),
+    );
+    await page.goto("/");
+    await expect(page.getByText("City: Krakow")).toBeVisible();
+    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await expectInApp(page);
+    const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
+    expect(stored.state.currentCityId).toBe("krakow");
+    await page.reload();
+    await expectInApp(page);
+  });
+
+  test.describe("time zone", () => {
+    test.use({ timezoneId: "Europe/Oslo" });
+
+    test("suggests the city in the device's time zone without choosing it", async ({ page }) => {
+      await page.goto("/");
+      const oslo = page.getByRole("button", { name: /^Oslo/ });
+      await expect(oslo).toHaveAttribute("aria-current", "true");
+      await expect(oslo).toContainText("Suggested from your device's time zone");
+      await page.waitForTimeout(300);
+      await expect(page.getByRole("heading", { name: "Choose your city" })).toBeVisible();
+    });
+  });
+
+  test.describe("small phone", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test("the city step and its actions fit without horizontal scroll", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: "Choose your city" })).toBeVisible();
+      const cityButtons = page.getByRole("list", { name: "Cities" }).getByRole("button");
+      expect(await cityButtons.count()).toBeGreaterThan(1);
+      for (const button of await cityButtons.all()) await expect(button).toBeInViewport({ ratio: 1 });
+      const overflow = () =>
+        page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(await overflow()).toBeLessThanOrEqual(0);
+
+      await chooseCity(page);
+      const start = page.getByRole("button", { name: "Start with recommended settings" });
+      await start.scrollIntoViewIfNeeded();
+      await expect(start).toBeInViewport({ ratio: 1 });
+      expect(await overflow()).toBeLessThanOrEqual(0);
+    });
   });
 });
 
