@@ -84,6 +84,7 @@ async function buildRecord(
   }
   return {
     id: fav.id,
+    ...(fav.cityId ? { cityId: fav.cityId === "gdansk" ? "tricity" : fav.cityId } : {}),
     endpoint: stored,
     alias: fav.name,
     savedAt: parseSavedAt(fav.createdAt),
@@ -96,7 +97,7 @@ async function buildRecord(
  * `savedLocations`. Gated behind `settingsStore.enableFavoritesMigration`
  * unless `opts.force` is set. Safe to re-run: a successful migration clears
  * the legacy key, so the second call is a no-op; on failure the legacy key is
- * left intact and already-written rows will be overwritten idempotently
+ * left intact. Writes commit atomically and retries preserve existing records
  * (ids are preserved from `FavoritePlace.id`).
  */
 export async function migrateFavoritesToSaves(
@@ -109,6 +110,7 @@ export async function migrateFavoritesToSaves(
     return { migrated: 0, legacyCleared: false, skipped: true };
   }
 
+  const legacySnapshot = localStorage.getItem(LEGACY_FAVORITES_KEY);
   const favorites = readLegacyFavorites();
   if (!favorites || favorites.length === 0) {
     return { migrated: 0, legacyCleared: false, skipped: false };
@@ -119,15 +121,21 @@ export async function migrateFavoritesToSaves(
     records.push(await buildRecord(fav));
   }
 
-  for (const rec of records) {
-    await db.savedLocations.put(rec);
-  }
-
-  localStorage.removeItem(LEGACY_FAVORITES_KEY);
+  let migrated = 0;
+  await db.transaction("rw", db.savedLocations, async () => {
+    for (const rec of records) {
+      // A retry must not overwrite a newer save or a user's city assignment.
+      if (await db.savedLocations.get(rec.id)) continue;
+      await db.savedLocations.put(rec);
+      migrated++;
+    }
+  });
+  const legacyCleared = localStorage.getItem(LEGACY_FAVORITES_KEY) === legacySnapshot;
+  if (legacyCleared) localStorage.removeItem(LEGACY_FAVORITES_KEY);
 
   return {
-    migrated: records.length,
-    legacyCleared: true,
+    migrated,
+    legacyCleared,
     skipped: false,
   };
 }

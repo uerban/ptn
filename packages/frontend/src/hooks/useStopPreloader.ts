@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { LatLon, StopWithLines } from "@pt/shared";
 import { api, HttpError } from "../services/api.ts";
 import { reportError } from "../services/errorReporter.ts";
+import {useCityDataStore} from "../services/cityData.ts";
 import { useStopStore } from "../stores/stopStore.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { getPolicy } from "../stores/privacyStore.ts";
@@ -54,17 +55,23 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
   const hydrated = useStopStore((s) => s.hydrated);
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const cachedStops = useStopStore((s) => s.stops);
+  const catalogEpoch = useCityDataStore(s => s.active?.token.cityId === activeCityId ? s.active.token.activationEpoch : null);
   const centroid = location ? nearestStopCentroid(location, cachedStops) : null;
   const hasCentroid = centroid !== null;
   const servedRequestRef = useRef(0);
-  const allLoadedRef = useRef(false);
-  const lastCityRef = useRef<string>("");
+  const loadedCityRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!hydrated) {
       useStopStore.getState().hydrate();
     }
   }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || catalogEpoch === null) return;
+    const store = useStopStore.getState();
+    if (store.cityId !== activeCityId || store.stops.length === 0) void store.overlayBundleStops();
+  }, [hydrated, activeCityId, catalogEpoch]);
 
   useEffect(() => {
     // Wait for the first fix after a request, then serve that request once.
@@ -104,7 +111,7 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
           1000,
         );
         if (isStale() || nearby.data.length === 0) return;
-        await useStopStore.getState().upsertStops(nearby.data, { isStale });
+        await useStopStore.getState().upsertStops(nearby.data, { isStale, cityId: requestCityId });
       } catch (e) {
         if (isStale()) return;
         console.debug("[preloader] nearby error:", e);
@@ -138,7 +145,12 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
   // upsert merges into the post-hydrate state.
   useEffect(() => {
     if (!hydrated) return;
-    if (allLoadedRef.current && lastCityRef.current === activeCityId) return;
+    if (loadedCityRef.current === activeCityId) return;
+    // Starting B invalidates A's completed-load shortcut immediately. B can
+    // paint its in-memory stops before its optional persistence settles; an
+    // A→B→A revisit during that await must fetch A again, rather than treating
+    // A's old success flag as proof that A still owns the stop store.
+    loadedCityRef.current = null;
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -153,7 +165,7 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
     // the very data pt-serve builds /stops/all from. Without this the map
     // stays empty for the rest of the session on a server outage while the
     // on-device planner keeps answering trips from the same bundle. Never
-    // marks `allLoadedRef`: the bundle is a floor, not a completed load, so
+    // marks `loadedCityRef`: the bundle is a floor, not a completed load, so
     // the next preloader trigger still tries the network.
     async function fallBackToBundle(): Promise<void> {
       if (isStale()) return;
@@ -179,10 +191,9 @@ export function useStopPreloader(location: LatLon | null, requestId = 0) {
           // race that the next attempt (with cache bypass) can recover from.
           throw new Error("/stops/all returned empty data");
         }
-        await useStopStore.getState().upsertStops(all.data, { isStale });
+        await useStopStore.getState().upsertStops(all.data, { isStale, cityId: requestCityId });
         if (isStale()) return;
-        allLoadedRef.current = true;
-        lastCityRef.current = activeCityId;
+        loadedCityRef.current = requestCityId;
       } catch (e) {
         if (isStale()) return;
         // 429 short-circuit. Retrying within the backoff window guarantees

@@ -53,6 +53,58 @@ function mockBytes(
   })) as unknown as typeof fetch;
 }
 
+describe("artifact-owned byte acquisition", () => {
+  beforeEach(async () => {
+    if (!db.isOpen()) await db.open();
+    await db.ptbBytes.clear();
+    const {shouldWriteShapes} = await import("./gtfsQuotaGuard.ts");
+    vi.mocked(shouldWriteShapes).mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => { globalThis.fetch = ORIG_FETCH; vi.restoreAllMocks(); });
+
+  it("returns fresh bytes without depending on quota inspection or a legacy write", async () => {
+    const {shouldWriteShapes} = await import("./gtfsQuotaGuard.ts");
+    vi.mocked(shouldWriteShapes).mockReturnValue(new Promise(() => {}));
+    const put = vi.spyOn(db.ptbBytes, "put");
+    globalThis.fetch = mockBytes(REAL_PTB_BYTES);
+    const result = await fetchPtbBytes("vilnius", {persist: false});
+    expect(result.bytes.byteLength).toBe(REAL_PTB_BYTES.byteLength);
+    expect(shouldWriteShapes).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("revalidates the owning artifact after the legacy cache was evicted", async () => {
+    const cached = {bytes: REAL_PTB_BYTES, etag: '"artifact"', cityTzIana: "Europe/Vilnius",
+      fromCache: true, networkValidated: false, transfersResolved: true};
+    const read = vi.spyOn(db.ptbBytes, "get");
+    const put = vi.spyOn(db.ptbBytes, "put");
+    globalThis.fetch = vi.fn(async (_url, options) => {
+      expect(new Headers(options?.headers).get("If-None-Match")).toBe(cached.etag);
+      return new Response(null, {status: 304, headers: {"X-PT-Raptor-Bundle-Provenance": "transfers-v1"}});
+    });
+    const result = await fetchPtbBytes("vilnius", {persist: false, cached});
+    expect(result.bytes).toBe(cached.bytes);
+    expect(result.networkValidated).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("does not join a legacy request stalled on persistence", async () => {
+    const Dexie = (await import("dexie")).default;
+    let finish!: () => void;
+    const stalled = new Dexie.Promise<string>(resolve => {finish = () => resolve("vilnius");});
+    const put = vi.spyOn(db.ptbBytes, "put").mockReturnValueOnce(stalled);
+    globalThis.fetch = mockBytes(REAL_PTB_BYTES);
+    const legacy = fetchPtbBytes("vilnius");
+    try {
+      await vi.waitFor(() => expect(put).toHaveBeenCalledOnce());
+      const result = await fetchPtbBytes("vilnius", {persist: false});
+      expect(result.networkValidated).toBe(true);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    } finally { finish(); await legacy; }
+  });
+});
+
 describe("fetchPtbBytes (network-first)", () => {
   beforeEach(async () => {
     if (db.isOpen()) await db.close();

@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db/index.ts";
+import { useCityDataQuery } from "../hooks/useCityDataQuery.ts";
 import type { StopGroupRecord } from "../db/index.ts";
 import type { Stop } from "@pt/shared";
 import { useGeolocation } from "../hooks/useGeolocation.ts";
@@ -34,7 +33,7 @@ export function ScheduleHome() {
   useCityGtfsLifecycle(cityId);
 
   // Load stop groups from IndexedDB (schedule mode uses IndexedDB, not API preloader)
-  const stopGroups = useLiveQuery(() => db.stopGroups.toArray(), []) ?? [];
+  const stopGroups = useCityDataQuery(data => data.stopGroups.toArray(), []) ?? [];
 
   // First-launch hint
   const [showHint, setShowHint] = useState<boolean>(

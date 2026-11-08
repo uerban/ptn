@@ -1,3 +1,4 @@
+import { useCityStore } from "../../src/stores/cityStore.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("maplibre-gl", () => ({ default: {} }));
@@ -10,6 +11,7 @@ import { writeGtfsBundle } from "../../src/services/gtfsBundle.ts";
 beforeEach(async () => {
   await db.delete();
   await db.open();
+  useCityStore.setState({activeCity: {...useCityStore.getState().activeCity, id: "vilnius"}});
 });
 
 describe("GtfsCorridorLayer data loader", () => {
@@ -33,6 +35,7 @@ describe("GtfsCorridorLayer data loader", () => {
       { id: "B", name: "B", lat: 54.688, lon: 25.281 },
     ]);
 
+    useCityStore.setState({activeCity: {...useCityStore.getState().activeCity, id: "oslo"}});
     const data = await loadGtfsCorridorFeatureCollection("oslo");
 
     expect(data.features).toEqual([]);
@@ -111,6 +114,7 @@ describe("GtfsCorridorLayer data loader", () => {
       ],
     });
 
+    useCityStore.setState({activeCity: {...useCityStore.getState().activeCity, id: "oslo"}});
     const data = await loadGtfsCorridorFeatureCollection("oslo");
 
     expect(data.features).toHaveLength(1);

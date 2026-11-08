@@ -1,3 +1,4 @@
+import { captureCityData } from "./cityData.ts";
 import {
   scheduleTileCoordAt,
   scheduleCellBounds,
@@ -49,10 +50,13 @@ export type DeparturesForStopResult =
  *  canonical table has no row. The UI cutover reuses this verbatim (it too only
  *  has a stopId). */
 export async function resolveStopLatLon(stopId: string): Promise<{ lat: number; lon: number } | null> {
-  const g = await db.gtfsStops.get(stopId);
+  const cityId = useCityStore.getState().activeCity.id;
+  const data = captureCityData(cityId);
+  const g = await data.gtfsStops.get(stopId);
   if (g) return { lat: g.lat, lon: g.lon };
   const s = await db.stops.get(stopId);
-  if (s?.location) return { lat: s.location.lat, lon: s.location.lon };
+  data.assertCurrent();
+  if (s?.cityId === cityId && s.location) return { lat: s.location.lat, lon: s.location.lon };
   return null;
 }
 
@@ -67,34 +71,45 @@ export interface DeparturesForStopOpts {
   onTileDownloadStart?: () => void;
 }
 
-// Module-scoped manifest cache (one generation in flight). Real cutover may hoist
-// this; the skeleton keeps it here.
-let cachedManifest: { manifest: BundleManifest; etag: string | null; bundleHash: string } | null = null;
+// Retain lightweight manifests by city; never send another city's ETag.
+type CachedManifest = { manifest: BundleManifest; etag: string | null; bundleHash: string };
+const manifests = new Map<string, CachedManifest>();
+const manifestRequests = new Map<string, Promise<CachedManifest>>();
+const activeCityId = () => useCityStore.getState().activeCity.id;
 
-/** Best-effort: fetch + cache the manifest so callers can call currentBundleHash()/
- *  currentManifest() without going through the full departuresForStop flow. Prunes
- *  stale-bundleHash tiles on a roll (R20) so the shared-manifest badge path keeps
- *  the same cache hygiene the per-stop path had. */
-export async function warmManifest(): Promise<void> {
-  try {
-    const r = await fetchManifest(cachedManifest ?? undefined);
-    const bundleHash = r.bundleHash ?? r.manifest.bundleHash;
-    if (cachedManifest && cachedManifest.bundleHash !== bundleHash) {
-      await pruneToBundleHash(bundleHash); // R20 — roll
+async function cityManifest(cityId: string): Promise<CachedManifest> {
+  const pending = manifestRequests.get(cityId);
+  if (pending) return pending;
+  const request = (async () => {
+    // fetchManifest captures the current city's URL synchronously.
+    if (activeCityId() !== cityId) throw new ManifestUnavailableError();
+    const previous = manifests.get(cityId);
+    const r = await fetchManifest(previous);
+    const entry = { manifest: r.manifest, etag: r.etag, bundleHash: r.bundleHash ?? r.manifest.bundleHash };
+    if (previous && previous.bundleHash !== entry.bundleHash) {
+      await pruneToBundleHash(entry.bundleHash, previous.bundleHash);
     }
-    cachedManifest = { manifest: r.manifest, etag: r.etag, bundleHash };
-  } catch { /* best-effort */ }
+    manifests.delete(cityId);
+    manifests.set(cityId, entry);
+    if (manifests.size > 8) manifests.delete(manifests.keys().next().value!);
+    return entry;
+  })();
+  manifestRequests.set(cityId, request);
+  try { return await request; }
+  finally { if (manifestRequests.get(cityId) === request) manifestRequests.delete(cityId); }
 }
 
-/** Returns the currently-cached bundle hash, or null if the manifest has not yet
- *  been fetched (via departuresForStop or warmManifest). */
+/** Best-effort refresh for the city selected when the call starts. */
+export async function warmManifest(): Promise<void> {
+  try { await cityManifest(activeCityId()); } catch { /* best-effort */ }
+}
+
 export function currentBundleHash(): string | null {
-  return cachedManifest?.bundleHash ?? null;
+  return manifests.get(activeCityId())?.bundleHash ?? null;
 }
 
-/** Returns the currently-cached manifest, or null if not yet fetched. */
 export function currentManifest(): BundleManifest | null {
-  return cachedManifest?.manifest ?? null;
+  return manifests.get(activeCityId())?.manifest ?? null;
 }
 
 /** Resolve schedule-tile coords for a lat/lon against a manifest (cell key +
@@ -147,7 +162,9 @@ export async function resolveDecodedTileForStop(
 ): Promise<ResolveDecodedTileResult> {
   if (!isScheduleTileEnabled()) return { state: "unavailable" };
 
+  const cityId = activeCityId();
   const coord = await resolveStopLatLon(stopId);
+  if (activeCityId() !== cityId) return { state: "unavailable" };
   if (!coord) return { state: "unavailable" };
   const { x, y } = scheduleTileCoordAt(coord.lat, coord.lon);
   const cellKey = `${x}_${y}`;
@@ -161,13 +178,10 @@ export async function resolveDecodedTileForStop(
     bundleHash = sharedManifest.bundleHash;
   } else {
     try {
-      const r = await fetchManifest(cachedManifest ?? undefined);
+      const r = await cityManifest(cityId);
+      if (activeCityId() !== cityId) return { state: "unavailable" };
       manifest = r.manifest;
-      bundleHash = r.bundleHash ?? r.manifest.bundleHash;
-      if (cachedManifest && cachedManifest.bundleHash !== bundleHash) {
-        await pruneToBundleHash(bundleHash); // R20 — hot path, every roll
-      }
-      cachedManifest = { manifest, etag: r.etag, bundleHash };
+      bundleHash = r.bundleHash;
     } catch (e) {
       if (e instanceof ManifestUnavailableError) return { state: "unavailable" };
       throw e;
@@ -193,7 +207,8 @@ export async function resolveDecodedTileForStop(
   // across the cascade (same lat/lon => same cell); only the leaf suffix changes —
   // pass it explicitly so leaf coords are never re-derived by string-splitting
   // `coords` (which corrupts negative-y keys like `2329_-629`).
-  const result = await resolveWithCascade(bundleHash, tileCoords, cellKey, cellBounds, coord, false, onTileDownloadStart);
+  const result = await resolveWithCascade(bundleHash, tileCoords, cellKey, cellBounds, coord, false, onTileDownloadStart, cityId);
+  if (activeCityId() !== cityId) return { state: "unavailable" };
   if (!result) {
     reportTelemetry("bundle_thrash", { stopId, tileCoords }); // R21
     return { state: "unavailable" };
@@ -218,6 +233,7 @@ export async function departuresForStop(
   opts: DeparturesForStopOpts = {},
 ): Promise<DeparturesForStopResult> {
   const { lookAheadHours: la, limit: lim } = departureWindow(args);
+  const city = useCityStore.getState().activeCity;
 
   const resolved = await resolveDecodedTileForStop(args.stopId, opts.onTileDownloadStart);
   if (resolved.state !== "ok") return { state: resolved.state };
@@ -225,11 +241,13 @@ export async function departuresForStop(
 
   // Live overlay at the SAME (post-cascade) coords; failure or the schedule-only
   // level => schedule-only (no fallback).
+  if (activeCityId() !== city.id) return { state: "unavailable" };
   const realtimeUpdates = await rtTileUpdates(rtHash, rtCoords, args.stopId);
+  if (activeCityId() !== city.id) return { state: "unavailable" };
 
   // K3: tz is read non-reactively from the city store (same pattern as routingStore.ts:148).
   // CityConfig.tz is required (cities.ts:20), so this is always a valid IANA string.
-  const tz = useCityStore.getState().activeCity.tz;
+  const tz = city.tz;
   const r = getDeparturesFromTile({ tile, stopId: args.stopId, now: args.now, limit: lim, lookAheadHours: la, realtimeUpdates, tz });
   await ensureUnderBudget();
   return { state: "ok", departures: r.departures, serviceState: r.serviceState };
@@ -322,9 +340,8 @@ export interface DeparturesForStopsArgs {
  *
  * Follows the badge-activity batch pattern (`useViewportBadgeActivity`): ONE
  * `warmManifest()` for the whole batch, then a SEQUENTIAL per-stop
- * `resolveDecodedTileForStop` over that shared manifest — `scheduleTileCache`
- * has no in-flight dedupe and only an LRU(2) decoded-tile memo, so parallel
- * resolves would download and decode the same tile several times. The rt-tile
+ * `resolveDecodedTileForStop` over that shared manifest. The tile cache
+ * shares in-flight reads and retains a bounded decoded-tile memo. The rt-tile
  * is fetched once per distinct post-cascade tile (`bundleHash` + `tileCoords`)
  * and reused for every stop in it (none at the schedule-only level, see
  * `rtTileUpdates`).
@@ -340,7 +357,8 @@ export async function departuresForStops(args: DeparturesForStopsArgs): Promise<
   if (stopIds.length === 0 || !isScheduleTileEnabled()) return out;
   const now = args.now ?? new Date();
   const { lookAheadHours: la, limit: lim } = departureWindow(args);
-  const aborted = () => args.signal?.aborted === true;
+  const city = useCityStore.getState().activeCity;
+  const aborted = () => args.signal?.aborted === true || activeCityId() !== city.id;
 
   // Manifest ONCE for the batch; unavailable → no per-stop fetch (no re-storm).
   await warmManifest();
@@ -348,7 +366,7 @@ export async function departuresForStops(args: DeparturesForStopsArgs): Promise<
   const bundleHash = currentBundleHash();
   if (!manifest || !bundleHash || aborted()) return out;
   const shared = { manifest, bundleHash };
-  const tz = useCityStore.getState().activeCity.tz; // K3
+  const tz = city.tz; // K3
 
   // The batch's own overlays, held for the whole batch: sequential cold tile
   // downloads can outlast `RT_TILE_REUSE_MS`, and a batch still makes one
@@ -363,6 +381,7 @@ export async function departuresForStops(args: DeparturesForStopsArgs): Promise<
       if (!rtByTile.has(key)) {
         rtByTile.set(key, await rtTileUpdates(resolved.bundleHash, resolved.tileCoords, stopId));
       }
+      if (aborted()) break;
       const r = getDeparturesFromTile({
         tile: resolved.tile,
         stopId,
@@ -387,14 +406,17 @@ export async function resolveWithCascade(
   coord: { lat: number; lon: number },
   manifestSpent: boolean,
   onTileDownloadStart?: () => void,
+  cityId: string = activeCityId(),
 ): Promise<{ tile: DecodedScheduleTile; bundleHash: string; tileCoords: string } | null> {
   let hash = bundleHash;
   let coords = tileCoords;
   let fetches = 0;
   let spent = manifestSpent;
   while (fetches < 2) {
+    if (activeCityId() !== cityId) return null;
     const got = await getDecodedTile(hash, SCHEDULE_TILE_SIZE_LABEL, coords, { onTileDownloadStart });
     fetches++;
+    if (activeCityId() !== cityId) return null;
     if ("tile" in got) return { tile: got.tile, bundleHash: hash, tileCoords: coords };
     const fr = got.fetchResult;
     if (fr.status === 200) continue; // (defensive; getDecodedTile returns tile on 200)

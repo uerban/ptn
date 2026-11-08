@@ -53,6 +53,17 @@ import {
   TRANSFERS_FALLBACK_EVENT,
 } from "./wasmLifecycle.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
+import {activateCityData, CityDataContext} from "./cityData.ts";
+import {useCityStore} from "../stores/cityStore.ts";
+
+function boundContext(id: string) {
+  const cityId = useCityStore.getState().activeCity.id;
+  return new CityDataContext({meta: {cityId, generatedAt: "today", cityTzIana: "UTC"},
+    stops: [], routes: [], calendar: []}, {id: "current", cityId, generationId: id,
+    etag: id, generatedAt: "today", lastSynced: 1}, [], {key: id, cityId,
+      generation: {generationId: id, bundleSha256: id, generatedAt: "today", cityTzIana: "UTC"},
+      ptb: {bytes: new Uint8Array([7]), etag: id, fromCache: false, networkValidated: true, transfersResolved: true}});
+}
 
 beforeEach(async () => {
   await useGtfsDataStore.getState().reset();
@@ -74,6 +85,48 @@ beforeEach(async () => {
 const TRANSFERS_ARTIFACT = { url: "/api/vilnius/transfers/fetch", hash: "abc", sizeBytes: 42 };
 
 describe("initOrSwapPtRouter", () => {
+  it("discards a separately fetched engine if a catalog became active during construction", async () => {
+    const context = boundContext("arrived");
+    fetchPtbBytesMock.mockResolvedValueOnce({bytes: new Uint8Array([1]), etag: '"other"',
+      fromCache: false, transfersResolved: true});
+    const router = {plan: () => [], free: vi.fn(), isAlive: () => true};
+    let finish!: (value: typeof router) => void;
+    buildPtRouterMock.mockReturnValueOnce(new Promise(resolve => {finish = resolve;}));
+    const build = initOrSwapPtRouter(context.token.cityId);
+    await vi.waitFor(() => expect(buildPtRouterMock).toHaveBeenCalledOnce());
+    activateCityData(context);
+    finish(router);
+    await build;
+    expect(router.free).toHaveBeenCalledOnce();
+    expect(useGtfsDataStore.getState().ptRouter).toBeNull();
+  });
+
+  it("builds from the installed catalog's exact raw bytes without fetching another generation", async () => {
+    const context = boundContext("a");
+    activateCityData(context);
+    const router = {plan: () => [], free: vi.fn(), isAlive: () => true};
+    buildPtRouterMock.mockResolvedValueOnce(router);
+    await initOrSwapPtRouter(context.token.cityId);
+    expect(buildPtRouterMock).toHaveBeenCalledWith(context.artifact!.ptb.bytes, context.token.cityId);
+    expect(fetchPtbBytesMock).not.toHaveBeenCalled();
+    expect(fetchPtbBytesPreferCacheMock).not.toHaveBeenCalled();
+    expect(readGtfsBundleMock).not.toHaveBeenCalled();
+  });
+
+  it("frees a router built from a context replaced during the build", async () => {
+    const context = boundContext("a");
+    activateCityData(context);
+    const router = {plan: () => [], free: vi.fn(), isAlive: () => true};
+    let finish!: (value: typeof router) => void;
+    buildPtRouterMock.mockReturnValueOnce(new Promise(resolve => {finish = resolve;}));
+    const build = initOrSwapPtRouter(context.token.cityId);
+    activateCityData(boundContext("b"));
+    finish(router);
+    await build;
+    expect(router.free).toHaveBeenCalledOnce();
+    expect(useGtfsDataStore.getState().ptRouter).toBeNull();
+  });
+
   it("fetches via network-first, builds router, swaps onto store", async () => {
     const bytes = new Uint8Array([1]);
     fetchPtbBytesMock.mockResolvedValueOnce({ bytes, etag: '"v1"', fromCache: false });

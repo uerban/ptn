@@ -1,3 +1,5 @@
+import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
+import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
 import { excludedRouteIdsForGroups, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
@@ -160,7 +162,8 @@ export async function convertRaptorResults(
   queryServiceDateYmd: number,
   endpointLabels: EndpointLabels,
 ): Promise<Itinerary[]> {
-  const allStops = await db.gtfsStops.toArray();
+  const data = captureCityData();
+  const allStops = await data.gtfsStops.toArray();
   const stopMap = new Map(allStops.map((s) => [s.id, s]));
 
   // Backfill transit-leg display fields (route short name / colour / headsign)
@@ -174,13 +177,14 @@ export async function convertRaptorResults(
       if (leg.type === "transit") tripIds.add(leg.tripId);
     }
   }
-  const routeRecords = await db.gtfsRoutes.toArray();
+  const routeRecords = await data.gtfsRoutes.toArray();
   const routeMap = new Map(routeRecords.map((r) => [r.id, r]));
-  const tripRecords = tripIds.size > 0 ? await db.gtfsTrips.bulkGet([...tripIds]) : [];
+  const tripRecords = tripIds.size > 0 ? await data.gtfsTrips.bulkGet([...tripIds]) : [];
   const tripMap = new Map(
     tripRecords.filter((t): t is NonNullable<typeof t> => t != null).map((t) => [t.tripId, t]),
   );
 
+  data.assertCurrent();
   return results.map((itin) => {
     // Project each time once, in the feed tz, against the query service date. Overnight-fallback
     // results carry the engine's -86400-rewritten secs and project correctly against the query date
@@ -328,11 +332,10 @@ export function SearchPage() {
   const routingProvider = useSettingsStore((s) => s.routingProvider);
   const ranking = useRoutingStore((s) => s.ranking);
   const setRanking = useRoutingStore((s) => s.setRanking);
-  const excludedModes = useSettingsStore((s) => s.excludedModes);
+  const excludedModes = useEffectiveExcludedModes();
   const excludedRouteGroupsByCity = useSettingsStore((s) => s.excludedRouteGroupsByCity);
   const toggleRouteGroup = useSettingsStore((s) => s.toggleRouteGroup);
   const toggleMode = useSettingsStore((s) => s.toggleMode);
-  const applyCityModeDefaults = useSettingsStore((s) => s.applyCityModeDefaults);
 
   // Derive which transit modes exist in the current city's GTFS data
   const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
@@ -425,7 +428,6 @@ export function SearchPage() {
     return groups.filter((g) => present.has(g.id));
   }, [cityRouteGroups, raptorIndex]);
   const feedTz = useCityStore((s) => s.activeCity.tz);
-  const cityDefaultExcludedModes = useCityStore((s) => s.activeCity.defaultExcludedModes);
   const privacyPolicy = usePolicy();
   // Privacy ceiling for remote routing: when the policy's
   // routingAdapter is "local-only", the engine-failure surface must NOT offer
@@ -460,13 +462,6 @@ export function SearchPage() {
     }
   }, [preferredAdapter, cityId]);
 
-  // Seed the active city's default-excluded modes (e.g. Vilnius ferry) before
-  // the auto-search effect below fires, so the first itinerary search already
-  // skips them. Idempotent per session; the chip stays toggleable.
-  useEffect(() => {
-    applyCityModeDefaults(cityId, cityDefaultExcludedModes ?? []);
-  }, [cityId, cityDefaultExcludedModes, applyCityModeDefaults]);
-
   // Use user location as from by default (only on initial mount, before user edits)
   useEffect(() => {
     if (userLocation && !fromEndpoint && fromText === null && !fromTouchedRef.current) {
@@ -488,10 +483,11 @@ export function SearchPage() {
     // gtfsSyncing=true, so they fall through immediately.)
     if (preferredAdapter === "raptor" && gtfsSyncing) return;
 
+    const data = captureCityData(cityId);
     let cancelled = false;
     (async () => {
       if (fromStopId) {
-        const stop = await db.gtfsStops.get(fromStopId);
+        const stop = await data.gtfsStops.get(fromStopId);
         if (stop && !cancelled) {
           fromTouchedRef.current = true;
           setFromText(stop.name);
@@ -505,7 +501,7 @@ export function SearchPage() {
         }
       }
       if (toStopId) {
-        const stop = await db.gtfsStops.get(toStopId);
+        const stop = await data.gtfsStops.get(toStopId);
         if (stop && !cancelled) {
           setToText(stop.name);
           setToEndpoint({
@@ -524,7 +520,7 @@ export function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, gtfsSyncing, preferredAdapter]);
+  }, [searchParams, gtfsSyncing, preferredAdapter, cityId]);
 
   // Endpoints handed off from a surface outside this page — today the map
   // long-press action sheet, which reduces the pin through `mapTapStore`,
@@ -671,7 +667,7 @@ export function SearchPage() {
           if (stale()) return;
           // Superseded on-device search (reset/city-switch/refresh) — drop it
           // silently rather than showing a search error.
-          if (err instanceof StaleWasmInitError) return;
+          if (err instanceof StaleWasmInitError || err instanceof StaleCityDataError) return;
           setItineraries([]);
           setSearchError(err instanceof Error ? err.message : "Route search failed");
         })
@@ -877,7 +873,7 @@ export function SearchPage() {
           // A stale wasm init means a reset/city-switch/refresh superseded this
           // search; a fresh one is already in flight. Drop it silently — do NOT
           // show an error surface.
-          if (err instanceof StaleWasmInitError) return;
+          if (err instanceof StaleWasmInitError || err instanceof StaleCityDataError) return;
           setItineraries([]);
           setSearchError(err instanceof Error ? err.message : "Route search failed");
         })

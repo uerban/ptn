@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useReducer, useRef } from "react";
-import { liveQuery } from "dexie";
+import { useEffect, useMemo, useRef } from "react";
+import { useCityDataQuery } from "./useCityDataQuery.ts";
 import type { LatLon, LegGeometryResult, LegGeometrySource, RaptorTransitLeg } from "@pt/shared";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { reportError, reportTelemetry } from "../services/errorReporter.ts";
-import { readLegSnapshot, type LegSnapshot } from "../services/legGeometry/readLegSnapshot.ts";
+import { readLegSnapshot } from "../services/legGeometry/readLegSnapshot.ts";
 import { buildTransitGeometry } from "../services/legGeometry/buildTransitGeometry.ts";
 
 const EMPTY: LegGeometryResult = {
@@ -18,35 +18,19 @@ export function useTransitLegGeometry(
   fromLocation: LatLon,
   toLocation: LatLon,
 ): LegGeometryResult {
-  const snapshotRef = useRef<LegSnapshot | null>(null);
   const lastSourceRef = useRef<LegGeometrySource | null>(null);
   const emittedTiersRef = useRef<Set<LegGeometrySource>>(new Set());
   const mountMsRef = useRef<number>(performance.now());
-  const [, force] = useReducer((v: number) => v + 1, 0);
-
-  useEffect(() => {
-    const subscription = liveQuery(() => readLegSnapshot(leg)).subscribe({
-      next: (value) => {
-        snapshotRef.current = value;
-        force();
-      },
-      error: (err) =>
-        reportError(err as Error, {
-          context: { where: "useTransitLegGeometry", leg },
-        }),
-    });
-    return () => subscription.unsubscribe();
-  }, [
-    leg.tripId,
-    leg.routeId,
-    leg.boardStopIdx,
-    leg.alightStopIdx,
-    leg.patternStopIds?.join(","),
-  ]);
+  const snapshot = useCityDataQuery(async (data) => {
+    try { return await readLegSnapshot(leg, data); }
+    catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) reportError(error as Error, {context: {where: "useTransitLegGeometry", leg}});
+      return undefined;
+    }
+  }, [leg.tripId, leg.routeId, leg.boardStopIdx, leg.alightStopIdx, leg.patternStopIds?.join(",")]);
 
   const syncing = useGtfsDataStore((s) => s.syncing);
-  const snapshot = snapshotRef.current;
-  const pending = snapshot === null || syncing;
+  const pending = snapshot == null || syncing;
   const tripShapeId = snapshot?.trip?.shapeId;
   const routeStopIdsLen = snapshot?.route?.stopIds.length ?? 0;
   const resolvedStopsLen = snapshot?.stops?.reduce(
@@ -68,7 +52,7 @@ export function useTransitLegGeometry(
       toLocation,
     });
     return { ...base, pending };
-  }, [memoKey, pending]);
+  }, [snapshot, memoKey, pending, fromLocation.lat, fromLocation.lon, toLocation.lat, toLocation.lon]);
 
   useEffect(() => {
     // Wait for real data before emitting — the initial `endpoints` + `pending`

@@ -1,3 +1,5 @@
+import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
+import { effectiveExcludedModes } from "./settingsStore.ts";
 import { excludedRouteIdsForGroups } from "../services/routeGroups.ts";
 import { create } from "zustand";
 import type { BaseEndpoint, RankingCriteria } from "@pt/shared";
@@ -14,7 +16,6 @@ import { useCityStore } from "./cityStore.ts";
 import { useRtStore } from "./rtStore.ts";
 import { useSettingsStore } from "./settingsStore.ts";
 import { osrmClient } from "../services/osrmWasm.ts";
-import { db } from "../db/index.ts";
 import { api } from "../services/api.ts";
 import {
   PtEngineMisconfiguredError, StaleWasmInitError,
@@ -101,16 +102,18 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   destination: null,
 
   async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean }) {
-    const raptorIndex = useGtfsDataStore.getState().raptorIndex;
-    if (!raptorIndex) {
-      set({ error: "GTFS data not loaded. Please wait for sync to complete.", loading: false });
+    const data = captureCityData();
+    const {raptorIndex, loadedCityId} = useGtfsDataStore.getState();
+    if (!raptorIndex || (loadedCityId != null && loadedCityId !== useCityStore.getState().activeCity.id)) {
+      set({ error: "GTFS data not loaded. Please wait for sync to complete.", loading: false,
+        results: [], engineError: null, engineFailureKind: null });
       return;
     }
 
     set({ loading: true, error: null, engineError: null, engineFailureKind: null, results: [] });
 
     try {
-      const allStops = await db.gtfsStops.toArray();
+      const allStops = await data.gtfsStops.toArray();
       const backendAssist = get().backendAssist;
 
       const {
@@ -118,9 +121,10 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         walkSpeedMps,
         maxWalkSecs,
         runToCatch,
-        excludedModes,
         excludedRouteGroupsByCity,
       } = useSettingsStore.getState();
+
+      const excludedModes = effectiveExcludedModes(useSettingsStore.getState(), useCityStore.getState().activeCity.defaultExcludedModes);
 
       // Privacy seam: resolve each endpoint to its candidate entry stops before
       // any coord reaches the orchestrator. Future milestones apply coarsening
@@ -188,6 +192,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destStopIds: destination.kind === "stopGroup" ? [...destination.stopIds] : undefined,
       });
 
+      data.assertCurrent();
       set({ results: itineraries, loading: false });
     } catch (err) {
       // Staleness: a reset()/city-switch/refresh invalidated the wasm build
@@ -199,6 +204,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       // (and could fire a provider-fallback server search). The caller's
       // `.catch` recognises StaleWasmInitError and drops it silently. `loading`
       // is dropped here too so the store state can't hang on a bare reset().
+      if (err instanceof StaleCityDataError) throw new StaleWasmInitError();
       if (err instanceof StaleWasmInitError) {
         set({ loading: false });
         throw err;

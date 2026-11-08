@@ -640,3 +640,23 @@ describe("useDepartures — cache-miss hedge", () => {
     expect(api.getDepartures).not.toHaveBeenCalled();
   });
 });
+
+
+it("clears a reused stop ID on city change and discards the old city's late result", async () => {
+  const {useCityStore} = await import("../../src/stores/cityStore.ts");
+  const original = useCityStore.getState().activeCity;
+  usePrivacyStore.getState().reset();
+  vi.mocked(isScheduleTileEnabled).mockReturnValue(false);
+  let finish!: (value: {data: typeof mockDepartures}) => void;
+  vi.mocked(api.getDepartures).mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}))
+    .mockResolvedValue({data: mockTileDepartures});
+  const view = renderHook(() => useDepartures("same-stop", false));
+  try {
+    await waitFor(() => expect(api.getDepartures).toHaveBeenCalled());
+    act(() => useCityStore.setState({activeCity: {...original, id: "other-city"}}));
+    expect(view.result.current.departures).toEqual([]);
+    await waitFor(() => expect(view.result.current.departures).toEqual(mockTileDepartures));
+    await act(async () => {finish({data: mockDepartures}); await Promise.resolve();});
+    expect(view.result.current.departures).toEqual(mockTileDepartures);
+  } finally {view.unmount(); useCityStore.setState({activeCity: original});}
+});

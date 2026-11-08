@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import {
@@ -276,6 +277,7 @@ describe("useGuidanceLegProgress — ride progress from the leg's stops", () => 
 
   beforeEach(async () => {
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.gtfsStops.bulkPut(stopRows);
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-09-25T20:05:00Z")); // the bus has left

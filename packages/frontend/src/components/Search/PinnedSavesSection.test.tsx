@@ -8,6 +8,7 @@ import { saveRoutePair } from "../../services/saves.ts";
 import { __clearRamStoreForTests } from "../../services/cryptoBox.ts";
 import { __resetInstallKeyCacheForTests } from "../../services/installKey.ts";
 import { __resetDegradedModeForTests } from "../../services/installKeyDegrade.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
 
 const stop1: BaseEndpoint = {
@@ -64,7 +65,7 @@ describe("PinnedSavesSection", () => {
       { id: "new", endpoint: stop2, alias: "New", savedAt: 500, encrypted: false },
       { id: "mid", endpoint: home, alias: "Mid", savedAt: 300, encrypted: false },
     ];
-    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => {
       expect(screen.getAllByRole("listitem")).toHaveLength(3);
     });
@@ -79,7 +80,7 @@ describe("PinnedSavesSection", () => {
       { id: "a", endpoint: stop1, alias: "Home", savedAt: 100, encrypted: false },
     ];
     const onSelect = vi.fn();
-    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => screen.getByRole("listitem"));
     fireEvent.click(screen.getByRole("listitem"));
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -98,7 +99,7 @@ describe("PinnedSavesSection", () => {
     const rows = await db.savedLocations.toArray();
 
     const onSelect = vi.fn();
-    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => screen.getByRole("listitem"));
     fireEvent.click(screen.getByRole("listitem"));
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -119,7 +120,7 @@ describe("PinnedSavesSection", () => {
     expect(rows[0]!.aliasCipher).toBeDefined();
 
     const onSelect = vi.fn();
-    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={onSelect} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => screen.getByRole("listitem"));
     expect(screen.getByRole("listitem").textContent).toContain("Therapist");
     fireEvent.click(screen.getByRole("listitem"));
@@ -133,7 +134,7 @@ describe("PinnedSavesSection", () => {
     const rows: SavedLocationRecord[] = [
       { id: "x", endpoint: stop1, alias: "", savedAt: 100, encrypted: false },
     ];
-    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => screen.getByRole("listitem"));
     expect(screen.getByRole("listitem").textContent).toContain("Central");
   });
@@ -149,7 +150,7 @@ describe("PinnedSavesSection", () => {
         encrypted: false,
       },
     ];
-    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => screen.getByRole("listitem"));
     const text = screen.getByRole("listitem").textContent ?? "";
     expect(text).toContain("Central");
@@ -165,7 +166,7 @@ describe("searchable saved places and trips", () => {
   ];
 
   test("bounds the empty-query preview and exposes the full collection", async () => {
-    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows} />);
+    render(<PinnedSavesSection onSelect={vi.fn()} rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
     fireEvent.click(screen.getByRole("button", { name: "Show all saved items (7)" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
@@ -173,18 +174,18 @@ describe("searchable saved places and trips", () => {
 
   test("matches normalized destination names and keeps both saved-trip endpoints", async () => {
     const onSelect = vi.fn();
-    const view = render(<PinnedSavesSection onSelect={onSelect} query="dluga" rowsOverride={rows} />);
+    const view = render(<PinnedSavesSection onSelect={onSelect} query="dluga" rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(6));
-    view.rerender(<PinnedSavesSection onSelect={onSelect} query="daily" rowsOverride={rows} />);
+    view.rerender(<PinnedSavesSection onSelect={onSelect} query="daily" rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     fireEvent.click(screen.getByRole("listitem"));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ origin: stop1, destination: home }));
   });
 
   test("filters aliases and origin names without unrelated saved items", async () => {
-    const view = render(<PinnedSavesSection onSelect={vi.fn()} query="university" rowsOverride={rows} />);
+    const view = render(<PinnedSavesSection onSelect={vi.fn()} query="university" rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(1));
     expect(screen.getByRole("listitem").textContent).toContain("Classes");
-    view.rerender(<PinnedSavesSection onSelect={vi.fn()} query="no match" rowsOverride={rows} />);
+    view.rerender(<PinnedSavesSection onSelect={vi.fn()} query="no match" rowsOverride={rows.map(row => ({ ...row, cityId: row.cityId ?? useCityStore.getState().activeCity.id }))} />);
     expect(screen.queryByRole("list")).toBeNull();
   });
 });

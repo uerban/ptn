@@ -88,6 +88,10 @@ describe("privacy data deletion boundaries", () => {
       lastSeen: Date.now(),
     });
     await db.gtfsStops.put({ id: "g1", name: "GTFS", lat: 1, lon: 2 });
+    await db.offlineCities.put({cityId: "vilnius", city: {id: "vilnius"} as never, preparedAt: 1, sizeBytes: 1, tables: {}});
+    await db.offlineCityMetadata.put({cityId: "vilnius", state: "legacy"});
+    await db.offlineTransfers.put({hash: "transfer", bytes: new Uint8Array([1])});
+    await db.cityShapes.put({hash: "shape", bytes: new Uint8Array([2])});
     const caches = fakeCaches([
       "api-general-cache",
       "carto-tiles",
@@ -104,6 +108,10 @@ describe("privacy data deletion boundaries", () => {
 
     expect(await db.stops.count()).toBe(0);
     expect(await db.gtfsStops.count()).toBe(0);
+    expect(await db.offlineCities.count()).toBe(0);
+    expect(await db.offlineCityMetadata.count()).toBe(0);
+    expect(await db.offlineTransfers.count()).toBe(0);
+    expect(await db.cityShapes.count()).toBe(0);
     expect(await db.recentLocations.count()).toBe(1);
     expect(await db.savedLocations.count()).toBe(1);
     expect(await db.usageStats.count()).toBe(1);

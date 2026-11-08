@@ -78,7 +78,7 @@ function parseStoredViewport(raw: string): PersistedViewport | null {
     const pitch = Number.isFinite(v.pitch) ? (v.pitch as number) : 0;
     const bearing = Number.isFinite(v.bearing) ? (v.bearing as number) : 0;
     return {
-      cityId: v.cityId,
+      cityId: v.cityId === "gdansk" ? "tricity" : v.cityId,
       lat: v.lat,
       lon: v.lon,
       zoom: v.zoom,
@@ -97,61 +97,69 @@ function storedMode(v: PersistedViewport): PersistedViewportMode {
   return v.privacyMode ?? "raw";
 }
 
-/**
- * Removes a representation that is less protective than the current floor.
- * Called both at restore and synchronously when the privacy store changes.
- */
-export function enforceStoredViewportPolicy(): void {
-  if (!isOptionalStorageEnabledNow("viewport")) {
-    clearStoredViewport();
-    return;
-  }
-  const required = getPolicy().viewportPersistence;
-  if (required === "off") {
-    clearStoredViewport();
-    return;
-  }
-  try {
-    const raw = globalThis.localStorage?.getItem(MAP_VIEWPORT_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = parseStoredViewport(raw);
-    if (!parsed || MODE_RANK[storedMode(parsed)] < MODE_RANK[required]) {
-      clearStoredViewport();
-    }
-  } catch {
-    clearStoredViewport();
-  }
+interface ViewportCollection {
+  lastCityId?: string;
+  viewports: Map<string, PersistedViewport>;
 }
 
-export function loadViewport(): SavedViewport | null {
-  if (!isOptionalStorageEnabledNow("viewport")) {
+function readViewports(): ViewportCollection {
+  const empty = {viewports: new Map<string, PersistedViewport>()};
+  const raw = globalThis.localStorage?.getItem(MAP_VIEWPORT_STORAGE_KEY);
+  if (!raw) return empty;
+  try {
+    const value = JSON.parse(raw);
+    const rows = value?.version === 2 && Array.isArray(value.viewports) ? value.viewports : [value];
+    const viewports = new Map<string, PersistedViewport>();
+    for (const row of rows) {
+      const parsed = parseStoredViewport(JSON.stringify(row));
+      if (parsed) viewports.set(parsed.cityId, parsed);
+    }
+    const legacy = parseStoredViewport(raw);
+    const lastCityId = value?.version === 2 ? value.lastCityId : legacy?.cityId;
+    return {viewports, lastCityId};
+  } catch { return empty; }
+}
+
+function writeViewports(collection: ViewportCollection): void {
+  if (!collection.viewports.size) {
     clearStoredViewport();
-    return null;
+    return;
+  }
+  const lastCityId = collection.lastCityId && collection.viewports.has(collection.lastCityId)
+    ? collection.lastCityId : collection.viewports.keys().next().value;
+  globalThis.localStorage?.setItem(MAP_VIEWPORT_STORAGE_KEY, JSON.stringify({
+    version: 2, lastCityId, viewports: [...collection.viewports.values()],
+  }));
+}
+
+/** Apply the global privacy floor to every city's remembered position. */
+export function enforceStoredViewportPolicy(): void {
+  if (!isOptionalStorageEnabledNow("viewport") || getPolicy().viewportPersistence === "off") {
+    clearStoredViewport();
+    return;
   }
   const required = getPolicy().viewportPersistence;
-  if (required === "off") {
-    clearStoredViewport();
-    return null;
-  }
   try {
-    const raw = globalThis.localStorage?.getItem(MAP_VIEWPORT_STORAGE_KEY);
-    if (!raw) return null;
-    const v = parseStoredViewport(raw);
-    if (!v || MODE_RANK[storedMode(v)] < MODE_RANK[required]) {
-      clearStoredViewport();
-      return null;
+    const collection = readViewports();
+    for (const [cityId, viewport] of collection.viewports) {
+      if (MODE_RANK[storedMode(viewport)] < MODE_RANK[required]) collection.viewports.delete(cityId);
     }
-    return {
-      cityId: v.cityId,
-      lat: v.lat,
-      lon: v.lon,
-      zoom: v.zoom,
-      bearing: v.bearing,
-      pitch: v.pitch,
-    };
-  } catch {
-    return null;
-  }
+    writeViewports(collection);
+  } catch { clearStoredViewport(); }
+}
+
+/** A caller selecting a city must pass its identity; omitted keeps compatibility
+ * with callers interested in the most recently saved city. */
+export function loadViewport(cityId?: string): SavedViewport | null {
+  enforceStoredViewportPolicy();
+  if (!isOptionalStorageEnabledNow("viewport") || getPolicy().viewportPersistence === "off") return null;
+  try {
+    const collection = readViewports();
+    const id = cityId === "gdansk" ? "tricity" : cityId ?? collection.lastCityId;
+    const v = id ? collection.viewports.get(id) : undefined;
+    if (!v) return null;
+    return {cityId: v.cityId, lat: v.lat, lon: v.lon, zoom: v.zoom, bearing: v.bearing, pitch: v.pitch};
+  } catch { return null; }
 }
 
 function roundToGrid(
@@ -187,6 +195,7 @@ export function saveViewport(
   v: SavedViewport,
   stops: readonly Pick<StopWithLines, "location">[] = [],
 ): boolean {
+  enforceStoredViewportPolicy();
   if (!isOptionalStorageEnabledNow("viewport")) {
     clearStoredViewport();
     return false;
@@ -206,7 +215,11 @@ export function saveViewport(
     case "snap-centroid": {
       const centroid = nearestStopLocation(v, stops);
       if (!centroid) {
-        clearStoredViewport();
+        try {
+          const collection = readViewports();
+          collection.viewports.delete(v.cityId);
+          writeViewports(collection);
+        } catch { clearStoredViewport(); }
         return false;
       }
       storedCoord = centroid;
@@ -229,10 +242,12 @@ export function saveViewport(
   try {
     const storage = globalThis.localStorage;
     if (!storage) return false;
-    storage.setItem(
-      MAP_VIEWPORT_STORAGE_KEY,
-      JSON.stringify(persisted),
-    );
+    const valid = parseStoredViewport(JSON.stringify(persisted));
+    if (!valid) return false;
+    const collection = readViewports();
+    collection.viewports.set(valid.cityId, valid);
+    collection.lastCityId = valid.cityId;
+    writeViewports(collection);
     return true;
   } catch {
     return false;

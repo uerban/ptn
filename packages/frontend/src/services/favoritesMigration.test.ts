@@ -204,6 +204,7 @@ describe("migrateFavoritesToSaves", () => {
       "simulated write failure",
     );
     expect(localStorage.getItem(LEGACY_FAVORITES_KEY)).not.toBeNull();
+    expect(await db.savedLocations.count()).toBe(0);
     spy.mockRestore();
   });
 
@@ -244,4 +245,23 @@ describe("migrateFavoritesToSaves", () => {
     expect(result.migrated).toBe(0);
     expect(result.legacyCleared).toBe(false);
   });
+});
+
+
+it("preserves known legacy city ownership without guessing unassigned cities", async () => {
+  await db.savedLocations.clear();
+  seedLegacyFavorites([home({ cityId: "gdansk" }), work()]);
+  await migrateFavoritesToSaves({ force: true });
+  expect((await db.savedLocations.get("fav-home"))?.cityId).toBe("tricity");
+  expect((await db.savedLocations.get("fav-work"))?.cityId).toBeUndefined();
+});
+
+
+it("migration retries preserve an existing save's explicit owner and edits", async () => {
+  await db.savedLocations.clear();
+  seedLegacyFavorites([home({cityId: "vilnius"})]);
+  const existing = {id: "fav-home", cityId: "krakow", endpoint: {kind: "mappoint" as const, lat: 1, lon: 2}, alias: "Edited", savedAt: 10, encrypted: false};
+  await db.savedLocations.put(existing);
+  expect((await migrateFavoritesToSaves({force: true})).migrated).toBe(0);
+  expect(await db.savedLocations.get("fav-home")).toEqual(existing);
 });

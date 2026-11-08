@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -18,6 +19,7 @@ describe("Search fromStopId/toStopId query-param prefill", () => {
   beforeEach(async () => {
     useRoutingStore.setState({ ranking: "fastest", results: [], error: null, loading: false });
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.gtfsStops.bulkPut([
       { id: "stop-a", name: "Alpha Station", lat: 50.1, lon: 19.9 },
       { id: "stop-b", name: "Beta Plaza", lat: 50.2, lon: 20.0 },

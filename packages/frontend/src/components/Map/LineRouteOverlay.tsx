@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCityDataQuery } from "../../hooks/useCityDataQuery.ts";
 import maplibregl from "../../map/maplibre.ts";
 import { useLineViewStore } from "../../stores/lineViewStore.ts";
-import { db, type GtfsShapeRecord, type GtfsStopRecord } from "../../db/index.ts";
+import { type GtfsShapeRecord, type GtfsStopRecord } from "../../db/index.ts";
 import { buildTransitGeometry } from "../../services/legGeometry/buildTransitGeometry.ts";
 import type { LinePattern } from "../../stores/lineViewStore.ts";
 import { Icon } from "../Icon.tsx";
@@ -103,10 +103,10 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
   // drifted direction.
   const stopIds = pattern?.stops.map((s) => s.id) ?? [];
   const stopIdsKey = stopIds.join(",");
-  const stopRows = useLiveQuery(
-    async () => {
+  const stopRows = useCityDataQuery(
+    async (data) => {
       if (stopIds.length === 0) return [];
-      return db.gtfsStops.bulkGet(stopIds);
+      return data.gtfsStops.bulkGet(stopIds);
     },
     [stopIdsKey],
   );
@@ -119,10 +119,10 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
   // missing" (returns `{ resolved: true, shape: undefined }`) — needed
   // for the drift-detection log below.
   const shapeId = pattern?.shapeId;
-  const shapeQuery = useLiveQuery(
-    async () => {
+  const shapeQuery = useCityDataQuery(
+    async (data) => {
       if (!shapeId) return { resolved: true, shape: undefined };
-      const row = await db.gtfsShapes.get(shapeId);
+      const row = await data.gtfsShapes.get(shapeId);
       return { resolved: true, shape: row };
     },
     [shapeId],

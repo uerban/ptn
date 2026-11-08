@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -72,6 +73,7 @@ describe("Search 'search on the server' re-run + remoteAllowed", () => {
       syncing: false,
     });
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.gtfsStops.bulkPut([
       { id: "stop-a", name: "Alpha", lat: 50.1, lon: 19.9 },
       { id: "stop-b", name: "Beta", lat: 50.2, lon: 20.0 },

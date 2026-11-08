@@ -8,10 +8,12 @@ import {
 } from "vitest";
 import "fake-indexeddb/auto";
 import type { BaseEndpoint, RecentRef } from "@pt/shared";
+import { useCityStore } from "../stores/cityStore.ts";
 import { db, type RecentLocationRecord } from "../db/index.ts";
 import {
   MAX_RECENTS,
   endpointFingerprint,
+  recentStorageId,
   recordRecent,
   readRamRecent,
   tierForRecentsAxis,
@@ -160,7 +162,7 @@ describe("recordRecent", () => {
     const rows = await db.recentLocations.toArray();
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
-    expect(row.id).toBe(endpointFingerprint(stopEndpoint));
+    expect(row.id).toBe(await recentStorageId(stopEndpoint));
     expect(row.usedAt).toBe(1_000);
     expect(row.usedAsOrigin).toBe(true);
     expect(row.endpoint).toEqual(stopEndpoint);
@@ -215,9 +217,10 @@ describe("recordRecent", () => {
 
     const ram = __getRamRecentsForTests();
     expect(ram.size).toBe(1);
-    const stored = ram.get(endpointFingerprint(stopEndpoint));
+    const stored = ram.get(await recentStorageId(stopEndpoint));
     expect(stored).toEqual({
-      id: endpointFingerprint(stopEndpoint),
+      id: await recentStorageId(stopEndpoint),
+      cityId: useCityStore.getState().activeCity.id,
       endpoint: stopEndpoint,
       usedAt: 3_000,
       usedAsOrigin: true,
@@ -259,10 +262,10 @@ describe("recordRecent", () => {
       tier: "plaintext",
     });
     expect(await db.recentLocations.count()).toBe(MAX_RECENTS);
-    const oldest = await db.recentLocations.get(endpointFingerprint(stopN(0)));
+    const oldest = await db.recentLocations.get(await recentStorageId(stopN(0)));
     expect(oldest).toBeUndefined();
     const newest = await db.recentLocations.get(
-      endpointFingerprint(stopN(MAX_RECENTS)),
+      await recentStorageId(stopN(MAX_RECENTS)),
     );
     expect(newest).toBeDefined();
   });
@@ -286,7 +289,7 @@ describe("recordRecent", () => {
     const survivors = await db.recentLocations.toArray();
     expect(survivors).toHaveLength(MAX_RECENTS);
     const evicted = await db.recentLocations.get(
-      endpointFingerprint(stopN(MAX_RECENTS - 1)),
+      await recentStorageId(stopN(MAX_RECENTS - 1)),
     );
     expect(evicted).toBeUndefined();
   });
@@ -304,11 +307,11 @@ describe("recordRecent", () => {
     expect(ram.size).toBe(MAX_RECENTS);
     // The 3 oldest (S0, S1, S2) should be gone.
     for (let i = 0; i < 3; i++) {
-      expect(ram.has(endpointFingerprint(stopN(i)))).toBe(false);
+      expect(ram.has(await recentStorageId(stopN(i)))).toBe(false);
     }
     // The 3 freshest should still be there.
     for (let i = MAX_RECENTS; i < MAX_RECENTS + 3; i++) {
-      expect(ram.has(endpointFingerprint(stopN(i)))).toBe(true);
+      expect(ram.has(await recentStorageId(stopN(i)))).toBe(true);
     }
   });
 
@@ -341,13 +344,14 @@ describe("recordRecent", () => {
     );
     expect(cryptoBoxEntries).toHaveLength(1);
     expect(cryptoBoxEntries[0]).toEqual({
-      id: endpointFingerprint(stopEndpoint),
+      id: await recentStorageId(stopEndpoint),
+      cityId: useCityStore.getState().activeCity.id,
       endpoint: stopEndpoint,
       usedAt: 10,
       usedAsOrigin: true,
     });
     // readRamRecent round-trips the same record via cryptoBox.readRecord.
-    const round = await readRamRecent(endpointFingerprint(stopEndpoint));
+    const round = await readRamRecent(await recentStorageId(stopEndpoint));
     expect(round).toEqual(cryptoBoxEntries[0]);
   });
 
@@ -367,7 +371,7 @@ describe("recordRecent", () => {
 
     expect(__getRamRecentsForTests().size).toBe(0);
     expect(
-      await readRamRecent(endpointFingerprint(stopEndpoint)),
+      await readRamRecent(await recentStorageId(stopEndpoint)),
     ).toBeNull();
     expect(await db.recentLocations.count()).toBe(0);
   });
@@ -699,6 +703,49 @@ describe("migrateRecentsForLevelChange", () => {
     __clearRamStoreForTests();
   });
 
+  it("retains unreadable city history and moves its opaque record off disk under RAM-only policy", async () => {
+    const row: RecentLocationRecord = {id: "unreadable", cityId: useCityStore.getState().activeCity.id,
+      endpoint: {v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(1)}, usedAt: 100, usedAsOrigin: true};
+    await db.recentLocations.put(row);
+    await migrateRecentsForLevelChange("hardened", "baseline");
+    expect(await db.recentLocations.get(row.id)).toEqual(row);
+    await migrateRecentsForLevelChange("hardened", "paranoid");
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(__getRamRecentsForTests().get(row.id)).toEqual(row);
+    usePrivacyStore.setState({level: "paranoid"});
+    expect(await listRecents()).toEqual([]);
+  });
+
+  it("keeps the RAM source if persisting its replacement fails", async () => {
+    usePrivacyStore.setState({level: "paranoid"});
+    await recordRecent(stopEndpoint, {usedAsOrigin: true, now: () => 100});
+    const source = [...__getRamRecentsForTests().values()];
+    const put = vi.spyOn(db.recentLocations, "put").mockRejectedValueOnce(new Error("quota"));
+    try {
+      await expect(migrateRecentsForLevelChange("paranoid", "standard")).rejects.toThrow("quota");
+      expect([...__getRamRecentsForTests().values()]).toEqual(source);
+      expect(await db.recentLocations.count()).toBe(0);
+    } finally { put.mockRestore(); }
+  });
+
+  it("preserves concurrent edits, deletions and new city history during conversion", async () => {
+    const row = (id: string, usedAt: number): RecentLocationRecord => ({id, cityId: "vilnius", endpoint: stopEndpoint, usedAt, usedAsOrigin: true});
+    await db.recentLocations.bulkPut([row("edited", 1), row("deleted", 1)]);
+    const read = db.recentLocations.toArray.bind(db.recentLocations);
+    const snapshot = vi.spyOn(db.recentLocations, "toArray").mockImplementationOnce(() => read().then(async rows => {
+      await db.recentLocations.put(row("edited", 2));
+      await db.recentLocations.delete("deleted");
+      await db.recentLocations.put({...row("new", 3), cityId: "krakow"});
+      return rows;
+    }));
+    try {
+      await migrateRecentsForLevelChange("baseline", "hardened");
+      expect(await db.recentLocations.get("edited")).toEqual(row("edited", 2));
+      expect(await db.recentLocations.get("deleted")).toBeUndefined();
+      expect(await db.recentLocations.get("new")).toMatchObject({cityId: "krakow", usedAt: 3});
+    } finally { snapshot.mockRestore(); }
+  });
+
   it("Baseline → Hardened encrypts existing plaintext recents at the new tier", async () => {
     // Seed a plaintext recent at Baseline.
     usePrivacyStore.setState({ level: "baseline" });
@@ -747,9 +794,10 @@ describe("migrateRecentsForLevelChange", () => {
     expect(await db.recentLocations.count()).toBe(0);
     const ram = __getRamRecentsForTests();
     expect(ram.size).toBe(1);
-    const moved = ram.get(endpointFingerprint(stopEndpoint));
+    const moved = ram.get(await recentStorageId(stopEndpoint));
     expect(moved).toEqual({
-      id: endpointFingerprint(stopEndpoint),
+      id: await recentStorageId(stopEndpoint),
+      cityId: useCityStore.getState().activeCity.id,
       endpoint: stopEndpoint,
       usedAt: 1_000,
       usedAsOrigin: true,
@@ -946,4 +994,37 @@ describe("listRecents", () => {
     expect(await countRecents()).toBe(1);
     usePrivacyStore.getState().reset();
   });
+});
+
+it("keeps same-ID city recents independent through cache reuse, reloads and privacy tier changes", async () => {
+  const original = useCityStore.getState().activeCity;
+  await db.recentLocations.clear();
+  __clearRamRecentsForTests();
+  __resetRecentsCacheForTests();
+  usePrivacyStore.getState().reset();
+  usePrivacyChoicesStore.getState().setChoice("recents", "enabled");
+  localStorage.setItem(PRIVACY_DATA_MIGRATION_KEY, PRIVACY_DATA_MIGRATION_VERSION);
+  try {
+    useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+    const pending = recordRecent(stopEndpoint, {usedAsOrigin: true, tier: "encrypted"});
+    useCityStore.setState({activeCity: {...original, id: "krakow"}});
+    await pending;
+    expect(await listRecents()).toEqual([]);
+    await recordRecent({...stopEndpoint, name: "Other city stop"}, {usedAsOrigin: false, tier: "encrypted"});
+    expect((await listRecents())[0]?.base).toMatchObject({name: "Other city stop"});
+    useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+    expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+    await migrateRecentsForLevelChange("hardened", "paranoid");
+    usePrivacyStore.setState({level: "paranoid"});
+    expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+    await migrateRecentsForLevelChange("paranoid", "hardened");
+    usePrivacyStore.setState({level: "hardened"});
+    db.close();
+    await db.open();
+    __resetRecentsCacheForTests();
+    expect((await listRecents())[0]?.base).toMatchObject({name: stopEndpoint.name});
+    const rows = await db.recentLocations.toArray();
+    expect(rows.map(row => row.cityId).sort()).toEqual(["krakow", "vilnius"]);
+    expect(rows.every(row => /^[a-f0-9]{64}$/.test(row.id))).toBe(true);
+  } finally { useCityStore.setState({activeCity: original}); }
 });

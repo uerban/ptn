@@ -33,6 +33,8 @@ import {
   type OverthrowLine,
 } from "../components/Settings/overthrow.ts";
 
+const CitySavesSection = lazy(() => import("../components/Settings/CitySavesSection.tsx").then(m => ({default: m.CitySavesSection})));
+
 const AdvancedSettings = lazy(() =>
   import("../components/Settings/AdvancedSettings.tsx").then((m) => ({
     default: m.AdvancedSettings,
@@ -966,6 +968,10 @@ export function SettingsPage() {
             </ErrorBoundary>
           </>
         )}
+
+        <ErrorBoundary fallback={<p>{t("settings.saved_places_error", "Could not load saved-place recovery.")}</p>}>
+          <Suspense fallback={null}><CitySavesSection /></Suspense>
+        </ErrorBoundary>
 
         {/* About */}
         <section>

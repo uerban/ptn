@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { encode } from "@pt/shared";
-import { fetchTransfersArtifact } from "../../src/services/transfersArtifact.ts";
+import { fetchTransfersArtifact, clearTransferArtifactMemory } from "../../src/services/transfersArtifact.ts";
 
 const URL = "/api/vilnius/transfers/fetch";
 
@@ -23,6 +23,7 @@ function mockFetch(impl: typeof fetch): void {
 
 describe("fetchTransfersArtifact", () => {
   beforeEach(() => {
+    clearTransferArtifactMemory();
     // jsdom doesn't supply window.location at module init for some test
     // configs — pin a known origin so the URL resolution is deterministic.
     vi.stubGlobal("window", { location: { origin: "http://localhost" } });

@@ -98,3 +98,26 @@ describe("optional stop-use personalization", () => {
     expect(retentionMsForStopUsage("off")).toBeNull();
   });
 });
+
+it("isolates reused stop IDs by captured city and counts concurrent taps atomically", async () => {
+  const {useCityStore} = await import("../stores/cityStore.ts");
+  const original = useCityStore.getState().activeCity;
+  await db.cityUsageStats.clear();
+  await db.usageStats.clear();
+  localStorage.setItem(PRIVACY_DATA_MIGRATION_KEY, PRIVACY_DATA_MIGRATION_VERSION);
+  usePrivacyStore.getState().reset();
+  usePrivacyChoicesStore.getState().setChoice("personalization", "enabled");
+  try {
+    useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+    const pending = Promise.all([recordStopUsage("same", () => 100), recordStopUsage("same", () => 100)]);
+    useCityStore.setState({activeCity: {...original, id: "krakow"}});
+    await pending;
+    expect((await loadStopUsage(["same"], () => 100)).size).toBe(0);
+    await recordStopUsage("same", () => 100);
+    expect((await loadStopUsage(["same"], () => 100)).get("same")?.tapCount).toBe(1);
+    useCityStore.setState({activeCity: {...original, id: "vilnius"}});
+    expect((await loadStopUsage(["same"], () => 100)).get("same")?.tapCount).toBe(2);
+    expect(await sweepStopUsage({axis: "off"})).toBe(2);
+    expect(await db.cityUsageStats.count()).toBe(0);
+  } finally { useCityStore.setState({activeCity: original}); }
+});

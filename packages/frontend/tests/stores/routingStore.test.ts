@@ -47,6 +47,24 @@ beforeEach(async () => {
 });
 
 describe("useRoutingStore.search", () => {
+  it("rejects a foreign resident index before the city lifecycle effect runs", async () => {
+    const {useGtfsDataStore} = await import("../../src/stores/gtfsDataStore.ts");
+    const {useCityStore} = await import("../../src/stores/cityStore.ts");
+    const {useRoutingStore} = await import("../../src/stores/routingStore.ts");
+    const {SearchOrchestrator} = await import("../../src/services/searchOrchestrator.ts");
+    await useGtfsDataStore.getState().init("vilnius");
+    const original = useCityStore.getState().activeCity;
+    const search = vi.spyOn(SearchOrchestrator.prototype, "search").mockResolvedValue([]);
+    try {
+      useCityStore.setState({activeCity: {...original, id: "other"}});
+      const group: BaseEndpoint = {kind: "stopGroup", stopIds: ["s1"], lat: 54.68, lon: 25.28, label: "Reused id"};
+      await useRoutingStore.getState().search(group, group, new Date());
+      expect(search).not.toHaveBeenCalled();
+      expect(useRoutingStore.getState().error).toMatch(/GTFS data not loaded/);
+      expect(useRoutingStore.getState().results).toEqual([]);
+    } finally {useCityStore.setState({activeCity: original}); search.mockRestore();}
+  });
+
   it("accepts BaseEndpoint for origin/destination", async () => {
     const { useGtfsDataStore } = await import("../../src/stores/gtfsDataStore.ts");
     await useGtfsDataStore.getState().init("vilnius");

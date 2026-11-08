@@ -5,6 +5,8 @@ import { decrypt, encrypt, type EncryptedRecord } from "./cryptoBox.ts";
 import { getOrCreateInstallKey } from "./installKey.ts";
 import { getPolicy, registerLevelChangeListener } from "../stores/privacyStore.ts";
 
+import { useCityStore } from "../stores/cityStore.ts";
+
 export type SavesTier = "plaintext" | "encrypted";
 
 /**
@@ -163,6 +165,8 @@ async function writeSave(
   },
   opts: SaveRoutePairOptions,
 ): Promise<SavedLocationRecord> {
+  // Capture ownership before encryption yields to a possible city switch.
+  const cityId = useCityStore.getState().activeCity.id;
   const axis = getPolicy().savesEncryption;
   const policyTier = tierForSavesAxis(axis);
   // Per-save override is honored only at axes that expose the toggle; at
@@ -199,6 +203,7 @@ async function writeSave(
 
   const record: SavedLocationRecord = {
     id,
+    cityId,
     endpoint: storedOrigin,
     // Omitted entirely for single-place saves — readers branch on presence.
     ...(storedDest !== undefined ? { destinationEndpoint: storedDest } : {}),
@@ -305,7 +310,9 @@ export async function migrateSavesForLevelChange(
       try {
         alias = (await decrypt(row.aliasCipher, await ensureKey())) as string;
       } catch {
-        alias = row.alias;
+        // Keep the sealed record recoverable if this installation cannot
+        // decrypt its alias. Replacing it with the empty display alias loses it.
+        continue;
       }
     } else {
       alias = row.alias;
@@ -330,6 +337,7 @@ export async function migrateSavesForLevelChange(
 
     const next: SavedLocationRecord = {
       id: row.id,
+      ...(row.cityId !== undefined ? { cityId: row.cityId } : {}),
       endpoint: storedOrigin,
       ...(storedDest !== undefined ? { destinationEndpoint: storedDest } : {}),
       alias: storedAlias,
@@ -341,10 +349,22 @@ export async function migrateSavesForLevelChange(
     rewritten.push(next);
   }
 
-  await db.savedLocations.clear();
-  for (const rec of rewritten) {
-    await db.savedLocations.put(rec);
-  }
+  // JSON's default ArrayBuffer representation is {}, which would consider
+  // different encrypted edits identical. Include the actual ciphertext bytes.
+  const version = (row: SavedLocationRecord) => JSON.stringify(row, (_key, value) =>
+    Object.prototype.toString.call(value) === "[object ArrayBuffer]"
+      ? Array.from(new Uint8Array(value as ArrayBuffer)) : value);
+  const originals = new Map(rows.map(row => [row.id, version(row)]));
+  await db.transaction("rw", db.savedLocations, async () => {
+    for (const rec of rewritten) {
+      const current = await db.savedLocations.get(rec.id);
+      // Encryption runs outside the transaction. Preserve concurrent edits,
+      // deletions and new saves, including those owned by another city.
+      if (current && version(current) === originals.get(rec.id)) {
+        await db.savedLocations.put(rec);
+      }
+    }
+  });
 }
 
 registerLevelChangeListener(migrateSavesForLevelChange);

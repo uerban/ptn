@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { TransportMode } from "@pt/shared";
-import { db } from "../db/index.ts";
+import { captureCityData } from "../services/cityData.ts";
 import { buildLinePatterns } from "../utils/buildLinePatterns.ts";
 import type { LinePattern } from "../stores/lineViewStore.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
@@ -74,7 +74,7 @@ export function LinePreviewPage() {
     (async () => {
       try {
         const [route, built] = await Promise.all([
-          db.gtfsRoutes.get(routeId),
+          captureCityData().gtfsRoutes.get(routeId),
           buildLinePatterns(routeId),
         ]);
         if (cancelled) return;

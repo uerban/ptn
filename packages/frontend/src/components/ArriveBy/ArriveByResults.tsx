@@ -1,3 +1,4 @@
+import { useEffectiveExcludedModes } from "../../hooks/useEffectiveExcludedModes.ts";
 /**
  * Opt-in Arrive-by results: while a deadline is applied, runs the selected
  * latest-then-portfolio search on the router's arrive-by channel and shows
@@ -11,7 +12,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
-import { db } from "../../db/index.ts";
+import { captureCityData } from "../../services/cityData.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
@@ -51,12 +52,14 @@ async function cardsFor(options: readonly ArriveByJourneyOption[], prepared: Arr
     markArriveBy(ARRIVE_BY_MARKS.cards, { status, start, tripsRead: start, routesRead: start, trips: 0, routes: 0, options: 0 });
     return [];
   }
+  const data = captureCityData();
   let tripsRead = start, routesRead = start;
   const tripIds = [...new Set(options.flatMap((o) => o.journey.rides.map((r) => r.tripId)))];
   const [trips, routeColors] = await Promise.all([
-    (tripIds.length > 0 ? db.gtfsTrips.bulkGet(tripIds) : Promise.resolve([])).then((rows) => { tripsRead = performance.now(); return rows; }),
+    (tripIds.length > 0 ? data.gtfsTrips.bulkGet(tripIds) : Promise.resolve([])).then((rows) => { tripsRead = performance.now(); return rows; }),
     arriveByRouteColors().then((colors) => { routesRead = performance.now(); return colors; }),
   ]);
+  data.assertCurrent();
   const headsigns = new Map<string, string>();
   for (const trip of trips) if (trip?.headsign) headsigns.set(trip.tripId, trip.headsign);
   const cards = arriveByCards(options, {
@@ -84,7 +87,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
   const cityId = useCityStore((s) => s.activeCity.id);
   const tz = useCityStore((s) => s.activeCity.tz) ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Every setting the query reads re-runs the search.
-  const excludedModes = useSettingsStore((s) => s.excludedModes);
+  const excludedModes = useEffectiveExcludedModes();
   const excludedRouteGroupsByCity = useSettingsStore((s) => s.excludedRouteGroupsByCity);
   const mobilityProfile = useSettingsStore((s) => s.mobilityProfile);
   const walkSpeedMps = useSettingsStore((s) => s.walkSpeedMps);

@@ -13,6 +13,8 @@ import {
 } from "./cryptoBox.ts";
 import { getOrCreateInstallKey } from "./installKey.ts";
 import { getPolicy, registerLevelChangeListener } from "../stores/privacyStore.ts";
+import { useCityStore } from "../stores/cityStore.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 import { isOptionalStorageEnabledNow } from "./privacyChoices.ts";
 
 export const MAX_RECENTS = 50;
@@ -25,9 +27,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Decrypted snapshot cache (hot-path: listRecents runs per keystroke). Invalidated
 // by every mutation (recordRecent / clearRecents / migrateRecentsForLevelChange).
-let _recentsCache: RecentRef[] | null = null;
+let _recentsCache: {cityId: string; axis: PrivacyPolicy["recentsEncryption"]; values: RecentRef[]} | null = null;
+let recentsRevision = 0;
 function invalidateRecentsCache(): void {
   _recentsCache = null;
+  recentsRevision++;
 }
 
 export type RecentsTier = "plaintext" | "encrypted" | "ram-only";
@@ -92,6 +96,13 @@ export function endpointFingerprint(ep: BaseEndpoint): string {
   }
 }
 
+/** Opaque city-qualified storage key; coordinates/labels never become indexes. */
+export async function recentStorageId(endpoint: BaseEndpoint, cityId = canonicalCityId(useCityStore.getState().activeCity.id)): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify([cityId, endpointFingerprint(endpoint)]));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function recordRecent(
   endpoint: BaseEndpoint,
   opts: RecordRecentOptions,
@@ -101,17 +112,20 @@ export async function recordRecent(
   if (opts.tier === undefined && axis === "off") return; // Off: never record
   const tier = opts.tier ?? tierForRecentsAxis(axis);
   const now = opts.now ? opts.now() : Date.now();
-  const id = endpointFingerprint(endpoint);
+  const cityId = canonicalCityId(useCityStore.getState().activeCity.id);
+  const id = await recentStorageId(endpoint, cityId);
+  if (!isOptionalStorageEnabledNow("recents")) return;
 
   if (tier === "ram-only") {
     const record: RecentLocationRecord = {
       id,
+      cityId,
       endpoint,
       usedAt: now,
       usedAsOrigin: opts.usedAsOrigin,
     };
     await writeRecord(db.recentLocations, record, { tier: "ram-only" });
-    evictRamIfNeeded();
+    evictRamIfNeeded(cityId);
     invalidateRecentsCache();
     return;
   }
@@ -124,31 +138,26 @@ export async function recordRecent(
     storedEndpoint = endpoint;
   }
 
+  if (!isOptionalStorageEnabledNow("recents") || getPolicy().recentsEncryption !== axis) return;
   await db.recentLocations.put({
     id,
+    cityId,
     endpoint: storedEndpoint,
     usedAt: now,
     usedAsOrigin: opts.usedAsOrigin,
   });
-  await evictIfNeeded();
+  await evictIfNeeded(cityId);
   invalidateRecentsCache();
 }
 
-async function evictIfNeeded(): Promise<void> {
-  const count = await db.recentLocations.count();
-  if (count <= MAX_RECENTS) return;
-  const excess = count - MAX_RECENTS;
-  const oldestIds = await db.recentLocations
-    .orderBy("usedAt")
-    .limit(excess)
-    .primaryKeys();
-  if (oldestIds.length > 0) {
-    await db.recentLocations.bulkDelete(oldestIds);
-  }
+async function evictIfNeeded(cityId: string): Promise<void> {
+  const rows = await db.recentLocations.where("cityId").equals(cityId).sortBy("usedAt");
+  const excess = rows.length - MAX_RECENTS;
+  if (excess > 0) await db.recentLocations.bulkDelete(rows.slice(0, excess).map(row => row.id));
 }
 
-function evictRamIfNeeded(): void {
-  const entries = listRamRecords<RecentLocationRecord>(db.recentLocations);
+function evictRamIfNeeded(cityId: string): void {
+  const entries = listRamRecords<RecentLocationRecord>(db.recentLocations).filter(row => row.cityId === cityId);
   if (entries.length <= MAX_RECENTS) return;
   entries.sort((a, b) => a.usedAt - b.usedAt);
   const excess = entries.length - MAX_RECENTS;
@@ -179,15 +188,18 @@ export async function listRecents(): Promise<RecentRef[]> {
   if (!isOptionalStorageEnabledNow("recents")) return [];
   const axis = getPolicy().recentsEncryption;
   if (axis === "off") return [];
-  if (_recentsCache) return _recentsCache;
+  const cityId = canonicalCityId(useCityStore.getState().activeCity.id);
+  const revision = recentsRevision;
+  if (_recentsCache?.cityId === cityId && _recentsCache.axis === axis) return _recentsCache.values;
   const tier = tierForRecentsAxis(axis);
   const out: RecentRef[] = [];
   if (tier === "ram-only") {
     for (const rec of listRamRecords<RecentLocationRecord>(db.recentLocations)) {
+      if (rec.cityId !== cityId || isEncryptedShape(rec.endpoint)) continue;
       out.push({ kind: "recent", base: rec.endpoint as BaseEndpoint, usedAt: rec.usedAt, usedAsOrigin: rec.usedAsOrigin });
     }
   } else {
-    const rows = await db.recentLocations.toArray();
+    const rows = await db.recentLocations.where("cityId").anyOf(cityId === "tricity" ? [cityId, "gdansk"] : [cityId]).toArray();
     let key: CryptoKey | null = null;
     for (const row of rows) {
       let base: BaseEndpoint;
@@ -206,8 +218,11 @@ export async function listRecents(): Promise<RecentRef[]> {
     }
   }
   out.sort((a, b) => b.usedAt - a.usedAt);
-  _recentsCache = out.slice(0, RECENTS_LIST_LIMIT);
-  return _recentsCache;
+  if (!isOptionalStorageEnabledNow("recents") || getPolicy().recentsEncryption !== axis || canonicalCityId(useCityStore.getState().activeCity.id) !== cityId) return [];
+  if (revision !== recentsRevision) return listRecents();
+  const values = out.slice(0, RECENTS_LIST_LIMIT);
+  _recentsCache = {cityId, axis, values};
+  return values;
 }
 
 /**
@@ -323,70 +338,64 @@ export async function migrateRecentsForLevelChange(
   const nextTier = tierForRecentsAxis(LEVEL_FLOORS[next].recentsEncryption);
   if (prevTier === nextTier) return;
 
-  const collected: RecentLocationRecord[] = [];
-
-  if (prevTier === "ram-only") {
-    for (const rec of listRamRecords<RecentLocationRecord>(
-      db.recentLocations,
-    )) {
-      collected.push(rec);
-    }
-    clearRamRecordsForTable(db.recentLocations);
-  } else {
-    const rows = await db.recentLocations.toArray();
-    if (rows.length === 0) return;
-    let key: CryptoKey | null = null;
-    for (const row of rows) {
-      let endpoint: BaseEndpoint;
-      if (isEncryptedShape(row.endpoint)) {
-        if (key === null) key = await getOrCreateInstallKey();
-        try {
-          endpoint = (await decrypt(row.endpoint, key)) as BaseEndpoint;
-        } catch {
-          continue;
-        }
-      } else {
-        endpoint = row.endpoint;
+  const source = prevTier === "ram-only"
+    ? listRamRecords<RecentLocationRecord>(db.recentLocations)
+    : await db.recentLocations.toArray();
+  if (!source.length) return;
+  const version = (row: RecentLocationRecord) => JSON.stringify(row, (_key, value) =>
+    Object.prototype.toString.call(value) === "[object ArrayBuffer]"
+      ? Array.from(new Uint8Array(value as ArrayBuffer)) : value);
+  const rewritten = new Map<string, RecentLocationRecord>();
+  let key: CryptoKey | null = null;
+  for (const row of source) {
+    let endpoint = row.endpoint;
+    if (isEncryptedShape(endpoint)) {
+      key ??= await getOrCreateInstallKey();
+      try { endpoint = await decrypt(endpoint, key) as BaseEndpoint; }
+      catch {
+        // Retain the opaque record for recovery. RAM-only policy moves even
+        // unreadable ciphertext off disk; listRecents does not expose it.
+        rewritten.set(row.id, row);
+        continue;
       }
-      collected.push({
-        id: row.id,
-        endpoint,
-        usedAt: row.usedAt,
-        usedAsOrigin: row.usedAsOrigin,
-      });
     }
-    await db.recentLocations.clear();
+    if (nextTier === "encrypted") {
+      key ??= await getOrCreateInstallKey();
+      endpoint = await encrypt(endpoint, key);
+    }
+    rewritten.set(row.id, {...row, endpoint});
   }
-
-  // collected empty: RAM store was already empty, nothing changed — cache stays valid.
-  if (collected.length === 0) return;
-
+  if (!isOptionalStorageEnabledNow("recents")) { await clearRecents(); return; }
+  const moved: RecentLocationRecord[] = [];
+  await db.transaction("rw", db.recentLocations, async () => {
+    for (const original of source) {
+      const current = await db.recentLocations.get(original.id);
+      if (prevTier === "ram-only") {
+        // A newly persisted visit must not be replaced by the older RAM copy.
+        if (current && current.usedAt > original.usedAt) continue;
+      } else if (!current || version(current) !== version(original)) continue;
+      const nextRow = rewritten.get(original.id)!;
+      if (nextTier === "ram-only") await db.recentLocations.delete(original.id);
+      else await db.recentLocations.put(nextRow);
+      moved.push(nextRow);
+    }
+  });
+  // Only committed rows move between stores. Encryption/quota/transaction
+  // failure leaves the source intact; concurrent visits and deletes survive.
+  if (!isOptionalStorageEnabledNow("recents")) { await clearRecents(); return; }
   if (nextTier === "ram-only") {
-    for (const rec of collected) {
-      await writeRecord(db.recentLocations, rec, { tier: "ram-only" });
+    for (const row of moved) {
+      if (!isOptionalStorageEnabledNow("recents")) { await clearRecents(); return; }
+      const current = listRamRecords<RecentLocationRecord>(db.recentLocations).find(value => value.id === row.id);
+      if (!current || current.usedAt <= row.usedAt) await writeRecord(db.recentLocations, row, {tier: "ram-only"});
     }
-    invalidateRecentsCache();
-    return;
   }
-
-  if (nextTier === "encrypted") {
-    const key = await getOrCreateInstallKey();
-    for (const rec of collected) {
-      const ct = await encrypt(rec.endpoint, key);
-      await db.recentLocations.put({
-        id: rec.id,
-        endpoint: ct,
-        usedAt: rec.usedAt,
-        usedAsOrigin: rec.usedAsOrigin,
-      });
+  if (prevTier === "ram-only") {
+    const currentRam = new Map(listRamRecords<RecentLocationRecord>(db.recentLocations).map(row => [row.id, row]));
+    for (const original of source) {
+      const current = currentRam.get(original.id);
+      if (current && version(current) === version(original)) deleteRamRecord(db.recentLocations, original.id);
     }
-    invalidateRecentsCache();
-    return;
-  }
-
-  // plaintext
-  for (const rec of collected) {
-    await db.recentLocations.put(rec);
   }
   invalidateRecentsCache();
 }

@@ -47,7 +47,7 @@ describe("savedLocations table schema", () => {
   it("opens with the savedLocations table present", async () => {
     const { db } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(7);
     expect(db.savedLocations).toBeDefined();
     expect(await db.savedLocations.count()).toBe(0);
   });

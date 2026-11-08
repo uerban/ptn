@@ -18,7 +18,7 @@ export async function clearViewportData(
 }
 
 export async function clearPersonalizationData(): Promise<void> {
-  await db.usageStats.clear();
+  await Promise.all([db.usageStats.clear(), db.cityUsageStats.clear()]);
 }
 
 export async function clearLocalReportsData(

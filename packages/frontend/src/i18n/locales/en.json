@@ -613,5 +613,14 @@
   "gps.pause": "Pause GPS to save battery",
   "gps.resume": "GPS paused. Tap to resume.",
   "gps.disabled_button": "GPS is off. Enable it in Settings.",
-  "gps.description": "Location stays on this device. Completely off also disables GPS during navigation and the Locate me button. Stop alerts need the app visible; they cannot be guaranteed with the screen locked."
+  "gps.description": "Location stays on this device. Completely off also disables GPS during navigation and the Locate me button. Stop alerts need the app visible; they cannot be guaranteed with the screen locked.",
+  "settings.assign_save_city": "Use in {city}",
+  "settings.city_saved_places": "Saved places for this city",
+  "settings.city_saves_description": "Home, Work and other saved places belong to the city where you save them.",
+  "settings.unassigned_saves": "Unassigned saved places",
+  "settings.unassigned_saves_help": "Older saved places may have no city. Choose which ones to use here; the others stay available in this list.",
+  "settings.saved_place": "Saved place",
+  "settings.no_unassigned_saves": "No unassigned saved places.",
+  "settings.assign_save_error": "Could not assign this saved place. Try again.",
+  "settings.saved_places_error": "Could not load saved-place recovery."
 }

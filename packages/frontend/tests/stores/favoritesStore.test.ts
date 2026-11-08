@@ -110,3 +110,27 @@ describe("favoritesStore", () => {
     expect(fav.stopId).toBe("lt-vilnius_16581");
   });
 });
+
+
+it("reordering one city's favorites preserves other cities and unassigned saves", () => {
+  const make = (id: string, cityId?: string) => ({
+    id, cityId, name: id, type: "place" as const,
+    location: { lat: 1, lon: 1 }, sortOrder: 0, createdAt: "2026-01-01",
+  });
+  useFavoritesStore.setState({ favorites: [make("a", "vilnius"), make("b", "krakow"), make("c", "vilnius"), make("legacy")] });
+  useFavoritesStore.getState().reorderFavorites(["c", "c", "missing", "a"]);
+  expect(useFavoritesStore.getState().favorites.map((f) => f.id)).toEqual(["c", "b", "a", "legacy"]);
+});
+
+
+it("adding, removing and reordering one city never rewrites another city's order", () => {
+  const make = (id: string, cityId: string, sortOrder: number) => ({id, cityId, sortOrder, name: id, type: "place" as const, location: {lat: 1, lon: 2}, createdAt: "2026-01-01"});
+  const foreign = make("b", "city-b", 99);
+  useFavoritesStore.setState({favorites: [make("a1", "city-a", 0), foreign, make("a2", "city-a", 1)]});
+  useFavoritesStore.getState().reorderFavorites(["a2", "a1"]);
+  expect(useFavoritesStore.getState().favorites.find(fav => fav.id === "b")).toBe(foreign);
+  useFavoritesStore.getState().removeFavorite("a1");
+  expect(useFavoritesStore.getState().favorites.find(fav => fav.id === "b")).toBe(foreign);
+  useFavoritesStore.getState().addFavorite({cityId: "city-a", name: "New", type: "home", location: {lat: 1, lon: 2}});
+  expect(useFavoritesStore.getState().favorites.find(fav => fav.id === "b")).toBe(foreign);
+});

@@ -17,6 +17,7 @@ import { migrationCoordinator } from "./migrationCoordinator.ts";
 
 interface StopRecord {
   id: string;
+  cityId?: string;
   name: string;
   location: LatLon;
   parentStationId?: string;
@@ -146,6 +147,7 @@ export interface InstallKeyRecord {
  */
 export interface RecentLocationRecord {
   id: string;
+  cityId?: string;
   endpoint: BaseEndpoint | EncryptedRecord;
   usedAt: number;
   usedAsOrigin: boolean;
@@ -166,6 +168,8 @@ export interface RecentLocationRecord {
  */
 export interface SavedLocationRecord {
   id: string;
+  /** Absent on legacy saves whose city has not been established. */
+  cityId?: string;
   endpoint: BaseEndpoint | EncryptedRecord;
   destinationEndpoint?: BaseEndpoint | EncryptedRecord;
   alias: string;
@@ -480,13 +484,58 @@ export interface OfflineCityRecord {
   sizeBytes: number;
   tables: Record<string, object[]>;
 }
+/** Small download-list row. Legacy placeholders deliberately contain no payload. */
+export interface OfflineCityMetadata {
+  cityId: string;
+  state: "legacy" | "complete";
+  city?: import("../config/cities.ts").CityConfig;
+  preparedAt?: number;
+  sizeBytes?: number;
+  generationId?: string;
+  transfersHash?: string;
+  artifactKey?: string;
+  shapesHash?: string;
+}
 export interface OfflineTransferRecord { hash: string; bytes: Uint8Array }
+export interface SharedArtifactMetadata {
+  key: string; kind: "transfers" | "shapes"; hash: string;
+  /** Missing for key-only legacy discovery until this payload is accessed. */
+  sizeBytes?: number;
+  lastUsedAt: number;
+}
+
+/** Immutable verified PTB generation. No decoded per-trip projection is stored. */
+export interface CityArtifactRecord {
+  key: string;
+  cityId: string;
+  generation: import("../services/ptbCatalog.ts").PtbCatalogGeneration;
+  ptb: import("../services/gtfsBundleBytes.ts").FetchPtbBytesResult;
+}
+/** Payload-free inventory for budget accounting and reference collection. */
+export interface CityArtifactMetadata {
+  key: string; cityId: string; sizeBytes: number; createdAt: number;
+  generationId: string;
+  transfersHash?: string;
+  shapesArtifact?: {url: string; hash: string; sizeBytes: number};
+  ptbSizeBytes?: number;
+  transfersSizeBytes?: number;
+}
+export interface CityCachePointer { cityId: string; artifactKey: string; lastUsedAt: number }
+
+export interface CityUsageStatRecord extends UsageStatRecord { id: string; cityId: string }
 
 interface PtnTables {
+  sharedArtifactMetadata: EntityTable<SharedArtifactMetadata, "key">;
+  cityShapes: EntityTable<OfflineTransferRecord, "hash">;
+  cityArtifacts: EntityTable<CityArtifactRecord, "key">;
+  cityArtifactMetadata: EntityTable<CityArtifactMetadata, "key">;
+  cityCachePointers: EntityTable<CityCachePointer, "cityId">;
   offlineCities: EntityTable<OfflineCityRecord, "cityId">;
+  offlineCityMetadata: EntityTable<OfflineCityMetadata, "cityId">;
   offlineTransfers: EntityTable<OfflineTransferRecord, "hash">;
   stops: EntityTable<StopRecord, "id">;
   usageStats: EntityTable<UsageStatRecord, "stopId">;
+  cityUsageStats: EntityTable<CityUsageStatRecord, "id">;
   gtfsRoutes: EntityTable<GtfsRouteRecord, "id">;
   gtfsTrips: EntityTable<GtfsTripRecord, "tripId">;
   gtfsServices: EntityTable<GtfsServiceRecord, "serviceId">;
@@ -510,11 +559,11 @@ interface PtnTables {
 }
 
 export type PtnTableName = keyof PtnTables;
-export type TableKind = "server-derived" | "user-owned";
+export type TableKind = "server-derived" | "user-owned" | "retained-download";
 
 /**
  * Classifies every Dexie table as server-derived (safe to wipe on a
- * data-schema bump) or user-owned (must survive every wipe). The
+ * data-schema bump), user-owned, or retained-download (both survive cache wipes). The
  * `satisfies Record<PtnTableName, TableKind>` clause forces a compile
  * error if a new table is added to `PtnTables` without classifying it
  * here — making the deployed/user-owned split a load-bearing
@@ -523,8 +572,14 @@ export type TableKind = "server-derived" | "user-owned";
  * Consumed by `dataSchemaVersion.ts` to derive the wipe set.
  */
 export const TABLE_KIND = {
+  sharedArtifactMetadata: "retained-download",
+  cityShapes: "retained-download",
+  cityArtifacts: "retained-download",
+  cityArtifactMetadata: "retained-download",
+  cityCachePointers: "retained-download",
   stops: "server-derived",
   usageStats: "user-owned",
+  cityUsageStats: "user-owned",
   gtfsRoutes: "server-derived",
   gtfsTrips: "server-derived",
   gtfsServices: "server-derived",
@@ -545,18 +600,26 @@ export const TABLE_KIND = {
   scheduleTileCache: "server-derived",
   gbfsSystems: "server-derived",
   addressSearchArtifacts: "server-derived",
-  offlineCities: "server-derived",
-  offlineTransfers: "server-derived",
+  offlineCities: "retained-download",
+  offlineTransfers: "retained-download",
+  offlineCityMetadata: "retained-download",
 } as const satisfies Record<PtnTableName, TableKind>;
 
 const db = new Dexie("ptn") as Dexie & PtnTables;
 
 /** The complete Dexie schema: table → primary key and indexes. */
 export const STORES = {
+  sharedArtifactMetadata: "key",
+  cityShapes: "hash",
+  cityArtifacts: "key",
+  cityArtifactMetadata: "key, cityId",
+  cityCachePointers: "cityId",
   offlineCities: "cityId",
   offlineTransfers: "hash",
+  offlineCityMetadata: "cityId",
   stops: "id, lastSeen",
   usageStats: "stopId, lastTapped",
+  cityUsageStats: "id, cityId, lastTapped",
   gtfsRoutes: "id",
   gtfsTrips: "tripId, routeId",
   gtfsServices: "serviceId",
@@ -564,8 +627,8 @@ export const STORES = {
   gtfsStops: "id",
   stopGroups: "groupId, name",
   installKey: "id",
-  recentLocations: "id, usedAt",
-  savedLocations: "id, savedAt",
+  recentLocations: "id, usedAt, cityId",
+  savedLocations: "id, savedAt, cityId",
   poiIndex: "id, [cityId+name], [cityId+geoBucket]",
   poiSyncMeta: "cityId",
   geocoderDedup: "queryHash, [providerId+createdAt]",
@@ -585,11 +648,44 @@ export const STORES = {
 migrationCoordinator.reserve({
   id: "ptn",
   version: 1,
-  stores: Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers"].includes(name))),
+  stores: {...Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers", "offlineCityMetadata", "cityUsageStats", "cityArtifacts", "cityArtifactMetadata", "cityCachePointers", "cityShapes", "sharedArtifactMetadata"].includes(name))), savedLocations: "id, savedAt", recentLocations: "id, usedAt"},
 });
 
 migrationCoordinator.reserve({id: "offline-city-packages", version: 2,
   stores: {offlineCities: "cityId", offlineTransfers: "hash"}});
+
+// Key-only discovery avoids cloning every timetable during the version upgrade.
+// Details are filled only when the corresponding city is opened or downloaded.
+migrationCoordinator.reserve({id: "offline-city-metadata", version: 3,
+  stores: {offlineCityMetadata: "cityId"},
+  upgrade: async (tx) => {
+    const cityIds = await tx.table("offlineCities").toCollection().primaryKeys();
+    await tx.table("offlineCityMetadata").bulkPut(cityIds.map(cityId => ({cityId, state: "legacy"})));
+  },
+});
+
+// Add ownership indexes without rewriting/decrypting legacy private values.
+migrationCoordinator.reserve({id: "city-user-data", version: 4,
+  stores: {savedLocations: "id, savedAt, cityId", recentLocations: "id, usedAt, cityId",
+    cityUsageStats: STORES.cityUsageStats},
+});
+
+migrationCoordinator.reserve({id: "city-artifacts", version: 5,
+  stores: {cityArtifacts: STORES.cityArtifacts, cityArtifactMetadata: STORES.cityArtifactMetadata,
+    cityCachePointers: STORES.cityCachePointers},
+});
+
+migrationCoordinator.reserve({id: "city-shape-artifacts", version: 6, stores: {cityShapes: STORES.cityShapes}});
+
+migrationCoordinator.reserve({id: "shared-artifact-inventory", version: 7,
+  stores: {sharedArtifactMetadata: STORES.sharedArtifactMetadata},
+  upgrade: async tx => {
+    for (const [kind, name] of [["transfers", "offlineTransfers"], ["shapes", "cityShapes"]] as const) {
+      const hashes = await tx.table(name).toCollection().primaryKeys();
+      await tx.table("sharedArtifactMetadata").bulkPut(hashes.map(hash => ({key: `${kind}:${hash}`, kind, hash, lastUsedAt: 0})));
+    }
+  },
+});
 
 for (const decl of migrationCoordinator.declaredMigrations()) {
   const v = db.version(decl.version).stores(decl.stores);

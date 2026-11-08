@@ -53,10 +53,10 @@ export interface CityConfig {
   readonly geocoder?: SelfHostedGeocoderConfig;
   /**
    * Modes that start excluded from routing for this city (the filter chip
-   * still shows, so the user can opt in for the session). For services that
+   * still shows, so the user can explicitly opt in globally). For services that
    * exist in the feed but are unreliable enough that defaulting them out is
-   * the safer behaviour. Seeded once per session by
-   * `settingsStore.applyCityModeDefaults`.
+   * the safer behaviour. Resolved as a city policy without changing global
+   * exclusions; explicit global choices take precedence.
    */
   readonly routeGroups?: readonly RouteGroup[];
   readonly defaultExcludedModes?: readonly TransportMode[];

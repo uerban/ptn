@@ -4,12 +4,8 @@ import { useFavoritesStore } from "../../stores/favoritesStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import type { BaseEndpoint, FavoritePlace } from "@pt/shared";
-import { db, type SavedLocationRecord } from "../../db/index.ts";
-import {
-  decrypt,
-  type EncryptedRecord,
-} from "../../services/cryptoBox.ts";
-import { getOrCreateInstallKey } from "../../services/installKey.ts";
+import { type SavedLocationRecord } from "../../db/index.ts";
+import { listCitySaves, resolveSaves, canonicalSaveCity } from "../../services/citySaves.ts";
 
 interface FavoritesBarProps {
   onFavoriteClick: (favorite: FavoritePlace) => void;
@@ -26,8 +22,9 @@ export function FavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   const enableMigration = useSettingsStore(
     (s) => s.enableFavoritesMigration,
   );
+  const cityId = useCityStore(s => s.activeCity.id);
   return enableMigration
-    ? <SavedLocationsBar onFavoriteClick={onFavoriteClick} />
+    ? <SavedLocationsBar key={cityId} cityId={cityId} onFavoriteClick={onFavoriteClick} />
     : <LegacyFavoritesBar onFavoriteClick={onFavoriteClick} />;
 }
 
@@ -35,10 +32,9 @@ function LegacyFavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   const favorites = useFavoritesStore((s) => s.favorites);
   const activeCityId = useCityStore((s) => s.activeCity.id);
 
-  // Stop favorites are city-bound; non-stop favorites (home/work/place)
-  // are coordinate-based shortcuts useful from any city.
+  // Every shortcut belongs to a city, including Home/Work and coordinates.
   const cityFavorites = favorites.filter(
-    (f) => f.type !== "stop" || f.cityId === activeCityId
+    (f) => f.cityId && canonicalSaveCity(f.cityId) === canonicalSaveCity(activeCityId)
   );
 
   if (cityFavorites.length === 0) return null;
@@ -50,10 +46,10 @@ function LegacyFavoritesBar({ onFavoriteClick }: FavoritesBarProps) {
   return <FavoritesRow favorites={sorted} onFavoriteClick={onFavoriteClick} />;
 }
 
-function SavedLocationsBar({ onFavoriteClick }: FavoritesBarProps) {
+function SavedLocationsBar({ onFavoriteClick, cityId }: FavoritesBarProps & {cityId: string}) {
   const rows = useLiveQuery(
-    () => db.savedLocations.orderBy("savedAt").toArray(),
-    [],
+    () => listCitySaves(cityId),
+    [cityId],
   );
   const [resolved, setResolved] = useState<FavoritePlace[] | null>(null);
 
@@ -105,28 +101,9 @@ function FavoritesRow({
 async function resolveSavedLocations(
   rows: SavedLocationRecord[],
 ): Promise<FavoritePlace[]> {
-  const key = rows.some((r) => r.encrypted)
-    ? await getOrCreateInstallKey().catch(() => null)
-    : null;
-  const out: FavoritePlace[] = [];
-  for (const row of rows) {
-    let endpoint: BaseEndpoint;
-    if (row.encrypted) {
-      if (!key) continue;
-      try {
-        endpoint = (await decrypt(
-          row.endpoint as EncryptedRecord,
-          key,
-        )) as BaseEndpoint;
-      } catch {
-        continue;
-      }
-    } else {
-      endpoint = row.endpoint as BaseEndpoint;
-    }
-    out.push(toFavoritePlace(row, endpoint));
-  }
-  return out;
+  const resolved = await resolveSaves(rows.filter(row => !row.destinationEndpoint));
+  const byId = new Map(rows.map(row => [row.id, row]));
+  return resolved.map(save => toFavoritePlace({...byId.get(save.id)!, alias: save.alias}, save.origin));
 }
 
 function toFavoritePlace(
@@ -141,6 +118,7 @@ function toFavoritePlace(
       : "place";
   return {
     id: row.id,
+    cityId: row.cityId,
     name: row.alias,
     type,
     location: { lat: endpoint.lat, lon: endpoint.lon },

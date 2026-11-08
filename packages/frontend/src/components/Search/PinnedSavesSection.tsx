@@ -1,22 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { BaseEndpoint } from "@pt/shared";
-import { db, type SavedLocationRecord } from "../../db/index.ts";
-import {
-  decrypt,
-  type EncryptedRecord,
-} from "../../services/cryptoBox.ts";
-import { getOrCreateInstallKey } from "../../services/installKey.ts";
+import { type SavedLocationRecord } from "../../db/index.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { canonicalSaveCity, listCitySaves, resolveSaves, type ResolvedSave } from "../../services/citySaves.ts";
+export type { ResolvedSave } from "../../services/citySaves.ts";
 import { normalizeQuery, nameMatchScore } from "../../services/geocoder/BundledGeocoderAdapter.ts";
 import { useTranslation } from "../../i18n/index.ts";
-
-export interface ResolvedSave {
-  id: string;
-  alias: string;
-  origin: BaseEndpoint;
-  destination?: BaseEndpoint;
-  savedAt: number;
-}
 
 export interface PinnedSavesSectionProps {
   onSelect: (save: ResolvedSave) => void;
@@ -26,18 +16,24 @@ export interface PinnedSavesSectionProps {
   rowsOverride?: SavedLocationRecord[] | null;
 }
 
-export function PinnedSavesSection({
+export function PinnedSavesSection(props: PinnedSavesSectionProps) {
+  const cityId = useCityStore(s => s.activeCity.id);
+  return <CityPinnedSavesSection key={cityId} {...props} cityId={cityId} />;
+}
+
+function CityPinnedSavesSection({
   onSelect,
   query = "",
   compact = false,
   rowsOverride,
-}: PinnedSavesSectionProps) {
+  cityId,
+}: PinnedSavesSectionProps & {cityId: string}) {
   const { t } = useTranslation();
   const liveRows = useLiveQuery(
-    () => db.savedLocations.toArray(),
-    [],
+    () => listCitySaves(cityId),
+    [cityId],
   );
-  const rows = rowsOverride ?? liveRows;
+  const rows = useMemo(() => (rowsOverride ?? liveRows)?.filter(row => row.cityId && canonicalSaveCity(row.cityId) === canonicalSaveCity(cityId)), [rowsOverride, liveRows, cityId]);
   const [resolved, setResolved] = useState<ResolvedSave[] | null>(null);
 
   useEffect(() => {
@@ -126,56 +122,4 @@ function endpointLabel(ep: BaseEndpoint): string {
   if (ep.kind === "geocoded") return ep.label;
   if (ep.kind === "stopGroup") return ep.label;
   return `${ep.lat.toFixed(4)}, ${ep.lon.toFixed(4)}`;
-}
-
-async function resolveSaves(
-  rows: SavedLocationRecord[],
-): Promise<ResolvedSave[]> {
-  const sorted = [...rows].sort((a, b) => b.savedAt - a.savedAt);
-  const needsKey = sorted.some((r) => r.encrypted || r.aliasCipher);
-  const key = needsKey
-    ? await getOrCreateInstallKey().catch(() => null)
-    : null;
-
-  const out: ResolvedSave[] = [];
-  for (const row of sorted) {
-    let origin: BaseEndpoint;
-    let destination: BaseEndpoint | undefined;
-    let alias = row.alias;
-    if (row.encrypted) {
-      if (!key) continue;
-      try {
-        origin = (await decrypt(
-          row.endpoint as EncryptedRecord,
-          key,
-        )) as BaseEndpoint;
-        if (row.destinationEndpoint) {
-          destination = (await decrypt(
-            row.destinationEndpoint as EncryptedRecord,
-            key,
-          )) as BaseEndpoint;
-        }
-      } catch {
-        continue;
-      }
-    } else {
-      origin = row.endpoint as BaseEndpoint;
-      destination = row.destinationEndpoint as BaseEndpoint | undefined;
-    }
-    if (row.aliasCipher && key) {
-      try {
-        alias = (await decrypt(row.aliasCipher, key)) as string;
-      } catch {
-        alias = "";
-      }
-    }
-    out.push({
-      id: row.id,
-      alias,
-      origin,
-      destination,
-      savedAt: row.savedAt,
-    });
-  }
-  return out;
 }

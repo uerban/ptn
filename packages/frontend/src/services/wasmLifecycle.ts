@@ -5,6 +5,7 @@ import { fetchPtbBytes, fetchPtbBytesPreferCache } from "./gtfsBundleBytes.ts";
 import { fetchTransfersArtifactBytes } from "./transfersArtifact.ts";
 import { readGtfsBundle, getTransfersManifest } from "./gtfsBundle.ts";
 import type { TransfersArtifactManifest } from "../db/index.ts";
+import {useCityDataStore} from "./cityData.ts";
 
 /**
  * Window CustomEvent emitted when an attach was attempted (manifest
@@ -114,15 +115,17 @@ export async function initOrSwapPtRouter(
   // before AND after (null !== null is false; reference-equality misses
   // this case — caught by panel code-review CRITICAL).
   const gen = useGtfsDataStore.getState().getInitGeneration();
+  const context = useCityDataStore.getState().active;
+  const bound = context?.token.cityId === cityId ? context.artifact?.ptb : undefined;
   // `preferCache` is for the eager init the store fires right after it
   // installs an index: those bytes are the ones the index was built from, so
   // revalidating them here would be a second multi-megabyte round-trip for
   // the same generation, and an engine built from newer bytes than the index
   // would disagree with it. A search-triggered init keeps the network-first
   // default: it may be the first thing that needs the catalog.
-  const { bytes, transfersArtifact, transfersResolved } = opts.preferCache
+  const { bytes, transfersArtifact, transfersResolved } = bound ?? (opts.preferCache
     ? await fetchPtbBytesPreferCache(cityId)
-    : await fetchPtbBytes(cityId);
+    : await fetchPtbBytes(cityId));
   const router = await buildPtRouter(bytes, cityId);
   // Attach footpath transfers before the install/free decision so an
   // orphaned-by-reset router gets freed together with its transfers
@@ -131,7 +134,7 @@ export async function initOrSwapPtRouter(
   // setTransfers call is skipped cheaply on a mid-flight reset.
   await attachTransfersIfAvailable(router, cityId, gen, transfersArtifact, transfersResolved);
   const store = useGtfsDataStore.getState();
-  if (store.getInitGeneration() !== gen) {
+  if (store.getInitGeneration() !== gen || useCityDataStore.getState().active !== context) {
     router.free();
     return router;
   }
@@ -147,11 +150,13 @@ export async function initOrSwapPtRouter(
  */
 async function reinstantiateFromCache(cityId: string): Promise<PtRouterHandle> {
   const gen = useGtfsDataStore.getState().getInitGeneration();
-  const { bytes, transfersArtifact, transfersResolved } = await fetchPtbBytesPreferCache(cityId);
+  const context = useCityDataStore.getState().active;
+  const bound = context?.token.cityId === cityId ? context.artifact?.ptb : undefined;
+  const { bytes, transfersArtifact, transfersResolved } = bound ?? await fetchPtbBytesPreferCache(cityId);
   const router = await buildPtRouter(bytes, cityId);
   await attachTransfersIfAvailable(router, cityId, gen, transfersArtifact, transfersResolved);
   const store = useGtfsDataStore.getState();
-  if (store.getInitGeneration() !== gen) {
+  if (store.getInitGeneration() !== gen || useCityDataStore.getState().active !== context) {
     router.free();
     return router;
   }

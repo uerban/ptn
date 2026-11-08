@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { buildLinePatterns } from "../../src/utils/buildLinePatterns.ts";
 import { useGtfsDataStore } from "../../src/stores/gtfsDataStore.ts";
@@ -47,6 +48,7 @@ describe("buildLinePatterns", () => {
   beforeEach(async () => {
     await db.gtfsStops.clear();
     await db.gtfsTrips.clear();
+    await seedLegacyCityProjection();
     useGtfsDataStore.setState({ raptorIndex: null, loadedCityId: null, syncing: false, error: null });
     reportErrorMock.mockClear();
   });

@@ -7,10 +7,10 @@ describe("IndexedDB schema", () => {
     await Dexie.delete("ptn");
   });
 
-  it("creates a fresh DB at version 2 with every declared table", async () => {
+  it("creates a fresh DB at version 7 with every declared table", async () => {
     const { db, STORES } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(7);
     expect(db.tables.map((t) => t.name).sort()).toEqual(Object.keys(STORES).sort());
     db.close();
   });

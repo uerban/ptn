@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("dexie-react-hooks", () => ({
-  useLiveQuery: () => mocks.stopGroups,
+vi.mock("../../hooks/useCityDataQuery.ts", () => ({
+  useCityDataQuery: () => mocks.stopGroups,
 }));
 
 vi.mock("../../db/index.ts", () => ({

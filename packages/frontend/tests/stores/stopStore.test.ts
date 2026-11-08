@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import {CityDataContext, useCityDataStore} from "../../src/services/cityData.ts";
+import {useGtfsDataStore} from "../../src/stores/gtfsDataStore.ts";
 import { useStopStore } from "../../src/stores/stopStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { db } from "../../src/db/index.ts";
@@ -10,6 +12,7 @@ import {
 
 describe("StopStore", () => {
   beforeEach(async () => {
+    useCityDataStore.setState({active: null});
     await db.delete();
     await db.open();
     useStopStore.getState().reset();
@@ -51,6 +54,7 @@ describe("StopStore", () => {
 
   it("hydrates from Dexie", async () => {
     await db.stops.put({
+      cityId: useCityStore.getState().activeCity.id,
       id: "s2",
       name: "Cached Stop",
       location: { lat: 54.69, lon: 25.29 },
@@ -64,7 +68,7 @@ describe("StopStore", () => {
     const store = useStopStore.getState();
     await store.recordTap("s1");
     await store.recordTap("s1");
-    const stat = await db.usageStats.get("s1");
+    const stat = await db.cityUsageStats.get(JSON.stringify([useCityStore.getState().activeCity.id, "s1"]));
     expect(stat?.tapCount).toBe(2);
   });
 
@@ -224,33 +228,85 @@ describe("StopStore", () => {
     bulkPutSpy.mockRestore();
   });
 
-  // City-switch leak: an in-flight upsert for city A must not land into
-  // city B's store after reset() has run. The store re-checks isStale()
-  // after its internal awaits (clearingDb, bulkPut) and reverts via reset()
-  // if it discovers it's stale, so the cleared state isn't re-poisoned.
-  it("does not write stale upsert when isStale() flips during the call", async () => {
-    let stale = false;
-    const isStale = () => stale;
+  it("cancels pending persistence on reset without restoring stale memory", async () => {
+    const pending = useStopStore.getState().upsertStops([
+      {id: "cancelled", name: "Old stop", location: {lat: 1, lon: 2}},
+    ]);
+    expect(useStopStore.getState().stops).toHaveLength(1);
+    useStopStore.getState().reset();
+    await pending;
+    expect(useStopStore.getState().stops).toEqual([]);
+    expect(await db.stops.get("cancelled")).toBeUndefined();
+  });
 
-    // Start an upsert, flip stale partway through (simulating a city switch
-    // during the bulkPut await), and confirm the store ends up empty rather
-    // than holding the upserted records.
-    const upsertPromise = useStopStore.getState().upsertStops(
-      [{
-        id: "s1", name: "Stop 1",
-        location: { lat: 54.68, lon: 25.28 },
-        routes: [{ id: "r1", shortName: "1", color: "0073AC", mode: "BUS" }],
-      }],
-      { isStale },
-    );
+  it("renders immediately but waits for activation before starting optional storage", async () => {
+    useGtfsDataStore.setState({syncing: true});
+    const put = vi.spyOn(db.stops, "bulkPut");
+    const pending = useStopStore.getState().upsertStops([
+      {id: "after-activation", name: "New", location: {lat: 1, lon: 2}},
+    ]);
+    expect(useStopStore.getState().stops[0].id).toBe("after-activation");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(put).not.toHaveBeenCalled();
+    useGtfsDataStore.setState({syncing: false});
+    await pending;
+    expect(put).toHaveBeenCalledTimes(1);
+    put.mockRestore();
+  });
 
-    // Flip stale before the await chain in upsertStops settles
-    stale = true;
-    await upsertPromise;
+  it("reset releases an optional write waiting on activation without touching disk", async () => {
+    useGtfsDataStore.setState({syncing: true});
+    const put = vi.spyOn(db.stops, "bulkPut");
+    const pending = useStopStore.getState().upsertStops([
+      {id: "cancel-wait", name: "Old", location: {lat: 1, lon: 2}},
+    ]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    useStopStore.getState().reset();
+    await pending;
+    expect(put).not.toHaveBeenCalled();
+    expect(useStopStore.getState().stops).toEqual([]);
+    useGtfsDataStore.setState({syncing: false});
+    put.mockRestore();
+  });
 
-    // Either the upsert short-circuited before set() OR it ran set() then
-    // reverted via reset(). Either way: no leaked records.
-    expect(useStopStore.getState().stops).toHaveLength(0);
+  it("keeps API enrichment in memory without duplicating an active catalog on disk", async () => {
+    const cityId = useCityStore.getState().activeCity.id;
+    const context = new CityDataContext({
+      meta: {cityId, generatedAt: "2026-11-07", cityTzIana: "UTC"},
+      stops: [], routes: [], calendar: [],
+    }, {id: "current", cityId, generationId: "raw", etag: "raw", generatedAt: "2026-11-07", lastSynced: 1});
+    useCityDataStore.setState({active: context});
+    const put = vi.spyOn(db.stops, "bulkPut");
+    await useStopStore.getState().upsertStops([
+      {id: "enriched", name: "API name", location: {lat: 1, lon: 2}, labelAnchor: "top-left"},
+    ]);
+    expect(useStopStore.getState().stops[0].labelAnchor).toBe("top-left");
+    expect(put).not.toHaveBeenCalled();
+    put.mockRestore();
+    useCityDataStore.setState({active: null});
+  });
+
+  it("reset preserves the durable snapshot without opening a clear", async () => {
+    await db.stops.put({id: "durable", cityId: "other", name: "Old", location: {lat: 1, lon: 2}, lastSeen: 1});
+    const clear = vi.spyOn(db.stops, "clear");
+    useStopStore.getState().reset();
+    expect(clear).not.toHaveBeenCalled();
+    expect(await db.stops.get("durable")).toBeDefined();
+    clear.mockRestore();
+  });
+
+  it("replaces a foreign snapshot atomically and preserves it if replacement fails", async () => {
+    await db.stops.put({id: "foreign", cityId: "other", name: "Old", location: {lat: 1, lon: 2}, lastSeen: 1});
+    const put = vi.spyOn(db.stops, "bulkPut").mockRejectedValueOnce(new Error("quota"));
+    const incoming = [{id: "current", name: "New", location: {lat: 3, lon: 4}}];
+    await useStopStore.getState().upsertStops(incoming);
+    expect(await db.stops.get("foreign")).toBeDefined();
+    expect(await db.stops.get("current")).toBeUndefined();
+    expect(useStopStore.getState().stops[0].id).toBe("current");
+    put.mockRestore();
+    await useStopStore.getState().upsertStops(incoming);
+    expect(await db.stops.get("foreign")).toBeUndefined();
+    expect((await db.stops.get("current"))?.cityId).toBe(useCityStore.getState().activeCity.id);
   });
 
   it("hydrate keeps stale stops on the map but drops their stale badge lines", async () => {
@@ -259,6 +315,7 @@ describe("StopStore", () => {
     const FRESH = now - (60 * 1000);           // 1 min ago
 
     await db.stops.put({
+      cityId: useCityStore.getState().activeCity.id,
       id: "stale",
       name: "Stale Stop",
       location: { lat: 1, lon: 1 },
@@ -266,6 +323,7 @@ describe("StopStore", () => {
       lines: [{ routeId: "r-old", shortName: "OLD", mode: "BUS" }],
     });
     await db.stops.put({
+      cityId: useCityStore.getState().activeCity.id,
       id: "fresh",
       name: "Fresh Stop",
       location: { lat: 2, lon: 2 },
@@ -348,6 +406,7 @@ describe("StopStore", () => {
     it("re-lines a stale server row from the bundle instead of leaving it bare", async () => {
       await seedBundle(useCityStore.getState().activeCity.id);
       await db.stops.put({
+      cityId: useCityStore.getState().activeCity.id,
         id: "b1",
         name: "Server One",
         location: { lat: 54.1, lon: 25.1 },
@@ -375,6 +434,7 @@ describe("StopStore", () => {
     it("leaves a fresh server snapshot alone", async () => {
       await seedBundle(useCityStore.getState().activeCity.id);
       await db.stops.put({
+      cityId: useCityStore.getState().activeCity.id,
         id: "s-fresh",
         name: "Server Fresh",
         location: { lat: 3, lon: 3 },
@@ -401,4 +461,29 @@ describe("StopStore", () => {
       expect(useStopStore.getState().stops.map((s) => s.id).sort()).toEqual(["b1", "b2"]);
     });
   });
+});
+
+
+it("does not hydrate unowned or foreign API cache rows into the current city", async () => {
+  await db.stops.clear();
+  await db.gtfsSyncMeta.clear();
+  await db.stops.bulkPut([
+    {id: "unknown", name: "Unowned", location: {lat: 1, lon: 2}, lastSeen: Date.now()},
+    {id: "foreign", cityId: "other-city", name: "Foreign", location: {lat: 1, lon: 2}, lastSeen: Date.now()},
+  ]);
+  await useStopStore.getState().hydrate();
+  expect(useStopStore.getState().stops).toEqual([]);
+  expect(await db.stops.count()).toBe(2);
+});
+
+
+it("paints a new stop synchronously after a completed reset instead of awaiting a retained clear promise", async () => {
+  useStopStore.getState().reset();
+  await db.stops.count();
+  await Promise.resolve();
+  const saving = useStopStore.getState().upsertStops([{
+    id: "paint-after-clear", name: "New stop", location: {lat: 54.68, lon: 25.28},
+  }]);
+  expect(useStopStore.getState().stops.some(stop => stop.id === "paint-after-clear")).toBe(true);
+  await saving;
 });

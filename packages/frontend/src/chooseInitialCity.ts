@@ -5,7 +5,8 @@ import {cityOverviewFeatures} from "./components/Map/cityOverview.ts";
 export function restoredCityId(cities: readonly CityConfig[]): string | null {
   try {
     const saved = JSON.parse(localStorage.getItem("ptn-city") ?? "null");
-    const id = saved?.state?.activeCity?.id;
+    const rawId = saved?.state?.currentCityId ?? saved?.state?.activeCity?.id;
+    const id = rawId === "gdansk" ? "tricity" : rawId;
     return cities.some(city => city.id === id) ? id : null;
   } catch { return null; }
 }
@@ -18,16 +19,23 @@ export async function chooseInitialCity(cities: readonly CityConfig[], hostUnava
   await ensureDbReady();
   const {ensureDataSchemaUpToDate} = await import("./db/dataSchemaVersion.ts");
   await ensureDataSchemaUpToDate();
-  const downloaded = new Set((await listDeviceCities()).map(city => city.cityId));
-  const installed = new Set(downloaded);
-  for (const city of cities) if (await hasLiveDeviceCity(city.id)) installed.add(city.id);
   const offline = navigator.onLine === false;
   const saved = restoredCityId(cities);
-  if (saved && (!offline || installed.has(saved))) {
+  // Online returning users do not need to enumerate downloads or clone live
+  // artifacts just to select their city. Offline selection still verifies them.
+  if (saved && !offline) {
     const {useCityStore} = await import("./stores/cityStore.ts");
     useCityStore.getState().setActiveCity(cities.find(city => city.id === saved)!);
     return;
   }
+  const downloaded = new Set((await listDeviceCities()).map(city => city.cityId));
+  const installed = new Set(downloaded);
+  if (saved && (installed.has(saved) || await hasLiveDeviceCity(saved))) {
+    const {useCityStore} = await import("./stores/cityStore.ts");
+    useCityStore.getState().setActiveCity(cities.find(city => city.id === saved)!);
+    return;
+  }
+  for (const city of cities) if (city.id !== saved && await hasLiveDeviceCity(city.id)) installed.add(city.id);
   const root = document.getElementById("root")!;
   root.innerHTML = '<section style="height:100dvh;position:relative;background:#eaf2f7"><div id="city-world-map" style="position:absolute;inset:0" aria-label="World map of served cities"></div><div style="position:absolute;z-index:2;top:16px;left:16px;right:16px;max-width:440px;padding:20px;border-radius:16px;background:var(--surface-raised,#fff);box-shadow:0 4px 24px #0002"><h1 style="font-size:24px;font-weight:600;margin-bottom:8px">Choose a city</h1><p style="font-size:14px;margin-bottom:12px">Choose on the map, or use your location to find coverage nearby.</p><button id="locate-city" type="button" style="padding:10px 16px;min-height:44px;background:#1d4ed8;color:#fff;border-radius:8px">Use my location</button><p id="city-location-status" role="status" style="font-size:14px;margin-top:8px"></p><div id="city-options" aria-label="Cities" style="display:flex;flex-wrap:wrap;max-height:30dvh;overflow:auto;margin-top:8px"></div></div></section>';
 
@@ -37,9 +45,7 @@ export async function chooseInitialCity(cities: readonly CityConfig[], hostUnava
     const select = (city: CityConfig) => {
       if (finished || (offline && !installed.has(city.id))) return;
       finished = true;
-      // Zustand's persisted shape; the store later resolves current metadata by ID.
-      try { localStorage.setItem("ptn-city", JSON.stringify({state: {activeCity: city}, version: 0})); } catch { /* Optional storage. */ }
-      // Also select in memory when persistence is unavailable.
+      // The store persists only the selected ID, and also works without storage.
       void import("./stores/cityStore.ts").then(({useCityStore}) => {
         useCityStore.getState().setActiveCity(city);
         map?.remove();

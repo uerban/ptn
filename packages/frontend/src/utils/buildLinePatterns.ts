@@ -1,4 +1,4 @@
-import { db } from "../db/index.ts";
+import { captureCityData } from "../services/cityData.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import type { LinePattern } from "../stores/lineViewStore.ts";
 
@@ -91,7 +91,8 @@ export async function buildLinePatterns(
   for (const dp of route.directionPatterns ?? []) {
     for (const id of dp.stopIds) allStopIds.add(id);
   }
-  const stopRecords = await db.gtfsStops.bulkGet([...allStopIds]);
+  const data = captureCityData();
+  const stopRecords = await data.gtfsStops.bulkGet([...allStopIds]);
   const stopMap = new Map<string, { name: string; lat: number; lon: number }>();
   for (const rec of stopRecords) {
     if (rec) stopMap.set(rec.id, { name: rec.name, lat: rec.lat, lon: rec.lon });
@@ -177,7 +178,7 @@ export async function buildLinePatterns(
       let shapeId = bestTrip.shapeId;
       if (!shapeId) {
         try {
-          const tripRecord = await db.gtfsTrips.get(bestTrip.tripId);
+          const tripRecord = await data.gtfsTrips.get(bestTrip.tripId);
           shapeId = tripRecord?.shapeId;
         } catch (err) {
           console.warn(
@@ -196,5 +197,6 @@ export async function buildLinePatterns(
     }
   }
 
+  data.assertCurrent();
   return patterns;
 }

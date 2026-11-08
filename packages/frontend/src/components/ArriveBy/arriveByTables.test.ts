@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../test-helpers/cityData.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../db/index.ts";
 import type { RaptorIndex } from "../../services/raptorIndex.ts";
@@ -10,6 +11,7 @@ const newIndex = (): void => { useGtfsDataStore.setState({ raptorIndex: {} as un
 beforeEach(async () => {
   await db.gtfsStops.clear();
   await db.gtfsRoutes.clear();
+  await seedLegacyCityProjection();
   await db.gtfsStops.bulkAdd([{ id: "S1", name: "First", lat: 54.68, lon: 25.28 }]);
   await db.gtfsRoutes.bulkAdd([
     { id: "R1", shortName: "1", mode: "BUS", color: "#ff0000", stopIds: [] },

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { BaseEndpoint } from "@pt/shared";
 import { db } from "../db/index.ts";
@@ -24,6 +24,7 @@ import {
   stateForSavesAxis,
   tierForSavesAxis,
 } from "./saves.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import { usePrivacyStore } from "../stores/privacyStore.ts";
 
 const origin: BaseEndpoint = {
@@ -587,5 +588,58 @@ describe("export/share visibility helpers (T-23)", () => {
     expect(canShareSaves("always")).toBe(true);
     expect(canShareSaves("always-no-export")).toBe(true);
     expect(canShareSaves("always-no-share")).toBe(false);
+  });
+});
+
+
+describe("save city ownership", () => {
+  beforeEach(async () => {
+    await db.savedLocations.clear();
+  });
+
+  it("preserves unreadable city saves when rewriting other cities' privacy tiers", async () => {
+    const unreadable = {
+      id: "unreadable", cityId: "krakow", endpoint: {v: 1 as const, iv: new ArrayBuffer(12), ct: new ArrayBuffer(1)},
+      alias: "", savedAt: 1, encrypted: true,
+    };
+    await db.savedLocations.put(unreadable);
+    await savePlace({endpoint: origin}, {tier: "encrypted", id: "readable"});
+    await migrateSavesForLevelChange("hardened", "baseline");
+    expect(await db.savedLocations.get("unreadable")).toEqual(unreadable);
+    expect((await db.savedLocations.get("readable"))?.endpoint).toEqual(origin);
+  });
+
+  it("does not restore deletions or overwrite encrypted edits made after its snapshot", async () => {
+    await savePlace({endpoint: origin}, {tier: "encrypted", id: "edited"});
+    await savePlace({endpoint: origin}, {tier: "encrypted", id: "deleted"});
+    const originalRead = db.savedLocations.toArray.bind(db.savedLocations);
+    let edited: Awaited<ReturnType<typeof savePlace>>;
+    const snapshot = vi.spyOn(db.savedLocations, "toArray").mockImplementationOnce(() => originalRead().then(async rows => {
+      edited = await savePlace({endpoint: destination}, {tier: "encrypted", id: "edited"});
+      await db.savedLocations.delete("deleted");
+      await savePlace({endpoint: origin}, {tier: "encrypted", id: "new"});
+      return rows;
+    }));
+    try {
+      await migrateSavesForLevelChange("hardened", "baseline");
+      expect(await db.savedLocations.get("edited")).toEqual(edited!);
+      expect(await db.savedLocations.get("deleted")).toBeUndefined();
+      expect(await db.savedLocations.get("new")).toBeDefined();
+    } finally { snapshot.mockRestore(); }
+  });
+
+  it("captures the city before encryption and preserves it through privacy rewrites", async () => {
+    const original = useCityStore.getState().activeCity;
+    try {
+      useCityStore.setState({ activeCity: { ...original, id: "vilnius" } });
+      const pending = savePlace({ endpoint: origin }, { tier: "encrypted", id: "city-save" });
+      useCityStore.setState({ activeCity: { ...original, id: "krakow" } });
+      const saved = await pending;
+      expect(saved.cityId).toBe("vilnius");
+      await migrateSavesForLevelChange("hardened", "baseline");
+      expect((await db.savedLocations.get(saved.id))?.cityId).toBe("vilnius");
+    } finally {
+      useCityStore.setState({ activeCity: original });
+    }
   });
 });

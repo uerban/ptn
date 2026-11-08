@@ -1,3 +1,5 @@
+import { captureCityData } from "./cityData.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import Dexie from "dexie";
 import { isPoiCategoryEnabled } from "./poiCategoryPreferences.ts";
 import type { Stop, LatLon, GeocoderCandidate, PoiFetchMode } from "@pt/shared";
@@ -682,14 +684,16 @@ export async function searchStopsWithGroups(
   signal: AbortSignal,
   provider: SearchProvider,
 ): Promise<SearchSuggestion[]> {
+  const usageCityId = useCityStore.getState().activeCity.id;
+  const data = captureCityData(usageCityId);
   const stops = await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal);
 
   if (stops.length === 0) return [];
 
-  const tapCounts = await loadTapCounts(stops.map((s) => s.id));
+  const tapCounts = await loadTapCounts(stops.map((s) => s.id), usageCityId);
 
   const stopIds = new Set(stops.map((s) => s.id));
-  const groups = await db.stopGroups
+  const groups = await data.stopGroups
     .filter((g) => g.stopIds.some((id) => stopIds.has(id)) && g.stopIds.length > 1)
     .toArray();
 
@@ -732,6 +736,7 @@ export async function searchStopsWithGroups(
     });
   }
 
+  data.assertCurrent();
   return suggestions;
 }
 
@@ -786,7 +791,7 @@ async function searchLocalStops(
 ): Promise<Stop[]> {
   if (!normalizedQuery) return [];
 
-  const records = await db.gtfsStops.toArray();
+  const records = await captureCityData().gtfsStops.toArray();
   throwIfAborted(signal);
   if (records.length === 0) return [];
 
@@ -843,8 +848,9 @@ function scoreStop(
 
 async function loadTapCounts(
   stopIds: string[],
+  cityId: string,
 ): Promise<Map<string, { tapCount: number; lastTapped: number }>> {
-  return loadStopUsage(stopIds);
+  return loadStopUsage(stopIds, Date.now, cityId);
 }
 
 async function searchPoi(

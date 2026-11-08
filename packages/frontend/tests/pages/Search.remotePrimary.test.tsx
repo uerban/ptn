@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -59,6 +60,9 @@ const nonEmptyResults = [
 // ceiling the mode is inert → the on-device-first path runs.
 describe("Search remote-primary flow", () => {
   beforeEach(async () => {
+    // These tests control readiness explicitly; startup must not replace the
+    // deliberately absent index from the endpoint-resolution cache fixture.
+    vi.spyOn(useGtfsDataStore.getState(), "init").mockResolvedValue(undefined);
     // `standard` keeps routingAdapter = "user-choice" → remoteAllowed === true.
     usePrivacyStore.setState({ level: "standard", overrides: {} });
     useSettingsStore.setState({
@@ -78,6 +82,7 @@ describe("Search remote-primary flow", () => {
       syncing: false,
     });
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.gtfsStops.bulkPut([
       { id: "stop-a", name: "Alpha", lat: 50.1, lon: 19.9 },
       { id: "stop-b", name: "Beta", lat: 50.2, lon: 20.0 },
