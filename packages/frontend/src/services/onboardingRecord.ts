@@ -8,16 +8,23 @@
  * needs to read), and it shares this schema.
  */
 import {
-  AXIS_STRICTNESS_ORDER,
-  isProtectionAxis,
-  PRIVACY_LEVELS,
+  isOnboardingPresetId,
+  isPrivacyLevel,
   sanitizeNetworkDecisions,
+  sanitizeProtectionOverrides,
   type NetworkDecisionMap,
   type OnboardingPresetId,
   type PrivacyLevel,
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import type { OptionalStorageChoices } from "../stores/privacyChoicesStore.ts";
+import {
+  isMapDetailMode,
+  isOptionalStorageChoice,
+  OPTIONAL_STORAGE_CATEGORIES,
+  type MapDetailMode,
+} from "./preferenceValues.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 
 export const ONBOARDING_RECORD_KEY = "ptn-onboarding";
 export const ONBOARDING_RECORD_VERSION = 1;
@@ -31,11 +38,9 @@ export interface InstallClassification {
 }
 
 export type StartMode = "map" | "text";
-export type PresentationMapDetail = "detailed" | "micromap" | "gtfs-only";
-
 export interface PresentationChoice {
   readonly startMode: StartMode;
-  readonly mapDetail?: PresentationMapDetail;
+  readonly mapDetail?: MapDetailMode;
   readonly nearbyCards?: boolean;
 }
 
@@ -72,23 +77,8 @@ export type OnboardingRecordRead =
   | { readonly status: "corrupt" }
   | { readonly status: "unavailable" };
 
-function defaultStorage(): Storage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-export function isPrivacyLevel(value: unknown): value is PrivacyLevel {
-  return (
-    typeof value === "string" &&
-    (PRIVACY_LEVELS as readonly string[]).includes(value)
-  );
 }
 
 function nonNegativeInt(value: unknown): number {
@@ -97,36 +87,7 @@ function nonNegativeInt(value: unknown): number {
     : 0;
 }
 
-/** Keep only protection overrides whose value is valid for the axis. */
-export function sanitizeProtectionOverrides(
-  raw: unknown,
-): Partial<ProtectionPolicy> {
-  if (!isRecordObject(raw)) return {};
-  const result: Record<string, unknown> = {};
-  for (const [axis, value] of Object.entries(raw)) {
-    if (!isProtectionAxis(axis)) continue;
-    const order = AXIS_STRICTNESS_ORDER[axis];
-    const valid =
-      order.kind === "numeric"
-        ? typeof value === "number" && Number.isFinite(value) && value >= 0
-        : (order.values as readonly unknown[]).includes(value);
-    if (valid) result[axis] = value;
-  }
-  return result as Partial<ProtectionPolicy>;
-}
-
 const START_MODES: readonly StartMode[] = ["map", "text"];
-const MAP_DETAILS: readonly PresentationMapDetail[] = [
-  "detailed",
-  "micromap",
-  "gtfs-only",
-];
-const PRESET_IDS: readonly OnboardingPresetId[] = [
-  "recommended",
-  "strict",
-  "customize",
-];
-const STORAGE_CHOICE_CATEGORIES = ["recents", "viewport", "personalization"] as const;
 
 function sanitizePresentation(raw: unknown): PresentationChoice | null {
   if (!isRecordObject(raw)) return null;
@@ -134,9 +95,7 @@ function sanitizePresentation(raw: unknown): PresentationChoice | null {
   const result: { -readonly [K in keyof PresentationChoice]: PresentationChoice[K] } = {
     startMode: raw.startMode as StartMode,
   };
-  if (MAP_DETAILS.includes(raw.mapDetail as PresentationMapDetail)) {
-    result.mapDetail = raw.mapDetail as PresentationMapDetail;
-  }
+  if (isMapDetailMode(raw.mapDetail)) result.mapDetail = raw.mapDetail;
   if (typeof raw.nearbyCards === "boolean") result.nearbyCards = raw.nearbyCards;
   return result;
 }
@@ -144,11 +103,9 @@ function sanitizePresentation(raw: unknown): PresentationChoice | null {
 function sanitizeStorageChoices(raw: unknown): OptionalStorageChoiceUpdate | undefined {
   if (!isRecordObject(raw)) return undefined;
   const result: Record<string, string> = {};
-  for (const category of STORAGE_CHOICE_CATEGORIES) {
+  for (const category of OPTIONAL_STORAGE_CATEGORIES) {
     const value = raw[category];
-    if (value === "unset" || value === "enabled" || value === "disabled") {
-      result[category] = value;
-    }
+    if (isOptionalStorageChoice(value)) result[category] = value;
   }
   return result as OptionalStorageChoiceUpdate;
 }
@@ -156,9 +113,7 @@ function sanitizeStorageChoices(raw: unknown): OptionalStorageChoiceUpdate | und
 function sanitizeSetupDecisions(raw: unknown): SetupDecisions | null {
   if (!isRecordObject(raw)) return null;
   const decisions: SetupDecisions = {
-    preset: PRESET_IDS.includes(raw.preset as OnboardingPresetId)
-      ? (raw.preset as OnboardingPresetId)
-      : null,
+    preset: isOnboardingPresetId(raw.preset) ? raw.preset : null,
     level: isPrivacyLevel(raw.level) ? raw.level : null,
     flows: sanitizeNetworkDecisions(raw.flows),
   };
@@ -198,7 +153,7 @@ export function sanitizeOnboardingRecord(raw: unknown): OnboardingRecord | undef
 }
 
 export function readOnboardingRecord(
-  storage: Pick<Storage, "getItem"> | undefined = defaultStorage(),
+  storage: Pick<Storage, "getItem"> | undefined = safeLocalStorage(),
 ): OnboardingRecordRead {
   if (!storage) return { status: "unavailable" };
   let text: string | null;
@@ -228,7 +183,7 @@ const unsavedRecords = new WeakMap<object, OnboardingRecord>();
 /** Persist the whole record with one `setItem`. Returns false on failure. */
 export function writeOnboardingRecord(
   record: OnboardingRecord,
-  storage: Pick<Storage, "setItem"> | undefined = defaultStorage(),
+  storage: Pick<Storage, "setItem"> | undefined = safeLocalStorage(),
 ): boolean {
   if (!storage) return false;
   try {

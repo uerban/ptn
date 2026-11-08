@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
 import {
-  AXIS_STRICTNESS_ORDER,
+  compareLevels,
   effectivePolicy,
-  isProtectionAxis,
-  PRIVACY_LEVELS,
+  isPrivacyLevel,
+  sanitizeProtectionOverrides,
   type PrivacyLevel,
   type PrivacyPolicy,
   type ProtectionAxis,
@@ -58,7 +58,7 @@ export const DEFAULT_DOWNGRADE_MESSAGE =
   "Lowering your privacy level can re-expose previously protected data on this device. Continue?";
 
 function isDowngrade(prev: PrivacyLevel, next: PrivacyLevel): boolean {
-  return PRIVACY_LEVELS.indexOf(next) < PRIVACY_LEVELS.indexOf(prev);
+  return compareLevels(next, prev) < 0;
 }
 
 /**
@@ -71,7 +71,7 @@ function withoutCarriedOverOverrides(
   level: PrivacyLevel,
   overrides: Partial<PrivacyPolicy>,
 ): Partial<PrivacyPolicy> | null {
-  if (PRIVACY_LEVELS.indexOf(level) >= PRIVACY_LEVELS.indexOf("strict")) return null;
+  if (compareLevels(level, "strict") >= 0) return null;
   const read = readOnboardingRecord();
   if (read.status !== "ok") return null;
   const carried = read.record.legacyOverrides;
@@ -119,36 +119,6 @@ interface PrivacyState {
 
 const DEFAULT_LEVEL: PrivacyLevel = "standard";
 
-function isPrivacyLevel(value: unknown): value is PrivacyLevel {
-  return typeof value === "string" && (PRIVACY_LEVELS as readonly string[]).includes(value);
-}
-
-function isValidAxisValue<K extends keyof PrivacyPolicy>(
-  axis: K,
-  value: unknown,
-): value is PrivacyPolicy[K] {
-  const order = AXIS_STRICTNESS_ORDER[axis];
-  if (order.kind === "numeric") {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0;
-  }
-  return (order.values as readonly unknown[]).includes(value);
-}
-
-// Only protection axes survive hydration. Former network axes are read from
-// raw storage by the installation classifier before any store loads; network
-// activity is decided per flow (`canUse`), never by an override.
-function sanitizeOverrides(raw: unknown): Partial<PrivacyPolicy> {
-  if (!raw || typeof raw !== "object") return {};
-  const result: Partial<PrivacyPolicy> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!isProtectionAxis(k)) continue;
-    const axis = k as keyof PrivacyPolicy;
-    if (isValidAxisValue(axis, v)) {
-      (result as Record<string, unknown>)[axis] = v;
-    }
-  }
-  return result;
-}
 
 export const usePrivacyStore = create<PrivacyState>()(
   persist(
@@ -211,7 +181,11 @@ export const usePrivacyStore = create<PrivacyState>()(
         return {
           ...current,
           level: isPrivacyLevel(stored?.level) ? stored.level : current.level,
-          overrides: sanitizeOverrides(stored?.overrides),
+          // Only protection axes survive hydration. Former network axes are
+          // read from raw storage by the installation classifier before any
+          // store loads; network activity is decided per flow (`canUse`),
+          // never by an override.
+          overrides: sanitizeProtectionOverrides(stored?.overrides),
         };
       },
     },

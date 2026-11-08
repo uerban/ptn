@@ -3,6 +3,11 @@ import { create } from "zustand";
 import { LOOSE_POI_CATEGORIES, sanitizePoiCategories, type LoosePoiCategory } from "../config/poiCategories.ts";
 import { persist } from "zustand/middleware";
 import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
+import {
+  isMapDetailMode,
+  MAP_DETAIL_MODES,
+  type MapDetailMode,
+} from "../services/preferenceValues.ts";
 import type { TransportMode } from "@pt/shared";
 import {
   DEFAULT_URBAN_LOOKAHEAD_HOURS,
@@ -31,18 +36,7 @@ import {
 
 export type ThemeMode = "light" | "dark" | "system";
 export type LanguageSetting = "auto" | SupportedLocale;
-/**
- * What the map canvas draws underneath the transit overlays. One choice, three
- * rungs of decreasing external dependence:
- *   - detailed : external street basemap (only when the privacy policy allows)
- *   - micromap : the on-device city micromap artifact (water, major roads,
- *                green areas, district labels) — no network at all
- *   - gtfs-only: nothing but GTFS-derived transit corridors
- * `src/map/mapMode.ts` owns the mapping between this setting and the
- * `basemapMode` privacy axis; the two used to be separate controls.
- */
-export const MAP_DETAIL_MODES = ["detailed", "micromap", "gtfs-only"] as const;
-export type MapDetailMode = (typeof MAP_DETAIL_MODES)[number];
+export { MAP_DETAIL_MODES, type MapDetailMode };
 /**
  * Route-search layout variant:
  *   - consumer   : Citymapper-style card with time-proportional timeline bar (default)
@@ -92,10 +86,6 @@ function isSearchProvider(x: unknown): x is SearchProvider {
 
 function isPoiFetchMode(x: unknown): x is PoiFetchMode {
   return typeof x === "string" && (POI_FETCH_MODES as readonly string[]).includes(x);
-}
-
-function isMapDetailMode(x: unknown): x is MapDetailMode {
-  return typeof x === "string" && (MAP_DETAIL_MODES as readonly string[]).includes(x);
 }
 
 // Use-time clamp (Search/Settings/indicator + the gateRemoteRouting dispatch backstop) keeps the

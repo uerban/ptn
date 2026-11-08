@@ -9,6 +9,8 @@
  *   an expiry so a crashed tab cannot hold it forever.
  */
 
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
+
 type StorageEventTarget = Pick<Window, "addEventListener" | "removeEventListener">;
 
 function defaultTarget(): StorageEventTarget | undefined {
@@ -73,11 +75,7 @@ function defaultLocks(): LockManagerLike | null {
 }
 
 function defaultLeaseStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
+  return safeLocalStorage() ?? null;
 }
 
 function randomOwner(): string {

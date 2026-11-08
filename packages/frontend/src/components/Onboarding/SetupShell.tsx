@@ -10,7 +10,8 @@ import type { StartMode } from "../../services/onboardingRecord.ts";
 import { activateSetupCity, chooseSetupCity, completeSetup } from "../../setup/completeSetup.ts";
 import { useSetupText } from "../../setup/setupStrings.ts";
 import type { SetupMode } from "../../setup/startupPlan.ts";
-import { CitySelection, type CatalogStatus } from "./CitySelection.tsx";
+import type { CatalogStatus } from "../../setup/cityList.ts";
+import { CitySelection } from "./CitySelection.tsx";
 import { QuickSetup, type QuickSetupChoice } from "./QuickSetup.tsx";
 
 export interface SetupShellProps {

@@ -155,7 +155,12 @@ export function resolveNetworkDecision(
 
 // --- Setup presets ---------------------------------------------------------
 
-export type OnboardingPresetId = "recommended" | "strict" | "customize";
+export const ONBOARDING_PRESET_IDS = ["recommended", "strict", "customize"] as const;
+export type OnboardingPresetId = (typeof ONBOARDING_PRESET_IDS)[number];
+
+export function isOnboardingPresetId(value: unknown): value is OnboardingPresetId {
+  return (ONBOARDING_PRESET_IDS as readonly unknown[]).includes(value);
+}
 
 export interface OnboardingPreset {
   readonly id: OnboardingPresetId;

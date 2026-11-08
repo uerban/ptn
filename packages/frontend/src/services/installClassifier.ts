@@ -16,13 +16,14 @@ import {
   legacyEffectiveNetworkPolicy,
   type LegacyNetworkPolicy,
   type NetworkDecision,
+  isPrivacyLevel,
   type PrivacyLevel,
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import { PRIVACY_DATA_MIGRATION_KEY } from "./privacyDataMigrationState.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 import { readStoredCityId } from "../utils/cityId.ts";
 import {
-  isPrivacyLevel,
   newInstallRecord,
   readOnboardingRecord,
   writeOnboardingRecord,
@@ -244,13 +245,7 @@ export function buildClassification(
  * or null when storage cannot be read at all.
  */
 export function classifyInstallation(
-  storage: Pick<Storage, "getItem" | "setItem"> | undefined = (() => {
-    try {
-      return globalThis.localStorage;
-    } catch {
-      return undefined;
-    }
-  })(),
+  storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeLocalStorage(),
 ): OnboardingRecord | null {
   const existing = readOnboardingRecord(storage);
   if (existing.status === "ok") return existing.record;

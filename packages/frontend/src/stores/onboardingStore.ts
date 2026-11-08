@@ -12,14 +12,15 @@
  */
 import { create } from "zustand";
 import {
+  compareLevels,
   ONBOARDING_PRESETS,
-  PRIVACY_LEVELS,
   presetDecisions,
   type GuidedNetworkChoice,
   type NetworkDecision,
   type OnboardingPresetId,
   type PrivacyLevel,
   type ProtectionAxis,
+  type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import {
   hasPendingJournal,
@@ -102,10 +103,8 @@ export async function applyJournalToStores(
   await safely(() => useNetworkDecisionsStore.getState().replaceDecisions(flows));
   if (level) await safely(() => usePrivacyStore.getState().setLevel(level));
 
-  for (const [axis, value] of Object.entries(record.legacyOverrides)) {
-    await safely(() =>
-      usePrivacyStore.getState().setOverride(axis as ProtectionAxis, value as never),
-    );
+  for (const axis of Object.keys(record.legacyOverrides) as ProtectionAxis[]) {
+    await safely(() => restoreOverride(axis, record.legacyOverrides));
   }
 
   if (record.presentation) {
@@ -129,6 +128,14 @@ export async function applyJournalToStores(
   }
 
   return { ...record, applied: true };
+}
+
+function restoreOverride<K extends ProtectionAxis>(
+  axis: K,
+  overrides: Partial<ProtectionPolicy>,
+): void {
+  const value = overrides[axis];
+  if (value !== undefined) usePrivacyStore.getState().setOverride(axis, value);
 }
 
 async function safely(step: () => unknown): Promise<void> {
@@ -185,14 +192,7 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
 
   commitSetup: async (input) => {
     const now = Date.now();
-    const base =
-      get().record ??
-      (() => {
-        const read = readOnboardingRecord();
-        return read.status === "ok"
-          ? read.record
-          : newInstallRecord({ kind: "new" });
-      })();
+    const base = currentRecord(get);
     const flows: Record<string, NetworkDecision> = {};
     for (const [flowId, value] of Object.entries(
       presetDecisions(input.presetId, input.guidedChoice),
@@ -219,14 +219,13 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
   },
 
   removeCarriedOverOverride: (axis) => {
-    const record = get().record;
-    if (!record || !(axis in record.legacyOverrides)) return;
+    if (!(axis in currentRecord(get).legacyOverrides)) return;
     usePrivacyStore.getState().clearOverride(axis);
-    const legacyOverrides = { ...record.legacyOverrides };
-    delete legacyOverrides[axis];
-    const next = { ...record, legacyOverrides };
-    writeOnboardingRecord(next);
-    set({ record: next });
+    updateRecord(get, set, (record) => {
+      const legacyOverrides = { ...record.legacyOverrides };
+      delete legacyOverrides[axis];
+      return { ...record, legacyOverrides };
+    });
   },
 
   recordAlertsNotNow: () => {
@@ -251,24 +250,28 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
  * again); the level can still be lowered in Settings.
  */
 function stricterLevel(a: PrivacyLevel, b: PrivacyLevel): PrivacyLevel {
-  return PRIVACY_LEVELS.indexOf(a) >= PRIVACY_LEVELS.indexOf(b) ? a : b;
+  return compareLevels(a, b) >= 0 ? a : b;
 }
 
 /**
- * Apply `change` to the freshest record: the stored one (another tab may have
- * written since this tab last read it), else the one in memory, else a fresh
- * one. When storage refuses the write, the change still holds for this
- * session.
+ * The freshest record: the stored one (another tab may have written since
+ * this tab last read it), else the one in memory, else a fresh one.
+ */
+function currentRecord(get: () => OnboardingState): OnboardingRecord {
+  const read = readOnboardingRecord();
+  return read.status === "ok" ? read.record : (get().record ?? newInstallRecord({ kind: "new" }));
+}
+
+/**
+ * Apply `change` to the freshest record. When storage refuses the write, the
+ * change still holds for this session.
  */
 function updateRecord(
   get: () => OnboardingState,
   set: (partial: Partial<OnboardingState>) => void,
   change: (record: OnboardingRecord) => OnboardingRecord,
 ): void {
-  const read = readOnboardingRecord();
-  const current =
-    read.status === "ok" ? read.record : (get().record ?? newInstallRecord({ kind: "new" }));
-  const next = change(current);
+  const next = change(currentRecord(get));
   if (!writeOnboardingRecord(next)) set({ record: next });
 }
 

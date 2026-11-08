@@ -1,8 +1,12 @@
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
 
-function local(): Storage | undefined {
+/**
+ * The page's localStorage, or undefined when it is missing or reading the
+ * property throws (blocked storage, sandboxed or opaque-origin frames).
+ */
+export function safeLocalStorage(): Storage | undefined {
   try {
-    return globalThis.localStorage;
+    return globalThis.localStorage ?? undefined;
   } catch {
     return undefined;
   }
@@ -17,21 +21,21 @@ function local(): Storage | undefined {
 export const tolerantLocalStorage: StateStorage = {
   getItem: (name) => {
     try {
-      return local()?.getItem(name) ?? null;
+      return safeLocalStorage()?.getItem(name) ?? null;
     } catch {
       return null;
     }
   },
   setItem: (name, value) => {
     try {
-      local()?.setItem(name, value);
+      safeLocalStorage()?.setItem(name, value);
     } catch {
       // Not stored: kept for this session only.
     }
   },
   removeItem: (name) => {
     try {
-      local()?.removeItem(name);
+      safeLocalStorage()?.removeItem(name);
     } catch {
       // Nothing to remove when storage is unavailable.
     }

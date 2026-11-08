@@ -6,8 +6,10 @@
  */
 import { installCityCatalog, type CityConfig } from "../config/cities.ts";
 import { readOnboardingRecord } from "../services/onboardingRecord.ts";
+import { safeLocalStorage } from "../services/tolerantLocalStorage.ts";
 import { readStoredCityId } from "../utils/cityId.ts";
-import type { CatalogStatus } from "../components/Onboarding/CitySelection.tsx";
+import type { OfflineCityMetadata } from "../db/index.ts";
+import type { CatalogStatus } from "./cityList.ts";
 import { deviceTimeZone, planStartup } from "./startupPlan.ts";
 
 export interface StartupGateInput {
@@ -16,12 +18,9 @@ export interface StartupGateInput {
   readonly catalogWasCached: boolean;
 }
 
-interface DeviceCityRecord {
-  readonly cityId: string;
-  /** Absent on downloads from before download details were listed separately. */
-  readonly city?: CityConfig;
-  readonly sizeBytes?: number;
-}
+/** `city` is absent on downloads from before download details were listed
+ * separately. */
+type DeviceCityRecord = Readonly<Pick<OfflineCityMetadata, "cityId" | "city" | "sizeBytes">>;
 
 interface DeviceCities {
   readonly records: readonly DeviceCityRecord[];
@@ -94,13 +93,7 @@ async function deviceCityConfigs(records: readonly DeviceCityRecord[]): Promise<
 /** The stored city choice, when it names a catalog city. */
 export function restoredCityId(
   cities: readonly CityConfig[],
-  storage: Pick<Storage, "getItem"> | undefined = (() => {
-    try {
-      return globalThis.localStorage;
-    } catch {
-      return undefined;
-    }
-  })(),
+  storage: Pick<Storage, "getItem"> | undefined = safeLocalStorage(),
 ): string | null {
   const id = readStoredCityId(storage);
   return id !== null && cities.some((city) => city.id === id) ? id : null;

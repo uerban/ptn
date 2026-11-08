@@ -5,6 +5,10 @@
  */
 import type { CityConfig } from "../config/cities.ts";
 
+/** Where the setup city list came from: a fresh or cached catalog, only the
+ * cities with data on this device, or nothing at all. */
+export type CatalogStatus = "fresh" | "cached" | "device-only" | "failed";
+
 /** Fewer openable cities than this: the list is short enough without a filter. */
 export const FILTER_MIN_CITIES = 8;
 /** More openable cities than this: cities are grouped by country. */

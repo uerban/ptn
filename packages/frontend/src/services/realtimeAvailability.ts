@@ -17,6 +17,7 @@ import {
   type RealtimeKind,
 } from "@pt/shared/schedule-tile";
 import { onStorageKeyChange } from "./crossTab.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 
 export const REALTIME_AVAILABILITY_STORAGE_KEY = "ptn-realtime-availability";
 
@@ -33,14 +34,6 @@ interface StoredCityAvailability {
 type StoredAvailability = Record<string, StoredCityAvailability>;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
-
-function defaultStorage(): StorageLike | undefined {
-  try {
-    return globalThis.localStorage ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function sanitize(raw: unknown): StoredAvailability {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -98,7 +91,7 @@ export function recordRealtimeHeader(
 ): void {
   if (!CITY_ID_PATTERN.test(cityId)) return;
   if (headerValue === null || headerValue === undefined) return;
-  const storage = options.storage ?? defaultStorage();
+  const storage = options.storage ?? safeLocalStorage();
   if (!storage) return;
   const kinds = parseRealtimeHeader(headerValue);
   const stored = read(storage);
@@ -125,7 +118,7 @@ export function recordRealtimeHeader(
  */
 export function getRealtimeAvailability(
   cityId: string,
-  storage: StorageLike | undefined = defaultStorage(),
+  storage: StorageLike | undefined = safeLocalStorage(),
 ): readonly RealtimeKind[] | undefined {
   return read(storage)[cityId]?.kinds;
 }

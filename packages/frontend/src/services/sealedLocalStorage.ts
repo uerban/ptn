@@ -13,6 +13,7 @@ import { createJSONStorage, type StateStorage } from "zustand/middleware";
 import { decrypt, encrypt } from "./cryptoBox.ts";
 import { durablePersonalKey, reportUnreadable } from "./personalStorage.ts";
 import { MAP_VIEWPORT_STORAGE_KEY } from "./privacyStorageKeys.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 
 const SEALED_FORMAT = "ptn-sealed";
 
@@ -24,14 +25,6 @@ interface SealedEnvelope {
 }
 
 type ItemStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-
-function defaultStorage(): ItemStorage | undefined {
-  try {
-    return globalThis.localStorage ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function toBase64(buf: ArrayBuffer): string {
   let binary = "";
@@ -106,7 +99,7 @@ const generations = new Map<string, number>();
  */
 export async function readSealedItem(
   name: string,
-  storage: ItemStorage | undefined = defaultStorage(),
+  storage: ItemStorage | undefined = safeLocalStorage(),
 ): Promise<string | null> {
   const key = await durablePersonalKey();
   if (!key || !storage) return null;
@@ -138,7 +131,7 @@ export async function readSealedItem(
 export async function writeSealedItem(
   name: string,
   value: string,
-  storage: ItemStorage | undefined = defaultStorage(),
+  storage: ItemStorage | undefined = safeLocalStorage(),
 ): Promise<boolean> {
   if (!storage || !writable.has(name)) return false;
   const generation = (generations.get(name) ?? 0) + 1;
@@ -160,7 +153,7 @@ export async function writeSealedItem(
 /** Removes a value, readable or not. Later writes may store a new one. */
 export function removeSealedItem(
   name: string,
-  storage: Pick<Storage, "removeItem"> | undefined = defaultStorage(),
+  storage: Pick<Storage, "removeItem"> | undefined = safeLocalStorage(),
 ): void {
   generations.set(name, (generations.get(name) ?? 0) + 1);
   try {
@@ -199,7 +192,7 @@ export const mapViewportItem = {
     mapViewportValue = next;
     void writeSealedItem(MAP_VIEWPORT_STORAGE_KEY, next).catch(() => {});
   },
-  remove(storage: Pick<Storage, "removeItem"> | undefined = defaultStorage()): void {
+  remove(storage: Pick<Storage, "removeItem"> | undefined = safeLocalStorage()): void {
     mapViewportValue = null;
     removeSealedItem(MAP_VIEWPORT_STORAGE_KEY, storage);
   },

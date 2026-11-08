@@ -4,12 +4,11 @@ import {
   buildCityList,
   groupsHolding,
   regionNamer,
+  type CatalogStatus,
   type CityNode,
 } from "../../setup/cityList.ts";
 import { isCityOpenable } from "../../setup/startupPlan.ts";
 import type { SetupText } from "../../setup/setupStrings.ts";
-
-export type CatalogStatus = "fresh" | "cached" | "device-only" | "failed";
 
 export interface CitySelectionProps {
   readonly cities: readonly CityConfig[];
