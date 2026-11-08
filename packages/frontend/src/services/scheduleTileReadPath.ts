@@ -310,6 +310,8 @@ async function fetchRtTileUpdates(
   // K2: value MUST include tripId — getDeparturesFromTile's realtimeUpdates is ReadonlyMap<string, RtTripUpdate>
   // (RtTripUpdate requires tripId, route-update.ts:24), mirroring the backend snapshot (store.ts:433).
   const rt = await fetchRtTile(bundleHash, SCHEDULE_TILE_SIZE_LABEL, tileCoords);
+  // Revoked while the request was out: the late answer is dropped.
+  if (!liveTileOverlayAllowed()) return undefined;
   if (rt.status === 200 && rt.body) {
     return new Map(rt.body.trips.map((t) => [
       t.startDate ? `${t.tripId}|${t.startDate}` : t.tripId,

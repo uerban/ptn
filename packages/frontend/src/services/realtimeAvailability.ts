@@ -10,6 +10,7 @@
  * The stored value is public, non-personal metadata. Reading it never makes a
  * request, so deciding whether to show a realtime surface or offer is free.
  */
+import { useCallback, useSyncExternalStore } from "react";
 import {
   parseRealtimeHeader,
   REALTIME_KINDS,
@@ -149,4 +150,26 @@ export function subscribeRealtimeAvailability(listener: () => void): () => void 
     listeners.delete(listener);
     stopCrossTab();
   };
+}
+
+export type RealtimeKindStatus = "available" | "unavailable" | "unknown";
+
+/** Whether the city offers `kind`, or `unknown` before any manifest was seen. */
+export function realtimeKindStatus(
+  cityId: string,
+  kind: RealtimeKind,
+  storage?: StorageLike,
+): RealtimeKindStatus {
+  const kinds = getRealtimeAvailability(cityId, storage);
+  if (kinds === undefined) return "unknown";
+  return kinds.includes(kind) ? "available" : "unavailable";
+}
+
+/** React binding of `realtimeKindStatus`; follows changes from any tab. */
+export function useRealtimeKindStatus(
+  cityId: string,
+  kind: RealtimeKind,
+): RealtimeKindStatus {
+  const get = useCallback(() => realtimeKindStatus(cityId, kind), [cityId, kind]);
+  return useSyncExternalStore(subscribeRealtimeAvailability, get, get);
 }

@@ -1,8 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApiAtServiceTime } from "../helpers/mock-api";
+import { seedNetworkDecisions } from "../helpers/setup-complete";
 
 /** Navigate to map, zoom into fixture center, click a marker and open the departure sheet. */
-async function openSheet(page: Page) {
+async function openSheet(page: Page, beforeCard?: () => Promise<void>) {
   // This suite asserts on `fixtures/departures.json` content (the "Centras"
   // line group, the LIVE badge, the cancelled strikethrough, predicted-vs-
   // scheduled times), which only the LEGACY /api/departures path produces.
@@ -51,6 +52,7 @@ async function openSheet(page: Page) {
   // Wait for at least one stop marker to appear (container has zero size so use 'attached')
   await page.locator(".stop-marker-container").first().waitFor({ state: "attached", timeout: 10_000 });
 
+  await beforeCard?.();
   // Click the visible card inside the marker container
   await page.locator(".stop-marker-container .cursor-pointer").first().click();
 
@@ -156,5 +158,59 @@ test.describe("Departure sheet @mock-api", () => {
     // Verify it shows clock format
     const predText = await predictedTime.first().textContent();
     expect(predText).toMatch(/\d{1,2}:\d{2}/);
+  });
+});
+
+test.describe("Departure sheet without live departures @mock-api", () => {
+  test("labels the times and asks before showing live times", async ({ page }) => {
+    await seedNetworkDecisions(page, { "operator.realtime": "denied" });
+    const departureCalls: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/[^/]+\/departures(-for-stop)?(\?|$)/.test(request.url())) departureCalls.push(request.url());
+    });
+    await openSheet(page);
+
+    const sheet = page.locator('[data-testid="departure-sheet"]');
+    const notice = sheet.getByTestId("live-times-notice");
+    await expect(notice).toHaveAttribute("data-state", "unavailable");
+    await expect(sheet.getByText("LIVE", { exact: true })).toBeHidden();
+    expect(departureCalls).toEqual([]);
+
+    await notice.getByTestId("show-live-times").click();
+    const disclosure = sheet.getByTestId("flow-disclosure");
+    await expect(disclosure).toBeVisible();
+    await expect(disclosure).toContainText("This app's server");
+    expect(departureCalls).toEqual([]);
+
+    await disclosure.getByRole("button", { name: "Show live times" }).click();
+    await expect(sheet.getByText("LIVE", { exact: true })).toBeVisible({ timeout: 5_000 });
+    expect(departureCalls.length).toBeGreaterThan(0);
+    await expect(sheet.getByTestId("live-times-notice")).toBeHidden();
+  });
+
+  test("activating a stop card never asks for location", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { __geoCalls: number };
+      w.__geoCalls = 0;
+      const geo = navigator.geolocation;
+      const get = geo.getCurrentPosition.bind(geo);
+      const watch = geo.watchPosition.bind(geo);
+      geo.getCurrentPosition = (...args: Parameters<Geolocation["getCurrentPosition"]>) => {
+        w.__geoCalls += 1;
+        return get(...args);
+      };
+      geo.watchPosition = (...args: Parameters<Geolocation["watchPosition"]>) => {
+        w.__geoCalls += 1;
+        return watch(...args);
+      };
+    });
+    let before = -1;
+    await openSheet(page, async () => {
+      before = await page.evaluate(() => (window as unknown as { __geoCalls: number }).__geoCalls);
+    });
+    const after = await page.evaluate(
+      () => (window as unknown as { __geoCalls: number }).__geoCalls,
+    );
+    expect(after).toBe(before);
   });
 });

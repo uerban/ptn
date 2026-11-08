@@ -6,6 +6,7 @@ import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
+import { LiveTimesNotice } from "./LiveTimesNotice.tsx";
 import { useLineClick } from "../../hooks/useLineClick.ts";
 import { ModeFilterPills } from "../ModeFilterPills.tsx";
 import { Icon } from "../Icon.tsx";
@@ -24,12 +25,18 @@ type SheetHeight = "peek" | "half" | "full";
 
 export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   const [height, setHeight] = useState<SheetHeight>("half");
-  const { departures, loading, error } = useDepartures(stop.id, true, 24, { hedge: true });
+  const { departures, loading, error, unavailable, updatedAt } = useDepartures(
+    stop.id,
+    true,
+    24,
+    { hedge: true },
+  );
   const { favorites, addFavorite, removeFavorite } = useFavoritesStore();
   // Favorites are sealed and load asynchronously; editing before they load
   // would replace the stored list.
   const favoritesLoaded = usePersistHydrated(useFavoritesStore.persist);
   const activeCityId = useCityStore((s) => s.activeCity.id);
+  const activeCityName = useCityStore((s) => s.activeCity.name);
   const { t } = useTranslation();
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -191,6 +198,18 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
         </div>
       </div>
 
+      {/* Scheduled vs live, and the way to live times */}
+      {height !== "peek" && (
+        <LiveTimesNotice
+          cityId={activeCityId}
+          cityName={activeCityName}
+          departures={departures}
+          loading={loading}
+          unavailable={unavailable}
+          updatedAt={updatedAt}
+        />
+      )}
+
       {/* Mode filter pills — only shown when 2+ modes present */}
       {height !== "peek" && !loading && (
         <ModeFilterPills modes={uniqueModes} activeMode={modeFilter} onChange={setModeFilter} />
@@ -215,7 +234,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             <div className="p-4 text-center text-danger text-sm">{error}</div>
           )}
 
-          {!loading && !error && filteredGroups.length === 0 && (
+          {!loading && !error && !unavailable && filteredGroups.length === 0 && (
             <div className="p-4 text-center text-fg-muted text-sm">
               {modeFilter && groups.length > 0
                 ? t("sheet.no_departures_for_mode", "No departures for this mode")

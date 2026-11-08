@@ -536,11 +536,59 @@ describe("useDepartures — /departures real-time gate", () => {
     expect(api.getDepartures).not.toHaveBeenCalled();
   });
 
-  it("global-off + real-time denied uses /departures (rollback override)", async () => {
+  it("global-off + real-time denied does NOT call /departures, and reports the stop unavailable", async () => {
     denyFlow("operator.realtime");
+    (isScheduleTileEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const { result } = renderHook(() => useDepartures("S1", false, 1.5));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(api.getDepartures).not.toHaveBeenCalled();
+    expect(result.current.unavailable).toBe(true);
+  });
+
+  it("global-off + real-time allowed uses /departures (rollback override)", async () => {
     (isScheduleTileEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
     renderHook(() => useDepartures("S1", false, 1.5));
     await waitFor(() => expect(api.getDepartures).toHaveBeenCalled());
+  });
+
+  it("marks a gated missing tile unavailable rather than an empty timetable", async () => {
+    denyFlow("operator.realtime");
+    (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({ state: "unavailable" });
+    const { result } = renderHook(() => useDepartures("S1", false, 1.5));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.unavailable).toBe(true);
+    expect(result.current.updatedAt).not.toBeNull();
+  });
+
+  it("refetches when live departures are granted, and again when revoked", async () => {
+    resetFlows();
+    (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({
+      state: "ok",
+      departures: mockDepartures,
+      serviceState: "active",
+    });
+    const { result } = renderHook(() => useDepartures("S1", false, 1.5));
+    await waitFor(() => expect(departuresForStop).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.unavailable).toBe(false);
+
+    (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({
+      state: "ok",
+      departures: mockTileDepartures,
+      serviceState: "active",
+    });
+    act(() => allowFlow("operator.realtime"));
+    await waitFor(() => expect(departuresForStop).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.departures).toEqual(mockTileDepartures));
+
+    (departuresForStop as ReturnType<typeof vi.fn>).mockResolvedValue({
+      state: "ok",
+      departures: mockDepartures,
+      serviceState: "active",
+    });
+    act(() => denyFlow("operator.realtime"));
+    await waitFor(() => expect(departuresForStop).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(result.current.departures).toEqual(mockDepartures));
   });
 
   it("emits schedule_tile_served with source on a warm tile", async () => {
