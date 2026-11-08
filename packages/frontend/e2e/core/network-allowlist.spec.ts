@@ -194,9 +194,11 @@ test.describe("request allowlist with the service worker @mock-api", () => {
     test(`recommended in ${mode} mode stays on the allowlist under the service worker`, async ({ page }) => {
       const requests = await freshProfile(page);
       await finishSetup(page, "recommended", mode);
+      // Let the first visit load the city's data before the worker takes over.
+      await useApp(page, mode);
       await waitForActiveServiceWorker(page);
-      // The second load runs under the worker's control.
-      await page.reload();
+      // The second visit runs under the worker's control.
+      await page.goto("/");
       expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
       await useApp(page, mode);
       expectAllowed(page, requests, [

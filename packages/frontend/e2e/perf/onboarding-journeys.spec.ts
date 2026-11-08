@@ -6,6 +6,9 @@
 //
 //   E2E_BASE_URL=http://localhost:5180 npx playwright test --project=perf \
 //     e2e/perf/onboarding-journeys.spec.ts
+//
+// Against a production build (E2E_PREVIEW=1), build with VITE_E2E=1 so the
+// Map journey can see when the map has drawn its stops.
 import { test, expect, type Page, type Request } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
