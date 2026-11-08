@@ -130,7 +130,7 @@ test.describe("@perf onboarding journeys", () => {
       if (journey.mode === "Text") {
         await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
         homeMs = Date.now() - start;
-        const stop = page.getByRole("region", { name: "Nearby stops" }).getByRole("button").first();
+        const stop = page.getByRole("region", { name: "Nearby stops" }).getByRole("listitem").getByRole("button").first();
         await expect(stop).toBeVisible({ timeout: 15_000 });
         await act(() => stop.click());
         await expect(page.getByTestId("departure-sheet")).toBeVisible({ timeout: 10_000 });

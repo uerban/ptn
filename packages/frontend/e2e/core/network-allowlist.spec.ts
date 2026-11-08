@@ -79,7 +79,7 @@ async function finishSetup(page: Page, preset: Preset, mode: StartMode): Promise
 
 /** Open the nearest stop's departures from the Text mode lists. */
 async function openNearbyStop(page: Page): Promise<void> {
-  const stop = page.getByRole("region", { name: "Nearby stops" }).getByRole("button").first();
+  const stop = page.getByRole("region", { name: "Nearby stops" }).getByRole("listitem").getByRole("button").first();
   await expect(stop).toBeVisible({ timeout: 15_000 });
   await stop.click();
   await expect(page.getByTestId("departure-sheet")).toBeVisible({ timeout: 10_000 });
