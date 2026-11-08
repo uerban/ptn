@@ -1151,7 +1151,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         //     and must NOT overwrite "where the user left off."
         //   - Tagged with the city the coordinates actually fall in, NOT the
         //     active city: a pan-to-switch settles in the new city's bbox while
-        //     setActiveCity is still 200ms away (debounce below), so reading the
+        //     setActiveCity runs in the next task, so reading the
         //     active city here would mis-tag a viewport in city B as city A and
         //     let it restore under A's data. findCityByLocation keeps the tag
         //     honest; fall back to the active city for centers in a bbox gap.

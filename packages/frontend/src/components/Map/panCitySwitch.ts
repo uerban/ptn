@@ -2,8 +2,8 @@ import type {Map} from "maplibre-gl";
 import {findCityByLocation, getAvailableCities} from "../../config/cities.ts";
 import {useCityStore} from "../../stores/cityStore.ts";
 
-/** Coalesce terminal gesture events without delaying every settled city entry
- * by half a second. Recheck motion because a flight can start during the wait. */
+/** Coalesce terminal events in the same turn. moveend already establishes a
+ * settled viewport; recheck motion in case another flight starts meanwhile. */
 export function createPanCitySwitcher(map: Pick<Map, "getCenter" | "isMoving">) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const dispose = () => { if (timer !== undefined) clearTimeout(timer); timer = undefined; };
@@ -20,7 +20,7 @@ export function createPanCitySwitcher(map: Pick<Map, "getCenter" | "isMoving">) 
             getAvailableCities().some(city => city.id === target.id)) {
           useCityStore.getState().setActiveCity(target);
         }
-      }, 200);
+      }, 0);
     },
   };
 }

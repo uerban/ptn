@@ -17,11 +17,9 @@ const create = () => createPanCitySwitcher(map as never);
 it("coalesces quick terminal events before activating the settled city", () => {
   const switcher = create();
   switcher.schedule();
-  vi.advanceTimersByTime(150);
   switcher.schedule();
-  vi.advanceTimersByTime(199);
   expect(mocks.switch).not.toHaveBeenCalled();
-  vi.advanceTimersByTime(1);
+  vi.advanceTimersByTime(0);
   expect(mocks.switch).toHaveBeenCalledExactlyOnceWith({id: "b"});
 });
 
@@ -29,21 +27,21 @@ it("does not switch during a flight started after the terminal event", () => {
   const switcher = create();
   switcher.schedule();
   map.isMoving.mockReturnValue(true);
-  vi.advanceTimersByTime(200);
+  vi.advanceTimersByTime(0);
   expect(mocks.switch).not.toHaveBeenCalled();
   map.isMoving.mockReturnValue(false);
   switcher.schedule();
-  vi.advanceTimersByTime(200);
+  vi.advanceTimersByTime(0);
   expect(mocks.switch).toHaveBeenCalledExactlyOnceWith({id: "b"});
 });
 
 it("uses the latest location and rejects unavailable or already active cities", () => {
   const switcher = create();
   switcher.schedule(); mocks.target = "unavailable";
-  vi.advanceTimersByTime(200);
+  vi.advanceTimersByTime(0);
   expect(mocks.switch).not.toHaveBeenCalled();
   switcher.schedule(); mocks.target = "a";
-  vi.advanceTimersByTime(200);
+  vi.advanceTimersByTime(0);
   expect(mocks.switch).not.toHaveBeenCalled();
 });
 
