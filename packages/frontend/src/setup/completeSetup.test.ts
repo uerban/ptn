@@ -71,5 +71,4 @@ describe("completing setup", () => {
     expect(useSettingsStore.getState().scheduleMode).toBe(true);
     useCityStore.getState().setActiveCity(current);
   });
-
 });
