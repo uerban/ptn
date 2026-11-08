@@ -15,9 +15,10 @@ export default defineConfig({
   // The M10 v2 dedup spec is also included so the threat-model harness
   // verifies "no plaintext dedup entries at any level" on every perf run.
   // The service alerts spec checks when the alerts request may leave and
-  // that it names only the city.
+  // that it names only the city. The referrer spec checks that no request
+  // names the page it came from.
   testMatch: [
-    /tests\/privacy-harness\/(baseline|smoke|service-alerts)\.spec\.ts$/,
+    /tests\/privacy-harness\/(baseline|smoke|service-alerts|referrer)\.spec\.ts$/,
     /e2e\/privacy\/map-tap-paranoid\.spec\.ts$/,
     /e2e\/privacy\/m10-dedup-encrypted\.spec\.ts$/,
   ],
