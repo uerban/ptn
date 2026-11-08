@@ -25,9 +25,17 @@ describe("realtime availability", () => {
     expect(isRealtimeKindAvailable("riga", "alerts")).toBe(false);
   });
 
-  it("records an empty or missing header as no kinds, distinct from unknown", () => {
-    recordRealtimeHeader("vilnius", null);
+  it("records an empty header as no kinds, distinct from unknown", () => {
+    recordRealtimeHeader("vilnius", "");
     expect(getRealtimeAvailability("vilnius")).toEqual([]);
+  });
+
+  it("leaves what is stored alone when the header is missing", () => {
+    recordRealtimeHeader("riga", null);
+    expect(getRealtimeAvailability("riga")).toBeUndefined();
+    recordRealtimeHeader("vilnius", "alerts");
+    recordRealtimeHeader("vilnius", null);
+    expect(getRealtimeAvailability("vilnius")).toEqual(["alerts"]);
   });
 
   it("ignores malformed city ids and corrupt storage", () => {

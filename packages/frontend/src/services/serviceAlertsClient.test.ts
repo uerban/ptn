@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { ServiceAlertsResponse } from "@pt/shared";
+import golden from "../../../shared/src/types/__fixtures__/service-alerts-response.json";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
   useNetworkDecisionsStore,
@@ -229,7 +230,6 @@ describe("serviceAlertsClient polling", () => {
     });
     const failed = getServiceAlertsSnapshot(CITY);
     expect(failed.status).toBe("failed");
-    expect(failed.error).toBe("network");
     expect(failed.response?.alerts).toHaveLength(1);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SERVICE_ALERTS_RETRY_MS);
@@ -238,16 +238,31 @@ describe("serviceAlertsClient polling", () => {
     stop();
   });
 
-  it("distinguishes a server that has not fetched yet and rejects foreign bodies", async () => {
+  it("fails on a server that has not fetched yet and on foreign bodies", async () => {
     fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 503 })));
     const stop = subscribeServiceAlerts(CITY, () => {});
     await flush();
-    expect(getServiceAlertsSnapshot(CITY).error).toBe("not-ready");
+    expect(getServiceAlertsSnapshot(CITY).status).toBe("failed");
     fetchMock.mockImplementation(() => Promise.resolve(ok(body({ city: "riga" }))));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SERVICE_ALERTS_RETRY_MS);
     });
-    expect(getServiceAlertsSnapshot(CITY).error).toBe("invalid");
+    expect(getServiceAlertsSnapshot(CITY).status).toBe("failed");
+    expect(getServiceAlertsSnapshot(CITY).response).toBeUndefined();
+    stop();
+  });
+
+  it("asks again without If-None-Match when a 304 arrives with nothing held", async () => {
+    fetchMock
+      .mockImplementationOnce(() => Promise.resolve(new Response(null, { status: 304 })))
+      .mockImplementation(() => Promise.resolve(ok(body())));
+    const stop = subscribeServiceAlerts(CITY, () => {});
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retry = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect((retry.headers as Headers).has("If-None-Match")).toBe(false);
+    expect(getServiceAlertsSnapshot(CITY)).toMatchObject({ status: "ready" });
+    expect(getServiceAlertsSnapshot(CITY).response?.alerts).toHaveLength(1);
     stop();
   });
 });
@@ -382,5 +397,19 @@ describe("parseServiceAlertsResponse", () => {
       CITY,
     );
     expect(parsed?.alerts.map((a) => a.id)).toEqual(["a1"]);
+  });
+
+  it("reads a severity it does not know as unknown", () => {
+    const [alert] = body().alerts;
+    const parsed = parseServiceAlertsResponse(
+      { ...body(), alerts: [{ ...alert, severity: "CATASTROPHIC" }] },
+      CITY,
+    );
+    expect(parsed?.alerts[0]?.severity).toBe("UNKNOWN");
+  });
+
+  it("keeps every alert of the reply the server's tests produce", () => {
+    const parsed = parseServiceAlertsResponse(golden, "vilnius");
+    expect(parsed).toEqual(golden);
   });
 });

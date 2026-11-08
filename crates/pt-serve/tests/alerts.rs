@@ -676,27 +676,13 @@ fn the_reply_matches_the_shared_contract() {
         ],
     )]);
     h.cycle(vec![Ok(bytes)], None);
-    let v = h.reply_json();
-    assert_eq!(
-        v,
-        serde_json::json!({
-            "schemaVersion": 1,
-            "city": "vilnius",
-            "fetchedAt": "2027-01-15T08:00:00.000Z",
-            "stale": false,
-            "alerts": [{
-                "id": "a1",
-                "cause": "STRIKE",
-                "effect": "NO_SERVICE",
-                "severity": "SEVERE",
-                "header": [{ "language": "en", "text": "Strike" }],
-                "description": [],
-                "url": [],
-                "activePeriods": [{ "start": "2027-01-15T07:59:00Z", "end": "2027-01-15T09:00:00Z" }],
-                "informedEntities": [{ "routeId": "R1", "directionId": 1 }],
-            }],
-        })
-    );
+    // The same file is parsed by the frontend client's tests, so a field the
+    // server renames or reshapes fails on both sides.
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../packages/shared/src/types/__fixtures__/service-alerts-response.json"
+    ))
+    .unwrap();
+    assert_eq!(h.reply_json(), golden);
 }
 
 #[test]

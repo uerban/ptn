@@ -72,7 +72,7 @@ describe("fetchManifest realtime availability", () => {
     expect(getRealtimeAvailability("vilnius")).toEqual(["departures", "alerts"]);
   });
 
-  it("updates the stored value from a 304 and records a missing header as none", async () => {
+  it("updates the stored value from a 304 and keeps it when the header is missing", async () => {
     const { fetchManifest } = await import("./api.ts");
     const { getRealtimeAvailability, recordRealtimeHeader } = await import(
       "./realtimeAvailability.ts"
@@ -81,6 +81,15 @@ describe("fetchManifest realtime availability", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(new Response(null, { status: 304 })),
+    );
+    await fetchManifest({ manifest: makeManifest(), etag: '"e1"' });
+    expect(getRealtimeAvailability("vilnius")).toEqual(["alerts"]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(null, { status: 304, headers: { "X-PT-Realtime": "" } }),
+      ),
     );
     await fetchManifest({ manifest: makeManifest(), etag: '"e1"' });
     expect(getRealtimeAvailability("vilnius")).toEqual([]);

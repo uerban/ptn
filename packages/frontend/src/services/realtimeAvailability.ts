@@ -85,9 +85,11 @@ function notify(): void {
 }
 
 /**
- * Record the `X-PT-Realtime` value of a manifest response for `cityId`. A
- * missing header records "no realtime kinds": a server that does not send it
- * offers neither. Writes only when the value changed.
+ * Record the `X-PT-Realtime` value of a manifest response for `cityId`. The
+ * server always sends the header, empty when the city offers no realtime
+ * kinds. A missing header (an older server, or a proxy that strips it) says
+ * nothing and leaves what is stored as it was. Writes only when the value
+ * changed.
  */
 export function recordRealtimeHeader(
   cityId: string,
@@ -95,6 +97,7 @@ export function recordRealtimeHeader(
   options: { storage?: StorageLike; now?: number } = {},
 ): void {
   if (!CITY_ID_PATTERN.test(cityId)) return;
+  if (headerValue === null || headerValue === undefined) return;
   const storage = options.storage ?? defaultStorage();
   if (!storage) return;
   const kinds = parseRealtimeHeader(headerValue);
