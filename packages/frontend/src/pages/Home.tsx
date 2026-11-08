@@ -45,6 +45,7 @@ import { useMapGuidance } from "../hooks/useMapGuidance.ts";
 import { findStopContextCandidates } from "../hooks/useRiderModeDetection.ts";
 import { useGuidanceSession } from "../components/Guidance/GuidanceSession.tsx";
 import { TextModeButton } from "../presentation/TextModeButton.tsx";
+import { WhatsNewCard } from "../components/WhatsNew/WhatsNewCard.tsx";
 import { GuidanceAlerts } from "../components/Guidance/GuidanceAlerts.tsx";
 import { ETACards, type EtaStopInfo } from "../components/Map/ETACards.tsx";
 import { MapObstacle } from "../components/Map/MapObstacle.tsx";
@@ -420,6 +421,8 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
         <MapObstacle id="map-detail" className="pointer-events-auto inline-block ml-3 mt-1">
           <MapDetailControl />
         </MapObstacle>
+        {/* Map mode only: a temporary map leaves What's new to Text mode. */}
+        {!onBackToText && <WhatsNewCard placement="overlay" />}
       </div>
 
       {/* Map */}

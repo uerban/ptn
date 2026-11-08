@@ -10,6 +10,13 @@ import type { Row, Side } from "../../services/nearbyDirections.ts";
 import { bottomStopOf, rowPills, type PillDeparture } from "../../services/nearbyDepartureRows.ts";
 import { DepartureLineBadge } from "../DepartureLineBadge.tsx";
 import { CHIPS_BOTTOM_VAR, CHIPS_RIGHT_VAR } from "./bottomControlInsets.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { useAlertedDepartures } from "../../hooks/useServiceAlertSelection.ts";
+import { usePresentationText } from "../../i18n/presentationStrings.ts";
+import { ServiceAlertIndicator } from "../ServiceAlerts/ServiceAlertIndicator.tsx";
+
+/** Whether a pill's line has an active service alert at its stop; null when none do. */
+type AlertedCheck = ((departure: Departure, stopId: string) => boolean) | null;
 
 /** Pills per row (`rows`), columns (`columns`). */
 const MAX_PILLS = 10;
@@ -103,7 +110,11 @@ function columnsOf(top: PillDeparture[], bottom: PillDeparture[]): Column[] {
  */
 export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loading, layout, onSelect }: ETACardsProps) {
   const { t } = useTranslation();
+  const text = usePresentationText();
   const now = useServerNow(COUNTDOWN_INTERVAL_MS, !loading);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const alerted = useAlertedDepartures(cityId, !loading);
+  const alertLabel = text("serviceAlerts.indicator");
 
   const stopFor = useCallback(
     (id: string): StopWithLines | undefined =>
@@ -162,6 +173,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
           columns={columns}
           labels={{ top: topHeader, bottom: bottomHeader }}
           mainStopNames={{ top: nearestStop.name, bottom: bottomStop.name }}
+          alerted={alerted}
+          alertLabel={alertLabel}
           onSelect={onSelect}
         />
       ) : (
@@ -172,6 +185,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
               header={headed ? topHeader : null}
               mainStopName={nearestStop.name}
               pills={top.slice(0, MAX_PILLS)}
+              alerted={alerted}
+              alertLabel={alertLabel}
               onSelect={onSelect}
             />
           )}
@@ -181,6 +196,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
               header={bottomHeader}
               mainStopName={bottomStop.name}
               pills={bottom.slice(0, MAX_PILLS)}
+              alerted={alerted}
+              alertLabel={alertLabel}
               onSelect={onSelect}
             />
           )}
@@ -196,6 +213,8 @@ interface ETAColumnsProps {
   labels: Record<Row, string>;
   /** Per row: pills leaving from a stop of another name show that name. */
   mainStopNames: Record<Row, string>;
+  alerted: AlertedCheck;
+  alertLabel: string;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
@@ -207,7 +226,7 @@ const ROWS: readonly Row[] = ["top", "bottom"];
  * by column (a route's top cell, then its bottom cell), and each pill is
  * described by its row's label, since there is no per-row group here.
  */
-function ETAColumns({ columns, labels, mainStopNames, onSelect }: ETAColumnsProps) {
+function ETAColumns({ columns, labels, mainStopNames, alerted, alertLabel, onSelect }: ETAColumnsProps) {
   const topId = useId();
   const bottomId = useId();
   const labelId: Record<Row, string> = { top: topId, bottom: bottomId };
@@ -243,6 +262,7 @@ function ETAColumns({ columns, labels, mainStopNames, onSelect }: ETAColumnsProp
                   pill={cell}
                   showStop={cell.stop.name !== mainStopNames[row]}
                   describedBy={labelId[row]}
+                  alertLabel={alerted?.(cell.departure, cell.stop.id) ? alertLabel : null}
                   onSelect={onSelect}
                 />
               )}
@@ -261,10 +281,12 @@ interface ETARowProps {
   /** Pills leaving from a stop of another name show that name. */
   mainStopName: string;
   pills: PillDeparture[];
+  alerted: AlertedCheck;
+  alertLabel: string;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
-function ETARow({ row, header, mainStopName, pills, onSelect }: ETARowProps) {
+function ETARow({ row, header, mainStopName, pills, alerted, alertLabel, onSelect }: ETARowProps) {
   const headerId = useId();
   return (
     <div
@@ -288,6 +310,7 @@ function ETARow({ row, header, mainStopName, pills, onSelect }: ETARowProps) {
             key={pill.key}
             pill={pill}
             showStop={pill.stop.name !== mainStopName}
+            alertLabel={alerted?.(pill.departure, pill.stop.id) ? alertLabel : null}
             onSelect={onSelect}
           />
         ))}
@@ -302,6 +325,8 @@ interface ETAPillProps {
   showStop: boolean;
   /** Id of the row label describing the pill (`columns`, which has no row groups). */
   describedBy?: string;
+  /** Set when the pill's line has an active service alert: the spoken mark. */
+  alertLabel?: string | null;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
@@ -312,7 +337,7 @@ interface ETAPillProps {
  * The `eta-card` test id predates the pills and is kept for the existing
  * page and component tests.
  */
-function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
+function ETAPill({ pill, showStop, describedBy, alertLabel, onSelect }: ETAPillProps) {
   const { t } = useTranslation();
   const { departure, minutes } = pill;
 
@@ -326,9 +351,10 @@ function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
     stop: pill.stop.name,
     minutes: String(minutes),
   };
-  const ariaLabel = minutes <= 0
+  const baseLabel = minutes <= 0
     ? fill(t("eta.pill_aria_due", "Line {line} toward {headsign}, from {stop}, due now"), labelValues)
     : fill(t("eta.pill_aria", "Line {line} toward {headsign}, from {stop}, in {minutes} min"), labelValues);
+  const ariaLabel = alertLabel ? `${baseLabel}, ${alertLabel}` : baseLabel;
 
   return (
     <button
@@ -348,6 +374,7 @@ function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
         routeColor={departure.routeColor}
         className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
       />
+      {alertLabel && <ServiceAlertIndicator className="w-4 h-4 -ml-1" />}
       <div className="flex flex-col min-w-0">
         <span className="text-[10px] text-fg-muted truncate">{departure.headsign}</span>
         <span data-testid="eta-countdown" data-countdown className="text-xs font-semibold text-fg">{countdown}</span>

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useMemo, useState } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
 import { Link } from "react-router-dom";
 import { useTranslation } from "../../i18n/index.ts";
@@ -17,6 +17,9 @@ import { TransitousPanel, type TransitousPanelProps } from "./TransitousPanel.ts
 import { RouteResultsConsumer } from "./RouteResultsConsumer.tsx";
 import { RouteResultsPower } from "./RouteResultsPower.tsx";
 import { RouteResultsAccessible } from "./RouteResultsAccessible.tsx";
+import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
+import { legTargets } from "../../hooks/useServiceAlertSelection.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
 
 /** How often the result cards re-read the time. */
 const RESULTS_CLOCK_MS = 10_000;
@@ -117,6 +120,12 @@ export function RouteResults({
     }),
   );
   const [savedDurably, setSavedDurably] = useState(true);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const cityName = useCityStore((s) => s.activeCity.name);
+  const alertTargets = useMemo(
+    () => itineraries.flatMap((it) => it.legs.flatMap(legTargets)),
+    [itineraries],
+  );
 
   const canSavePair = Boolean(origin && destination) && itineraries.length > 0;
 
@@ -259,6 +268,14 @@ export function RouteResults({
   return (
     <>
     <div ref={listRef} className="pt-2" onKeyDown={handleResultsKeyDown}>
+      {/* The alerts' state and the offer; each card lists its own alerts. */}
+      <ServiceAlertsPanel
+        cityId={cityId}
+        cityName={cityName}
+        targets={alertTargets}
+        surface="route-results"
+        listAlerts={false}
+      />
       {variant === "power" ? (
         <RouteResultsPower
           itineraries={itineraries}

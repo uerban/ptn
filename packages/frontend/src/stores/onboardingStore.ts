@@ -73,6 +73,11 @@ interface OnboardingState {
   ) => void;
   commitSetup: (input: CommitSetupInput) => Promise<OnboardingRecord>;
   removeCarriedOverOverride: (axis: ProtectionAxis) => void;
+  /** Count one **Not now** answer to the alerts offer. */
+  recordAlertsNotNow: () => void;
+  /** Mark What's new entries up to `id` as seen; `alertsNotNow` also counts
+   * one **Not now** (the card closed with its alerts item unanswered). */
+  markWhatsNewSeen: (id: number, options?: { alertsNotNow?: boolean }) => void;
 }
 
 function initialDraft(): SetupDraft {
@@ -220,7 +225,39 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
     writeOnboardingRecord(next);
     set({ record: next });
   },
+
+  recordAlertsNotNow: () => {
+    updateRecord(get, set, (record) => ({
+      ...record,
+      alertsNotNow: record.alertsNotNow + 1,
+    }));
+  },
+
+  markWhatsNewSeen: (id, options = {}) => {
+    updateRecord(get, set, (record) => ({
+      ...record,
+      seenWhatsNew: Math.max(record.seenWhatsNew, id),
+      alertsNotNow: record.alertsNotNow + (options.alertsNotNow ? 1 : 0),
+    }));
+  },
 }));
+
+/**
+ * Apply `change` to the freshest record: the stored one (another tab may have
+ * written since this tab last read it), else the one in memory. When storage
+ * refuses the write, the change still holds for this session.
+ */
+function updateRecord(
+  get: () => OnboardingState,
+  set: (partial: Partial<OnboardingState>) => void,
+  change: (record: OnboardingRecord) => OnboardingRecord,
+): void {
+  const read = readOnboardingRecord();
+  const current = read.status === "ok" ? read.record : get().record;
+  if (!current) return;
+  const next = change(current);
+  if (!writeOnboardingRecord(next)) set({ record: next });
+}
 
 onOnboardingRecordWrite((record) => {
   useOnboardingStore.setState({ record });

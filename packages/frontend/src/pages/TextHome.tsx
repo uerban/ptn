@@ -11,6 +11,7 @@ import { useNearbyAnchor } from "../stores/nearbyAnchorStore.ts";
 import { useWatchPosition } from "../hooks/useWatchPosition.ts";
 import { restoreReturnFocus, type TemporaryMap } from "../presentation/temporaryMap.ts";
 import { useShowMapAction } from "../presentation/ShowMapAction.tsx";
+import { WhatsNewCard } from "../components/WhatsNew/WhatsNewCard.tsx";
 
 /**
  * A line opened from a departure list is shown on its own page here: the
@@ -63,7 +64,12 @@ export function TextHome({ temporaryMap }: { temporaryMap: TemporaryMap }) {
   const showStopsMap = useCallback(() => request("show-map"), [request]);
   const showTripMap = useCallback(() => request("guidance-show-map"), [request]);
   const renderNearby = useCallback(
-    (showStop: (stop: Stop) => void) => <NearbyDepartures showStop={showStop} />,
+    (showStop: (stop: Stop) => void) => (
+      <>
+        <WhatsNewCard placement="inline" />
+        <NearbyDepartures showStop={showStop} />
+      </>
+    ),
     [],
   );
 

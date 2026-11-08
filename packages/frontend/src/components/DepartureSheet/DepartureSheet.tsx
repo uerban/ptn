@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Stop, TransportMode } from "@pt/shared";
 import { useDepartures } from "../../hooks/useDepartures.ts";
 import { useFavoritesStore } from "../../stores/favoritesStore.ts";
@@ -7,6 +7,8 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
 import { LiveTimesNotice } from "./LiveTimesNotice.tsx";
+import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
+import { stopTargets } from "../../hooks/useServiceAlertSelection.ts";
 import { useLineClick } from "../../hooks/useLineClick.ts";
 import { ModeFilterPills } from "../ModeFilterPills.tsx";
 import { Icon } from "../Icon.tsx";
@@ -79,6 +81,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, []);
 
   const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
+  const alertTargets = useMemo(() => stopTargets(stop.id, departures), [stop.id, departures]);
 
   const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);
@@ -222,6 +225,13 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
           onKeyDown={handleBodyKeyDown}
           className="overflow-y-auto flex-1 py-1"
         >
+          {/* Service alerts for this stop and its departures, or the offer */}
+          <ServiceAlertsPanel
+            cityId={activeCityId}
+            cityName={activeCityName}
+            targets={alertTargets}
+            surface="departure-sheet"
+          />
           {loading && (
             <div className="space-y-1.5 mx-2 my-2" data-testid="departure-sheet-skeleton" aria-hidden>
               {Array.from({ length: 5 }).map((_, i) => (

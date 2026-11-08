@@ -1,4 +1,4 @@
-import type { Leg, LegStatus, WalkingProgress, TransitProgress } from "@pt/shared";
+import type { Alert, Leg, LegStatus, WalkingProgress, TransitProgress } from "@pt/shared";
 import { TransportModeIcon } from "../TransportModeIcon.tsx";
 import { WalkingLegInfo } from "./WalkingLegInfo.tsx";
 import { TransitLegInfo } from "./TransitLegInfo.tsx";
@@ -6,6 +6,7 @@ import type { ConnectionStatus } from "./connectionStatus.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { useTripDelay } from "../../stores/rtStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { ServiceAlertNote } from "../ServiceAlerts/ServiceAlertItem.tsx";
 
 interface LegRowProps {
   leg: Leg;
@@ -14,6 +15,8 @@ interface LegRowProps {
   transitProgress?: TransitProgress | null;
   /** Connection intelligence message for upcoming transit legs */
   connectionStatus?: ConnectionStatus | null;
+  /** Service alerts concerning this leg while it runs. */
+  serviceAlerts?: readonly Alert[];
   onTap?: () => void;
 }
 
@@ -30,6 +33,7 @@ export function LegRow({
   walkingProgress,
   transitProgress,
   connectionStatus,
+  serviceAlerts,
   onTap,
 }: LegRowProps) {
   const { t, formattingLocale } = useTranslation();
@@ -122,6 +126,15 @@ export function LegRow({
             }`} style={{ fontSize: "var(--variant-meta-text-size)" }}>
               {connectionStatus.message}
             </div>
+          )}
+          {/* Shown, not announced: the step list is a live region, and the
+              only spoken alert is the trip announcer's (SEVERE only). */}
+          {serviceAlerts && serviceAlerts.length > 0 && !isWalking && status !== "completed" && (
+            <span aria-live="off" data-testid="leg-service-alerts" className="mt-1 flex flex-col gap-0.5">
+              {serviceAlerts.map((alert) => (
+                <ServiceAlertNote key={alert.id} alert={alert} />
+              ))}
+            </span>
           )}
         </div>
 

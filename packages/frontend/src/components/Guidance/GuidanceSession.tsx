@@ -6,6 +6,7 @@ import { useGuidanceLegProgress } from "../../hooks/useGuidanceLegProgress.ts";
 import { useRiderModeDetection } from "../../hooks/useRiderModeDetection.ts";
 import { useTripNotifications } from "../../hooks/useTripNotifications.ts";
 import { useGuidanceDashboard, type GuidanceDashboard } from "../../hooks/useGuidanceDashboard.ts";
+import { ServiceAlertTripAnnouncer } from "../ServiceAlerts/ServiceAlertTripAnnouncer.tsx";
 
 const IDLE: GuidanceDashboard = {
   currentLeg: null,
@@ -37,6 +38,7 @@ export function GuidanceSessionProvider({ children }: { children: ReactNode }) {
   return (
     <GuidanceSessionContext.Provider value={dashboard}>
       {children}
+      {isNavigating && <ServiceAlertTripAnnouncer />}
     </GuidanceSessionContext.Provider>
   );
 }

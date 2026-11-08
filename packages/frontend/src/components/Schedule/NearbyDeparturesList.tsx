@@ -8,6 +8,12 @@ import { usePresentationText, type PresentationText } from "../../i18n/presentat
 import { bottomStopOf, rowPills, type PillDeparture } from "../../services/nearbyDepartureRows.ts";
 import { haversineDistance } from "../../utils/geo.ts";
 import { DepartureLineBadge } from "../DepartureLineBadge.tsx";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { useAlertedDepartures } from "../../hooks/useServiceAlertSelection.ts";
+import { ServiceAlertIndicator } from "../ServiceAlerts/ServiceAlertIndicator.tsx";
+
+/** Whether a departure's line has an active service alert at its stop; null when none do. */
+type AlertedCheck = ((departure: PillDeparture["departure"], stopId: string) => boolean) | null;
 
 /** Departures per group, as on the map's strip. */
 const MAX_PER_GROUP = 10;
@@ -44,6 +50,8 @@ export function NearbyDeparturesList({ center, chosenStopName, onSelectStop }: N
     cityStops: stops,
   });
   const now = useServerNow(COUNTDOWN_INTERVAL_MS, !nearby.loading);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const alerted = useAlertedDepartures(cityId, center !== null && !nearby.loading);
 
   const nearestStop = nearby.nearestStop;
   const stopsById = useMemo(() => new Map(stops.map((s) => [s.id, s])), [stops]);
@@ -86,6 +94,7 @@ export function NearbyDeparturesList({ center, chosenStopName, onSelectStop }: N
               row="top"
               pills={top.slice(0, MAX_PER_GROUP)}
               text={text}
+              alerted={alerted}
               onSelectStop={onSelectStop}
             />
           )}
@@ -95,6 +104,7 @@ export function NearbyDeparturesList({ center, chosenStopName, onSelectStop }: N
               row="bottom"
               pills={bottom.slice(0, MAX_PER_GROUP)}
               text={text}
+              alerted={alerted}
               onSelectStop={onSelectStop}
             />
           )}
@@ -109,10 +119,11 @@ interface DepartureGroupProps {
   row: "top" | "bottom";
   pills: PillDeparture[];
   text: PresentationText;
+  alerted: AlertedCheck;
   onSelectStop: (stop: Stop) => void;
 }
 
-function DepartureGroup({ label, row, pills, text, onSelectStop }: DepartureGroupProps) {
+function DepartureGroup({ label, row, pills, text, alerted, onSelectStop }: DepartureGroupProps) {
   const labelId = useId();
   return (
     <div role="group" aria-labelledby={labelId} data-testid="nearby-departure-group" data-row={row} className="mb-3">
@@ -120,7 +131,12 @@ function DepartureGroup({ label, row, pills, text, onSelectStop }: DepartureGrou
       <ul className="list-none m-0 p-0 flex flex-col gap-1">
         {pills.map((pill) => (
           <li key={pill.key}>
-            <DepartureRow pill={pill} text={text} onSelectStop={onSelectStop} />
+            <DepartureRow
+              pill={pill}
+              text={text}
+              alerted={alerted?.(pill.departure, pill.stop.id) ?? false}
+              onSelectStop={onSelectStop}
+            />
           </li>
         ))}
       </ul>
@@ -128,7 +144,17 @@ function DepartureGroup({ label, row, pills, text, onSelectStop }: DepartureGrou
   );
 }
 
-function DepartureRow({ pill, text, onSelectStop }: { pill: PillDeparture; text: PresentationText; onSelectStop: (stop: Stop) => void }) {
+function DepartureRow({
+  pill,
+  text,
+  alerted,
+  onSelectStop,
+}: {
+  pill: PillDeparture;
+  text: PresentationText;
+  alerted: boolean;
+  onSelectStop: (stop: Stop) => void;
+}) {
   const { departure, minutes, stop } = pill;
   const when = minutes <= 0 ? text("nearby.due") : text("nearby.inMinutes", { minutes: String(minutes) });
   const status = departure.predictedTime ? text("nearby.live") : text("nearby.scheduled");
@@ -136,7 +162,7 @@ function DepartureRow({ pill, text, onSelectStop }: { pill: PillDeparture; text:
     line: departure.routeShortName,
     headsign: departure.headsign,
     stop: stop.name,
-  })}, ${when}, ${status}`;
+  })}, ${when}, ${status}${alerted ? `, ${text("serviceAlerts.indicator")}` : ""}`;
   return (
     <button
       type="button"
@@ -153,6 +179,7 @@ function DepartureRow({ pill, text, onSelectStop }: { pill: PillDeparture; text:
         routeColor={departure.routeColor}
         className="text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
       />
+      {alerted && <ServiceAlertIndicator className="w-5 h-5" />}
       <span className="flex-1 min-w-0">
         <span className="block text-sm text-fg truncate">{departure.headsign}</span>
         <span className="block text-xs text-fg-muted truncate">{stop.name}</span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useCityDataQuery } from "../../hooks/useCityDataQuery.ts";
 import maplibregl from "../../map/maplibre.ts";
 import { useLineViewStore } from "../../stores/lineViewStore.ts";
@@ -8,6 +8,11 @@ import type { LinePattern } from "../../stores/lineViewStore.ts";
 import { Icon } from "../Icon.tsx";
 import { useRegisterMapObstacle } from "../../hooks/useRegisterMapObstacle.ts";
 import { labelFontstack } from "../../map/styleBuilder.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import {
+  ServiceAlertsPanel,
+  routeTargets,
+} from "../ServiceAlerts/ServiceAlertsPanel.tsx";
 
 const LINE_SOURCE = "line-route-source";
 const LINE_LAYER = "line-route-line";
@@ -83,6 +88,10 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
   const activeRouteShortName = useLineViewStore((s) => s.activeRouteShortName);
   const toggleDirection = useLineViewStore((s) => s.toggleDirection);
   const hideLine = useLineViewStore((s) => s.hideLine);
+  const activeRouteId = useLineViewStore((s) => s.activeRouteId);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const cityName = useCityStore((s) => s.activeCity.name);
+  const alertTargets = useMemo(() => routeTargets(activeRouteId), [activeRouteId]);
   const layersAddedRef = useRef(false);
 
   const pattern = patterns[activeDirection] ?? patterns[0] ?? null;
@@ -368,7 +377,7 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
         data-testid="line-route-label"
         className="absolute top-20 left-1/2 -translate-x-1/2 z-20"
       >
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-raised
+        <div className="w-fit mx-auto flex items-center gap-2 px-3 py-1.5 bg-surface-raised
           rounded-full shadow-lg border border-divider">
           <span
             className="text-xs font-bold px-2 py-0.5 rounded text-badge-text"
@@ -392,6 +401,16 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
           >
             <Icon name="close" size={14} className="text-fg-muted" />
           </button>
+        </div>
+        {/* The line's service alerts, or the offer, under its label */}
+        <div className="mt-2 w-[min(22rem,calc(100vw-1.5rem))] max-h-[40vh] overflow-y-auto rounded-xl bg-surface-raised shadow-lg empty:hidden">
+          <ServiceAlertsPanel
+            cityId={cityId}
+            cityName={cityName}
+            targets={alertTargets}
+            includePartial
+            surface="line-view"
+          />
         </div>
       </div>
     </>
