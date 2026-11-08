@@ -50,7 +50,7 @@
 //!   to the accepted divergence already documented on
 //!   [`crate::app::schedule_tile`].
 
-use crate::app::response::{ByteBody, Resp};
+use crate::app::response::{if_none_match_hits, ByteBody, Resp};
 use crate::bundle::Generation;
 use std::sync::Arc;
 
@@ -102,7 +102,7 @@ pub fn gtfs_manifest(gen: &Generation, if_none_match: Option<&str>) -> Resp {
         };
     };
 
-    if if_none_match == Some(response.etag.as_str()) {
+    if if_none_match_hits(if_none_match, &response.etag) {
         // Node's 304 carries ETag + X-PT-Bundle-Hash only: no Cache-Control,
         // no Vary.
         return Resp::WithBundleHash {

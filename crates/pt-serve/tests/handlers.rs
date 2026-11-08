@@ -128,6 +128,26 @@ fn shapes_304_on_if_none_match() {
 }
 
 #[test]
+fn shapes_304_on_weak_listed_or_proxy_suffixed_tags() {
+    let (_tmp, gen) = gen_with_artifacts();
+    let hash = gen.shapes_json_sha256.clone().unwrap();
+    let artifact = format!("shapes-{hash}.json");
+    for header in [
+        format!("W/\"{hash}\""),
+        format!("\"other\", \"{hash}\""),
+        format!("\"{hash}-gzip\""),
+    ] {
+        assert!(
+            matches!(
+                shapes(&gen, &artifact, Some(&header), true),
+                Resp::NotModified { .. }
+            ),
+            "{header} must 304",
+        );
+    }
+}
+
+#[test]
 fn shapes_404_on_bad_regex_and_wrong_hash() {
     let (_tmp, gen) = gen_with_artifacts();
     assert!(matches!(

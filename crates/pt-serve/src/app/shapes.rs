@@ -1,5 +1,5 @@
 //! `GET /api/<city>/gtfs/shapes/<artifact>` — content-addressed shapes JSON.
-use crate::app::response::{ByteBody, Resp};
+use crate::app::response::{if_none_match_hits, ByteBody, Resp};
 use crate::bundle::{generation::gzip, Generation};
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ pub fn shapes(
     if hash != expected {
         return Resp::NotFoundEmpty;
     }
-    if if_none_match == Some(etag.as_str()) {
+    if if_none_match_hits(if_none_match, etag) {
         // No provenance: the raptor-bundle capability marker is scoped to
         // /raptor-bundle only.
         return Resp::NotModified {
