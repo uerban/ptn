@@ -8,7 +8,8 @@ const MAX_DEPARTURE_CHIPS = 3;
 
 export interface StopCardProps {
   group: StopGroupRecord;
-  distanceMeters: number;
+  /** Null when there is no centre to measure from: no distance is shown. */
+  distanceMeters: number | null;
   lineLabels: string[];
   lineColors: Map<string, string>;
   directionLabels: DirectionLabel[];
@@ -78,7 +79,7 @@ export function StopCard({
   const directionParts = directionLabels.map((d) => `toward ${d.label}`);
   const linePart = lineLabels.length > 0 ? `lines ${lineLabels.join(", ")}` : "";
   const transferPart = isTransfer ? t("stop.transfer_point", "transfer point") : "";
-  const distancePart = `${formatDistance(distanceMeters)} away`;
+  const distancePart = distanceMeters === null ? "" : `${formatDistance(distanceMeters)} away`;
 
   const ariaLabelParts = [group.name, transferPart, distancePart, linePart, ...directionParts].filter(Boolean);
   const ariaLabel = ariaLabelParts.join(", ");
@@ -113,7 +114,8 @@ export function StopCard({
       style={{ padding: "var(--variant-row-pad)", minHeight: "var(--variant-row-min-height)" }}
     >
       <span id={stopSummaryId} className="sr-only">
-        {group.name}, {lineLabels.length} {t("stop.lines", "lines")}, {formatDistance(distanceMeters)} {t("stop.away", "away")}
+        {group.name}, {lineLabels.length} {t("stop.lines", "lines")}
+        {distanceMeters !== null && `, ${formatDistance(distanceMeters)} ${t("stop.away", "away")}`}
       </span>
       {/* Header row: name + distance */}
       <div className="flex items-center justify-between gap-2">
@@ -136,13 +138,15 @@ export function StopCard({
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <span
-            data-testid="stop-distance"
-            className="text-fg-muted"
-            style={{ fontSize: "var(--variant-meta-text-size)" }}
-          >
-            {formatDistance(distanceMeters)}
-          </span>
+          {distanceMeters !== null && (
+            <span
+              data-testid="stop-distance"
+              className="text-fg-muted"
+              style={{ fontSize: "var(--variant-meta-text-size)" }}
+            >
+              {formatDistance(distanceMeters)}
+            </span>
+          )}
           {expandable && (
             <button
               type="button"

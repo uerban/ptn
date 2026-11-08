@@ -6,7 +6,8 @@ import { StopCard } from "./StopCard.tsx";
 
 export interface ExpandableStopGroupProps {
   group: StopGroupRecord;
-  distanceMeters: number;
+  /** Null when there is no centre to measure from. */
+  distanceMeters: number | null;
   lineLabels: string[];
   lineColors: Map<string, string>;
   directionLabels: DirectionLabel[];

@@ -89,8 +89,16 @@ export interface UseNearbyDirectionsArgs {
    */
   enabled: boolean;
   position: LatLon | null;
-  /** Stops the nearest stop is picked from (the map's visible set). */
+  /**
+   * Stops the nearest stop is picked from: the map's visible set, or every
+   * downloaded stop of the city where no map is rendered (Text mode).
+   */
   visibleStops: StopWithLines[];
+  /**
+   * The city's stops a reverse stop is looked up in. Defaults to the stop
+   * store, which the map fills; Text mode passes the downloaded stops.
+   */
+  cityStops?: StopWithLines[];
 }
 
 export interface NearbyDirections {
@@ -131,10 +139,12 @@ export function useNearbyDirections({
   enabled,
   position,
   visibleStops,
+  cityStops,
 }: UseNearbyDirectionsArgs): NearbyDirections {
   const cityId = useCityStore((s) => s.activeCity.id);
   const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
-  const allStops = useStopStore((s) => s.stops);
+  const storedStops = useStopStore((s) => s.stops);
+  const allStops = cityStops ?? storedStops;
 
   // Hysteresis state: the last committed pick, dropped on a city change. Read
   // while rendering, written only once a render commits.
