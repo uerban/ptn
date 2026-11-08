@@ -81,7 +81,7 @@ test.describe("Privacy: nearby stops @mock-api", () => {
 
     // Wait for schedule view to render
     await expect(
-      page.locator("main[aria-label='Schedule view']"),
+      page.locator("main[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Wait for nearby stops to be computed and rendered

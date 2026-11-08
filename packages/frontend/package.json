@@ -18,7 +18,7 @@
     "e2e:pr": "playwright test --project=pr-chromium --project=pr-webkit e2e/core/",
     "e2e:staging": "playwright test --project=staging e2e/core/",
     "e2e:full": "playwright test e2e/",
-    "e2e:offline": "pnpm build && E2E_PREVIEW=1 playwright test --project=offline e2e/core/offline.spec.ts e2e/poi/offline-search.spec.ts",
+    "e2e:offline": "pnpm build && E2E_PREVIEW=1 playwright test --project=offline e2e/core/offline.spec.ts e2e/core/text-mode.spec.ts e2e/poi/offline-search.spec.ts",
     "e2e:privacy": "playwright test --project=pr-chromium --grep @mock-api e2e/core/privacy-nearby.spec.ts",
     "e2e:smoke": "playwright test e2e/smoke/",
     "e2e:perf": "playwright test --project=perf e2e/perf/",

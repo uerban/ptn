@@ -15,7 +15,7 @@ test.describe("Schedule-only mode", () => {
     await page.goto("/");
 
     // Should show schedule view, not map
-    await expect(page.locator("main[aria-label='Schedule view']")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("main[aria-label='Text mode']")).toBeVisible({ timeout: 10_000 });
 
     // Should have Plan trip button
     await expect(
