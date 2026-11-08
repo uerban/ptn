@@ -46,7 +46,8 @@ export type AlertEffect =
  * GTFS-RT `Alert.SeverityLevel`. `UNKNOWN` stands for `UNKNOWN_SEVERITY`, which
  * is also what an alert without a severity level carries.
  */
-export type AlertSeverity = "UNKNOWN" | "INFO" | "WARNING" | "SEVERE";
+export const ALERT_SEVERITIES = ["UNKNOWN", "INFO", "WARNING", "SEVERE"] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 
 /**
  * One translation of a GTFS-RT `TranslatedString`. `language` is a BCP-47 tag;

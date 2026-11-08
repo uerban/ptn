@@ -20,9 +20,9 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 import {
+  ALERT_SEVERITIES,
   SERVICE_ALERTS_SCHEMA_VERSION,
   type Alert,
-  type AlertSeverity,
   type ServiceAlertsResponse,
 } from "@pt/shared";
 import { canUse } from "../privacy/canUse.ts";
@@ -95,12 +95,7 @@ function isTextList(value: unknown): boolean {
   );
 }
 
-const SEVERITIES: ReadonlySet<string> = new Set<AlertSeverity>([
-  "UNKNOWN",
-  "INFO",
-  "WARNING",
-  "SEVERE",
-]);
+const SEVERITIES: ReadonlySet<string> = new Set(ALERT_SEVERITIES);
 
 function isAlert(value: unknown): value is Alert {
   if (!value || typeof value !== "object") return false;
