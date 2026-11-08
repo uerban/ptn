@@ -50,6 +50,19 @@ describe("installKey", () => {
     expect(new TextDecoder().decode(decoded)).toBe("probe");
   });
 
+  it("drops its cached key when another tab deletes the keys", async () => {
+    const before = await getOrCreateInstallKey();
+    // Another tab deletes every key and tells the others.
+    await db.installKey.clear();
+    const otherTab = new BroadcastChannel("ptn-install-key");
+    otherTab.postMessage("reset");
+    otherTab.close();
+    await vi.waitFor(async () => {
+      expect(await getOrCreateInstallKey()).not.toBe(before);
+    });
+    expect(await db.installKey.count()).toBe(1);
+  });
+
   it("produces a non-extractable AES-GCM 256 key with encrypt + decrypt usages", async () => {
     const key = await getOrCreateInstallKey();
     expect(key.extractable).toBe(false);

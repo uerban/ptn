@@ -229,7 +229,30 @@ export async function resetInstallKeys(): Promise<void> {
   await db.installKey.clear();
   states.clear();
   setDegradedMode(null);
+  try {
+    resetChannel?.postMessage("reset");
+  } catch {
+    // Channel closed: other tabs pick up the new key after a reload.
+  }
 }
+
+/**
+ * Other tabs drop their cached keys when one tab deletes them, so they never
+ * seal a record with a key that no longer exists; their next write reads (or
+ * creates) the current key.
+ */
+const resetChannel: BroadcastChannel | null = (() => {
+  try {
+    if (typeof BroadcastChannel === "undefined") return null;
+    const channel = new BroadcastChannel("ptn-install-key");
+    channel.onmessage = (event: MessageEvent) => {
+      if (event.data === "reset") states.clear();
+    };
+    return channel;
+  } catch {
+    return null;
+  }
+})();
 
 /** Test-only: drops the cached keys so each test boots from a clean slate. */
 export function __resetInstallKeyCacheForTests(): void {

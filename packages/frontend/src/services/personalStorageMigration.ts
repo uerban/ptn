@@ -50,7 +50,7 @@ import { isPrivacyDataMigrationComplete } from "./privacyDataMigrationState.ts";
 import type { RecentPayload } from "./recents.ts";
 import type { SavePayload } from "./saves.ts";
 import { isSealedValue, openSealedString, sealString } from "./sealedLocalStorage.ts";
-import { canonicalCityId } from "../utils/cityId.ts";
+import { canonicalCityId, readStoredCityId } from "../utils/cityId.ts";
 
 /**
  * A legacy row's city, moved inside the sealed payload. Rows written before
@@ -60,20 +60,6 @@ import { canonicalCityId } from "../utils/cityId.ts";
 function legacyCity(cityId: unknown, fallbackCityId: string | null): { cityId?: string } {
   if (typeof cityId === "string" && cityId) return { cityId: canonicalCityId(cityId) };
   return fallbackCityId ? { cityId: fallbackCityId } : {};
-}
-
-/** The selected city stored by the city store (`ptn-city`), if any. */
-export function storedCurrentCityId(storage: Pick<Storage, "getItem">): string | null {
-  try {
-    const state = (JSON.parse(storage.getItem("ptn-city") ?? "null") as {
-      state?: { currentCityId?: unknown; activeCity?: { id?: unknown } | null };
-    } | null)?.state;
-    // Current stores keep only the id; older ones kept the whole city.
-    const id = state?.currentCityId ?? state?.activeCity?.id;
-    return typeof id === "string" && id ? canonicalCityId(id) : null;
-  } catch {
-    return null;
-  }
 }
 
 /** localStorage values holding personal state, sealed by this migration. */
@@ -392,7 +378,7 @@ async function convertAll(
         "The install key cannot be stored on this device",
       );
     }
-    const currentCityId = storedCurrentCityId(storage);
+    const currentCityId = readStoredCityId(storage);
     await convertRecents(key, opts, currentCityId);
     await convertSaves(key, opts, currentCityId);
     await convertUsage(key, opts, currentCityId);
@@ -415,7 +401,17 @@ export function runPersonalStorageMigration(
   opts: PersonalStorageMigrationOptions = {},
 ): Promise<PersonalStorageMigrationResult> {
   if (running) return running;
-  const storage = opts.storage ?? globalThis.localStorage;
+  let storage: MigrationStorage;
+  try {
+    // Reading `localStorage` itself throws where site data is blocked.
+    storage = opts.storage ?? globalThis.localStorage;
+    if (!storage) throw new Error("localStorage is not available");
+  } catch {
+    // Nothing durable can be written: personal records stay session-only
+    // and no reader retries the conversion in this session.
+    setPersonalStorageMigrationState("failed", "key-unavailable");
+    return Promise.resolve("failed");
+  }
   if (isPersonalStorageMigrated(storage)) {
     setPersonalStorageMigrationState("complete");
     return Promise.resolve("already-complete");

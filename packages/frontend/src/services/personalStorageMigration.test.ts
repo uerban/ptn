@@ -139,7 +139,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  for (const k of [LEGACY_FAVORITES_KEY, MAP_VIEWPORT_STORAGE_KEY, DELAY_REPORTS_STORAGE_KEY]) {
+  for (const k of ["ptn-city", LEGACY_FAVORITES_KEY, MAP_VIEWPORT_STORAGE_KEY, DELAY_REPORTS_STORAGE_KEY]) {
     localStorage.removeItem(k);
   }
 });
@@ -234,7 +234,40 @@ describe("runPersonalStorageMigration", () => {
       Home: "tricity",
       Work: "paris",
     });
-    localStorage.removeItem("ptn-city");
+  });
+
+  it("reads the selected city from the current store shape, also for per-city usage", async () => {
+    localStorage.setItem("ptn-city", JSON.stringify({ state: { currentCityId: "vilnius" }, version: 1 }));
+    await db.recentLocations.put({ id: "stop:S-88", endpoint: { ...stop, stopId: "S-88" }, usedAt: 1 } as never);
+    await db.cityUsageStats.put({ id: "x:S-77", stopId: "S-77", tapCount: 1, lastTapped: 1 } as never);
+
+    expect(await runPersonalStorageMigration({ cacheStorage: null, lock: NO_LOCK })).toBe("migrated");
+
+    const recents = await listPersonal<{ cityId?: string }>("recentLocations");
+    expect(recents.map((r) => r.value.cityId)).toEqual(["vilnius"]);
+    const usage = await listPersonal<{ stopId: string; cityId?: string }>("personalUsage");
+    expect(usage.map((u) => u.value)).toEqual([expect.objectContaining({ stopId: "S-77", cityId: "vilnius" })]);
+  });
+
+  it("leaves records untagged when the stored city cannot be parsed", async () => {
+    localStorage.setItem("ptn-city", "{not json");
+    await db.recentLocations.put({ id: "stop:S-88", endpoint: { ...stop, stopId: "S-88" }, usedAt: 1 } as never);
+
+    expect(await runPersonalStorageMigration({ cacheStorage: null, lock: NO_LOCK })).toBe("migrated");
+
+    const recents = await listPersonal<{ cityId?: string }>("recentLocations");
+    expect(recents.map((r) => r.value.cityId ?? null)).toEqual([null]);
+  });
+
+  it("fails without throwing when the browser blocks localStorage itself", async () => {
+    vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(await runPersonalStorageMigration({ cacheStorage: null, lock: NO_LOCK })).toBe("failed");
+    expect(usePersonalStorageStatus.getState()).toMatchObject({
+      migration: "failed",
+      failure: "key-unavailable",
+    });
   });
 
   it("drops the geocoder dedup cache and purges activity caches only", async () => {
