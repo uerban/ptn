@@ -51,7 +51,7 @@ export async function prepareCityActivation(cityId: string, options: {
         const local = artifact;
         wire = await measureCityStage(cityId, "catalog-decode", () => decodePtbCatalogInWorker(local.ptb.bytes,
           {cityId, generation: local.generation,
-            ...(local.ptb.transfersArtifact ? {transfersArtifact: local.ptb.transfersArtifact} : {})}));
+            ...(local.ptb.transfersArtifact ? {transfersArtifact: local.ptb.transfersArtifact} : {})}, options.signal));
       }
     }
   } catch (error) {
@@ -82,7 +82,7 @@ export async function prepareCityActivation(cityId: string, options: {
         unchanged = true;
       } else {
         wire = await measureCityStage(cityId, "catalog-decode", () => decodePtbCatalogInWorker(ptb.bytes,
-          {cityId, generation, ...(ptb.transfersArtifact ? {transfersArtifact: ptb.transfersArtifact} : {})}));
+          {cityId, generation, ...(ptb.transfersArtifact ? {transfersArtifact: ptb.transfersArtifact} : {})}, options.signal));
         assertCurrent();
         artifact = await prepareCityArtifact(cityId, generation, ptb);
       }
@@ -96,7 +96,7 @@ export async function prepareCityActivation(cityId: string, options: {
       assertCurrent();
       if (!retained) throw error;
       wire = await decodePtbCatalogInWorker(retained.ptb.bytes, {cityId, generation: retained.generation,
-        ...(retained.ptb.transfersArtifact ? {transfersArtifact: retained.ptb.transfersArtifact} : {})});
+        ...(retained.ptb.transfersArtifact ? {transfersArtifact: retained.ptb.transfersArtifact} : {})}, options.signal);
       artifact = retained;
       fresh = false;
     }
