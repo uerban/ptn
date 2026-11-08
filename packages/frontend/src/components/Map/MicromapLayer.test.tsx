@@ -6,6 +6,7 @@ const loadMicromap = vi.fn();
 vi.mock("../../services/micromapLoader.ts", () => ({
   loadMicromap: (...args: unknown[]) => loadMicromap(...args),
   micromapUrl: (cityId: string) => `/micromap/${cityId}.micromap.br`,
+  useMicromapState: () => undefined,
 }));
 
 vi.mock("../../stores/cityStore.ts", () => ({
@@ -17,6 +18,7 @@ import { MicromapLayer, MICROMAP_LAYERS, MICROMAP_SOURCES } from "./MicromapLaye
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
 import { allowFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
+import { reportDetailedBasemapStatus } from "../../services/basemapPrivacy.ts";
 
 const SQUARE = "_rzlI_{xxC?o}@o}@??n}@n}@?";
 
@@ -103,6 +105,7 @@ beforeEach(() => {
   resetFlows();
   useSettingsStore.getState().setMapDetailMode("micromap");
   useSettingsStore.setState({ resolvedTheme: "light" });
+  reportDetailedBasemapStatus("off");
 });
 
 afterEach(() => cleanup());
@@ -190,5 +193,23 @@ describe("MicromapLayer", () => {
     for (const layer of Object.values(MICROMAP_LAYERS)) {
       expect(map.hasLayer(layer)).toBe(false);
     }
+  });
+
+  test("falls back to the micromap when the detailed map fails, never to another provider", async () => {
+    allowFlow("external.detailed-basemap", "carto");
+    useSettingsStore.getState().setMapDetailMode("detailed");
+    const map = createFakeMap();
+    const { rerender } = await renderLayer(map);
+    expect(map.hasLayer(MICROMAP_LAYERS.roads)).toBe(false);
+
+    await act(async () => {
+      reportDetailedBasemapStatus("failed");
+      await Promise.resolve();
+    });
+    rerender(<MicromapLayer map={map as unknown as maplibregl.Map} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(map.hasLayer(MICROMAP_LAYERS.roads)).toBe(true);
   });
 });

@@ -1,8 +1,11 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
 import {
+  getMicromapState,
   loadMicromap,
   micromapUrl,
+  MICROMAP_CACHE,
   resetMicromapCache,
+  subscribeMicromapState,
 } from "./micromapLoader.ts";
 
 // The artifact is stored brotli-compressed; the tests hand the loader plain
@@ -131,5 +134,62 @@ describe("loadMicromap", () => {
     expect(await loadMicromap("vilnius")).toBeNull();
     expect(await loadMicromap("vilnius")).not.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("micromap state", () => {
+  test("is loading while the request is out, then ready", async () => {
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>((r) => (resolve = r))),
+    );
+    const seen: (string | undefined)[] = [];
+    const stop = subscribeMicromapState(() => seen.push(getMicromapState("vilnius")));
+
+    const load = loadMicromap("vilnius");
+    expect(getMicromapState("vilnius")).toBe("loading");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    resolve(jsonResponse(ARTIFACT));
+    await load;
+
+    expect(getMicromapState("vilnius")).toBe("ready");
+    expect(seen).toEqual(["loading", "ready"]);
+    stop();
+  });
+
+  test("reports a city without an artifact as absent", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    await loadMicromap("krakow");
+    expect(getMicromapState("krakow")).toBe("absent");
+  });
+
+  test("tells a copy already on this device apart from a network load", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(ARTIFACT)));
+    vi.stubGlobal("caches", {
+      has: vi.fn(async (name: string) => name === MICROMAP_CACHE),
+      open: vi.fn(async () => ({
+        match: vi.fn(async (url: string) =>
+          url === micromapUrl("vilnius") ? new Response("cached") : undefined,
+        ),
+      })),
+    });
+    await loadMicromap("vilnius");
+    expect(getMicromapState("vilnius")).toBe("cached");
+  });
+
+  test("separates an offline miss from a failure, and only reports the failure", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }));
+    vi.stubGlobal("navigator", { onLine: false });
+    await loadMicromap("vilnius");
+    expect(getMicromapState("vilnius")).toBe("offline");
+    expect(reportError).not.toHaveBeenCalled();
+
+    vi.stubGlobal("navigator", { onLine: true });
+    await loadMicromap("vilnius");
+    expect(getMicromapState("vilnius")).toBe("failed");
+    expect(reportError).toHaveBeenCalledTimes(1);
   });
 });

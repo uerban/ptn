@@ -73,7 +73,9 @@ import {
 } from "../../map/styleBuilder.ts";
 import {
   fetchBasemapStyle,
+  guardMapRequest,
   isExternalBasemapAllowed,
+  reportDetailedBasemapStatus,
   useExternalBasemapAllowed,
 } from "../../services/basemapPrivacy.ts";
 import { useEffectiveMapMode } from "../../map/mapMode.ts";
@@ -221,6 +223,21 @@ function collectNewBasemapResources(
   };
 }
 
+interface CartoState {
+  status: "idle" | "loading" | "loaded" | "failed";
+  abortCtrl: AbortController | null;
+}
+
+/** Record the external basemap's fetch state and publish it for the map's
+ * status line. `idle` means no external style is (or stays) on the map. */
+function updateCartoState(
+  ref: { current: CartoState },
+  next: CartoState,
+): void {
+  ref.current = next;
+  reportDetailedBasemapStatus(next.status === "idle" ? "off" : next.status);
+}
+
 /** Remove only the resources introduced by the external basemap. Dynamic PTN
  * overlays (routes, selected stops, and user position) stay attached. */
 function removeExternalBasemap(
@@ -345,10 +362,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
     const currentMapThemeRef = useRef<"light" | "dark" | null>(null);
     const lastFlownCityRef = useRef<string>(activeCity.id);
     const hasFlownToLocationRef = useRef(false);
-    const cartoStateRef = useRef<{
-      status: "idle" | "loading" | "loaded" | "failed";
-      abortCtrl: AbortController | null;
-    }>({ status: "idle", abortCtrl: null });
+    const cartoStateRef = useRef<CartoState>({ status: "idle", abortCtrl: null });
     // Track what is actually installed in MapLibre separately from fetch
     // state. A theme swap changes status to "loading" while the old external
     // style is still live; privacy tightening must remove that style too.
@@ -833,10 +847,16 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         zoom: restore?.zoom ?? zoom,
         bearing: restore?.bearing ?? 0,
         pitch: restore?.pitch ?? 0,
-        transformRequest: (url, resourceType) =>
-          resourceType === "Glyphs"
+        // Every engine request passes the provider guard first: an external
+        // style, tile, glyph or sprite is only fetched while its provider is
+        // allowed, whatever source or style asked for it.
+        transformRequest: (url, resourceType) => {
+          const blocked = guardMapRequest(url, resourceType, window.location.origin);
+          if (blocked) return { url: blocked };
+          return resourceType === "Glyphs"
             ? { url: localGlyphRequest(url, window.location.origin) }
-            : undefined,
+            : undefined;
+        },
       });
 
       installAttributionAutoHide(
@@ -883,7 +903,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         const dark =
           document.documentElement.getAttribute("data-theme") === "dark";
         const ctrl = new AbortController();
-        cartoStateRef.current = { status: "loading", abortCtrl: ctrl };
+        updateCartoState(cartoStateRef, { status: "loading", abortCtrl: ctrl });
         const timer = setTimeout(
           () => ctrl.abort(new DOMException("basemap-timeout", "AbortError")),
           resolveBasemapTimeoutMs(),
@@ -899,7 +919,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             localMapOnlyRef.current ||
             !isExternalBasemapAllowed()
           ) {
-            cartoStateRef.current = { status: "idle", abortCtrl: null };
+            updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
             return;
           }
           // Theme may have flipped during the fetch — drop stale result.
@@ -907,10 +927,10 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             dark ===
             (document.documentElement.getAttribute("data-theme") === "dark");
           if (!stillCurrent) {
-            cartoStateRef.current = {
+            updateCartoState(cartoStateRef, {
               status: cartoAppliedRef.current ? "loaded" : "idle",
               abortCtrl: null,
-            };
+            });
             void loadCarto();
             return;
           }
@@ -919,24 +939,24 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           mergeCartoIntoRunningMap(map, cartoStyle, stopsBeforeId);
           cartoResourcesRef.current = resources;
           cartoAppliedRef.current = true;
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
               isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
           setGlyphsReady(true);
         } catch {
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
               isExternalBasemapAllowed()
                 ? "failed"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } finally {
           clearTimeout(timer);
         }
@@ -1249,7 +1269,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         removeAllMarkers();
         window.removeEventListener("online", onOnline);
         cartoStateRef.current.abortCtrl?.abort();
-        cartoStateRef.current = { status: "idle", abortCtrl: null };
+        updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
         cartoAppliedRef.current = false;
         cartoResourcesRef.current = NO_BASEMAP_RESOURCES;
         loadCartoRef.current = null;
@@ -1273,7 +1293,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       if (!basemapAllowed || localMapOnly) {
         const wasLoaded = cartoAppliedRef.current;
         cartoStateRef.current.abortCtrl?.abort();
-        cartoStateRef.current = { status: "idle", abortCtrl: null };
+        updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
         if (wasLoaded) {
           const isDark =
             document.documentElement.getAttribute("data-theme") === "dark";
@@ -1633,7 +1653,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         cartoStateRef.current.abortCtrl?.abort();
 
         const ctrl = new AbortController();
-        cartoStateRef.current = { status: "loading", abortCtrl: ctrl };
+        updateCartoState(cartoStateRef, { status: "loading", abortCtrl: ctrl });
         const timer = setTimeout(
           () => ctrl.abort(new DOMException("basemap-timeout", "AbortError")),
           resolveBasemapTimeoutMs(),
@@ -1649,7 +1669,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             localMapOnlyRef.current ||
             !isExternalBasemapAllowed()
           ) {
-            cartoStateRef.current = { status: "idle", abortCtrl: null };
+            updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
             return;
           }
 
@@ -1684,7 +1704,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           // briefly un-dim until the next pan/zoom. Harmless no-op when hard-hide
           // is rolled back off (just an extra end-of-gesture-class solve).
           map.once("idle", () => debouncedResolveLabels());
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
               isExternalBasemapAllowed() &&
@@ -1692,19 +1712,19 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } catch {
           // Theme swap fetch failed — the old Carto basemap is still on
           // screen for the previous theme. Not ideal, but better than a
           // teardown that leaves the user with a blank map.
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
               isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } finally {
           clearTimeout(timer);
         }

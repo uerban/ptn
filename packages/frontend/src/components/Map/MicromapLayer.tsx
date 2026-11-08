@@ -4,7 +4,9 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useEffectiveMapMode } from "../../map/mapMode.ts";
 import { labelFontstack } from "../../map/styleBuilder.ts";
-import { loadMicromap } from "../../services/micromapLoader.ts";
+import { loadMicromap, useMicromapState } from "../../services/micromapLoader.ts";
+import { useDetailedBasemapStatus } from "../../services/basemapPrivacy.ts";
+import type { MicromapArtifact } from "../../map/micromap/types.ts";
 import {
   EMPTY_MICROMAP_GEOJSON,
   micromapToGeoJson,
@@ -363,18 +365,29 @@ function ensureMicromapOrder(
  */
 export function MicromapLayer({ map }: MicromapLayerProps) {
   const activeCityId = useCityStore((s) => s.activeCity.id);
-  const enabled = useEffectiveMapMode() === "micromap";
+  const mode = useEffectiveMapMode();
+  const detailedStatus = useDetailedBasemapStatus();
+  // Also under a detailed map that failed to load: the city outline is
+  // better than an empty background, and it is all local.
+  const enabled =
+    mode === "micromap" || (mode === "detailed" && detailedStatus === "failed");
+  const loadState = useMicromapState(activeCityId);
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const [data, setData] = useState<MicromapGeoJson>(EMPTY_MICROMAP_GEOJSON);
   const dataRef = useRef<MicromapGeoJson>(EMPTY_MICROMAP_GEOJSON);
+  const artifactRef = useRef<MicromapArtifact | null>(null);
   const themeRef = useRef(theme);
 
   useEffect(() => {
     themeRef.current = theme;
   }, [theme]);
 
+  // Re-run when the load state changes too, so a retry that succeeds (from
+  // the map's status line) is drawn. Loads are memoized per city, and an
+  // artifact already converted is not handed to the map again.
   useEffect(() => {
     if (!enabled) {
+      artifactRef.current = null;
       setData(EMPTY_MICROMAP_GEOJSON);
       return;
     }
@@ -383,13 +396,14 @@ export function MicromapLayer({ map }: MicromapLayerProps) {
     // caller. Ignoring a late result is enough.
     let cancelled = false;
     void loadMicromap(activeCityId).then((artifact) => {
-      if (cancelled) return;
+      if (cancelled || artifact === artifactRef.current) return;
+      artifactRef.current = artifact;
       setData(artifact ? micromapToGeoJson(artifact) : EMPTY_MICROMAP_GEOJSON);
     });
     return () => {
       cancelled = true;
     };
-  }, [enabled, activeCityId]);
+  }, [enabled, activeCityId, loadState]);
 
   useEffect(() => {
     dataRef.current = data;

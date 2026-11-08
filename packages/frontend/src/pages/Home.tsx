@@ -22,6 +22,7 @@ import { BikeShareToggle } from "../components/Map/BikeShareToggle.tsx";
 import { BikeShareLayer } from "../components/Map/BikeShareLayer.tsx";
 import { GtfsCorridorLayer } from "../components/Map/GtfsCorridorLayer.tsx";
 import { MicromapLayer } from "../components/Map/MicromapLayer.tsx";
+import { MapDetailControl } from "../components/Map/MapDetailControl.tsx";
 import { BikeShareStationSheet } from "../components/Map/BikeShareStationSheet.tsx";
 import { useBikeShareStore } from "../stores/bikeShareStore.ts";
 import { useMapTapStore } from "../stores/mapTapStore.ts";
@@ -410,13 +411,16 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
         </div>
       </MapObstacle>
 
-      {/* Favorites bar */}
-      <MapObstacle
-        id="favorites-bar"
-        className="absolute top-[4.5rem] left-0 right-0 z-10"
-      >
-        <FavoritesBar onFavoriteClick={handleFavoriteClick} />
-      </MapObstacle>
+      {/* Favorites bar, then the map-detail control and the local map's
+          status below it. The column itself lets map gestures through. */}
+      <div className="absolute top-[4.5rem] left-0 right-0 z-10 pointer-events-none">
+        <MapObstacle id="favorites-bar" className="pointer-events-auto">
+          <FavoritesBar onFavoriteClick={handleFavoriteClick} />
+        </MapObstacle>
+        <MapObstacle id="map-detail" className="pointer-events-auto inline-block ml-3 mt-1">
+          <MapDetailControl />
+        </MapObstacle>
+      </div>
 
       {/* Map */}
       <div className="flex-1 relative">

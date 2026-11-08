@@ -11,6 +11,7 @@
  * mode. That fallback is why nothing here reports to the error reporter for a
  * 404 — an absent micromap is a normal state, not a fault.
  */
+import { useCallback, useSyncExternalStore } from "react";
 import { decompressBrotli } from "./brotliDecode.ts";
 import { reportError } from "./errorReporter.ts";
 import {
@@ -20,6 +21,80 @@ import {
 
 const cache = new Map<string, MicromapArtifact | null>();
 const inFlight = new Map<string, Promise<MicromapArtifact | null>>();
+
+/**
+ * What the minimal map is doing for a city, so the map can say so instead of
+ * silently showing nothing:
+ *
+ * - `loading`: the artifact is being fetched or decoded;
+ * - `ready`: drawn, fetched from the network;
+ * - `cached`: drawn from the copy already on this device;
+ * - `absent`: the city has no minimal map (a normal state);
+ * - `failed`: the artifact was unreachable or malformed while online;
+ * - `offline`: not on this device yet and there is no connection.
+ *
+ * Transit routes and stops never wait for any of these.
+ */
+export type MicromapState =
+  | "loading"
+  | "ready"
+  | "cached"
+  | "absent"
+  | "failed"
+  | "offline";
+
+/** The service worker's cache for micromap artifacts (`sw/runtimeCaching.ts`). */
+export const MICROMAP_CACHE = "micromap-artifacts";
+
+const states = new Map<string, MicromapState>();
+const stateListeners = new Set<() => void>();
+
+function setState(cityId: string, state: MicromapState): void {
+  if (states.get(cityId) === state) return;
+  states.set(cityId, state);
+  for (const listener of stateListeners) {
+    try {
+      listener();
+    } catch {
+      // One failing subscriber must not stop the others.
+    }
+  }
+}
+
+/** Current state for `cityId`, or `undefined` before any load was asked for. */
+export function getMicromapState(cityId: string): MicromapState | undefined {
+  return states.get(cityId);
+}
+
+export function subscribeMicromapState(listener: () => void): () => void {
+  stateListeners.add(listener);
+  return () => {
+    stateListeners.delete(listener);
+  };
+}
+
+/** React binding of `getMicromapState`. */
+export function useMicromapState(cityId: string): MicromapState | undefined {
+  const get = useCallback(() => getMicromapState(cityId), [cityId]);
+  return useSyncExternalStore(subscribeMicromapState, get, get);
+}
+
+/** Whether the service worker already holds this city's artifact. Asks
+ * `has` first: `open` would create the cache. */
+async function isCachedOnDevice(cityId: string): Promise<boolean> {
+  try {
+    const storage = globalThis.caches;
+    if (!storage || !(await storage.has(MICROMAP_CACHE))) return false;
+    const cache = await storage.open(MICROMAP_CACHE);
+    return (await cache.match(micromapUrl(cityId))) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+function isOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
 
 export function micromapUrl(cityId: string): string {
   return `/micromap/${cityId}.micromap.br`;
@@ -85,12 +160,24 @@ export async function loadMicromap(
   const pending = inFlight.get(cityId);
   if (pending) return pending;
 
-  const promise = fetchMicromap(cityId)
-    .then((artifact) => {
+  setState(cityId, "loading");
+  const promise = isCachedOnDevice(cityId)
+    .then(async (cachedOnDevice) => {
+      const artifact = await fetchMicromap(cityId);
       cache.set(cityId, artifact);
+      setState(
+        cityId,
+        artifact === null ? "absent" : cachedOnDevice ? "cached" : "ready",
+      );
       return artifact;
     })
     .catch((error: unknown) => {
+      // Not on this device and no connection: expected, report nothing.
+      if (isOffline()) {
+        setState(cityId, "offline");
+        return null;
+      }
+      setState(cityId, "failed");
       // Malformed or unreachable: remember nothing (a later attempt may
       // succeed) but tell the reporter, since this one IS a fault.
       reportError(error instanceof Error ? error : new Error(String(error)), {
@@ -106,8 +193,9 @@ export async function loadMicromap(
   return promise;
 }
 
-/** Test seam — drops the memoized artifacts. */
+/** Test seam — drops the memoized artifacts and states. */
 export function resetMicromapCache(): void {
   cache.clear();
   inFlight.clear();
+  states.clear();
 }
