@@ -4,6 +4,8 @@ import type { Itinerary, LatLon } from "@pt/shared";
 import { AUTO_FOLLOW_PADDING_PX } from "@pt/shared/constants";
 import { decodePolyline } from "../utils/polyline.ts";
 import { bearing as computeBearing, progressAlongLine } from "../utils/geo.ts";
+import { guidancePadding } from "./guidancePadding.ts";
+import { useMapObstaclesStore } from "../stores/mapObstaclesStore.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
 
 /**
@@ -42,7 +44,12 @@ export function useMapGuidance(
       }
 
       map.fitBounds(bounds, {
-        padding: AUTO_FOLLOW_PADDING_PX,
+        padding: guidancePadding(
+          map.getContainer().getBoundingClientRect(),
+          useMapObstaclesStore.getState().obstacles.get("step-list"),
+          AUTO_FOLLOW_PADDING_PX,
+        ),
+        retainPadding: false,
         maxZoom: 17,
         duration: 500,
       });
