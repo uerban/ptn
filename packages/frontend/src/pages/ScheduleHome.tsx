@@ -111,7 +111,7 @@ export function ScheduleHome({
   return (
     <section aria-label={text("presentation.textMode")} className="flex flex-col h-full bg-surface overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 pt-safe-top pt-4 pb-3 border-b border-divider bg-surface-raised">
+      <header className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-divider bg-surface-raised">
         <span className="text-base font-semibold text-fg" data-testid="city-name">
           {activeCity.name}
         </span>

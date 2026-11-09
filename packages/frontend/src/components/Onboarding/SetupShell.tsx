@@ -195,7 +195,7 @@ export function SetupShell(props: SetupShellProps) {
     <main
       ref={mainRef}
       data-testid="setup-shell"
-      className="min-h-dvh bg-surface px-4 py-6 text-fg [&_h1]:outline-none"
+      className="min-h-dvh bg-surface px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-fg [&_h1]:outline-none"
     >
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         {!props.storageAvailable && (
