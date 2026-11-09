@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- PTN mark: two transit lines joined at stations, with a route from the
+       origin (light ring) across the connector. Full-bleed: platforms that
+       mask icons (iOS, Android adaptive) apply their own corner shape. -->
+  <rect width="1024" height="1024" fill="#1257A2"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M196 208H828M196 770H828" stroke-width="46"/>
+    <path d="M512 208V770" stroke-width="46"/>
+    <path d="M262 455C340 405 425 418 512 482C590 540 630 574 694 574C772 574 828 522 828 450V378" stroke-width="48"/>
+    <circle cx="512" cy="208" r="58" fill="#1257A2" stroke-width="38"/>
+    <circle cx="512" cy="770" r="58" fill="#1257A2" stroke-width="38"/>
+  </g>
+  <circle cx="207" cy="500" r="59" fill="#1257A2" stroke="#1BA1FF" stroke-width="38"/>
+</svg>

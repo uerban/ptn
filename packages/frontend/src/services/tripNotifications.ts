@@ -24,7 +24,7 @@ export async function notifyIfBackground(title: string, body: string): Promise<b
     typeof Notification !== "undefined" &&
     Notification.permission === "granted"
   ) {
-    const options = { body, icon: "/favicon.svg", tag: "ptn-trip" };
+    const options = { body, icon: "/pwa-192x192.png", tag: "ptn-trip" };
     try {
       // Android and iOS PWAs require persistent service-worker notifications.
       // https://developer.mozilla.org/en-US/docs/Web/API/Notification/Notification

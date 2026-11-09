@@ -23,6 +23,25 @@ test.describe("Branding", () => {
     expect(response.ok()).toBe(true);
   });
 
+  test("iOS home-screen icon is a PNG at the linked and probed paths", async ({ page }) => {
+    // Safari falls back to a letter tile when the touch icon is missing or is
+    // served the SPA's HTML fallback, so every path it may use must be a PNG.
+    const linked = await page
+      .locator('link[rel="apple-touch-icon"]')
+      .getAttribute("href");
+    for (const path of [linked!, "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"]) {
+      const response = await page.request.get(path);
+      expect(response.ok(), path).toBe(true);
+      expect(response.headers()["content-type"], path).toContain("image/png");
+    }
+  });
+
+  test("favicon.ico is an icon, not the SPA fallback", async ({ page }) => {
+    const response = await page.request.get("/favicon.ico");
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["content-type"]).not.toContain("text/html");
+  });
+
   test("Open Graph meta tags are present", async ({ page }) => {
     const ogTitle = await page
       .locator('meta[property="og:title"]')
@@ -50,5 +69,6 @@ test.describe("Branding", () => {
     expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
     expect(manifest.icons.some((i: any) => i.sizes === "192x192")).toBe(true);
     expect(manifest.icons.some((i: any) => i.sizes === "512x512")).toBe(true);
+    expect(manifest.icons.some((i: any) => i.purpose === "maskable")).toBe(true);
   });
 });
