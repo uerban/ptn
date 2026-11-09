@@ -8,6 +8,7 @@ import {
   recordStopUsage,
   retentionMsForStopUsage,
   sweepStopUsage,
+  whenStopUsageSweepsSettled,
 } from "./stopUsage.ts";
 import {
   PRIVACY_DATA_MIGRATION_KEY,
@@ -18,13 +19,23 @@ import { findLeaks, rawTableText, resetPersonalStorage } from "../test-helpers/p
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Resetting the protection level can change stop-use retention, which queues
+ * a sweep. Wait for it before clearing storage, so it cannot delete rows the
+ * next test writes.
+ */
+async function resetPrivacy(): Promise<void> {
+  usePrivacyStore.getState().reset();
+  await whenStopUsageSweepsSettled();
+}
+
 describe("optional stop-use personalization", () => {
   beforeEach(async () => {
+    await resetPrivacy();
     localStorage.clear();
     await db.delete();
     await db.open();
     await resetPersonalStorage();
-    usePrivacyStore.getState().reset();
     usePrivacyChoicesStore.getState().reset();
   });
 
@@ -124,10 +135,10 @@ describe("optional stop-use personalization", () => {
 
 describe("per-city stop use", () => {
   beforeEach(async () => {
+    await resetPrivacy();
     localStorage.clear();
     await resetPersonalStorage();
     localStorage.setItem(PRIVACY_DATA_MIGRATION_KEY, PRIVACY_DATA_MIGRATION_VERSION);
-    usePrivacyStore.getState().reset();
     usePrivacyChoicesStore.getState().setChoice("personalization", "enabled");
   });
 
