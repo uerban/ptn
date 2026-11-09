@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 
-REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart')
+REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')
 LABELS = {
     'identity': 'Exact source revision',
     'build': 'Browser bindings and native reference build',
@@ -18,6 +18,8 @@ LABELS = {
     'measurement': 'Browser measurement hooks build',
     'heap': 'Browser JS heap budget',
     'coldstart': 'WASM cold-start p95 budgets',
+    'cities': 'Synthetic two-city serving',
+    'cityswitch': 'City switch and viewport pan workloads',
 }
 
 

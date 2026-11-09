@@ -74,6 +74,21 @@ The initial suite recovers these useful checks from the archive:
 - Native and WASM routing goldens, nonempty native/WASM binding comparisons and
   Rust/TypeScript PTB decoding parity.
 - Native RSS admission and rejection-before-bind process checks.
+- City switching and viewport panning (`e2e/perf/city-switch.spec.ts`), ported
+  from the [city-switch investigation](diagnostics/city-switch-performance/README.md).
+  `scripts/regression/synthetic_cities.py` generates two fixed-seed synthetic
+  GTFS cities (about 1,000 and 2,300 stops, round-the-clock service), publishes
+  them with `pt-producer republish` and serves each with its own `pt-serve`; the
+  browser reaches them through the same API paths as a native host. Twelve
+  alternating arrivals at zoom 16 must each complete index activation, resolve
+  every in-view badge and settle nonempty stop cards for 500 ms. Four one-second
+  pans per zoom (14, 16) in all-stops and urban modes must render frames and
+  show cards. Neither workload may run the legacy timetable projection write or
+  write its tables after the first city is ready, and page errors fail the gate.
+  Switch, badge, card-settlement, frame and long-task timings are recorded in
+  `city-switch.json` and `viewport-pan.json` but do not fail yet: the
+  investigation's 1 s budget came from a desktop GPU, and CI budgets will be set
+  once hosted-runner baselines exist.
 
 The browser heap workload uses a separate preview build with `VITE_E2E=1` to
 expose the existing map inspection handle. Production size budgets run before that

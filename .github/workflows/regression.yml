@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ci:regression')
     name: Performance, memory and binding parity
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     defaults:
       run:
         working-directory: source
@@ -60,7 +60,7 @@ jobs:
           wasm-pack build --release --target nodejs --out-dir pkg-node
           cd ../..
           pnpm install --frozen-lockfile
-          cargo build --release --locked -p pt-core-emit
+          cargo build --release --locked -p pt-core-emit -p pt-producer -p pt-serve
           pnpm --filter @pt/shared build
           pnpm --filter @pt/frontend build
       - name: WASM import and compressed-size budgets
@@ -122,6 +122,41 @@ jobs:
         run: |
           pnpm --filter @pt/frontend exec playwright test --project=pr-chromium --project=pr-chromium-throttled e2e/core/wasm-engine-coldstart.spec.ts --retries=0 --reporter=json > evidence/browser-coldstart.json
           node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-coldstart.json 'fast profile' 'real CDP CPU throttle'
+      - name: Serve two synthetic cities through producer and pt-serve
+        id: cities
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          nohup python3 "$GATE_TOOLS/scripts/regression/synthetic_cities.py" --bin-dir target/release \
+            --work "$RUNNER_TEMP/synthetic-cities" --catalog "$RUNNER_TEMP/synthetic-cities.json" \
+            > "$RUNNER_TEMP/synthetic-cities.log" 2>&1 &
+          for _ in $(seq 1 600); do
+            if [ -f "$RUNNER_TEMP/synthetic-cities.json" ]; then break; fi
+            if ! kill -0 $! 2>/dev/null; then break; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/synthetic-cities.log"
+          test -f "$RUNNER_TEMP/synthetic-cities.json"
+          cp "$RUNNER_TEMP/synthetic-cities.json" evidence/synthetic-cities.json
+      - name: City switch and viewport pan workloads
+        if: ${{ !cancelled() && steps.cities.outcome == 'success' && steps.browser.outcome == 'success' && steps.measurement.outcome == 'success' }}
+        id: cityswitch
+        env:
+          E2E_PREVIEW: "1"
+          CI: "true"
+          PTN_SYNTHETIC_CITIES: ${{ runner.temp }}/synthetic-cities.json
+        run: |
+          pnpm --filter @pt/frontend exec playwright test --project=perf e2e/perf/city-switch.spec.ts --retries=0 --reporter=json > evidence/browser-city-switch.json
+          node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-city-switch.json 'alternating city switches' 'viewport pans'
+          cp packages/frontend/test-results/perf-metrics/city-switch.json packages/frontend/test-results/perf-metrics/viewport-pan.json evidence/
+      - name: Retain synthetic city server logs
+        if: ${{ always() && steps.cities.outcome != 'skipped' }}
+        run: |
+          mkdir -p evidence/synthetic-cities
+          cp "$RUNNER_TEMP/synthetic-cities.log" evidence/synthetic-cities/ 2>/dev/null || true
+          for log in "$RUNNER_TEMP"/synthetic-cities/*/*.log; do
+            [ -f "$log" ] && cp "$log" "evidence/synthetic-cities/$(basename "$(dirname "$log")")-$(basename "$log")"
+          done
+          true
       - name: Record exact revision and gate outcomes
         if: always()
         env:

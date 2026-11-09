@@ -96,7 +96,7 @@ class PromotionTests(unittest.TestCase):
             # Inject real complete proof and its original run IDs into the fixture.
             proof = {'schemaVersion': 1, 'revision': REV, 'passed': True, 'sourceDirty': False,
                      'runId': '1', 'runner': 'Linux', 'checks': {name: 'success' for name in
-                     ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart')}}
+                     ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')}}
             (root / 'regression.json').write_text(json.dumps(proof))
             evidence = json.loads((root / 'release-evidence.json').read_text())
             evidence.update(regressionRunId='1', releaseRunId='2')
