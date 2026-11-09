@@ -79,11 +79,11 @@ describe("decisions that could not be stored", () => {
 
 describe("concurrent writes from another tab", () => {
   async function otherTabWrites(decisions: Record<string, unknown>): Promise<void> {
-    localStorage.setItem(
-      NETWORK_DECISIONS_STORAGE_KEY,
-      JSON.stringify({ state: { decisions }, version: 1 }),
+    const raw = JSON.stringify({ state: { decisions }, version: 1 });
+    localStorage.setItem(NETWORK_DECISIONS_STORAGE_KEY, raw);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: NETWORK_DECISIONS_STORAGE_KEY, newValue: raw }),
     );
-    window.dispatchEvent(new StorageEvent("storage", { key: NETWORK_DECISIONS_STORAGE_KEY }));
     await Promise.resolve();
   }
 
@@ -150,7 +150,9 @@ describe("concurrent writes from another tab", () => {
 
 describe("returns to ask-first across tabs", () => {
   function otherTabStores(state: Record<string, unknown>): string {
-    const raw = JSON.stringify({ state, version: 1 });
+    const { generation } = JSON.parse(localStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY) ?? "{}")
+      .state as { generation: string };
+    const raw = JSON.stringify({ state: { ...state, generation }, version: 1 });
     localStorage.setItem(NETWORK_DECISIONS_STORAGE_KEY, raw);
     return raw;
   }
@@ -232,17 +234,129 @@ describe("a tab that overwrote another tab's change", () => {
     }
   });
 
-  it("ignores the removal of the stored decisions by another tab", async () => {
+});
+
+describe("all data deleted in another tab", () => {
+  function storedState(): { decisions: Stored; generation?: string } {
+    return JSON.parse(localStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY) ?? "null")?.state;
+  }
+
+  /** The deleting tab resets its stores, removes every key and reloads. */
+  async function otherTabDeletesAll(): Promise<void> {
+    localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: NETWORK_DECISIONS_STORAGE_KEY, newValue: null }),
+    );
+    await Promise.resolve();
+  }
+
+  /** The reloaded tab completes a Strict setup: every flow asks first. */
+  async function freshTabStoresStrictSetup(generation: string): Promise<string> {
+    const raw = JSON.stringify({
+      state: { decisions: {}, cleared: { [ALERTS]: Date.now() }, generation },
+      version: 1,
+    });
+    localStorage.setItem(NETWORK_DECISIONS_STORAGE_KEY, raw);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: NETWORK_DECISIONS_STORAGE_KEY, newValue: raw }),
+    );
+    await Promise.resolve();
+    return raw;
+  }
+
+  it("drops this tab's grants and writes nothing back", async () => {
     const stop = installPrivacyStateSync();
     try {
       useNetworkDecisionsStore
         .getState()
-        .setDecision("operator.service-alerts", "allowed", "settings");
+        .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
+      await otherTabDeletesAll();
+
+      expect(useNetworkDecisionsStore.getState().decisions).toEqual({});
+      expect(localStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY)).toBeNull();
+
+      await freshTabStoresStrictSetup("fresh");
+      useNetworkDecisionsStore.getState().setDecision("operator.service-alerts", "denied", "settings");
+
+      expect(storedDecisions()[CARTO]).toBeUndefined();
+      expect(useNetworkDecisionsStore.getState().decisions[CARTO]).toBeUndefined();
+      expect(storedState().generation).toBe("fresh");
+    } finally {
+      stop();
+    }
+  });
+
+  it("does not merge its grants into a new setup stored before the removal reached it", async () => {
+    const stop = installPrivacyStateSync();
+    try {
+      useNetworkDecisionsStore
+        .getState()
+        .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
       localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: NETWORK_DECISIONS_STORAGE_KEY, newValue: null }),
-      );
-      await Promise.resolve();
+      const raw = await freshTabStoresStrictSetup("fresh");
+
+      expect(useNetworkDecisionsStore.getState().decisions[CARTO]).toBeUndefined();
+      expect(localStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY)).toBe(raw);
+    } finally {
+      stop();
+    }
+  });
+
+  it("does not bring back its grants with a change made before it heard of the deletion", () => {
+    const store = useNetworkDecisionsStore.getState();
+    store.setDecision("external.detailed-basemap", "allowed", "settings", "carto");
+    localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
+
+    store.setDecision("operator.service-alerts", "denied", "settings");
+
+    expect(storedDecisions()[CARTO]).toBeUndefined();
+    expect(storedDecisions()[ALERTS]?.value).toBe("denied");
+    expect(useNetworkDecisionsStore.getState().decisions[CARTO]).toBeUndefined();
+  });
+
+  it("does not bring back its grants when a new setup is already stored", () => {
+    const store = useNetworkDecisionsStore.getState();
+    store.setDecision("external.detailed-basemap", "allowed", "settings", "carto");
+    localStorage.setItem(
+      NETWORK_DECISIONS_STORAGE_KEY,
+      JSON.stringify({ state: { decisions: {}, cleared: {}, generation: "fresh" }, version: 1 }),
+    );
+
+    store.setDecision("operator.service-alerts", "denied", "settings");
+
+    expect(storedDecisions()[CARTO]).toBeUndefined();
+    expect(storedState().generation).toBe("fresh");
+  });
+
+  it("still merges decisions it could never store into the stored ones", () => {
+    // Nothing is stored yet and this tab's writes are all refused, so its
+    // copy was never stored; another tab then stores the first decisions.
+    localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    const store = useNetworkDecisionsStore.getState();
+    store.reset();
+    store.setDecision("external.detailed-basemap", "denied", "settings", "carto");
+    setItem.mockRestore();
+    localStorage.setItem(
+      NETWORK_DECISIONS_STORAGE_KEY,
+      JSON.stringify({ state: { decisions: {}, cleared: {}, generation: "other" }, version: 1 }),
+    );
+
+    store.setDecision("operator.service-alerts", "allowed", "settings");
+
+    expect(storedDecisions()[CARTO]?.value).toBe("denied");
+    expect(storedDecisions()[ALERTS]?.value).toBe("allowed");
+  });
+
+  it("settles without writing when every tab already dropped its copy", async () => {
+    const stop = installPrivacyStateSync();
+    try {
+      await otherTabDeletesAll();
+      const setItem = vi.spyOn(localStorage, "setItem");
+      await otherTabDeletesAll();
+      expect(setItem).not.toHaveBeenCalled();
       expect(localStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY)).toBeNull();
     } finally {
       stop();

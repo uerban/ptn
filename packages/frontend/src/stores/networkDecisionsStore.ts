@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage } from "zustand/middleware";
 import {
   createTolerantJSONStorage,
   tolerantLocalStorage,
@@ -23,6 +23,14 @@ type DecisionClears = Readonly<Record<string, number>>;
 interface DecisionSnapshot {
   decisions: NetworkDecisionMap;
   cleared: DecisionClears;
+  /**
+   * Which life of the stored decisions this copy belongs to. Deleting all
+   * data starts a new one, so a copy another tab kept from before the
+   * deletion is recognised as outdated instead of being merged back. Empty
+   * for a copy that does not say (written before generations existed); such
+   * a copy merges with any generation.
+   */
+  generation: string;
 }
 
 interface NetworkDecisionsState extends DecisionSnapshot {
@@ -44,13 +52,24 @@ interface NetworkDecisionsState extends DecisionSnapshot {
   reset: () => void;
 }
 
-const EMPTY: DecisionSnapshot = { decisions: {}, cleared: {} };
+const EMPTY: DecisionSnapshot = { decisions: {}, cleared: {}, generation: "" };
+
+const MAX_GENERATION_LENGTH = 64;
+
+function newGeneration(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function sanitizeSnapshot(raw: unknown): DecisionSnapshot {
   const state = (raw && typeof raw === "object" ? raw : {}) as Partial<DecisionSnapshot>;
+  const generation =
+    typeof state.generation === "string" && state.generation.length <= MAX_GENERATION_LENGTH
+      ? state.generation
+      : "";
   return {
     decisions: sanitizeNetworkDecisions(state.decisions),
     cleared: sanitizeDecisionClears(state.cleared),
+    generation,
   };
 }
 
@@ -66,14 +85,27 @@ function parseSnapshot(raw: string | null | undefined): DecisionSnapshot | null 
   }
 }
 
+function storedRaw(): string | null {
+  return tolerantLocalStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY) as string | null;
+}
+
 /** The decisions as last stored by any tab, or null when nothing readable is
  * stored. */
 function storedSnapshot(): DecisionSnapshot | null {
-  return parseSnapshot(tolerantLocalStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY) as string | null);
+  return parseSnapshot(storedRaw());
 }
 
 function snapshotOf(state: DecisionSnapshot): DecisionSnapshot {
-  return { decisions: state.decisions, cleared: state.cleared };
+  return { decisions: state.decisions, cleared: state.cleared, generation: state.generation };
+}
+
+/** The generation this tab last found in storage, or null before it has
+ * found one. A tab whose own generation was stored and is now gone from
+ * storage knows all data was deleted meanwhile. */
+let seenGeneration: string | null = null;
+
+function sameGeneration(a: string, b: string): boolean {
+  return a === "" || b === "" || a === b;
 }
 
 /** One flow's latest change: a decision, or `null` for back to "ask first". */
@@ -103,6 +135,7 @@ function supersedes(a: Change, b: Change): boolean {
  * same result in any order, so tabs converge whichever writes last.
  */
 function mergeSnapshots(...snapshots: DecisionSnapshot[]): DecisionSnapshot {
+  const generation = snapshots.find((snapshot) => snapshot.generation)?.generation ?? "";
   const latest = new Map<string, Change>();
   const offer = (key: string, change: Change) => {
     const current = latest.get(key);
@@ -120,7 +153,7 @@ function mergeSnapshots(...snapshots: DecisionSnapshot[]): DecisionSnapshot {
     if (decision) decisions[key] = decision;
     else cleared[key] = at;
   }
-  return { decisions, cleared };
+  return { decisions, cleared, generation };
 }
 
 function sameSnapshot(a: DecisionSnapshot, b: DecisionSnapshot): boolean {
@@ -139,23 +172,74 @@ function sameSnapshot(a: DecisionSnapshot, b: DecisionSnapshot): boolean {
     const keys = Object.keys(x);
     return keys.length === Object.keys(y).length && keys.every((key) => x[key] === y[key]);
   };
-  return sameDecisions(a.decisions, b.decisions) && sameClears(a.cleared, b.cleared);
+  return (
+    a.generation === b.generation &&
+    sameDecisions(a.decisions, b.decisions) &&
+    sameClears(a.cleared, b.cleared)
+  );
 }
 
 function changedAt(snapshot: DecisionSnapshot, key: string): number {
   return Math.max(snapshot.decisions[key]?.decidedAt ?? 0, snapshot.cleared[key] ?? 0);
 }
 
+/** What storage holds now, read once. */
+interface StoredRead {
+  /** The stored copy, or null when missing or unreadable. */
+  stored: DecisionSnapshot | null;
+  /** Nothing is stored at all (as opposed to an unreadable value). */
+  missing: boolean;
+}
+
+function readStored(): StoredRead {
+  const raw = storedRaw();
+  return { stored: parseSnapshot(raw), missing: raw === null };
+}
+
 /**
- * Apply this tab's changes on top of the latest stored copy merged with this
- * tab's own. Merging the tab's copy keeps a decision whose write was refused
- * in effect, and written again with the next change.
+ * The decisions to build on: the stored copy merged with this tab's own and,
+ * when given, with the copy another tab just stored. Merging this tab's copy
+ * keeps a decision whose write was refused in effect, and written again with
+ * the next change.
+ *
+ * This tab's copy is left out once all data was deleted after it was stored:
+ * the stored decisions were removed (`removed`, or missing although this
+ * tab's generation was stored), or replaced by a new generation. Its grants
+ * then never come back.
+ */
+function current(
+  state: DecisionSnapshot,
+  { stored, missing }: StoredRead,
+  { removed = false, incoming = null }: { removed?: boolean; incoming?: DecisionSnapshot | null } = {},
+): DecisionSnapshot {
+  const ownWasStored = seenGeneration === state.generation;
+  const outdated =
+    removed ||
+    (ownWasStored &&
+      (missing || (!!stored && !sameGeneration(stored.generation, state.generation))));
+  const copies: DecisionSnapshot[] = [];
+  if (stored) {
+    copies.push(stored);
+    if (incoming && sameGeneration(incoming.generation, stored.generation)) copies.push(incoming);
+  }
+  if (!outdated) copies.push(snapshotOf(state));
+  return copies.length > 0 ? mergeSnapshots(...copies) : EMPTY;
+}
+
+/** Remember the generation storage holds now. */
+function noteStored(): void {
+  const stored = storedSnapshot();
+  if (stored) seenGeneration = stored.generation;
+}
+
+/**
+ * Apply this tab's changes on top of the current decisions (see `current`).
  */
 function decide(
   state: DecisionSnapshot,
   changes: Record<string, NetworkDecision | null>,
 ): DecisionSnapshot {
-  const base = mergeSnapshots(storedSnapshot() ?? EMPTY, snapshotOf(state));
+  const base = current(snapshotOf(state), readStored());
   const decisions: Record<string, NetworkDecision> = { ...base.decisions };
   const cleared: Record<string, number> = { ...base.cleared };
   const now = Date.now();
@@ -171,8 +255,22 @@ function decide(
       cleared[key] = at;
     }
   }
-  return { decisions, cleared };
+  return { decisions, cleared, generation: base.generation || newGeneration() };
 }
+
+type PersistedDecisions = DecisionSnapshot;
+
+const tolerantStorage = createTolerantJSONStorage<PersistedDecisions>();
+let writesHeld = false;
+
+/** Writes go through unless the store is updated in memory only. */
+const decisionsStorage: PersistStorage<PersistedDecisions> | undefined = tolerantStorage && {
+  getItem: (name) => tolerantStorage.getItem(name),
+  setItem: (name, value) => {
+    if (!writesHeld) return tolerantStorage.setItem(name, value);
+  },
+  removeItem: (name) => tolerantStorage.removeItem(name),
+};
 
 /**
  * Optional network decisions keyed by data flow. Kept separate from the
@@ -186,43 +284,53 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
     (set) => ({
       decisions: {},
       cleared: {},
+      generation: "",
       setDecision: (flowId, value, source, providerId) => {
         const key = decisionKey(flowId, providerId);
         if (!key) return false;
         set((state) =>
           decide(state, { [key]: value === "unset" ? null : { value, source } }),
         );
+        noteStored();
         return true;
       },
       replaceDecisions: (decisions) =>
         set((state) => {
           const wanted = sanitizeNetworkDecisions(decisions);
-          const current = mergeSnapshots(storedSnapshot() ?? EMPTY, snapshotOf(state));
+          const base = current(snapshotOf(state), readStored());
           const changes: Record<string, NetworkDecision | null> = {};
-          for (const key of Object.keys(current.decisions)) changes[key] = null;
+          for (const key of Object.keys(base.decisions)) changes[key] = null;
           for (const [key, decision] of Object.entries(wanted)) {
             changes[key] = { value: decision.value, source: decision.source };
           }
           return decide(state, changes);
         }),
-      reset: () => set({ decisions: {}, cleared: {} }),
+      // A new generation: copies other tabs hold from before are outdated.
+      reset: () => {
+        set({ decisions: {}, cleared: {}, generation: newGeneration() });
+        noteStored();
+      },
     }),
     {
       name: NETWORK_DECISIONS_STORAGE_KEY,
-      storage: createTolerantJSONStorage(),
+      storage: decisionsStorage,
       version: NETWORK_DECISIONS_SCHEMA_VERSION,
-      partialize: (state) => ({ decisions: state.decisions, cleared: state.cleared }),
+      partialize: (state): PersistedDecisions => snapshotOf(state),
       migrate: (persisted) => sanitizeSnapshot(persisted),
-      merge: (persisted, current) => ({
-        ...current,
-        ...mergeSnapshots(sanitizeSnapshot(persisted), snapshotOf(current)),
-      }),
+      merge: (persisted, state) => {
+        if (persisted === undefined) return state;
+        const stored = sanitizeSnapshot(persisted);
+        const next = current(snapshotOf(state), { stored, missing: false });
+        seenGeneration = stored.generation;
+        return { ...state, ...next };
+      },
     },
   ),
 );
 
 /**
- * Take in a change another tab stored (`newValue` of its `storage` event).
+ * Take in a change another tab stored (`newValue` of its `storage` event,
+ * null when that tab removed the decisions).
  *
  * Writes from two tabs are not serialized: a tab can read the stored copy
  * just before another tab's write lands and then store its own change on top,
@@ -231,15 +339,36 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
  * tab receives the dropped change as `newValue`, even though its own read of
  * storage no longer shows it, and stores the merge. A change is only lost when
  * every tab that saw it closes before handling these events.
+ *
+ * A removal means another tab deleted all data: this tab drops its own copy
+ * and takes whatever was stored since, or nothing, without writing anything
+ * back.
  */
-export function absorbStoredDecisions(newValue: string | null | undefined): void {
-  const stored = storedSnapshot();
-  const incoming = parseSnapshot(newValue);
-  // Removed (data deletion) or unreadable: nothing to merge, nothing to write.
-  if (!stored && !incoming) return;
+export function absorbStoredDecisions(newValue: string | null): void {
+  const read = readStored();
+  const { stored } = read;
   const state = useNetworkDecisionsStore.getState();
-  const merged = mergeSnapshots(stored ?? EMPTY, incoming ?? EMPTY, snapshotOf(state));
-  if (!stored || !sameSnapshot(stored, merged) || !sameSnapshot(snapshotOf(state), merged)) {
-    useNetworkDecisionsStore.setState(merged);
+  const next = current(snapshotOf(state), read, {
+    removed: newValue === null,
+    incoming: parseSnapshot(newValue),
+  });
+  if (stored) seenGeneration = stored.generation;
+  const memoryChanged = !sameSnapshot(snapshotOf(state), next);
+  if (stored && sameSnapshot(stored, next)) {
+    if (memoryChanged) useNetworkDecisionsStore.setState(next);
+    return;
   }
+  if (!stored) {
+    // Nothing readable is stored: update memory only, so a deletion holds.
+    if (!memoryChanged) return;
+    writesHeld = true;
+    try {
+      useNetworkDecisionsStore.setState(next);
+    } finally {
+      writesHeld = false;
+    }
+    return;
+  }
+  useNetworkDecisionsStore.setState(next);
+  noteStored();
 }
