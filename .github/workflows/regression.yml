@@ -183,9 +183,8 @@ jobs:
           name: regression-evidence
           retention-days: 30
           if-no-files-found: error
-          # Benchmark output is a dot-file; upload-artifact skips those by default.
-          include-hidden-files: true
+          # Gate metrics are copied into evidence/; test-results keeps failure traces.
           path: |
             source/evidence/
-            source/packages/frontend/tests/benchmarks/.results.json
             source/packages/frontend/test-results/
+            !source/packages/frontend/test-results/perf-metrics/

@@ -4,6 +4,9 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
+
+BASELINE = Path(__file__).resolve().parent / 'regression' / 'baseline.json'
 
 REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')
 LABELS = {
@@ -60,8 +63,43 @@ def collect_measurements():
     pan = load('viewport-pan.json')
     for run in (pan or {}).get('runs') or []:
         add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} frame p95", (run.get('frameIntervalMs') or {}).get('p95'), 'ms')
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long tasks", run.get('longTaskTotalMs'), 'ms')
+        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task count", (run.get('longTaskMs') or {}).get('samples'), 'tasks')
+        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task total", run.get('longTaskTotalMs'), 'ms')
     return rows
+
+
+def baseline_key(row):
+    return f"{row['gate']}/{row['name']}"
+
+
+def load_baseline():
+    try:
+        return json.loads(BASELINE.read_text())
+    except (OSError, ValueError):
+        return {'measurements': {}}
+
+
+def compare_baseline(rows, baseline):
+    """Attach the recorded baseline and relative change; informational only."""
+    known = baseline.get('measurements') or {}
+    for row in rows:
+        base = known.get(baseline_key(row))
+        row['baseline'] = base['value'] if base and base.get('unit') == row['unit'] else None
+        if row['baseline']:
+            row['deltaPercent'] = round((row['value'] - row['baseline']) / row['baseline'] * 100, 1)
+    return rows
+
+
+def update_baseline(report_path):
+    """Promote a regression.json from a passing run to the stored baseline."""
+    report = json.loads(Path(report_path).read_text())
+    if not report.get('passed'):
+        raise SystemExit(f'{report_path}: only a passing run can become the baseline')
+    baseline = {'schemaVersion': 1, 'revision': report['revision'], 'runId': report.get('runId'),
+                'measurements': {baseline_key(row): {'value': row['value'], 'unit': row['unit']}
+                                 for row in report['measurements']}}
+    BASELINE.write_text(json.dumps(baseline, indent=2) + '\n')
+    print(f"{BASELINE}: {len(baseline['measurements'])} measurements from run {baseline['runId']}")
 
 
 def write_summary(report, steps):
@@ -74,10 +112,17 @@ def write_summary(report, steps):
         outcome = steps.get(name, {}).get('outcome', 'missing')
         lines.append(f'| {label} | {outcome} |')
     if report['measurements']:
-        lines += ['', '### Measurements', '', '| Gate | Measurement | Value | Budget |', '| --- | --- | ---: | ---: |']
+        base = report.get('baseline') or {}
+        lines += ['', '### Measurements', '',
+                  f"Baseline: run {base.get('runId') or 'none'} at `{(base.get('revision') or 'none')[:12]}` "
+                  '(changes are informational; only budgets fail the gate).', '',
+                  '| Gate | Measurement | Value | Baseline | Change | Budget |',
+                  '| --- | --- | ---: | ---: | ---: | ---: |']
         for row in report['measurements']:
             budget = 'recorded only' if row['budget'] is None else f"{row['budget']} {row['unit']}"
-            lines.append(f"| {row['gate']} | {row['name']} | {row['value']} {row['unit']} | {budget} |")
+            baseline = '—' if row.get('baseline') is None else f"{row['baseline']} {row['unit']}"
+            delta = '—' if row.get('deltaPercent') is None else f"{row['deltaPercent']:+}%"
+            lines.append(f"| {row['gate']} | {row['name']} | {row['value']} {row['unit']} | {baseline} | {delta} | {budget} |")
         lines += ['', 'Routing parity and native RSS checks are pass/fail; their logs are in the evidence.']
     lines += ['', 'Failed, cancelled, skipped or missing required gates do not count as passed.', '',
               'Download **regression-proof** for `regression.json` and '
@@ -91,6 +136,10 @@ def write_summary(report, steps):
 
 
 def main():
+    if sys.argv[1:2] == ['--update-baseline'] and len(sys.argv) == 3:
+        update_baseline(sys.argv[2])
+        return
+    baseline = load_baseline()
     steps = json.loads(os.environ['STEP_RESULTS'])
     checks = {name: steps.get(name, {}).get('outcome', 'missing') for name in REQUIRED}
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
@@ -98,7 +147,8 @@ def main():
     report = {'schemaVersion': 1, 'revision': revision, 'sourceDirty': dirty, 'checks': checks,
               'passed': not dirty and all(value == 'success' for value in checks.values()),
               'runner': os.environ.get('RUNNER_OS'), 'runId': os.environ.get('GITHUB_RUN_ID'),
-              'measurements': collect_measurements()}
+              'measurements': compare_baseline(collect_measurements(), baseline),
+              'baseline': {'revision': baseline.get('revision'), 'runId': baseline.get('runId')}}
     Path('evidence').mkdir(exist_ok=True)
     Path('evidence/regression.json').write_text(json.dumps(report, indent=2) + '\n')
     write_summary(report, steps)

@@ -98,6 +98,12 @@ The initial suite recovers these useful checks from the archive:
   investigation's 1 s budget came from a desktop GPU, and CI budgets will be set
   once hosted-runner baselines exist.
 
+Every run compares its measurements with `scripts/regression/baseline.json` and
+shows the baseline and relative change next to each value in `regression.md`,
+`regression.json` and the run summary. Changes are informational; only budgets
+fail. To move the baseline, download `regression-proof` from a passing run and
+run `scripts/record-regression-evidence.py --update-baseline regression.json`.
+
 The browser heap workload uses a separate preview build with `VITE_E2E=1` to
 expose the existing map inspection handle. Production size budgets run before that
 build; instrumented files are never packaged for release. Browser fixtures select

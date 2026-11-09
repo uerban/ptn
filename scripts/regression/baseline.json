@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "revision": "fbc211adbea1514d6a79ae2b9a9aef98f0717951",
+  "runId": "42627339683",
+  "measurements": {
+    "wasm/WASM gzip size": {
+      "value": 239076,
+      "unit": "bytes"
+    },
+    "wasm/WASM raw size": {
+      "value": 515763,
+      "unit": "bytes"
+    },
+    "index/hydrate patterns-ON index at pattern-fanout scale p99": {
+      "value": 34.37,
+      "unit": "ms"
+    },
+    "bundle/First paint JS": {
+      "value": 68833,
+      "unit": "bytes"
+    },
+    "bundle/Entry chunk": {
+      "value": 9427,
+      "unit": "bytes"
+    },
+    "bundle/Text mode start (excludes vendor-map; graph checked by scripts/check-text-entry-chunks.mjs)": {
+      "value": 83018,
+      "unit": "bytes"
+    },
+    "bundle/MapLibre chunk (lazy)": {
+      "value": 257775,
+      "unit": "bytes"
+    },
+    "bundle/MapLibre worker (lazy)": {
+      "value": 132598,
+      "unit": "bytes"
+    },
+    "bundle/pt-wasm chunk (lazy)": {
+      "value": 242680,
+      "unit": "bytes"
+    },
+    "bundle/raptorWasm adapter + planner": {
+      "value": 2992,
+      "unit": "bytes"
+    },
+    "bundle/PTB catalog decoder + worker (lazy)": {
+      "value": 23174,
+      "unit": "bytes"
+    },
+    "bundle/Core non-wasm Total JS (separately-gated payloads excluded)": {
+      "value": 936813,
+      "unit": "bytes"
+    },
+    "bundle/Offline glyphs (precached)": {
+      "value": 66238,
+      "unit": "bytes"
+    },
+    "bundle/Per-locale i18n chunks (lazy, one locale per reader)": {
+      "value": 217503,
+      "unit": "bytes"
+    },
+    "heap/JS heap after load": {
+      "value": 21.78,
+      "unit": "MB"
+    },
+    "coldstart/fast dynImport p95": {
+      "value": 25.4,
+      "unit": "ms"
+    },
+    "coldstart/fast instantiate p95": {
+      "value": 22.5,
+      "unit": "ms"
+    },
+    "coldstart/fast ptNew p95": {
+      "value": 7,
+      "unit": "ms"
+    },
+    "coldstart/fast plan p95": {
+      "value": 3.9,
+      "unit": "ms"
+    },
+    "coldstart/fast total p95": {
+      "value": 55.6,
+      "unit": "ms"
+    },
+    "coldstart/throttled dynImport p95": {
+      "value": 44.9,
+      "unit": "ms"
+    },
+    "coldstart/throttled instantiate p95": {
+      "value": 14.2,
+      "unit": "ms"
+    },
+    "coldstart/throttled ptNew p95": {
+      "value": 9.4,
+      "unit": "ms"
+    },
+    "coldstart/throttled plan p95": {
+      "value": 9.1,
+      "unit": "ms"
+    },
+    "coldstart/throttled total p95": {
+      "value": 111.2,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-north index ready p95": {
+      "value": 1051.6,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-north badges resolved p95": {
+      "value": 1369.9,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-north cards settled p95": {
+      "value": 1574.1,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-south index ready p95": {
+      "value": 2795.4,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-south badges resolved p95": {
+      "value": 3623.8,
+      "unit": "ms"
+    },
+    "cityswitch/synthetic-south cards settled p95": {
+      "value": 3755.5,
+      "unit": "ms"
+    },
+    "cityswitch/pan all z14 frame p95": {
+      "value": 66.7,
+      "unit": "ms"
+    },
+    "cityswitch/pan all z14 long-task count": {
+      "value": 0,
+      "unit": "tasks"
+    },
+    "cityswitch/pan all z14 long-task total": {
+      "value": 0,
+      "unit": "ms"
+    },
+    "cityswitch/pan all z16 frame p95": {
+      "value": 66.7,
+      "unit": "ms"
+    },
+    "cityswitch/pan all z16 long-task count": {
+      "value": 0,
+      "unit": "tasks"
+    },
+    "cityswitch/pan all z16 long-task total": {
+      "value": 0,
+      "unit": "ms"
+    },
+    "cityswitch/pan urban z14 frame p95": {
+      "value": 50.1,
+      "unit": "ms"
+    },
+    "cityswitch/pan urban z14 long-task count": {
+      "value": 0,
+      "unit": "tasks"
+    },
+    "cityswitch/pan urban z14 long-task total": {
+      "value": 0,
+      "unit": "ms"
+    },
+    "cityswitch/pan urban z16 frame p95": {
+      "value": 66.6,
+      "unit": "ms"
+    },
+    "cityswitch/pan urban z16 long-task count": {
+      "value": 0,
+      "unit": "tasks"
+    },
+    "cityswitch/pan urban z16 long-task total": {
+      "value": 0,
+      "unit": "ms"
+    }
+  }
+}
