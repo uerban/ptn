@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { expect } from "vitest";
+import { afterEach, expect, vi } from "vitest";
 import { toHaveNoViolations } from "jest-axe";
 
 // Register the jest-axe accessibility matcher with vitest's expect.
@@ -100,4 +100,30 @@ Object.defineProperty(window, "matchMedia", {
     removeEventListener: () => {},
     dispatchEvent: () => false,
   }),
+});
+
+// Async work that outlives its test (a promise settling after unmount, a
+// timer firing after cleanup) surfaces as a run-level "Unhandled Rejection"
+// with no test attached, sometimes after jsdom is torn down ("window is not
+// defined"). Pin such errors to the test that was running, and give pending
+// work a few turns after each test to settle while the DOM still exists, so a
+// leak fails that test by name instead of the whole run anonymously.
+const strayErrors: {test: string; error: unknown}[] = [];
+const recordStray = (error: unknown) => {
+  strayErrors.push({test: expect.getState().currentTestName ?? "(between tests)", error});
+};
+process.on("unhandledRejection", recordStray);
+process.on("uncaughtException", recordStray);
+
+afterEach(async () => {
+  // Under fake timers setTimeout never fires on its own; skip the drain there.
+  if (!vi.isFakeTimers()) {
+    for (let i = 0; i < 3; i++) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  if (!strayErrors.length) return;
+  const found = strayErrors.splice(0);
+  const detail = found
+    .map(({test, error}) => `- ${test}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`)
+    .join("\n");
+  throw new Error(`Unhandled async error(s) during this test:\n${detail}`);
 });

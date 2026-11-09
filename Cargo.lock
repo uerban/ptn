@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "pt-artifacts"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "base64",
  "brotli",
@@ -1053,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "pt-core"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "bytemuck",
  "hashbrown 0.15.5",
@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "pt-core-emit"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "pt-core",
  "serde",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "pt-geocode"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "fst",
  "serde",
@@ -1083,7 +1083,7 @@ dependencies = [
 
 [[package]]
 name = "pt-producer"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "brotli",
  "clap",
@@ -1114,7 +1114,7 @@ dependencies = [
 
 [[package]]
 name = "pt-serve"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "arc-swap",
  "base64",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "pt-shared"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "indexmap",
  "jiff",
@@ -1167,14 +1167,14 @@ dependencies = [
 
 [[package]]
 name = "pt-walk"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "pt-wasm"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "js-sys",
  "pt-core",

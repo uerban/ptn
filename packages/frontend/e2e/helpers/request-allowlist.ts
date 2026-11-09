@@ -95,7 +95,7 @@ export const REQUEST_RULES: readonly Rule[] = [
     matches: (u) =>
       /^\/(?:index\.html)?$/.test(u.pathname) ||
       /^\/assets\//.test(u.pathname) ||
-      /^\/(?:sw\.js|dev-sw\.js|registerSW\.js|workbox-[\w-]+\.js|manifest\.webmanifest|deployment-config\.js|favicon\.svg|og-image\.png|pwa-\d+x\d+\.png)$/.test(
+      /^\/(?:sw\.js|dev-sw\.js|registerSW\.js|workbox-[\w-]+\.js|manifest\.webmanifest|deployment-config\.js|favicon\.(?:svg|ico)|og-image\.png|pwa-(?:maskable-)?\d+x\d+\.png|apple-touch-icon(?:-precomposed)?\.png)$/.test(
         u.pathname,
       ) ||
       // The dev server serves source modules and dependencies by path.

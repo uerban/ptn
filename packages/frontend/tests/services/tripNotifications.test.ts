@@ -34,7 +34,7 @@ describe("tripNotifications", () => {
       expect(result).toBe(true);
       expect(NotificationMock).toHaveBeenCalledWith("Title", {
         body: "Body text",
-        icon: "/favicon.svg",
+        icon: "/pwa-192x192.png",
         tag: "ptn-trip",
       });
     });
