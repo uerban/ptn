@@ -22,9 +22,20 @@ export interface ScheduleHomeProps {
   onShowMap: () => void;
   /** Nearby departures above the stop list; receives the departure-sheet opener. */
   renderNearbyDepartures?: (showStop: (stop: Stop) => void) => ReactNode;
+  /**
+   * The stop whose departure sheet is open. Pass it with `onSelectStop` to
+   * keep the selection outside this screen; without them it is kept here.
+   */
+  selectedStop?: Stop | null;
+  onSelectStop?: (stop: Stop | null) => void;
 }
 
-export function ScheduleHome({ onShowMap, renderNearbyDepartures }: ScheduleHomeProps) {
+export function ScheduleHome({
+  onShowMap,
+  renderNearbyDepartures,
+  selectedStop: controlledStop,
+  onSelectStop,
+}: ScheduleHomeProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const text = usePresentationText();
@@ -54,7 +65,10 @@ export function ScheduleHome({ onShowMap, renderNearbyDepartures }: ScheduleHome
   }, []);
 
   // Selected stop for departure sheet
-  const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+  const [localStop, setLocalStop] = useState<Stop | null>(null);
+  const controlled = onSelectStop !== undefined;
+  const selectedStop = controlled ? (controlledStop ?? null) : localStop;
+  const setSelectedStop = controlled ? onSelectStop : setLocalStop;
   // Line view integration (used by DepartureSheet internally)
   const { cancel: cancelLineLoad } = useLineClick();
 
@@ -69,12 +83,12 @@ export function ScheduleHome({ onShowMap, renderNearbyDepartures }: ScheduleHome
       location: { lat: group.lat, lon: group.lon },
     };
     setSelectedStop(stop);
-  }, [cancelLineLoad]);
+  }, [cancelLineLoad, setSelectedStop]);
 
   const handleSheetClose = useCallback(() => {
     cancelLineLoad();
     setSelectedStop(null);
-  }, [cancelLineLoad]);
+  }, [cancelLineLoad, setSelectedStop]);
 
   const handleFavoriteClick = useCallback(
     (fav: FavoritePlace) => {
@@ -91,7 +105,7 @@ export function ScheduleHome({ onShowMap, renderNearbyDepartures }: ScheduleHome
         );
       }
     },
-    [navigate],
+    [navigate, setSelectedStop],
   );
 
   return (

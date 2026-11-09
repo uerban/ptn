@@ -51,7 +51,7 @@ import { ETACards, type EtaStopInfo } from "../components/Map/ETACards.tsx";
 import { MapObstacle } from "../components/Map/MapObstacle.tsx";
 import { haversineDistance } from "../utils/geo.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
-import type { StopWithLines, FavoritePlace, RiderCandidate, Departure } from "@pt/shared";
+import type { StopWithLines, FavoritePlace, RiderCandidate, Departure, Stop } from "@pt/shared";
 import {
   GTFS_CLIENT_REFRESH_INTERVAL_MS,
   PEDESTRIAN_SPEED_THRESHOLD_MS,
@@ -65,9 +65,12 @@ import {
 export interface HomePageProps {
   /** Set when the map is a temporary view opened from Text mode. */
   onBackToText?: () => void;
+  /** The stop Text mode was showing: the map opens centred on it, with its
+   * departures. */
+  contextStop?: Stop | null;
 }
 
-export function HomePage({ onBackToText }: HomePageProps = {}) {
+export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -170,7 +173,11 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
 
   // --- Independent popup and sheet state -----------------------------------
   const [popupStop, setPopupStop] = useState<StopWithLines | null>(null);
-  const [sheetStop, setSheetStop] = useState<StopWithLines | null>(null);
+  // Read once: the map opens on the text screen's stop, then is independent.
+  const [openedOn] = useState(() => contextStop ?? null);
+  const [sheetStop, setSheetStop] = useState<StopWithLines | null>(() =>
+    openedOn ? { ...openedOn, lastSeen: Date.now() } : null,
+  );
 
   // Dismiss popup and sheet when line view becomes visible or switches route
   useEffect(() => {
@@ -433,7 +440,8 @@ export function HomePage({ onBackToText }: HomePageProps = {}) {
           onStopClick={handleStopClick}
           onMapClick={handleMapClick}
           onMapReady={handleMapReady}
-          autoLocateOnLoad={startupLocate}
+          center={openedOn?.location}
+          autoLocateOnLoad={startupLocate && !openedOn}
           selectedStopId={popupStop?.id ?? sheetStop?.id}
         />
         <LineRouteOverlay map={mapInstance} />
