@@ -51,9 +51,14 @@ def main():
     secure = []
 
     def run(tail, name, *, input=None, check=True):
-        with (evidence / f"{name}.log").open("w") as log:
-            return subprocess.run(command + secure + tail, cwd=ROOT, env=environment,
-                input=input, text=True, stdout=log, stderr=subprocess.STDOUT, check=check)
+        log_path = evidence / f"{name}.log"
+        try:
+            with log_path.open("w") as log:
+                return subprocess.run(command + secure + tail, cwd=ROOT, env=environment,
+                    input=input, text=True, stdout=log, stderr=subprocess.STDOUT, check=check)
+        except subprocess.CalledProcessError:
+            print(log_path.read_text(), file=sys.stderr, flush=True)
+            raise
 
     def ready(url, generation=None, context=None):
         last_error = None
@@ -96,7 +101,10 @@ def main():
         fixture = (ROOT / "scripts/hosting_fixture.py").read_text()
         run(["exec", "-T", "transit", "python3", "-"], "changed-feed",
             input=fixture + "\nchange_stop_label('/var/lib/ptn/vilnius.zip', '/var/lib/ptn/changed.zip')\n")
-        run(["exec", "-T", "-e", "PT_COLOR_BUILD=rust", "-e", "PT_TILE_BUILD=rust", "transit",
+        producer_environment = ["-e", "PT_COLOR_BUILD=rust", "-e", "PT_TILE_BUILD=rust"]
+        if "dataRootId" in config:
+            producer_environment += ["-e", f"PT_DATA_ROOT_ID={config['dataRootId']}"]
+        run(["exec", "-T", *producer_environment, "transit",
              "/opt/ptn/bin/pt-producer", "republish", "--data-root", "/var/lib/ptn/transit",
              "--city", "vilnius", "--city-tz-iana", "Europe/Vilnius", "--from-cache", "/var/lib/ptn/changed.zip",
              "--osm-artifact-root", "/var/lib/ptn/artifacts", "--osm-lease-root", "/var/lib/ptn/leases"], "republish")
