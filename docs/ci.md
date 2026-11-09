@@ -105,8 +105,13 @@ The initial suite recovers these useful checks from the archive:
 Every run compares its measurements with `scripts/regression/baseline.json` and
 shows the baseline and relative change next to each value in `regression.md`,
 `regression.json` and the run summary. Changes are informational; only budgets
-fail. To move the baseline, download `regression-proof` from a passing run and
-run `scripts/record-regression-evidence.py --update-baseline regression.json`.
+fail. A change is marked ⚠ when it is at least 15% and also above an absolute
+floor (20 ms, 5 MB), because hosted-runner timings swing by tens of percent
+between identical runs and settle times of a few milliseconds would otherwise
+flag on every run. To move the baseline, download `regression-proof` from three
+to five passing runs of the same revision and run
+`scripts/record-regression-evidence.py --update-baseline run1.json run2.json ...`;
+it stores the per-measurement median.
 
 The browser heap workload uses a separate preview build with `VITE_E2E=1` to
 expose the existing map inspection handle. Production size budgets run before that

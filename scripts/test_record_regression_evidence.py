@@ -59,10 +59,10 @@ class BaselineTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def write_report(self, passed):
-        path = Path(self.directory.name) / 'regression.json'
-        path.write_text(json.dumps({'passed': passed, 'revision': 'b' * 40, 'runId': '7', 'measurements': [
-            {'gate': 'heap', 'name': 'JS heap after load', 'value': 20.0, 'unit': 'MB', 'budget': 100},
+    def write_report(self, passed, run='7', heap=20.0):
+        path = Path(self.directory.name) / f'regression-{run}.json'
+        path.write_text(json.dumps({'passed': passed, 'revision': 'b' * 40, 'runId': run, 'measurements': [
+            {'gate': 'heap', 'name': 'JS heap after load', 'value': heap, 'unit': 'MB', 'budget': 100},
             {'gate': 'cityswitch', 'name': 'pan all z14 long-task count', 'value': 0, 'unit': 'tasks', 'budget': None},
         ]}))
         return path
@@ -80,11 +80,38 @@ class BaselineTests(unittest.TestCase):
         regression.main(['--update-baseline', str(self.write_report(True))])
         stored = json.loads(self.baseline.read_text())
         self.assertEqual(stored['revision'], 'b' * 40)
-        self.assertEqual(stored['runId'], '7')
+        self.assertEqual(stored['runIds'], ['7'])
         self.assertEqual(stored['measurements'], {
-            'heap/JS heap after load': {'value': 20.0, 'unit': 'MB'},
-            'cityswitch/pan all z14 long-task count': {'value': 0, 'unit': 'tasks'},
+            'heap/JS heap after load': {'value': 20.0, 'unit': 'MB', 'samples': 1},
+            'cityswitch/pan all z14 long-task count': {'value': 0, 'unit': 'tasks', 'samples': 1},
         })
+
+    def test_update_baseline_takes_median_of_runs(self):
+        paths = [str(self.write_report(True, run, heap)) for run, heap in (('1', 30.0), ('2', 10.0), ('3', 22.0))]
+        regression.main(['--update-baseline', *paths])
+        stored = json.loads(self.baseline.read_text())
+        self.assertEqual(stored['runIds'], ['1', '2', '3'])
+        self.assertEqual(stored['measurements']['heap/JS heap after load'], {'value': 22.0, 'unit': 'MB', 'samples': 3})
+
+    def test_update_baseline_refuses_any_failed_run(self):
+        with self.assertRaises(SystemExit):
+            regression.main(['--update-baseline', str(self.write_report(True, '1')), str(self.write_report(False, '2'))])
+        self.assertFalse(self.baseline.exists())
+
+    def test_notable_needs_percent_and_absolute_floor(self):
+        baseline = {'measurements': {
+            'g/tiny': {'value': 2, 'unit': 'ms'},
+            'g/slow': {'value': 200, 'unit': 'ms'},
+            'g/small': {'value': 100, 'unit': 'ms'},
+            'g/cards': {'value': 20, 'unit': 'cards'},
+        }}
+        rows = regression.compare_baseline([
+            {'gate': 'g', 'name': 'tiny', 'value': 5, 'unit': 'ms'},
+            {'gate': 'g', 'name': 'slow', 'value': 250, 'unit': 'ms'},
+            {'gate': 'g', 'name': 'small', 'value': 110, 'unit': 'ms'},
+            {'gate': 'g', 'name': 'cards', 'value': 10, 'unit': 'cards'},
+        ], baseline)
+        self.assertEqual([row['notable'] for row in rows], [False, True, False, True])
 
     def test_compare_reports_change_and_skips_unusable_baselines(self):
         baseline = {'measurements': {
@@ -105,7 +132,7 @@ class BaselineTests(unittest.TestCase):
         self.assertIsNone(rows[3]['baseline'])
 
     def test_summary_shows_baseline_and_pan_counts(self):
-        self.baseline.write_text(json.dumps({'revision': 'c' * 40, 'runId': '9', 'measurements': {
+        self.baseline.write_text(json.dumps({'revision': 'c' * 40, 'runIds': ['8', '9'], 'measurements': {
             'cityswitch/viewport all cards z16 stop cards': {'value': 20, 'unit': 'cards'}}}))
         previous = Path.cwd()
         try:
@@ -124,8 +151,9 @@ class BaselineTests(unittest.TestCase):
             content = Path('evidence/regression.md').read_text()
         finally:
             os.chdir(previous)
-        self.assertEqual(report['baseline'], {'revision': 'c' * 40, 'runId': '9'})
-        self.assertIn('Baseline: run 9 at `cccccccccccc`', content)
+        self.assertEqual(report['baseline'], {'revision': 'c' * 40, 'runIds': ['8', '9']})
+        self.assertIn('Baseline: median of runs 8, 9 at `cccccccccccc`', content)
+        self.assertIn('Notable changes (⚠, at least 15% and above the absolute floor 20 ms, 5 MB): 0', content)
         self.assertIn('| cityswitch | viewport all cards z16 long-task count | 2 tasks | — | — | recorded only |', content)
         self.assertIn('| cityswitch | viewport all cards z16 long-task total | 120 ms | — | — | recorded only |', content)
         self.assertIn('| cityswitch | viewport all cards z16 settle after last move | 31.5 ms | — | — | recorded only |', content)
