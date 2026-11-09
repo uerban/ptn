@@ -4,6 +4,9 @@ import type { Itinerary, LatLon } from "@pt/shared";
 import { AUTO_FOLLOW_PADDING_PX } from "@pt/shared/constants";
 import { decodePolyline } from "../utils/polyline.ts";
 import { bearing as computeBearing, progressAlongLine } from "../utils/geo.ts";
+import { GUIDANCE_AUTO_FOLLOW_ENABLED } from "../config/featureFlags.ts";
+import { guidancePadding } from "./guidancePadding.ts";
+import { useMapObstaclesStore } from "../stores/mapObstaclesStore.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
 
 /**
@@ -42,7 +45,11 @@ export function useMapGuidance(
       }
 
       map.fitBounds(bounds, {
-        padding: AUTO_FOLLOW_PADDING_PX,
+        padding: guidancePadding(
+          map.getContainer().getBoundingClientRect(),
+          useMapObstaclesStore.getState().obstacles.get("step-list"),
+          AUTO_FOLLOW_PADDING_PX,
+        ),
         maxZoom: 17,
         duration: 500,
       });
@@ -53,6 +60,7 @@ export function useMapGuidance(
   // Auto-follow during walking legs
   useEffect(() => {
     if (
+      !GUIDANCE_AUTO_FOLLOW_ENABLED ||
       !map ||
       !itinerary ||
       !userPosition ||
@@ -104,7 +112,7 @@ export function useMapGuidance(
   useEffect(() => {
     if (!map || !userPosition) return;
 
-    if (phase === "riderMode") {
+    if (GUIDANCE_AUTO_FOLLOW_ENABLED && phase === "riderMode") {
       // Compute bearing from vehicle heading (RT data) or polyline direction
       let mapBearing = 0;
       if (vehicleHeading != null) {
