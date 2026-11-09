@@ -6,6 +6,8 @@
  * Rule order:
  *   0. lazy locale + privacy chunks — CacheFirst (kept out of the precache;
  *        see precache.ts. Must stay CacheFirst or they break offline)
+ *   0b. map-only chunk, worker and glyphs — CacheFirst (kept out of the
+ *        precache so Text mode never downloads them)
  *   1. /version     — NetworkOnly  (deploy-skew surface)
  *   1b. /health*    — NetworkOnly  (liveness surface; a replayed 200 hides an
  *        outage for as long as the entry lives)
@@ -20,6 +22,8 @@
  *        served from the cache; the \bgtfs\b anchor prevents stealing
  *        /departures-for-stop /stops /version)
  *   5. address-search endpoints — NetworkOnly (verified + stored in IDB)
+ *   5a. service alerts — NetworkOnly (kept in memory only; a replayed answer
+ *        would hide a failed refresh)
  *   5b. micromap artifacts — CacheFirst
  *   5c. managed OSM discovery/artifacts — NetworkOnly (verified IDB fallback)
  *   6. /api/ catch-all — NetworkFirst
@@ -66,6 +70,24 @@ export const runtimeCaching = [
     },
   },
   {
+    // Map-only assets are excluded from the precache (precache.ts) so Text
+    // mode never downloads them. Choosing Map fetches them once; this rule
+    // keeps them for offline use. Anchored on the exact chunk names and the
+    // bundled glyph directory.
+    urlPattern:
+      /\/(?:assets\/(?:vendor-map|maplibre|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
+    handler: "CacheFirst" as const,
+    options: {
+      cacheName: "map-assets",
+      expiration: {
+        // One deploy's map chunks, worker and glyph ranges, plus superseded hashes.
+        maxEntries: 16,
+        maxAgeSeconds: 60 * 60 * 24 * 90,
+      },
+      cacheableResponse: { statuses: [0, 200] },
+    },
+  },
+  {
     // Build-info reflects the *current* deploy. Stale SW cache would
     // mask the very deploy-skew this feature is meant to surface.
     urlPattern: /\/api\/[^/]+\/version$/,
@@ -94,9 +116,10 @@ export const runtimeCaching = [
       // entries in the old cache inert.
       cacheName: "api-stops-cache-v1",
       networkTimeoutSeconds: 5,
+      // Entries name the stops the rider looked at: kept briefly and few.
       expiration: {
-        maxEntries: 50,
-        maxAgeSeconds: 86400,
+        maxEntries: 20,
+        maxAgeSeconds: 60 * 60,
       },
     },
   },
@@ -106,9 +129,10 @@ export const runtimeCaching = [
     options: {
       cacheName: "api-departures-cache",
       networkTimeoutSeconds: 3,
+      // Entries name the stops the rider looked at: kept briefly and few.
       expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 300,
+        maxEntries: 20,
+        maxAgeSeconds: 120,
       },
     },
   },
@@ -126,6 +150,14 @@ export const runtimeCaching = [
     // addressSearchLoader. The service worker must not replay stale manifest,
     // bundle, or query responses from the generic API cache.
     urlPattern: /\/api\/[^/]+\/address-search(?:[/?#]|$)/,
+    handler: "NetworkOnly" as const,
+  },
+  {
+    // Service alerts live in memory only and carry their own freshness
+    // (`stale`, `fetchedAt`). Under the /api/ catch-all a failed refresh fell
+    // back to an answer up to an hour old that the client then showed as
+    // just checked; it must see the failure instead.
+    urlPattern: /\/api\/[^/]+\/alerts(?:[/?#]|$)/,
     handler: "NetworkOnly" as const,
   },
   {
@@ -192,9 +224,11 @@ export const runtimeCaching = [
     handler: "CacheFirst" as const,
     options: {
       cacheName: "carto-tiles",
+      // Tiles show which areas the rider viewed; the offline map does not
+      // depend on them, so they are kept for two days only.
       expiration: {
-        maxEntries: 400,
-        maxAgeSeconds: 60 * 60 * 24 * 14,
+        maxEntries: 300,
+        maxAgeSeconds: 60 * 60 * 24 * 2,
       },
       cacheableResponse: { statuses: [0, 200] },
     },

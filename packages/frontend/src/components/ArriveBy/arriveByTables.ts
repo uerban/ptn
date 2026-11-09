@@ -10,7 +10,7 @@
  * kept table is always the rows a fresh read would return. The normal
  * planner reads its own.
  */
-import { db } from "../../db/index.ts";
+import { captureCityData } from "../../services/cityData.ts";
 import type { RaptorIndex } from "../../services/raptorIndex.ts";
 import type { SearchConfig } from "../../services/searchOrchestrator.ts";
 import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
@@ -45,13 +45,13 @@ function keptPerIndex<T>(read: () => Promise<T>): () => Promise<T> {
 }
 
 export const arriveByStopTable = keptPerIndex(async (): Promise<ArriveByStopTable> => {
-  const rows = await db.gtfsStops.toArray();
+  const rows = await captureCityData().gtfsStops.toArray();
   return { rows, lookup: new Map(rows.map((s) => [s.id, { name: s.name, lat: s.lat, lon: s.lon }])) };
 });
 
 /** routeId → colour, for rides that carry none. */
 export const arriveByRouteColors = keptPerIndex(async (): Promise<ReadonlyMap<string, string>> => {
   const colors = new Map<string, string>();
-  for (const r of await db.gtfsRoutes.toArray()) if (r.color) colors.set(r.id, r.color);
+  for (const r of await captureCityData().gtfsRoutes.toArray()) if (r.color) colors.set(r.id, r.color);
   return colors;
 });

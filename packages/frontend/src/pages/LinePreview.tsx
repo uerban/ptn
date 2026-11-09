@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { TransportMode } from "@pt/shared";
-import { db } from "../db/index.ts";
+import { captureCityData } from "../services/cityData.ts";
 import { buildLinePatterns } from "../utils/buildLinePatterns.ts";
 import type { LinePattern } from "../stores/lineViewStore.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
@@ -13,6 +13,10 @@ import { LineBadge } from "../components/RouteResults/shared/LineBadge.tsx";
 import { LiveBadge } from "../components/RouteResults/shared/LiveBadge.tsx";
 import { useCityStore } from "../stores/cityStore.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
+import {
+  ServiceAlertsPanel,
+  routeTargets,
+} from "../components/ServiceAlerts/ServiceAlertsPanel.tsx";
 
 interface RouteMeta {
   id: string;
@@ -40,6 +44,12 @@ export function LinePreviewPage() {
   const variant = useSettingsStore((s) => s.routeSearchVariant);
   const badgeSize = getBadgeSize(variant);
   const cityId = useCityStore((s) => s.activeCity.id);
+  const cityName = useCityStore((s) => s.activeCity.name);
+  const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => routeTargets(routeId, raptorIndex),
+    [routeId, raptorIndex],
+  );
 
   // Make sure GTFS data is loaded for the active city.
   useEffect(() => {
@@ -74,7 +84,7 @@ export function LinePreviewPage() {
     (async () => {
       try {
         const [route, built] = await Promise.all([
-          db.gtfsRoutes.get(routeId),
+          captureCityData().gtfsRoutes.get(routeId),
           buildLinePatterns(routeId),
         ]);
         if (cancelled) return;
@@ -208,6 +218,13 @@ export function LinePreviewPage() {
       )}
 
       <div className="flex-1 overflow-y-auto">
+        <ServiceAlertsPanel
+          cityId={cityId}
+          cityName={cityName}
+          targets={alertTargets}
+          includePartial
+          surface="line-view"
+        />
         {!otherDir && patterns.length <= 1 && (
           <div className="px-4 py-2 text-xs text-fg-muted">
             {t(

@@ -4,6 +4,7 @@ import {
 } from "../../config/geocoderProviders.ts";
 import { DEFAULT_GRID_METERS } from "../../services/geocoder/ThirdPartyGeocoderAdapter.ts";
 import { usePolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
+import { isFlowAvailable } from "../../privacy/flowGrants.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useTranslation, usePrivacyNamespace } from "../../i18n/index.ts";
 
@@ -19,7 +20,11 @@ export function ThirdPartyProvidersSection() {
   const setProvider = useSettingsStore((s) => s.setThirdPartyProvider);
   const setApiKey = useSettingsStore((s) => s.setThirdPartyApiKey);
 
-  const locked = !policy.m10ThirdPartyEnabled;
+  // Configuring a provider sends nothing: requests wait for the provider's
+  // own decision. The section is locked only when no provider can run.
+  const locked = (Object.keys(GEOCODER_PROVIDERS) as ThirdPartyProviderId[]).every(
+    (id) => !isFlowAvailable("external.place-search", id),
+  );
   const effectiveGridMeters = policy.m10CoarsenGridDefaultMeters > 0
     ? policy.m10CoarsenGridDefaultMeters
     : DEFAULT_GRID_METERS;
@@ -33,8 +38,8 @@ export function ThirdPartyProvidersSection() {
         <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 opacity-50">
           <p className="text-xs text-fg-muted italic">
             {t(
-              "privacy.thirdParty.lockedCopy",
-              `Third-party geocoding is disabled at this privacy level. Lower your level to Standard or below to configure providers.`,
+              "privacy.thirdParty.unavailable",
+              "Third-party geocoding is not available in this version of the app.",
             )}
           </p>
         </div>

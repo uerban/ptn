@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PrivacyPolicy } from "@pt/shared";
+import type { ProtectionPolicy } from "@pt/shared/privacy";
 import { useTranslation } from "../../i18n/index.ts";
 import {
   usePrivacyChoicesStore,
@@ -23,7 +23,7 @@ export interface OptionalStorageChoiceProps {
 
 function policyPermits(
   category: OptionalStorageCategory,
-  policy: PrivacyPolicy,
+  policy: ProtectionPolicy,
 ): boolean {
   switch (category) {
     case "recents":
@@ -86,6 +86,10 @@ export function OptionalStorageChoice({
       </p>
     ) : null;
   }
+
+  // A contextual prompt is never offered for something the protection level
+  // forbids; Settings explains that it needs a lower level.
+  if (presentation === "contextual" && !permitted) return null;
 
   function remember(): void {
     setError(null);

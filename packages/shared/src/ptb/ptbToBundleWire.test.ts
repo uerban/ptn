@@ -128,6 +128,18 @@ describe("ptbBundleToWire — PatternMode", () => {
     expect(() => ptbBundleToWire(ptb, PatternMode.Off)).toThrow(/frequency exact_times/);
   });
 
+  it("carries each route's GTFS route_type and agency_id", () => {
+    const ptb = fixture("branch-pattern.ptb");
+    for (const mode of [PatternMode.Off, PatternMode.Unbounded]) {
+      const wire = ptbBundleToWire(ptb, mode);
+      for (const route of wire.routes) {
+        const source = ptb.routes.find((r) => r.routeId === route.id)!;
+        expect(route.routeType).toBe(source.routeType);
+        expect(route.agencyId).toBe(source.agencyId || undefined);
+      }
+    }
+  });
+
   it("Off mode: one wire-route per .ptb route (unchanged behavior)", () => {
     const wire = ptbBundleToWire(fixture("branch-pattern.ptb"), PatternMode.Off);
     expect(wire.routes).toHaveLength(1);

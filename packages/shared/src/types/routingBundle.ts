@@ -38,6 +38,8 @@ export interface RoutingBundleRoute {
   textColor?: string;
   /** GTFS agency_id cross-reference (omitted when the route has none). */
   agencyId?: string;
+  /** GTFS `route_type` (`mode` is derived from it); absent on older bundles. */
+  routeType?: number;
   /** Ordered stop IDs defining this route's stop sequence. */
   stopIds: string[];
   /** Trips on this route, each with departure times parallel to stopIds. */

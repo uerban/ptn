@@ -1,10 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Stop, TransportMode } from "@pt/shared";
 import { useDepartures } from "../../hooks/useDepartures.ts";
 import { useFavoritesStore } from "../../stores/favoritesStore.ts";
+import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
+import { LiveTimesNotice } from "./LiveTimesNotice.tsx";
+import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
+import { stopTargets } from "../../hooks/useServiceAlertSelection.ts";
 import { useLineClick } from "../../hooks/useLineClick.ts";
 import { ModeFilterPills } from "../ModeFilterPills.tsx";
 import { Icon } from "../Icon.tsx";
@@ -23,9 +28,18 @@ type SheetHeight = "peek" | "half" | "full";
 
 export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   const [height, setHeight] = useState<SheetHeight>("half");
-  const { departures, loading, error } = useDepartures(stop.id, true, 24, { hedge: true });
+  const { departures, loading, error, unavailable, updatedAt } = useDepartures(
+    stop.id,
+    true,
+    24,
+    { hedge: true },
+  );
   const { favorites, addFavorite, removeFavorite } = useFavoritesStore();
+  // Favorites are sealed and load asynchronously; editing before they load
+  // would replace the stored list.
+  const favoritesLoaded = usePersistHydrated(useFavoritesStore.persist);
   const activeCityId = useCityStore((s) => s.activeCity.id);
+  const activeCityName = useCityStore((s) => s.activeCity.name);
   const { t } = useTranslation();
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -68,6 +82,11 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, []);
 
   const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
+  const timetable = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => stopTargets(stop.id, departures, timetable),
+    [stop.id, departures, timetable],
+  );
 
   const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);
@@ -98,6 +117,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, [onClose]);
 
   function toggleFavorite() {
+    if (!favoritesLoaded) return;
     if (isFavorite) {
       const fav = favorites.find((f) => f.stopId === stop.id && f.cityId === activeCityId);
       if (fav) removeFavorite(fav.id);
@@ -137,14 +157,15 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
       {/* Drag handle */}
-      <div
+      <button
+        type="button"
         data-testid="sheet-handle"
-        className="flex justify-center pt-2 pb-1 cursor-pointer"
+        className="flex w-full justify-center pt-2 pb-1 min-h-6 cursor-pointer"
         onClick={cycleHeight}
         aria-label={height === "peek" ? "Expand sheet" : height === "half" ? "Expand sheet" : "Collapse sheet"}
       >
-        <div className="w-10 h-1 rounded-full bg-sheet-handle" />
-      </div>
+        <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-sheet-handle" />
+      </button>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-divider">
@@ -163,7 +184,9 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
         <div className="flex items-center gap-1 ml-2">
           <button
             onClick={toggleFavorite}
-            className="p-2 rounded-full hover:bg-surface-overlay"
+            disabled={!favoritesLoaded}
+            aria-busy={!favoritesLoaded}
+            className="p-2 rounded-full hover:bg-surface-overlay disabled:opacity-50"
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
           >
             <Icon
@@ -184,6 +207,18 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
         </div>
       </div>
 
+      {/* Scheduled vs live, and the way to live times */}
+      {height !== "peek" && (
+        <LiveTimesNotice
+          cityId={activeCityId}
+          cityName={activeCityName}
+          departures={departures}
+          loading={loading}
+          unavailable={unavailable}
+          updatedAt={updatedAt}
+        />
+      )}
+
       {/* Mode filter pills — only shown when 2+ modes present */}
       {height !== "peek" && !loading && (
         <ModeFilterPills modes={uniqueModes} activeMode={modeFilter} onChange={setModeFilter} />
@@ -196,6 +231,13 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
           onKeyDown={handleBodyKeyDown}
           className="overflow-y-auto flex-1 py-1"
         >
+          {/* Service alerts for this stop and its departures, or the offer */}
+          <ServiceAlertsPanel
+            cityId={activeCityId}
+            cityName={activeCityName}
+            targets={alertTargets}
+            surface="departure-sheet"
+          />
           {loading && (
             <div className="space-y-1.5 mx-2 my-2" data-testid="departure-sheet-skeleton" aria-hidden>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -208,7 +250,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             <div className="p-4 text-center text-danger text-sm">{error}</div>
           )}
 
-          {!loading && !error && filteredGroups.length === 0 && (
+          {!loading && !error && !unavailable && filteredGroups.length === 0 && (
             <div className="p-4 text-center text-fg-muted text-sm">
               {modeFilter && groups.length > 0
                 ? t("sheet.no_departures_for_mode", "No departures for this mode")

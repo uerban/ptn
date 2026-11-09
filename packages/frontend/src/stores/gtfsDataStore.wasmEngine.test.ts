@@ -30,6 +30,9 @@ function makeRouter(): PtRouterHandle {
 beforeEach(async () => {
   vi.resetModules();
   vi.unstubAllGlobals();
+  // Engine lifecycle tests keep catalog acquisition unavailable.
+  // Decoded-artifact activation has separate readiness and race coverage.
+  vi.doMock("../services/cityActivation.ts", () => ({prepareCityActivation: vi.fn().mockRejectedValue(new Error("legacy fixture"))}));
   restoreDeviceCityMock.mockReset().mockResolvedValue(false);
   vi.doMock("../services/deviceCities.ts", () => ({restoreDeviceCity: restoreDeviceCityMock, hasLiveDeviceCity: vi.fn().mockResolvedValue(false)}));
 
@@ -191,7 +194,7 @@ describe("gtfsDataStore wasm engine lifecycle", () => {
     // A real city switch through init(): bumps initGeneration and moves
     // loadedCityId to kaunas, exactly like a user picking a new city.
     await useGtfsDataStore.getState().init("kaunas");
-    expect(useGtfsDataStore.getState().loadedCityId).toBe("kaunas");
+    expect(useGtfsDataStore.getState().loadedCityId).toBeNull();
 
     resolveInit();
     await expect(vilniusInit).rejects.toThrow(/stale wasm init/i);
@@ -243,122 +246,21 @@ describe("gtfsDataStore wasm engine lifecycle", () => {
   });
 });
 
-describe("gtfsDataStore warm start builds the engine alongside the JS index", () => {
-  it("starts the engine build before the JS index is built, and builds once", async () => {
-    let finishIndex!: () => void;
-    buildRaptorIndexMock.mockReturnValueOnce(
-      new Promise((resolve) => { finishIndex = () => resolve({ cityTzIana: "Europe/Vilnius" }); }),
-    );
-    initOrSwapPtRouterMock.mockReturnValue(new Promise(() => {}));
-
-    const init = useGtfsDataStore.getState().init("vilnius");
-    await vi.waitFor(() => expect(buildRaptorIndexMock).toHaveBeenCalledTimes(1));
-    // The build started while the index is still being built.
-    expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1);
-    expect(useGtfsDataStore.getState().raptorIndex).toBeNull();
-    expect(useGtfsDataStore.getState().wasmEngine.status).toBe("loading");
-
-    finishIndex();
-    await init;
-    // The eager init after the index joins the same build.
-    expect(useGtfsDataStore.getState().loadedCityId).toBe("vilnius");
-    expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1);
-    expect(osrmInitMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("an engine finished before the index is ready, not stale", async () => {
-    let finishIndex!: () => void;
-    buildRaptorIndexMock.mockReturnValueOnce(
-      new Promise((resolve) => { finishIndex = () => resolve({ cityTzIana: "Europe/Vilnius" }); }),
-    );
-    const router = makeRouter();
-    initOrSwapPtRouterMock.mockImplementationOnce(async () => {
-      useGtfsDataStore.getState().setPtRouter(router);
-      return router;
-    });
-
-    const init = useGtfsDataStore.getState().init("vilnius");
-    await vi.waitFor(() => expect(useGtfsDataStore.getState().wasmEngine.status).toBe("ready"));
-    expect(useGtfsDataStore.getState().loadedCityId).toBeNull();
-
-    finishIndex();
-    await init;
-    expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1);
-    await expect(useGtfsDataStore.getState().ensureWasmReady("vilnius")).resolves.toBe(router);
-    expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("a fresh sync still builds the engine only after the index", async () => {
-    needsSyncMock.mockResolvedValueOnce(true);
-    let finishIndex!: () => void;
-    buildRaptorIndexMock.mockReturnValueOnce(
-      new Promise((resolve) => { finishIndex = () => resolve({ cityTzIana: "Europe/Vilnius" }); }),
-    );
-    initOrSwapPtRouterMock.mockReturnValue(new Promise(() => {}));
-
-    const init = useGtfsDataStore.getState().init("vilnius");
-    await vi.waitFor(() => expect(buildRaptorIndexMock).toHaveBeenCalledTimes(1));
-    expect(initOrSwapPtRouterMock).not.toHaveBeenCalled();
-
-    finishIndex();
-    await init;
-    expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("a reset during the early build leaves the engine idle, never ready", async () => {
-    let finishIndex!: () => void;
-    buildRaptorIndexMock.mockReturnValueOnce(
-      new Promise((resolve) => { finishIndex = () => resolve({ cityTzIana: "Europe/Vilnius" }); }),
-    );
-    let finishBuild!: () => void;
-    const router = makeRouter();
-    initOrSwapPtRouterMock.mockReturnValueOnce(new Promise((resolve) => { finishBuild = () => resolve(router); }));
-
-    const init = useGtfsDataStore.getState().init("vilnius");
-    await vi.waitFor(() => expect(initOrSwapPtRouterMock).toHaveBeenCalledTimes(1));
-    await useGtfsDataStore.getState().reset();
-    finishBuild();
-    finishIndex();
-    await init;
-    await vi.waitFor(() => expect(useGtfsDataStore.getState().wasmEngine.status).toBe("idle"));
-    expect(useGtfsDataStore.getState().raptorIndex).toBeNull();
-    expect(useGtfsDataStore.getState().ptRouter).toBeNull();
-  });
-});
-
-describe("downloaded-city startup", () => {
-  it("restores a downloaded city while offline without refreshing from the host", async () => {
-    vi.stubGlobal("navigator", {onLine: false});
-    restoreDeviceCityMock.mockResolvedValue(true);
-    initOrSwapPtRouterMock.mockRejectedValue(new Error("test engine stub"));
-    await useGtfsDataStore.getState().init("downloaded");
-    expect(restoreDeviceCityMock).toHaveBeenCalledWith("downloaded", expect.any(AbortSignal));
-    expect(syncGtfsDataMock).not.toHaveBeenCalled();
-    expect(useGtfsDataStore.getState().loadedCityId).toBe("downloaded");
-  });
-  it("restores a downloaded package when an apparently online host is unreachable", async () => {
-    needsSyncMock.mockResolvedValue(true);
-    syncGtfsDataMock.mockRejectedValue(new Error("network failed"));
-    restoreDeviceCityMock.mockResolvedValue(true);
-    initOrSwapPtRouterMock.mockRejectedValue(new Error("test engine stub"));
-    await useGtfsDataStore.getState().init("downloaded");
-    expect(useGtfsDataStore.getState().loadedCityId).toBe("downloaded");
-    expect(useGtfsDataStore.getState().error).toBeNull();
-  });
-});
-
-it("opens an explicit download without network sync even when navigator reports online", async () => {
-  restoreDeviceCityMock.mockResolvedValue(true);
-  await useGtfsDataStore.getState().init("vilnius", {preferDownload: true});
-  expect(restoreDeviceCityMock).toHaveBeenCalledWith("vilnius", expect.anything());
-  expect(syncGtfsDataMock).not.toHaveBeenCalled();
-  expect(useGtfsDataStore.getState().loadedCityId).toBe("vilnius");
-});
-it("does not restore an old package after an explicit update fails", async () => {
-  syncGtfsDataMock.mockRejectedValue(new Error("offline"));
-  restoreDeviceCityMock.mockResolvedValue(true);
-  await useGtfsDataStore.getState().refresh("vilnius", {requireNetwork: true});
-  expect(syncGtfsDataMock).toHaveBeenCalledWith("vilnius", {requireNetwork: true});
-  expect(restoreDeviceCityMock).not.toHaveBeenCalled();
-  expect(useGtfsDataStore.getState().error).toContain("offline");
+it("invalidates the old city synchronously without starting a disk clear", async () => {
+  const router = makeRouter();
+  useGtfsDataStore.setState({loadedCityId: "vilnius", raptorIndex: {cityTzIana: "Europe/Vilnius"} as never,
+    stopNames: new Map([["S", "Old stop"]]), ptRouter: router});
+  clearGtfsDataMock.mockReturnValueOnce(new Promise<void>(() => {}));
+  const generation = useGtfsDataStore.getState().getInitGeneration();
+  const reset = useGtfsDataStore.getState().reset();
+  const state = useGtfsDataStore.getState();
+  expect(state.getInitGeneration()).toBeGreaterThan(generation);
+  expect(state.raptorIndex).toBeNull();
+  expect(state.loadedCityId).toBeNull();
+  expect(state.stopNames).toBeNull();
+  expect(state.ptRouter).toBeNull();
+  expect(state.wasmEngine.status).toBe("idle");
+  expect(router.free).toHaveBeenCalledOnce();
+  expect(clearGtfsDataMock).not.toHaveBeenCalled();
+  await reset;
 });

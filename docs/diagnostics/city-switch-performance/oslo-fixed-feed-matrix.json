@@ -1,0 +1,74 @@
+{
+  "scenario": "Vilnius-to-Oslo arrival with identical captured transit bytes; one run per cell on source-enabled Vite servers with native GPU",
+  "base": "e4420d996b66b97593db7aedd8474cc521f220eb",
+  "candidateCheckpoint": "Storage/activation repair before final map-source/spatial-index changes",
+  "rows": [
+    {
+      "version": "base",
+      "retained": 0,
+      "arrivalToIndexMs": 23091.700000047684,
+      "projectionWriteMs": 18901.19999998808,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    },
+    {
+      "version": "base",
+      "retained": 1,
+      "arrivalToIndexMs": 22131.400000035763,
+      "projectionWriteMs": 18642.299999952316,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    },
+    {
+      "version": "base",
+      "retained": 8,
+      "arrivalToIndexMs": 22590.600000023842,
+      "projectionWriteMs": 18826.100000023842,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    },
+    {
+      "version": "candidate",
+      "retained": 0,
+      "arrivalToIndexMs": 1405.4000000357628,
+      "projectionWriteMs": 0,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    },
+    {
+      "version": "candidate",
+      "retained": 1,
+      "arrivalToIndexMs": 1373.199999988079,
+      "projectionWriteMs": 0,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    },
+    {
+      "version": "candidate",
+      "retained": 8,
+      "arrivalToIndexMs": 1389.3999999761581,
+      "projectionWriteMs": 0,
+      "fixtureMisses": 0,
+      "graphics": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+      }
+    }
+  ],
+  "limits": "Single observations, not p95. Ordinary legacy retained packages are seeded from one identical template. The unchanged base requests one Oslo tile using Vilnius publication identity in the eight-retained case; its real separately captured HTTP 409 response is replayed, not fabricated."
+}

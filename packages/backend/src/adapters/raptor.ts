@@ -4,7 +4,6 @@ import type {
   TripResult,
   Stop,
   Departure,
-  Alert,
   VehiclePosition,
   Itinerary,
   Leg,
@@ -141,10 +140,6 @@ export class RaptorAdapter implements RoutingAdapter {
   }
 
   async searchStops(_q: string, _l?: number): Promise<Stop[]> {
-    return [];
-  }
-
-  async getAlerts(): Promise<Alert[]> {
     return [];
   }
 

@@ -1,0 +1,88 @@
+{
+  "scenario": "Ten fresh native-GPU browser contexts; cold Krakow after initial Vilnius, fixed API replay",
+  "renderer": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "samples": [
+    {
+      "indexLocalMs": 494.19999998807907,
+      "activityLocalMs": 719.1000000238419,
+      "lastCardChangeLocalMs": 1618.800000011921,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 471.2000000476837,
+      "activityLocalMs": 689,
+      "lastCardChangeLocalMs": 1571.6000000238419,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 498,
+      "activityLocalMs": 726.1999999880791,
+      "lastCardChangeLocalMs": 1588.3999999761581,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 494,
+      "activityLocalMs": 720.5,
+      "lastCardChangeLocalMs": 1602.199999988079,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 499.60000002384186,
+      "activityLocalMs": 725.1999999880791,
+      "lastCardChangeLocalMs": 1561.5,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 488.30000001192093,
+      "activityLocalMs": 709.1999999880791,
+      "lastCardChangeLocalMs": 1624.6000000238419,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 484.80000001192093,
+      "activityLocalMs": 708.8000000119209,
+      "lastCardChangeLocalMs": 1604.199999988079,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 497.5999999642372,
+      "activityLocalMs": 728.0999999642372,
+      "lastCardChangeLocalMs": 1594.199999988079,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 475.19999998807907,
+      "activityLocalMs": 701.5999999642372,
+      "lastCardChangeLocalMs": 1572.699999988079,
+      "requestedStops": 48,
+      "readyStops": 48
+    },
+    {
+      "indexLocalMs": 531.8999999761581,
+      "activityLocalMs": 772.3000000119209,
+      "lastCardChangeLocalMs": 1653.0999999642372,
+      "requestedStops": 48,
+      "readyStops": 48
+    }
+  ],
+  "p95": {
+    "indexLocalMs": 531.8999999761581,
+    "activityLocalMs": 772.3000000119209,
+    "lastCardChangeLocalMs": 1653.0999999642372
+  },
+  "caveats": [
+    "Local timing starts after verified catalog acquisition, excluding network transfer and ready bracketing.",
+    "External basemap resources remain live; no mobile or staging claim."
+  ]
+}

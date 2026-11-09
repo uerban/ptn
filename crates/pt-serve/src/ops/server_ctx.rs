@@ -44,6 +44,13 @@ pub struct ServerCtx {
     /// need no `Option` dance and tests need no constructor change. The
     /// `pt-serve-rt-poll` thread (main.rs) is the only publisher.
     pub rt: Arc<crate::rt::RtState>,
+    /// GTFS-RT ServiceAlerts state, disabled when no
+    /// `PT_SERVE_RT_SERVICE_ALERTS_URLS` are configured. The
+    /// `pt-serve-alerts-poll` thread (main.rs) is the only publisher.
+    pub alerts: Arc<crate::rt::AlertsState>,
+    /// `X-PT-Realtime` value sent on `/gtfs/manifest` replies, computed once
+    /// from the feed configuration ([`ServerConfig::realtime_header_value`]).
+    pub realtime_header: Arc<str>,
     /// Schedule-tile response cache (`ops/tile_cache.rs`). Process-scoped
     /// like `rt` — survives a generation swap; its epoch-gated design
     /// purges wholesale (forward-only, race-safe) on the next request that
@@ -77,6 +84,8 @@ impl ServerCtx {
     /// share construct with `Metrics::new()` at the call site.
     pub fn new(initial: Generation, mut config: ServerConfig, metrics: Arc<Metrics>) -> Arc<Self> {
         let rt = crate::rt::RtState::from_config(&config);
+        let alerts = crate::rt::AlertsState::from_urls(config.alerts_urls());
+        let realtime_header: Arc<str> = config.realtime_header_value().into();
         let tile_cache = Arc::new(crate::ops::TileCache::new(
             config.schedule_tile_cache_max_bytes,
         ));
@@ -103,6 +112,8 @@ impl ServerCtx {
             gen_handle: Arc::new(ArcSwap::new(Arc::new(initial))),
             config: Arc::new(config),
             rt,
+            alerts,
+            realtime_header,
             tile_cache,
             rt_tile_membership_cache,
             rt_tile_response_cache,

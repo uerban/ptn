@@ -1,8 +1,4 @@
 import {
-  usePrivacyStore,
-  usePolicy,
-} from "../../stores/privacyStore.ts";
-import {
   useSettingsStore,
   type MapDetailMode,
 } from "../../stores/settingsStore.ts";
@@ -11,33 +7,54 @@ import {
   effectiveMapMode,
   isDetailedMapLocked,
   MAP_MODE_ORDER,
-  maxLevelForDetailedMap,
 } from "../../map/mapMode.ts";
+import { useExternalBasemapAllowed } from "../../services/basemapPrivacy.ts";
 import { BASEMAP_PROVIDERS } from "../../config/basemapProviders.ts";
 import { useTranslation } from "../../i18n/index.ts";
+import { MICROMAP_LAYERS, type MicromapLayer } from "../../map/micromap/types.ts";
+import { useMicromapState } from "../../services/micromapLoader.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+
+const LAYER_FALLBACKS: Record<MicromapLayer, string> = {
+  water: "lakes and the sea",
+  green: "parks and forests",
+  waterways: "rivers and canals",
+  roads: "main roads",
+  places: "district and place names",
+};
+
+/** "a, b and c" in the reader's language. */
+function joinList(items: readonly string[], locale: string): string {
+  try {
+    return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
+  } catch {
+    return items.join(", ");
+  }
+}
 
 /**
  * The single map-mode control.
  *
- * It replaces the pair that used to disagree with each other: the old Display →
- * "Map detail" radio and the privacy centre's "Detailed map" axis. Selecting a
- * mode here writes the display setting AND the `basemapMode` privacy override
- * (see `map/mapMode.ts`); the privacy preset still caps what is selectable, so
- * at Hardened and above the external option renders locked instead of being
- * silently ignored.
+ * Selecting a mode writes the display setting; selecting the detailed map is
+ * also the deliberate action that allows its provider (see `map/mapMode.ts`).
+ * While the provider is not allowed, a detailed preference draws the micromap
+ * and says so, with a way to allow it.
  */
 export function MapModeSection() {
-  const { t } = useTranslation();
+  const { t, formattingLocale } = useTranslation();
+  const city = useCityStore((s) => s.activeCity);
+  const micromapState = useMicromapState(city.id);
   const mapDetailMode = useSettingsStore((s) => s.mapDetailMode);
   const setMapDetailMode = useSettingsStore((s) => s.setMapDetailMode);
-  const level = usePrivacyStore((s) => s.level);
-  const setOverride = usePrivacyStore((s) => s.setOverride);
-  const clearOverride = usePrivacyStore((s) => s.clearOverride);
-  const basemapMode = usePolicy().basemapMode;
-  const effectiveMode = effectiveMapMode(mapDetailMode, basemapMode);
-  const detailedLocked = isDetailedMapLocked(level);
+  const basemapAllowed = useExternalBasemapAllowed();
+  const effectiveMode = effectiveMapMode(mapDetailMode, basemapAllowed);
+  const detailedLocked = isDetailedMapLocked();
 
   const providerName = BASEMAP_PROVIDERS.carto.name;
+  const micromapContents = joinList(
+    MICROMAP_LAYERS.map((layer) => t(`settings.micromap_layer_${layer}`, LAYER_FALLBACKS[layer])),
+    formattingLocale,
+  );
 
   const OPTIONS: Record<MapDetailMode, { label: string; desc: string }> = {
     detailed: {
@@ -48,11 +65,11 @@ export function MapModeSection() {
       ).replace("{provider}", providerName),
     },
     micromap: {
-      label: t("settings.map_mode_micromap", "Offline micromap"),
+      label: t("settings.map_mode_micromap", "Minimal offline map"),
       desc: t(
         "settings.map_mode_micromap_desc",
-        "A tiny city map kept on this device — water, major roads, green areas, district names. No map requests, works in a tunnel.",
-      ),
+        "Kept on this device and shows only {contents}. Side streets, buildings, addresses and points of interest are left out. Makes no map requests.",
+      ).replace("{contents}", micromapContents),
     },
     "gtfs-only": {
       label: t("settings.map_mode_gtfs_only", "Transit corridors only"),
@@ -64,11 +81,9 @@ export function MapModeSection() {
   };
 
   const lockedCopy = t(
-    "settings.map_mode_locked",
-    "Locked by the {level} preset. Lower your privacy level to {minLevel} to use the external map.",
-  )
-    .replace("{level}", level)
-    .replace("{minLevel}", maxLevelForDetailedMap());
+    "privacy.map.detailedUnavailable",
+    "The detailed map is not available in this version of the app.",
+  );
 
   return (
     <section id="settings-map-mode" aria-labelledby="settings-map-mode-heading">
@@ -95,7 +110,7 @@ export function MapModeSection() {
           return (
             <label
               key={mode}
-              className={`flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+              className={`flex items-start justify-between gap-3 px-4 py-3 min-h-11 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
             >
               <span className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-sm text-fg">{option.label}</span>
@@ -103,6 +118,14 @@ export function MapModeSection() {
                 {disabled && (
                   <span className="text-xs text-fg-muted italic">
                     {lockedCopy}
+                  </span>
+                )}
+                {mode === "micromap" && micromapState === "absent" && (
+                  <span className="text-xs text-fg-muted italic">
+                    {t(
+                      "settings.map_mode_micromap_absent",
+                      "Not available for {city} yet, so transit route shapes are drawn instead.",
+                    ).replace("{city}", city.name)}
                   </span>
                 )}
               </span>
@@ -113,12 +136,7 @@ export function MapModeSection() {
                 checked={mapDetailMode === mode}
                 disabled={disabled}
                 onChange={() =>
-                  applyMapMode(mode, {
-                    level,
-                    setMapDetailMode,
-                    setOverride,
-                    clearOverride,
-                  })
+                  applyMapMode(mode, { setMapDetailMode })
                 }
                 className="accent-accent mt-1"
               />
@@ -141,13 +159,22 @@ export function MapModeSection() {
           </a>
         </p>
       )}
-      {mapDetailMode === "detailed" && basemapMode !== "external-detailed" && (
-        <p className="text-xs text-fg-muted mt-2">
-          {t(
-            "settings.map_mode_demoted",
-            "Your privacy level is withholding the external map, so the offline micromap is drawn instead.",
-          )}
-        </p>
+      {mapDetailMode === "detailed" && !basemapAllowed && !detailedLocked && (
+        <div className="text-xs text-fg-muted mt-2 flex flex-col items-start gap-1">
+          <p>
+            {t(
+              "privacy.map.detailedNotAllowed",
+              "Detailed maps from {provider} are off, so the minimal offline map is drawn instead.",
+            ).replace("{provider}", providerName)}
+          </p>
+          <button
+            type="button"
+            onClick={() => applyMapMode("detailed", { setMapDetailMode })}
+            className="text-accent underline"
+          >
+            {t("privacy.map.allowDetailed", "Use detailed maps")}
+          </button>
+        </div>
       )}
     </section>
   );

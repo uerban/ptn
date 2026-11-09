@@ -4,6 +4,7 @@ import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
 import type { PrivacyLevel } from "@pt/shared";
 
 const ADAPTER_MODULE = "/src/services/geocoder/ThirdPartyGeocoderAdapter.ts";
+const DECISIONS_MODULE = "/src/stores/networkDecisionsStore.ts";
 const DB_MODULE = "/src/db/index.ts";
 
 const NOMINATIM_RESPONSE = [
@@ -71,6 +72,28 @@ async function readDedupTable(page: Page): Promise<DedupRow[]> {
   }, DB_MODULE);
 }
 
+/** Allow the provider the way the Settings control does, after the
+ * carried-over decisions have been applied. */
+async function allowProviderInSettings(page: Page): Promise<void> {
+  await page.evaluate(async (modulePath) => {
+    const mod = (await import(/* @vite-ignore */ modulePath)) as {
+      useNetworkDecisionsStore: {
+        getState: () => {
+          setDecision: (
+            flowId: string,
+            value: "allowed",
+            source: "settings",
+            providerId: string,
+          ) => void;
+        };
+      };
+    };
+    mod.useNetworkDecisionsStore
+      .getState()
+      .setDecision("external.place-search", "allowed", "settings", "nominatim");
+  }, DECISIONS_MODULE);
+}
+
 async function runForwardQuery(
   page: Page,
   hint: { lat: number; lon: number } | null,
@@ -81,7 +104,6 @@ async function runForwardQuery(
         ThirdPartyGeocoderAdapter: new (
           config: { provider: string; endpoint: string },
           getPolicy: () => {
-            m10ThirdPartyEnabled: boolean;
             m10CoarsenGridDefaultMeters: number;
           },
         ) => {
@@ -98,7 +120,6 @@ async function runForwardQuery(
           endpoint: "https://nominatim.openstreetmap.org",
         },
         () => ({
-          m10ThirdPartyEnabled: true,
           m10CoarsenGridDefaultMeters: 500,
         }),
       );
@@ -115,7 +136,6 @@ async function tryForwardExpectingFailure(page: Page): Promise<string | null> {
         ThirdPartyGeocoderAdapter: new (
           config: { provider: string; endpoint: string },
           getPolicy: () => {
-            m10ThirdPartyEnabled: boolean;
             m10CoarsenGridDefaultMeters: number;
           },
         ) => {
@@ -127,18 +147,15 @@ async function tryForwardExpectingFailure(page: Page): Promise<string | null> {
           ) => Promise<unknown>;
         };
       };
-      // Mirror the production boot: the adapter only exists where M10 third-
-      // party is enabled. When disabled we still instantiate it with the
-      // current policy (disabled) so `isAvailable()` is false and `forward()`
-      // throws — proving both that registration gating is honored AND that
-      // no dedup write slips through if the gate is bypassed.
+      // The carried-over profile denies the provider. Instantiating the
+      // adapter anyway must leave `isAvailable()` false and make `forward()`
+      // throw, so no dedup write slips through if registration is bypassed.
       const adapter = new mod.ThirdPartyGeocoderAdapter(
         {
           provider: "nominatim",
           endpoint: "https://nominatim.openstreetmap.org",
         },
         () => ({
-          m10ThirdPartyEnabled: false,
           m10CoarsenGridDefaultMeters: 500,
         }),
       );
@@ -155,18 +172,15 @@ async function tryForwardExpectingFailure(page: Page): Promise<string | null> {
 }
 
 test.describe("M10 v2: no plaintext dedup entries at any level @mock-api", () => {
-  // Baseline, Standard, Hardened: M10 third-party either default-on (Baseline,
-  // Standard) or user-enabled via settings override (Hardened). In all three
-  // cases a dedup write must land encrypted.
+  // Baseline, Standard, Hardened: once the user allows the provider, a dedup
+  // write must land encrypted whatever the protection level.
   const ENABLED_LEVELS = ["baseline", "standard", "hardened"] as const;
 
   for (const level of ENABLED_LEVELS) {
     test(`two identical queries hit cache exactly once and store encrypted at ${level}`, async ({
       page,
     }) => {
-      await bootAtPrivacyLevel(page, level, {
-        m10ThirdPartyEnabled: true,
-      });
+      await bootAtPrivacyLevel(page, level);
       await mockApi(page);
 
       const outbound: Array<{ url: string }> = [];
@@ -177,6 +191,7 @@ test.describe("M10 v2: no plaintext dedup entries at any level @mock-api", () =>
 
       await page.goto("/");
       await page.waitForLoadState("networkidle");
+      await allowProviderInSettings(page);
 
       // First call — outbound fetch, writes dedup entry.
       await runForwardQuery(page, HINT);
@@ -202,9 +217,21 @@ test.describe("M10 v2: no plaintext dedup entries at any level @mock-api", () =>
       expect(row!.ctUtf8).not.toContain(QUERY);
       expect(row!.ctUtf8).not.toContain("Gdansk, Pomerania, Poland");
       expect(row!.ctUtf8).not.toContain("display_name");
-      // The queryHash is a SHA-256 hex (64 chars); it is a one-way derivative
-      // of the plaintext query + coarsened coord and is not itself PII.
+      // The queryHash is an HMAC-SHA-256 hex (64 chars) under a per-install
+      // key, so a guessed query cannot be hashed to confirm it: it must not
+      // equal an unkeyed SHA-256 of the same input.
       expect(row!.queryHash).toMatch(/^[0-9a-f]{64}$/);
+      const unkeyed = await page.evaluate(
+        async ({ query, gridMeters, lat, lon, providerId }) => {
+          const payload = JSON.stringify({ query, lat, lon, gridMeters, providerId });
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+          return Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        },
+        { query: QUERY, gridMeters: row!.gridMeters, lat: HINT.lat, lon: HINT.lon, providerId: row!.providerId },
+      );
+      expect(row!.queryHash).not.toBe(unkeyed);
     });
   }
 

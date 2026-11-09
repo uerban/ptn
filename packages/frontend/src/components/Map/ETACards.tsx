@@ -1,16 +1,22 @@
 import { useCallback, useId, useMemo } from "react";
 import type { Departure, StopWithLines } from "@pt/shared";
-import { COUNTDOWN_INTERVAL_MS, POPUP_DEPARTED_CUTOFF_MINUTES } from "@pt/shared/constants";
+import { COUNTDOWN_INTERVAL_MS } from "@pt/shared/constants";
 import { useServerNow } from "../../hooks/useServerNow.ts";
-import { minutesUntil } from "../../hooks/useCountdown.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { fill } from "../../i18n/fill.ts";
 import type { EtaCardsLayout } from "../../stores/settingsStore.ts";
 import { useRegisterMapObstacle } from "../../hooks/useRegisterMapObstacle.ts";
-import { groupDeparturesByLine } from "../../utils/groupDeparturesByLine.ts";
 import type { Row, Side } from "../../services/nearbyDirections.ts";
+import { bottomStopOf, rowPills, type PillDeparture } from "../../services/nearbyDepartureRows.ts";
 import { DepartureLineBadge } from "../DepartureLineBadge.tsx";
 import { CHIPS_BOTTOM_VAR, CHIPS_RIGHT_VAR } from "./bottomControlInsets.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { useAlertedDepartures } from "../../hooks/useServiceAlertSelection.ts";
+import { usePresentationText } from "../../i18n/presentationStrings.ts";
+import { ServiceAlertIndicator } from "../ServiceAlerts/ServiceAlertIndicator.tsx";
+
+/** Whether a pill's line has an active service alert at its stop; null when none do. */
+type AlertedCheck = ((departure: Departure, stopId: string) => boolean) | null;
 
 /** Pills per row (`rows`), columns (`columns`). */
 const MAX_PILLS = 10;
@@ -36,95 +42,6 @@ interface ETACardsProps {
   layout: EtaCardsLayout;
   /** A pill was activated (click, or Enter/Space through the native button). */
   onSelect: (departure: Departure, stop: StopWithLines) => void;
-}
-
-interface PillDeparture {
-  /** Unique within the strip: stop, line, direction and headsign. */
-  key: string;
-  /** The departure this pill shows, handed back through `onSelect`. */
-  departure: Departure;
-  /** The stop it leaves from. */
-  stop: StopWithLines;
-  /** Its effective (predicted, else scheduled) instant, epoch ms. */
-  time: number;
-  /** Minutes until `time`, rounded up; ≤ 0 reads "Due". */
-  minutes: number;
-}
-
-/**
- * The soonest departure per route+headsign group of one side that has not
- * left yet. Cancelled departures and departed ones (past
- * `POPUP_DEPARTED_CUTOFF_MINUTES`) are dropped *before* grouping: this surface
- * is for "next vehicle coming", so a group shows its next run still to come,
- * and a group whose runs are all cancelled or gone shows nothing.
- *
- * Filtering after grouping would key the group on a trip nobody can take: the
- * helper's between-group sort would order it by a cancelled time, and a
- * departed first run would hide the group although its next run is minutes
- * away (tiles return departures back to ten minutes ago).
- */
-function pickNextPerGroup(side: Side, departures: Departure[], stop: StopWithLines, now: number): PillDeparture[] {
-  const pills: PillDeparture[] = [];
-  const upcoming = departures.filter(
-    (d) =>
-      !d.cancelled &&
-      minutesUntil(Date.parse(d.predictedTime ?? d.scheduledTime), now) >= POPUP_DEPARTED_CUTOFF_MINUTES,
-  );
-  for (const group of groupDeparturesByLine(upcoming)) {
-    const next = group.departures[0];
-    const time = Date.parse(next.predictedTime ?? next.scheduledTime);
-    pills.push({
-      key: `${side.stopId}::${side.routeId}::${side.dirKey}::${group.headsign}`,
-      departure: next,
-      stop,
-      time,
-      minutes: minutesUntil(time, now),
-    });
-  }
-  return pills;
-}
-
-/**
- * The pills of one row over all its sides, soonest first. The sort is stable,
- * so equal times keep side order, then group order. Not capped: each layout
- * caps what it shows.
- */
-function rowPills(
-  row: Row,
-  sides: Side[],
-  departuresBySide: Map<Side, Departure[]>,
-  stopFor: (id: string) => StopWithLines | undefined,
-  now: number,
-): PillDeparture[] {
-  const pills: PillDeparture[] = [];
-  for (const side of sides) {
-    if (side.row !== row) continue;
-    const stop = stopFor(side.stopId);
-    if (!stop) continue;
-    pills.push(...pickNextPerGroup(side, departuresBySide.get(side) ?? [], stop, now));
-  }
-  return pills.sort((a, b) => a.time - b.time);
-}
-
-/**
- * The stop that names the bottom row: the one carrying the most of its sides,
- * the first in side order on a tie. It depends on the sides only, so the
- * header does not flip as departures come and go.
- */
-function bottomStopOf(
-  sides: Side[],
-  stopFor: (id: string) => StopWithLines | undefined,
-): StopWithLines | null {
-  const counts = new Map<string, number>();
-  for (const side of sides) {
-    if (side.row !== "bottom" || !stopFor(side.stopId)) continue;
-    counts.set(side.stopId, (counts.get(side.stopId) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  for (const [id, n] of counts) {
-    if (best === null || n > counts.get(best)!) best = id;
-  }
-  return best === null ? null : stopFor(best) ?? null;
 }
 
 interface Column {
@@ -193,7 +110,11 @@ function columnsOf(top: PillDeparture[], bottom: PillDeparture[]): Column[] {
  */
 export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loading, layout, onSelect }: ETACardsProps) {
   const { t } = useTranslation();
+  const text = usePresentationText();
   const now = useServerNow(COUNTDOWN_INTERVAL_MS, !loading);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const alerted = useAlertedDepartures(cityId, !loading);
+  const alertLabel = text("serviceAlerts.indicator");
 
   const stopFor = useCallback(
     (id: string): StopWithLines | undefined =>
@@ -252,6 +173,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
           columns={columns}
           labels={{ top: topHeader, bottom: bottomHeader }}
           mainStopNames={{ top: nearestStop.name, bottom: bottomStop.name }}
+          alerted={alerted}
+          alertLabel={alertLabel}
           onSelect={onSelect}
         />
       ) : (
@@ -262,6 +185,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
               header={headed ? topHeader : null}
               mainStopName={nearestStop.name}
               pills={top.slice(0, MAX_PILLS)}
+              alerted={alerted}
+              alertLabel={alertLabel}
               onSelect={onSelect}
             />
           )}
@@ -271,6 +196,8 @@ export function ETACards({ sides, departuresBySide, nearestStop, stopInfo, loadi
               header={bottomHeader}
               mainStopName={bottomStop.name}
               pills={bottom.slice(0, MAX_PILLS)}
+              alerted={alerted}
+              alertLabel={alertLabel}
               onSelect={onSelect}
             />
           )}
@@ -286,6 +213,8 @@ interface ETAColumnsProps {
   labels: Record<Row, string>;
   /** Per row: pills leaving from a stop of another name show that name. */
   mainStopNames: Record<Row, string>;
+  alerted: AlertedCheck;
+  alertLabel: string;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
@@ -297,7 +226,7 @@ const ROWS: readonly Row[] = ["top", "bottom"];
  * by column (a route's top cell, then its bottom cell), and each pill is
  * described by its row's label, since there is no per-row group here.
  */
-function ETAColumns({ columns, labels, mainStopNames, onSelect }: ETAColumnsProps) {
+function ETAColumns({ columns, labels, mainStopNames, alerted, alertLabel, onSelect }: ETAColumnsProps) {
   const topId = useId();
   const bottomId = useId();
   const labelId: Record<Row, string> = { top: topId, bottom: bottomId };
@@ -333,6 +262,7 @@ function ETAColumns({ columns, labels, mainStopNames, onSelect }: ETAColumnsProp
                   pill={cell}
                   showStop={cell.stop.name !== mainStopNames[row]}
                   describedBy={labelId[row]}
+                  alertLabel={alerted?.(cell.departure, cell.stop.id) ? alertLabel : null}
                   onSelect={onSelect}
                 />
               )}
@@ -351,10 +281,12 @@ interface ETARowProps {
   /** Pills leaving from a stop of another name show that name. */
   mainStopName: string;
   pills: PillDeparture[];
+  alerted: AlertedCheck;
+  alertLabel: string;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
-function ETARow({ row, header, mainStopName, pills, onSelect }: ETARowProps) {
+function ETARow({ row, header, mainStopName, pills, alerted, alertLabel, onSelect }: ETARowProps) {
   const headerId = useId();
   return (
     <div
@@ -378,6 +310,7 @@ function ETARow({ row, header, mainStopName, pills, onSelect }: ETARowProps) {
             key={pill.key}
             pill={pill}
             showStop={pill.stop.name !== mainStopName}
+            alertLabel={alerted?.(pill.departure, pill.stop.id) ? alertLabel : null}
             onSelect={onSelect}
           />
         ))}
@@ -392,6 +325,8 @@ interface ETAPillProps {
   showStop: boolean;
   /** Id of the row label describing the pill (`columns`, which has no row groups). */
   describedBy?: string;
+  /** Set when the pill's line has an active service alert: the spoken mark. */
+  alertLabel?: string | null;
   onSelect: (departure: Departure, stop: StopWithLines) => void;
 }
 
@@ -402,7 +337,7 @@ interface ETAPillProps {
  * The `eta-card` test id predates the pills and is kept for the existing
  * page and component tests.
  */
-function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
+function ETAPill({ pill, showStop, describedBy, alertLabel, onSelect }: ETAPillProps) {
   const { t } = useTranslation();
   const { departure, minutes } = pill;
 
@@ -416,9 +351,10 @@ function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
     stop: pill.stop.name,
     minutes: String(minutes),
   };
-  const ariaLabel = minutes <= 0
+  const baseLabel = minutes <= 0
     ? fill(t("eta.pill_aria_due", "Line {line} toward {headsign}, from {stop}, due now"), labelValues)
     : fill(t("eta.pill_aria", "Line {line} toward {headsign}, from {stop}, in {minutes} min"), labelValues);
+  const ariaLabel = alertLabel ? `${baseLabel}, ${alertLabel}` : baseLabel;
 
   return (
     <button
@@ -438,6 +374,7 @@ function ETAPill({ pill, showStop, describedBy, onSelect }: ETAPillProps) {
         routeColor={departure.routeColor}
         className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
       />
+      {alertLabel && <ServiceAlertIndicator className="w-4 h-4 -ml-1" />}
       <div className="flex flex-col min-w-0">
         <span className="text-[10px] text-fg-muted truncate">{departure.headsign}</span>
         <span data-testid="eta-countdown" data-countdown className="text-xs font-semibold text-fg">{countdown}</span>

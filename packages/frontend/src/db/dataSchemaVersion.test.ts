@@ -337,22 +337,24 @@ async function seedRow(name: PtnTableName): Promise<void> {
         keyCount: 1,
         bytes: new ArrayBuffer(8),
       }));
+    case "cityUsageStats":
+      return void (await db.cityUsageStats.put({id: "city-stop", cityId: "vilnius", stopId: "s1", tapCount: 1, lastTapped: Date.now()}));
     case "usageStats":
       return void (await db.usageStats.put({ stopId: "s1", tapCount: 1, lastTapped: Date.now() }));
     case "recentLocations":
       return void (await db.recentLocations.put({
         id: "rl1",
-        endpoint: { lat: 0, lon: 0 } as never,
-        usedAt: Date.now(),
-        usedAsOrigin: false,
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
       }));
     case "savedLocations":
       return void (await db.savedLocations.put({
         id: "sv1",
-        endpoint: { lat: 0, lon: 0 } as never,
-        alias: "Home",
-        savedAt: Date.now(),
-        encrypted: false,
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
+      }));
+    case "personalUsage":
+      return void (await db.personalUsage.put({
+        id: "pu1",
+        sealed: { v: 1, iv: new ArrayBuffer(12), ct: new ArrayBuffer(16) },
       }));
     case "installKey":
       // Constructing a real CryptoKey is impractical in this env. The
@@ -362,3 +364,14 @@ async function seedRow(name: PtnTableName): Promise<void> {
       return;
   }
 }
+
+it("preserves explicit downloads and their transfer bytes across cache stamp changes", async () => {
+  await db.offlineCities.put({cityId: "vilnius", city: {id: "vilnius"} as never, preparedAt: 1, sizeBytes: 1, tables: {}});
+  await db.offlineCityMetadata.put({cityId: "vilnius", state: "legacy"});
+  await db.offlineTransfers.put({hash: "transfer", bytes: new Uint8Array([1, 2])});
+  localStorage.setItem(KEY, "older-cache-contract");
+  expect((await ensureDataSchemaUpToDate()).kind).toBe("wiped");
+  expect(await db.offlineCities.count()).toBe(1);
+  expect(await db.offlineCityMetadata.count()).toBe(1);
+  expect(Array.from((await db.offlineTransfers.get("transfer"))!.bytes)).toEqual([1, 2]);
+});

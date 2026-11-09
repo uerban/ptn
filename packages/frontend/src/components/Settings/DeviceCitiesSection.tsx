@@ -4,12 +4,12 @@ import {useCityStore} from "../../stores/cityStore.ts";
 import {useRtStore} from "../../stores/rtStore.ts";
 import {useGtfsDataStore} from "../../stores/gtfsDataStore.ts";
 import {listDeviceCities, removeDeviceCity, saveDeviceCity} from "../../services/deviceCities.ts";
-import type {OfflineCityRecord} from "../../db/index.ts";
+import type {OfflineCityMetadata} from "../../db/index.ts";
 
 export function DeviceCitiesSection() {
   const activeCity = useCityStore(state => state.activeCity);
   const [selected, setSelected] = useState(activeCity.id);
-  const [downloads, setDownloads] = useState<OfflineCityRecord[]>([]);
+  const [downloads, setDownloads] = useState<OfflineCityMetadata[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const refresh = () => listDeviceCities().then(setDownloads);
@@ -66,10 +66,14 @@ export function DeviceCitiesSection() {
     </select>
     <button type="button" disabled={busy} onClick={() => void download()}>Open and download</button>
     <p role="status" className="text-xs">{message}</p>
-    <ul>{downloads.map(download => <li key={download.cityId} className="text-xs py-1">
-      {download.city.name} · {(download.sizeBytes / 1_000_000).toFixed(1)} MB · {new Date(download.preparedAt).toLocaleDateString()}
-      <button type="button" disabled={busy || !getAvailableCities().some(city => city.id === download.cityId)} onClick={() => void open(download.cityId)}>Open {download.city.name}</button>
-      <button type="button" disabled={busy} onClick={() => void remove(download.cityId)}>Remove download</button>
-    </li>)}</ul>
+    <ul>{downloads.map(download => {
+      const name = getAvailableCities().find(city => city.id === download.cityId)?.name ?? download.city?.name ?? download.cityId;
+      return <li key={download.cityId} className="text-xs py-1">
+        {name}{download.sizeBytes !== undefined && ` · ${(download.sizeBytes / 1_000_000).toFixed(1)} MB`}
+        {download.preparedAt !== undefined && ` · ${new Date(download.preparedAt).toLocaleDateString()}`}
+        <button type="button" disabled={busy || !getAvailableCities().some(city => city.id === download.cityId)} onClick={() => void open(download.cityId)}>Open {name}</button>
+        <button type="button" disabled={busy} onClick={() => void remove(download.cityId)}>Remove download</button>
+      </li>;
+    })}</ul>
   </section>;
 }

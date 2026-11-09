@@ -52,6 +52,15 @@ fn city_path(city: &str) -> io::Result<&str> {
     Ok(city)
 }
 
+impl Drop for Store {
+    fn drop(&mut self) {
+        // Concurrent subprocess creation can briefly inherit this open file
+        // description before exec closes CLOEXEC descriptors. Explicit unlock
+        // ends our critical section even while such a duplicate still exists.
+        let _ = flock(&self._lock, FlockOperation::Unlock);
+    }
+}
+
 impl Store {
     fn refresh_status(&self, city: &str) -> io::Result<Option<RefreshStatus>> {
         match fs::read(
@@ -463,6 +472,22 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("manifest.json"), b"{}").unwrap();
     }
+    #[test]
+    fn dropping_writer_unlocks_inherited_file_description() {
+        let root = tempfile::tempdir().unwrap();
+        let writer = Store::open(root.path()).unwrap();
+        // dup and fork share the same lock-bearing open file description.
+        let inherited = writer._lock.try_clone().unwrap();
+        assert!(Store::open(root.path()).is_err());
+        drop(writer);
+        let next = Store::open(root.path()).unwrap();
+        drop(inherited);
+        // Closing the old duplicate must not release the new writer's lock.
+        assert!(Store::open(root.path()).is_err());
+        drop(next);
+        assert!(Store::open(root.path()).is_ok());
+    }
+
     #[test]
     fn objects_are_bounded_verified_and_repaired() {
         let dir = tempfile::tempdir().unwrap();

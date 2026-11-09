@@ -18,7 +18,6 @@ export function registerThirdPartyGeocoder(
     new ThirdPartyGeocoderAdapter(
       configFromAllowlist(providerId),
       () => ({
-        m10ThirdPartyEnabled: getPolicy().m10ThirdPartyEnabled,
         m10CoarsenGridDefaultMeters: getPolicy().m10CoarsenGridDefaultMeters,
       }),
       () => useSettingsStore.getState().thirdPartyApiKeys[providerId],

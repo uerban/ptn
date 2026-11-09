@@ -1567,18 +1567,9 @@ fn build_pack_manifest(
         }
     }
 
-    let address_path = staging_dir.join("address-search.fst");
-    if address_path.is_file() {
-        let bytes = std::fs::read(&address_path)?;
-        artifacts.push(pack_artifact(
-            "address-search",
-            "address-search.fst",
-            sha256_hex(&bytes),
-            bytes.len() as u64,
-            false,
-            "application/vnd.ptn.ptas",
-        ));
-    }
+    // Address/POI/walking artifacts have independent publication lifecycles.
+    // The local generation may still stage an address index for serving, but
+    // the downloadable transit pack must not require or distribute that extra.
 
     let feeds: Vec<PackFeed> = outcome
         .feed_records
@@ -3433,6 +3424,12 @@ mod tests {
         std::fs::write(&address, pack("Old address")).unwrap();
         let first = published(tick());
         let first_dir = dir.path().join("generations").join(&first);
+        let transit_pack: PackManifest =
+            serde_json::from_slice(&std::fs::read(first_dir.join("pack.json")).unwrap()).unwrap();
+        assert!(transit_pack
+            .artifacts
+            .iter()
+            .all(|artifact| artifact.kind != "address-search"));
         let original = std::fs::read(first_dir.join("address-search.fst")).unwrap();
         let bundle = std::fs::read(first_dir.join("bundle.ptb")).unwrap();
         std::fs::write(&address, pack("New address")).unwrap();

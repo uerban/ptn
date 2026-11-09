@@ -1,13 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db/index.ts";
+import { useCityDataQuery } from "../hooks/useCityDataQuery.ts";
 import type { StopGroupRecord } from "../db/index.ts";
 import type { Stop } from "@pt/shared";
 import { useGeolocation } from "../hooks/useGeolocation.ts";
 import { useLineClick } from "../hooks/useLineClick.ts";
 import { useCityStore } from "../stores/cityStore.ts";
-import { useSettingsStore } from "../stores/settingsStore.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
 import { FavoritesBar } from "../components/Favorites/FavoritesBar.tsx";
 import { DepartureSheet } from "../components/DepartureSheet/DepartureSheet.tsx";
@@ -15,12 +13,32 @@ import { NearbyStopsList } from "../components/Schedule/NearbyStopsList.tsx";
 import { useTranslation } from "../i18n/index.ts";
 import type { FavoritePlace } from "@pt/shared";
 import { Icon } from "../components/Icon.tsx";
+import { usePresentationText } from "../i18n/presentationStrings.ts";
 
 const FIRST_LAUNCH_KEY = "ptn-schedule-seen";
 
-export function ScheduleHome() {
+export interface ScheduleHomeProps {
+  /** Show map: opens the temporary map without changing the starting view. */
+  onShowMap: () => void;
+  /** Nearby departures above the stop list; receives the departure-sheet opener. */
+  renderNearbyDepartures?: (showStop: (stop: Stop) => void) => ReactNode;
+  /**
+   * The stop whose departure sheet is open. Pass it with `onSelectStop` to
+   * keep the selection outside this screen; without them it is kept here.
+   */
+  selectedStop?: Stop | null;
+  onSelectStop?: (stop: Stop | null) => void;
+}
+
+export function ScheduleHome({
+  onShowMap,
+  renderNearbyDepartures,
+  selectedStop: controlledStop,
+  onSelectStop,
+}: ScheduleHomeProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const text = usePresentationText();
   const activeCity = useCityStore((s) => s.activeCity);
   const cityId = activeCity.id;
 
@@ -34,7 +52,7 @@ export function ScheduleHome() {
   useCityGtfsLifecycle(cityId);
 
   // Load stop groups from IndexedDB (schedule mode uses IndexedDB, not API preloader)
-  const stopGroups = useLiveQuery(() => db.stopGroups.toArray(), []) ?? [];
+  const stopGroups = useCityDataQuery(data => data.stopGroups.toArray(), []) ?? [];
 
   // First-launch hint
   const [showHint, setShowHint] = useState<boolean>(
@@ -47,7 +65,10 @@ export function ScheduleHome() {
   }, []);
 
   // Selected stop for departure sheet
-  const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+  const [localStop, setLocalStop] = useState<Stop | null>(null);
+  const controlled = onSelectStop !== undefined;
+  const selectedStop = controlled ? (controlledStop ?? null) : localStop;
+  const setSelectedStop = controlled ? onSelectStop : setLocalStop;
   // Line view integration (used by DepartureSheet internally)
   const { cancel: cancelLineLoad } = useLineClick();
 
@@ -62,12 +83,12 @@ export function ScheduleHome() {
       location: { lat: group.lat, lon: group.lon },
     };
     setSelectedStop(stop);
-  }, [cancelLineLoad]);
+  }, [cancelLineLoad, setSelectedStop]);
 
   const handleSheetClose = useCallback(() => {
     cancelLineLoad();
     setSelectedStop(null);
-  }, [cancelLineLoad]);
+  }, [cancelLineLoad, setSelectedStop]);
 
   const handleFavoriteClick = useCallback(
     (fav: FavoritePlace) => {
@@ -84,11 +105,11 @@ export function ScheduleHome() {
         );
       }
     },
-    [navigate],
+    [navigate, setSelectedStop],
   );
 
   return (
-    <main aria-label={t("schedule.main", "Schedule view")} className="flex flex-col h-full bg-surface overflow-hidden">
+    <section aria-label={text("presentation.textMode")} className="flex flex-col h-full bg-surface overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-4 pt-safe-top pt-4 pb-3 border-b border-divider bg-surface-raised">
         <span className="text-base font-semibold text-fg" data-testid="city-name">
@@ -105,7 +126,8 @@ export function ScheduleHome() {
           </button>
           <button
             type="button"
-            onClick={() => useSettingsStore.getState().setScheduleMode(false)}
+            onClick={onShowMap}
+            data-return-focus="show-map"
             className="p-2 rounded-lg border border-divider hover:bg-surface-overlay"
             aria-label={t("schedule.show_map", "Show map")}
             title={t("schedule.show_map", "Show map")}
@@ -159,6 +181,8 @@ export function ScheduleHome() {
           <FavoritesBar onFavoriteClick={handleFavoriteClick} />
         </nav>
 
+        {renderNearbyDepartures?.(setSelectedStop)}
+
         {/* Nearby stops */}
         <section aria-label={t("schedule.nearby", "Nearby stops")}>
           <NearbyStopsList
@@ -180,6 +204,6 @@ export function ScheduleHome() {
           />
         </div>
       )}
-    </main>
+    </section>
   );
 }

@@ -133,6 +133,8 @@ function arriveByExperimentAliases() {
   ];
 }
 
+const REFERRER_POLICY_HEADERS = { "Referrer-Policy": "strict-origin" };
+
 export default defineConfig({
   customLogger: logger,
   resolve: {
@@ -297,7 +299,14 @@ export default defineConfig({
     exclude: ["brotli-dec-wasm"],
   },
 
+  // Page addresses can name stops, lines and coordinates. The deployment
+  // sends the same header (examples/native/Caddyfile); index.html carries it
+  // as a meta tag for hosts that do not.
+  preview: {
+    headers: REFERRER_POLICY_HEADERS,
+  },
   server: {
+    headers: REFERRER_POLICY_HEADERS,
     proxy: {
       // The POI route is intentionally cityless; preserve its path before the
       // generic /api/<transit-city>/ prefix rewrite below.

@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import {
   nearestStopCentroid,
   useStopPreloader,
 } from "../../src/hooks/useStopPreloader.ts";
+import {CityDataContext, useCityDataStore} from "../../src/services/cityData.ts";
 import type { StopWithLines } from "@pt/shared";
 
 const upsertStopsMock = vi.fn().mockResolvedValue(undefined);
 const overlayBundleStopsMock = vi.fn().mockResolvedValue(undefined);
 const reportErrorMock = vi.fn();
 let cachedStops: StopWithLines[] = [];
+let activeCityId = "vilnius";
 
 vi.mock("../../src/services/api.ts", () => ({
   api: {
@@ -50,18 +52,24 @@ vi.mock("../../src/stores/stopStore.ts", () => ({
 
 vi.mock("../../src/stores/cityStore.ts", () => ({
   useCityStore: Object.assign(
-    (selector: any) => selector({ activeCity: { id: "vilnius", name: "Vilnius" } }),
-    { getState: () => ({ activeCity: { id: "vilnius", name: "Vilnius" } }) },
+    (selector: any) => selector({ activeCity: { id: activeCityId, name: activeCityId } }),
+    { getState: () => ({ activeCity: { id: activeCityId, name: activeCityId } }) },
   ),
 }));
 
 import { api, HttpError } from "../../src/services/api.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 
 describe("useStopPreloader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    activeCityId = "vilnius";
+    useCityDataStore.setState({active: null});
+    upsertStopsMock.mockResolvedValue(undefined);
     usePrivacyStore.getState().reset();
+    resetFlows();
+    allowFlow("operator.nearby-stop-centroid");
     cachedStops = [
       {
         id: "public-centroid",
@@ -70,6 +78,45 @@ describe("useStopPreloader", () => {
         lines: [],
       },
     ];
+  });
+
+  it("paints an arriving local catalog while the API request is stalled", async () => {
+    cachedStops = [];
+    vi.mocked(api.getAllStops).mockReturnValueOnce(new Promise(() => {}));
+    const {unmount} = renderHook(() => useStopPreloader(null));
+    expect(overlayBundleStopsMock).not.toHaveBeenCalled();
+    const context = new CityDataContext({
+      meta: {cityId: "vilnius", generatedAt: "2026-11-07", cityTzIana: "UTC"},
+      stops: [], routes: [], calendar: [],
+    }, {id: "current", cityId: "vilnius", generationId: "local", etag: "local", generatedAt: "2026-11-07", lastSynced: 1});
+    act(() => { useCityDataStore.setState({active: context}); });
+    await waitFor(() => expect(overlayBundleStopsMock).toHaveBeenCalledTimes(1));
+    expect(upsertStopsMock).not.toHaveBeenCalled();
+    unmount();
+    useCityDataStore.setState({active: null});
+  });
+
+  it("reloads A after B paints but its stop persistence is still pending", async () => {
+    vi.mocked(api.getAllStops).mockResolvedValue({data: [{
+      id: "reused", name: "Stop", location: {lat: 54.68, lon: 25.28},
+    }]} as Awaited<ReturnType<typeof api.getAllStops>>);
+    let finishB!: () => void;
+    upsertStopsMock.mockImplementation((_stops, options) => options.cityId === "krakow"
+      ? new Promise<void>(resolve => { finishB = resolve; }) : Promise.resolve());
+    const {rerender} = renderHook(() => useStopPreloader(null));
+    await waitFor(() => expect(upsertStopsMock).toHaveBeenCalledTimes(1));
+    // Let A finish marking its successful load before visiting B.
+    await Promise.resolve();
+    activeCityId = "krakow";
+    rerender();
+    await waitFor(() => expect(upsertStopsMock).toHaveBeenCalledTimes(2));
+    activeCityId = "vilnius";
+    rerender();
+    await waitFor(() => expect(api.getAllStops).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(upsertStopsMock).toHaveBeenCalledTimes(3));
+    finishB();
+    await Promise.resolve();
+    expect(upsertStopsMock.mock.calls[2][1].cityId).toBe("vilnius");
   });
 
   it("calls getNearbyStops with the nearest public centroid, never GPS", async () => {
@@ -127,11 +174,27 @@ describe("useStopPreloader", () => {
     await waitFor(() => expect(api.getNearbyStops).toHaveBeenCalledTimes(2));
   });
 
-  it("skips the nearby endpoint when the policy is local-only", async () => {
-    await usePrivacyStore.getState().setLevel("hardened");
+  it.each([
+    ["unset", () => resetFlows()],
+    ["denied", () => denyFlow("operator.nearby-stop-centroid")],
+  ])("skips the nearby endpoint while the lookup is %s", async (_name, apply) => {
+    apply();
     renderHook(() => useStopPreloader({ lat: 54.68123, lon: 25.28456 }, 1));
     await Promise.resolve();
     expect(api.getNearbyStops).not.toHaveBeenCalled();
+  });
+
+  it("asks again after the lookup is allowed", async () => {
+    resetFlows();
+    const { rerender } = renderHook(({ requestId }) =>
+      useStopPreloader({ lat: 54.68123, lon: 25.28456 }, requestId), {
+      initialProps: { requestId: 1 },
+    });
+    await Promise.resolve();
+    expect(api.getNearbyStops).not.toHaveBeenCalled();
+    allowFlow("operator.nearby-stop-centroid");
+    rerender({ requestId: 2 });
+    await waitFor(() => expect(api.getNearbyStops).toHaveBeenCalledTimes(1));
   });
 
   it("skips the nearby endpoint on a cold cache", async () => {
@@ -141,14 +204,14 @@ describe("useStopPreloader", () => {
     expect(api.getNearbyStops).not.toHaveBeenCalled();
   });
 
-  it("re-reads policy before a retry after the level becomes stricter", async () => {
+  it("re-reads the decision before a retry after it is revoked", async () => {
     vi.useFakeTimers();
     (api.getNearbyStops as any).mockRejectedValue(new Error("temporary"));
     renderHook(() => useStopPreloader({ lat: 54.68123, lon: 25.28456 }, 1));
 
     await vi.advanceTimersByTimeAsync(0);
     expect(api.getNearbyStops).toHaveBeenCalledTimes(1);
-    await usePrivacyStore.getState().setLevel("hardened");
+    denyFlow("operator.nearby-stop-centroid");
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(api.getNearbyStops).toHaveBeenCalledTimes(1);

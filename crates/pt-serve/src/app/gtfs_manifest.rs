@@ -27,6 +27,14 @@
 //! a compact re-serialisation. See `pt_shared::js_json` for what that costs
 //! to reproduce exactly.
 //!
+//! ## Realtime availability
+//!
+//! [`gtfs_manifest_with_realtime`] adds `X-PT-Realtime` to the 200 and 304:
+//! the GTFS-RT kinds this process is configured to serve (`departures`,
+//! `alerts`), computed once at startup, or an empty value. It is a header,
+//! not a body field, so the body stays the producer's manifest and the ETag
+//! stays that file's hash. It describes configuration, not feed health.
+//!
 //! ## Deliberate divergences from Node
 //!
 //! - **No previous-good hash on the 503.** Node's `getLastKnownBundleHash`
@@ -42,13 +50,36 @@
 //!   to the accepted divergence already documented on
 //!   [`crate::app::schedule_tile`].
 
-use crate::app::response::{ByteBody, Resp};
+use crate::app::response::{if_none_match_hits, ByteBody, Resp};
 use crate::bundle::Generation;
 use std::sync::Arc;
 
 /// Node's cold-start reply, byte-for-byte (`routes/gtfsManifest.ts`).
 const MANIFEST_UNAVAILABLE_BODY: &str =
     r#"{"error":{"code":"MANIFEST_UNAVAILABLE","message":"No bundle has been published yet"}}"#;
+
+/// Must stay byte-identical to `REALTIME_HEADER` in
+/// `packages/shared/src/types/scheduleTile.ts`.
+pub const REALTIME_HEADER: &str = "X-PT-Realtime";
+
+/// [`gtfs_manifest`] plus the `X-PT-Realtime` header on its 200 and 304.
+/// The 503 is left alone: there is no manifest for the header to describe.
+pub fn gtfs_manifest_with_realtime(
+    gen: &Generation,
+    if_none_match: Option<&str>,
+    realtime: &str,
+) -> Resp {
+    let inner = gtfs_manifest(gen, if_none_match);
+    match inner {
+        Resp::WithBundleHash {
+            status: 200 | 304, ..
+        } => Resp::WithHeaders {
+            inner: Box::new(inner),
+            headers: vec![(REALTIME_HEADER, realtime.to_string())],
+        },
+        other => other,
+    }
+}
 
 pub fn gtfs_manifest(gen: &Generation, if_none_match: Option<&str>) -> Resp {
     // `gtfs_manifest_response` and `schedule_tile_manifest` are populated
@@ -71,7 +102,7 @@ pub fn gtfs_manifest(gen: &Generation, if_none_match: Option<&str>) -> Resp {
         };
     };
 
-    if if_none_match == Some(response.etag.as_str()) {
+    if if_none_match_hits(if_none_match, &response.etag) {
         // Node's 304 carries ETag + X-PT-Bundle-Hash only: no Cache-Control,
         // no Vary.
         return Resp::WithBundleHash {

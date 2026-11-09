@@ -1,29 +1,27 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+import { rawStorageDump, rowShapes } from "../helpers/raw-storage";
 
 /**
- * M8c T-17 — favorites → savedLocations migration E2E.
+ * Favorites → saved places migration.
  *
- * Seeds the legacy `ptn-favorites` localStorage envelope (and the
- * `enableFavoritesMigration` flag on `ptn-settings`) via `addInitScript` so
- * both are present before the first boot, then runs the real migration
- * service via a dynamic import and asserts:
- *   1. every legacy entry lands in `savedLocations`,
- *   2. rows that originated from `home`/`work` are encrypted (no plaintext
- *      label leaks into `endpoint`), and `stop`/`place` rows are plaintext,
+ * Seeds the legacy `ptn-favorites` localStorage envelope in plaintext (and
+ * the `enableFavoritesMigration` flag on `ptn-settings`) via `addInitScript`
+ * so both are present before the first boot. The app encrypts the envelope
+ * at start-up; the spec then runs the real migration service via a dynamic
+ * import and asserts:
+ *   1. every legacy entry lands in `savedLocations` with its label and kind,
+ *   2. stored rows hold only an id and a sealed payload, and no label or
+ *      coordinate appears anywhere in IndexedDB or localStorage,
  *   3. the legacy `ptn-favorites` key is removed once writes succeed.
- *
- * The migration isn't wired into app boot yet (it's flag-gated until this
- * spec lands), so we invoke it directly via dynamic import — same pattern as
- * `install-key-destruction.spec.ts`.
  *
  * Tagged @mock-api because it boots the real app against deterministic
  * fixtures (required for `/src/...` dynamic imports served by Vite).
  */
 
 const FAVORITES_MIGRATION_MODULE_URL = "/src/services/favoritesMigration.ts";
-const CRYPTO_BOX_MODULE_URL = "/src/services/cryptoBox.ts";
-const INSTALL_KEY_MODULE_URL = "/src/services/installKey.ts";
+const SAVES_MODULE_URL = "/src/services/saves.ts";
+const SENSITIVE = ["Dom", "Biuro", "Central", "Rynek", "S-42", "54.35", "54.37"];
 
 interface SeededFavorite {
   id: string;
@@ -111,88 +109,20 @@ async function runMigration(page: Page): Promise<{
   }, FAVORITES_MIGRATION_MODULE_URL);
 }
 
-interface SavedRow {
+interface ResolvedRow {
   id: string;
   alias: string;
-  encrypted: boolean;
-  endpointJson: string;
-  endpointKind?: string;
-  endpointLabel?: string;
-  decryptedLabel?: string;
-  decryptedLat?: number;
-  decryptedLon?: number;
+  placeType?: string;
+  origin: { kind: string; label?: string; name?: string; stopId?: string; lat: number };
 }
 
-async function readSavedRows(page: Page): Promise<SavedRow[]> {
-  return await page.evaluate(
-    async ({ cryptoUrl, keyUrl }) => {
-      const crypto = (await import(/* @vite-ignore */ cryptoUrl)) as {
-        decrypt: (
-          rec: { iv: ArrayBuffer; ct: ArrayBuffer },
-          key: CryptoKey,
-        ) => Promise<unknown>;
-      };
-      const installKey = (await import(/* @vite-ignore */ keyUrl)) as {
-        getOrCreateInstallKey: () => Promise<CryptoKey>;
-      };
-
-      return await new Promise<SavedRow[]>((resolve, reject) => {
-        const req = indexedDB.open("ptn");
-        req.onsuccess = async () => {
-          try {
-            const idb = req.result;
-            const tx = idb.transaction("savedLocations", "readonly");
-            const store = tx.objectStore("savedLocations");
-            const all = await new Promise<unknown[]>((res, rej) => {
-              const r = store.getAll();
-              r.onsuccess = () => res(r.result as unknown[]);
-              r.onerror = () => rej(r.error);
-            });
-            const key = await installKey.getOrCreateInstallKey();
-            const rows: SavedRow[] = [];
-            for (const raw of all) {
-              const row = raw as {
-                id: string;
-                alias: string;
-                encrypted: boolean;
-                endpoint:
-                  | { kind: string; label?: string }
-                  | { iv: ArrayBuffer; ct: ArrayBuffer };
-              };
-              const endpointJson = JSON.stringify(row.endpoint);
-              const out: SavedRow = {
-                id: row.id,
-                alias: row.alias,
-                encrypted: row.encrypted,
-                endpointJson,
-              };
-              if (row.encrypted) {
-                const decoded = (await crypto.decrypt(
-                  row.endpoint as { iv: ArrayBuffer; ct: ArrayBuffer },
-                  key,
-                )) as { kind: string; label?: string; lat: number; lon: number };
-                out.decryptedLabel = decoded.label;
-                out.decryptedLat = decoded.lat;
-                out.decryptedLon = decoded.lon;
-                out.endpointKind = decoded.kind;
-              } else {
-                const ep = row.endpoint as { kind: string; label?: string };
-                out.endpointKind = ep.kind;
-                out.endpointLabel = ep.label;
-              }
-              rows.push(out);
-            }
-            idb.close();
-            resolve(rows);
-          } catch (e) {
-            reject(e);
-          }
-        };
-        req.onerror = () => reject(req.error);
-      });
-    },
-    { cryptoUrl: CRYPTO_BOX_MODULE_URL, keyUrl: INSTALL_KEY_MODULE_URL },
-  );
+async function readSaves(page: Page): Promise<ResolvedRow[]> {
+  return await page.evaluate(async (moduleUrl) => {
+    const mod = (await import(/* @vite-ignore */ moduleUrl)) as {
+      listSaves: () => Promise<ResolvedRow[]>;
+    };
+    return await mod.listSaves();
+  }, SAVES_MODULE_URL);
 }
 
 async function readLegacyFavoritesKey(page: Page): Promise<string | null> {
@@ -211,44 +141,31 @@ test.describe("Migration: favorites → savedLocations @mock-api", () => {
       timeout: 20_000,
     });
 
-    // Sanity: seeded envelope is present before the migration runs.
+    // The envelope is still there, but encrypted at start-up.
     const preLegacy = await readLegacyFavoritesKey(page);
     expect(preLegacy).not.toBeNull();
+    expect(preLegacy).not.toContain("Dom");
 
     const result = await runMigration(page);
     expect(result.skipped).toBe(false);
     expect(result.migrated).toBe(SEED_FAVORITES.length);
     expect(result.legacyCleared).toBe(true);
 
-    const rows = await readSavedRows(page);
-    expect(rows).toHaveLength(SEED_FAVORITES.length);
-    const byId = new Map(rows.map((r) => [r.id, r]));
+    const shapes = await rowShapes(page, "savedLocations");
+    expect(shapes).toHaveLength(SEED_FAVORITES.length);
+    for (const shape of shapes) expect(shape).toEqual(["id", "sealed"]);
+    const raw = await rawStorageDump(page);
+    for (const needle of SENSITIVE) expect(raw).not.toContain(needle);
 
-    const homeRow = byId.get("fav-home")!;
-    expect(homeRow.encrypted).toBe(true);
-    // Ciphertext must not leak the plaintext alias.
-    expect(homeRow.endpointJson).not.toContain("Dom");
-    expect(homeRow.decryptedLabel).toBe("Dom");
-    expect(homeRow.decryptedLat).toBeCloseTo(54.35);
-
-    const workRow = byId.get("fav-work")!;
-    expect(workRow.encrypted).toBe(true);
-    expect(workRow.endpointJson).not.toContain("Biuro");
-    expect(workRow.decryptedLabel).toBe("Biuro");
-
-    const stopRow = byId.get("fav-stop")!;
-    expect(stopRow.encrypted).toBe(false);
-    expect(stopRow.endpointKind).toBe("stop");
-    expect(stopRow.alias).toBe("Central");
-
-    const placeRow = byId.get("fav-place")!;
-    expect(placeRow.encrypted).toBe(false);
-    expect(placeRow.endpointKind).toBe("geocoded");
-    expect(placeRow.endpointLabel).toBe("Rynek");
+    const byId = new Map((await readSaves(page)).map((r) => [r.id, r]));
+    expect(byId.get("fav-home")).toMatchObject({ alias: "Dom", placeType: "home" });
+    expect(byId.get("fav-home")!.origin.lat).toBeCloseTo(54.35);
+    expect(byId.get("fav-work")!.origin.label).toBe("Biuro");
+    expect(byId.get("fav-stop")!.origin).toMatchObject({ kind: "stop", stopId: "S-42" });
+    expect(byId.get("fav-place")!.origin).toMatchObject({ kind: "geocoded", label: "Rynek" });
 
     // Legacy key is removed only after every row is written.
-    const postLegacy = await readLegacyFavoritesKey(page);
-    expect(postLegacy).toBeNull();
+    expect(await readLegacyFavoritesKey(page)).toBeNull();
   });
 
   test("with flag OFF, migration is skipped and legacy key is preserved", async ({
@@ -268,8 +185,9 @@ test.describe("Migration: favorites → savedLocations @mock-api", () => {
 
     const postLegacy = await readLegacyFavoritesKey(page);
     expect(postLegacy).not.toBeNull();
+    // Kept, but encrypted.
+    expect(postLegacy).not.toContain("Dom");
     // `savedLocations` stays empty because the flag was off.
-    const rows = await readSavedRows(page);
-    expect(rows).toHaveLength(0);
+    expect(await readSaves(page)).toHaveLength(0);
   });
 });

@@ -257,10 +257,10 @@ export function pairKey(name: string): string {
  *  - Otherwise `dirsAgree` is whether every serving segment's travel direction
  *    is within ±90° of the first (dot ≥ 0) → `deriveSide` branch (b)/(c).
  */
-export function deriveStopHints(
+function* stopHintEntries(
   stops: StopLike[],
   shapesByStopId: Map<string, LatLon[][]>,
-): Map<string, StopHint> {
+): Generator<[string, StopHint]> {
   // First group by normalized name and parent station. Unparented same-name
   // stops still need a proximity split: otherwise two unrelated "Centras"
   // stops anywhere in the city become siblings and point cards across town.
@@ -308,13 +308,12 @@ export function deriveStopHints(
     }
   }
 
-  const out = new Map<string, StopHint>();
   for (const stop of stops) {
     const group = physicalGroupByStopId.get(stop.id) ?? [stop];
     const isPair = group.length === 2;
     const t = nearestSegmentTangent(stop.location, shapesByStopId.get(stop.id) ?? []);
     if (!t) {
-      out.set(stop.id, { side: null });
+      yield [stop.id, { side: null }];
       continue;
     }
 
@@ -341,10 +340,33 @@ export function deriveStopHints(
       side = deriveSide({ travelDir: t.travelDir, dirsAgree });
     }
 
-    out.set(stop.id, { side });
+    yield [stop.id, { side }];
   }
+}
 
-  return out;
+/** Synchronous geometry seam for small callers and pure geometry tests. */
+export function deriveStopHints(stops: StopLike[], shapesByStopId: Map<string, LatLon[][]>): Map<string, StopHint> {
+  return new Map(stopHintEntries(stops, shapesByStopId));
+}
+
+/** Optional placement work must let map rendering and city changes run.
+ * Keep complete physical groups, but yield after about 4 ms of stop geometry.
+ * Publish only the complete result; aborted runs never expose partial hints. */
+export async function deriveStopHintsAsync(stops: StopLike[], shapesByStopId: Map<string, LatLon[][]>,
+  signal: AbortSignal): Promise<Map<string, StopHint>> {
+  const result = new Map<string, StopHint>();
+  let batchStart = performance.now();
+  signal.throwIfAborted();
+  for (const [id, hint] of stopHintEntries(stops, shapesByStopId)) {
+    signal.throwIfAborted();
+    result.set(id, hint);
+    if (performance.now() - batchStart >= 4) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      signal.throwIfAborted();
+      batchStart = performance.now();
+    }
+  }
+  return result;
 }
 
 /**

@@ -22,6 +22,7 @@ import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
+import { ServiceAlertTripNotes } from "../ServiceAlerts/ServiceAlertTripNotes.tsx";
 
 interface Props {
   itineraries: Itinerary[];
@@ -111,6 +112,7 @@ export function RouteResultsAccessible({
             ) : (
               it.timingUnreliable === true && <RtWarningBanner reason="unreliable" />
             )}
+            <ServiceAlertTripNotes itinerary={it} />
             <AccessibleCard
               it={it}
               fastest={i === 0}

@@ -3,6 +3,7 @@ import type { PrivacyPolicy } from "./privacy.js";
 export const PRIVACY_DATA_FLOW_IDS = [
   "operator.transit-data",
   "operator.realtime",
+  "operator.service-alerts",
   "operator.nearby-stop-centroid",
   "external.detailed-basemap",
   "operator.place-search",
@@ -11,6 +12,7 @@ export const PRIVACY_DATA_FLOW_IDS = [
   "operator.remote-routing",
   "external.remote-routing",
   "operator.client-report",
+  "external.bike-share",
 ] as const;
 
 export type PrivacyDataFlowId = (typeof PRIVACY_DATA_FLOW_IDS)[number];
@@ -21,7 +23,7 @@ export type PrivacyFlowTrigger =
   | "standing-choice"
   | "explicit-action";
 export type PrivacyFlowStatus = "active" | "not-shared" | "unavailable";
-export type PrivacyProviderKind = "basemap" | "geocoder" | "routing";
+export type PrivacyProviderKind = "basemap" | "geocoder" | "routing" | "bike-share";
 export type PrivacyNetworkPath =
   | "none"
   | "operator"

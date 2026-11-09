@@ -17,6 +17,48 @@ import type { Bbox } from "../poi/tileKey.js";
 export const BUNDLE_HASH_HEADER = "X-PT-Bundle-Hash";
 
 /**
+ * Per-city realtime availability, carried on `GET /api/<city>/gtfs/manifest`
+ * 200 and 304 responses from both serving planes. The value is a
+ * comma-separated list of {@link RealtimeKind} tokens naming the GTFS-RT feeds
+ * the server has configured for the city (for example `departures, alerts`),
+ * or empty when none are. It describes configuration, not feed health.
+ *
+ * Kept out of the manifest body so the body and its ETag stay the producer's
+ * bytes.
+ */
+export const REALTIME_HEADER = "X-PT-Realtime";
+
+/** Realtime kinds a server can announce in {@link REALTIME_HEADER}. */
+export const REALTIME_KINDS = ["departures", "alerts"] as const;
+export type RealtimeKind = (typeof REALTIME_KINDS)[number];
+
+function isRealtimeKind(token: string): token is RealtimeKind {
+  return (REALTIME_KINDS as readonly string[]).includes(token);
+}
+
+/**
+ * Parse a {@link REALTIME_HEADER} value. Tokens are trimmed and matched
+ * case-insensitively; unknown tokens are ignored so a newer server can announce
+ * kinds an older client does not know. A missing header parses as no kinds.
+ * The result is deduplicated and in {@link REALTIME_KINDS} order.
+ */
+export function parseRealtimeHeader(value: string | null | undefined): RealtimeKind[] {
+  if (!value) return [];
+  const seen = new Set<RealtimeKind>();
+  for (const raw of value.split(",")) {
+    const token = raw.trim().toLowerCase();
+    if (isRealtimeKind(token)) seen.add(token);
+  }
+  return REALTIME_KINDS.filter((kind) => seen.has(kind));
+}
+
+/** Format kinds as a {@link REALTIME_HEADER} value (canonical order, no duplicates). */
+export function formatRealtimeHeader(kinds: Iterable<RealtimeKind>): string {
+  const set = new Set(kinds);
+  return REALTIME_KINDS.filter((kind) => set.has(kind)).join(", ");
+}
+
+/**
  * Decoded schedule tile.
  *
  * Stop-major columnar layout: each stop has parallel `(tripIxs, departureSecs)`

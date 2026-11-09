@@ -27,6 +27,14 @@ export type MicromapRoadClass = (typeof MICROMAP_ROAD_CLASSES)[number];
 export const MICROMAP_WATERWAY_CLASSES = ["river", "canal", "stream"] as const;
 export type MicromapWaterwayClass = (typeof MICROMAP_WATERWAY_CLASSES)[number];
 
+/**
+ * What a micromap artifact can draw, one entry per content field of
+ * `MicromapArtifact`. Settings describes the minimal map from this list, so
+ * the description follows the artifact rather than a hand-written guess.
+ */
+export const MICROMAP_LAYERS = ["water", "green", "waterways", "roads", "places"] as const;
+export type MicromapLayer = (typeof MICROMAP_LAYERS)[number];
+
 export interface MicromapArea {
   /** Encoded rings; `r[0]` is the outer ring, `r[1..]` are holes. */
   r: string[];

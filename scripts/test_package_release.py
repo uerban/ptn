@@ -110,7 +110,11 @@ class ArchiveContents(unittest.TestCase):
                 "release-builder/packages/backend/scripts/extract-addr-fixture.mjs": "extractor",
                 "examples/native/gtfs.py": "recipe runtime",
                 "examples/native/host.py": "host",
+                "examples/native/prebuilt.py": "prebuilt adapter",
+                "examples/native/prebuilt.md": "prebuilt guide",
+                "examples/native/config.prebuilt.example.json": "prebuilt configuration",
                 "examples/VALIDATION.md": "validation",
+                "scripts/verify-transit-installation.py": "transit acceptance harness",
                 "docs/release-platforms.md": "platforms",
                 "docs/gtfs-sources.md": "sources",
                 "docs/runtime-cities.md": "runtime city discovery",
@@ -120,10 +124,12 @@ class ArchiveContents(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
+            for filename in package.TRANSIT_DOCS:
+                (root / "docs" / filename).write_text("transit guide")
             with patch.object(package, "ROOT", root), patch.object(sys, "argv", ["package-release.py", "--platform", "linux-x86_64", "--bin-dir", str(binaries), "--out", str(root / "out")]), patch.object(package.subprocess, "check_output", side_effect=["a" * 40, b""]), patch("builtins.print"):
                 package.main()
             with tarfile.open(root / "out/ptn-linux-x86_64.tar.gz") as archive:
                 checksums = archive.extractfile("ptn-linux-x86_64/SHA256SUMS").read().decode()
-                for relative in ["examples/native/gtfs.py", "docs/gtfs-sources.md"]:
+                for relative in ["scripts/verify-transit-installation.py", "examples/native/gtfs.py", "examples/native/prebuilt.py", "examples/native/prebuilt.md", "examples/native/config.prebuilt.example.json", "docs/gtfs-sources.md", *["bin/" + name for name in package.BINARIES], *["docs/" + name for name in package.TRANSIT_DOCS]]:
                     content = archive.extractfile("ptn-linux-x86_64/" + relative).read()
                     self.assertIn(hashlib.sha256(content).hexdigest() + "  " + relative, checksums)

@@ -2,14 +2,22 @@ import type {
   GeocoderAdapter,
   GeocoderCandidate,
   LatLon,
-  PrivacyPolicy,
+  ProtectionPolicy,
   SelfHostedGeocoderConfig,
 } from "@pt/shared";
 import type { AddressSearchResponse } from "@pt/shared/address-search";
 import { coarsen } from "../coordPrivacy.ts";
 import { assertNoPrecisionLeak, formatCoord } from "./fetchThirdParty.ts";
+import { canUse } from "../../privacy/canUse.ts";
 
-type PolicySlice = Pick<PrivacyPolicy, "m9SelfHosted" | "m10CoarsenGridDefaultMeters">;
+type PolicySlice = Pick<
+  ProtectionPolicy,
+  "m10CoarsenGridFloorMeters" | "m10CoarsenGridDefaultMeters"
+>;
+
+/** A protection level whose coarsening floor reaches this (Hardened and
+ * above) coarsens every operator geocoder query, not only multi-tenant ones. */
+const ALWAYS_COARSEN_FLOOR_METERS = 50;
 
 function resolveUrl(path: string): URL {
   if (/^https?:\/\//.test(path)) return new URL(path);
@@ -34,13 +42,15 @@ export class SelfHostedGeocoderAdapter implements GeocoderAdapter {
   readonly id = "self-hosted" as const;
   readonly privacyTier = "self-hosted" as const;
 
+  /** `isAllowed` resolves `operator.place-search` at every query. */
   constructor(
     private readonly config: SelfHostedGeocoderConfig,
     private readonly getPolicy: () => PolicySlice,
+    private readonly isAllowed: () => boolean = () => canUse("operator.place-search"),
   ) {}
 
   isAvailable(): boolean {
-    return this.getPolicy().m9SelfHosted !== "disabled";
+    return this.isAllowed();
   }
 
   async forward(
@@ -73,7 +83,7 @@ export class SelfHostedGeocoderAdapter implements GeocoderAdapter {
 
   private shouldCoarsen(): boolean {
     const policy = this.getPolicy();
-    if (policy.m9SelfHosted === "always-coarsen") return true;
+    if (policy.m10CoarsenGridFloorMeters >= ALWAYS_COARSEN_FLOOR_METERS) return true;
     if (this.config.multiTenant) return true;
     return false;
   }

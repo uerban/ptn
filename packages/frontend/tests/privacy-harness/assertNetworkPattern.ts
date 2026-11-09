@@ -17,6 +17,7 @@ export type RequestKind =
   | "catalog-ready"
   | "color-config"
   | "health"
+  | "service-alerts"
   | "other";
 
 export interface ExpectedPattern {
@@ -58,6 +59,8 @@ const KIND_MATCHERS: Array<{ kind: RequestKind; test: (url: string) => boolean }
   { kind: "catalog-ready", test: (u) => /\/api\/[^/]+\/ready(\?|$)/.test(u) },
   { kind: "color-config", test: (u) => /\/api\/[^/]+\/color-config/.test(u) },
   { kind: "health", test: (u) => /\/api\/[^/]+\/health/.test(u) },
+  // City-wide service alerts: off until recommended setup or a grant.
+  { kind: "service-alerts", test: (u) => /\/api\/[^/]+\/alerts(\?|$)/.test(u) },
   // Reverse before forward: reverse-geocode URLs typically include `?lat=`+`lon=`,
   // forward URLs include `?q=` / `?text=`. Order matters for tiles vs geocode
   // when a provider muxes endpoints.

@@ -3,7 +3,9 @@
 //! Pure in-memory state for the GTFS-RT poller: per-feed health tracking,
 //! last-good-on-failure retention, and multi-feed merge. Mirrors the
 //! non-network parts of `packages/backend/src/gtfs/realtime.ts`'s
-//! `GtfsRealtimePoller` class.
+//! `GtfsRealtimePoller` class. [`FeedPoller`] is generic over what a feed
+//! decodes into, so TripUpdates ([`RtPoller`]) and ServiceAlerts
+//! (`rt::alerts`) share the same health and retention rules.
 //!
 //! **No network I/O lives here.** [`RtPoller::apply_fetch_result`] is the
 //! seam a future fetch layer calls after making the actual HTTP request —
@@ -43,19 +45,51 @@ pub enum PollerConfigError {
     EmptyStringInUrls,
 }
 
+/// What one feed's body decodes into. The poller keeps the last good value
+/// per feed; the type decides how a body parses and what counts as an entry
+/// in `/health/rt`.
+pub trait FeedPayload: Sized {
+    /// Decode one fetched body. `Err` is the operator-readable reason stored
+    /// in [`FeedHealth::last_error`].
+    fn parse(bytes: &[u8]) -> Result<Self, String>;
+    /// Entries reported as [`FeedHealth::entry_count`].
+    fn entry_count(&self) -> usize;
+}
+
+/// A TripUpdates feed: `{tripId -> TripUpdate}` plus dated keys.
+pub type TripUpdates = HashMap<String, TripUpdate>;
+
+impl FeedPayload for TripUpdates {
+    fn parse(bytes: &[u8]) -> Result<Self, String> {
+        parse_trip_updates_buffer(bytes).map_err(|_| "malformed GTFS-RT feed".to_string())
+    }
+
+    fn entry_count(&self) -> usize {
+        self.len()
+    }
+}
+
+/// Per-feed health and last-good retention for a set of feed URLs, generic
+/// over what a feed decodes into.
 // `Debug` only (no `PartialEq`) — needed so `Result<RtPoller, _>::unwrap_err()`
 // type-checks in the constructor-validation tests below (it must be able to
 // print the `Ok` value in a panic message if the result were unexpectedly
-// `Ok`). `RtPoller` is mutable poller state, not a value type, so equality
+// `Ok`). The poller is mutable state, not a value type, so equality
 // comparison is intentionally not derived.
 #[derive(Debug)]
-pub struct RtPoller {
+pub struct FeedPoller<P> {
     urls: Vec<String>,
-    last_updates_by_url: HashMap<String, HashMap<String, TripUpdate>>,
+    last_good_by_url: HashMap<String, P>,
+    /// When each feed last parsed successfully (ms since the epoch). Unlike
+    /// [`FeedHealth::last_fetched_at`], a failed attempt never moves it.
+    last_success_by_url: HashMap<String, u64>,
     health_by_url: HashMap<String, FeedHealth>,
 }
 
-impl RtPoller {
+/// The TripUpdates poller.
+pub type RtPoller = FeedPoller<TripUpdates>;
+
+impl<P: FeedPayload> FeedPoller<P> {
     pub fn new(urls: Vec<String>) -> Result<Self, PollerConfigError> {
         if urls.is_empty() {
             return Err(PollerConfigError::EmptyUrls);
@@ -76,9 +110,10 @@ impl RtPoller {
                 },
             );
         }
-        Ok(RtPoller {
+        Ok(FeedPoller {
             urls,
-            last_updates_by_url: HashMap::new(),
+            last_good_by_url: HashMap::new(),
+            last_success_by_url: HashMap::new(),
             health_by_url,
         })
     }
@@ -95,16 +130,18 @@ impl RtPoller {
     }
 
     /// Applies the outcome of one feed's fetch attempt. `Ok(bytes)` parses
-    /// and stores the update map, marking the feed healthy. `Err(msg)`
-    /// marks the feed failed WITHOUT touching its previously-stored map —
-    /// a failed fetch never wipes a feed's last-good state (parity with
-    /// JS's `lastUpdatesByUrl` retention across failures).
+    /// and stores the payload, marking the feed healthy. `Err(msg)` (or a
+    /// body that does not parse) marks the feed failed WITHOUT touching its
+    /// previously-stored payload — a failed fetch never wipes a feed's
+    /// last-good state (parity with JS's `lastUpdatesByUrl` retention across
+    /// failures).
     pub fn apply_fetch_result(&mut self, url: &str, result: Result<Vec<u8>, String>, now_ms: u64) {
         match result {
-            Ok(bytes) => match parse_trip_updates_buffer(&bytes) {
-                Ok(updates) => {
-                    let entry_count = updates.len();
-                    self.last_updates_by_url.insert(url.to_string(), updates);
+            Ok(bytes) => match P::parse(&bytes) {
+                Ok(payload) => {
+                    let entry_count = payload.entry_count();
+                    self.last_good_by_url.insert(url.to_string(), payload);
+                    self.last_success_by_url.insert(url.to_string(), now_ms);
                     if let Some(h) = self.health_by_url.get_mut(url) {
                         h.status = FeedStatus::Ok;
                         h.last_error = None;
@@ -112,15 +149,15 @@ impl RtPoller {
                         h.entry_count = entry_count;
                     }
                 }
-                Err(_) => self.mark_failed(url, "malformed GTFS-RT feed".to_string(), now_ms),
+                Err(e) => self.mark_failed(url, e, now_ms),
             },
             Err(e) => self.mark_failed(url, e, now_ms),
         }
     }
 
-    // Silently no-ops if `url` isn't one of the configured feeds — the future
-    // fetch layer only ever calls this with URLs from `feed_urls()`, so this
-    // is a defensive guard against a caller bug, not a real code path.
+    // Silently no-ops if `url` isn't one of the configured feeds — the fetch
+    // layer only ever calls this with URLs from `feed_urls()`, so this is a
+    // defensive guard against a caller bug, not a real code path.
     fn mark_failed(&mut self, url: &str, err: String, now_ms: u64) {
         if let Some(h) = self.health_by_url.get_mut(url) {
             h.status = FeedStatus::Failed;
@@ -129,21 +166,34 @@ impl RtPoller {
         }
     }
 
+    /// The last good payload of every feed that has one, in configured URL
+    /// order.
+    pub fn last_good(&self) -> impl Iterator<Item = &P> {
+        self.urls
+            .iter()
+            .filter_map(|u| self.last_good_by_url.get(u))
+    }
+
+    /// When `url` last parsed successfully, or `None` if it never has.
+    pub fn last_success_at(&self, url: &str) -> Option<u64> {
+        self.last_success_by_url.get(url).copied()
+    }
+}
+
+impl FeedPoller<TripUpdates> {
     /// Merges all per-feed maps into one superset. Feeds later in the
     /// configured URL order win on key collisions — a colliding tripId
     /// across two feeds indicates a feed misconfiguration, so this is a
     /// deterministic resolution, not a policy (matches JS's documented
     /// tradeoff in `realtime.ts`'s `poll()`).
-    // Clones every TripUpdate on every call — fine at this stage (no network
-    // wiring yet, no established call frequency). If a future poll loop calls
-    // this per-request rather than once per poll cycle, revisit (e.g. Arc<TripUpdate>).
+    // Clones every TripUpdate on every call — once per poll cycle, not per
+    // request. If a caller ever needs it per request, revisit (e.g.
+    // Arc<TripUpdate>).
     pub fn merged_updates(&self) -> HashMap<String, TripUpdate> {
         let mut merged = HashMap::new();
-        for url in &self.urls {
-            if let Some(per) = self.last_updates_by_url.get(url) {
-                for (k, v) in per {
-                    merged.insert(k.clone(), v.clone());
-                }
+        for per in self.last_good() {
+            for (k, v) in per {
+                merged.insert(k.clone(), v.clone());
             }
         }
         merged

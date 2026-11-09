@@ -128,8 +128,21 @@ test.describe("Popup / sheet independence @mock-api", () => {
     await clickStopCard(page, 1);
     await expect(page.locator("[data-testid='stop-popup']")).toBeVisible({ timeout: 5_000 });
 
-    // Click an empty area on the map canvas
-    await page.locator(".maplibregl-canvas").click({ position: { x: 50, y: 100 } });
+    // Click an empty area on the map canvas: the first point, scanning from
+    // the top left, where nothing sits over the canvas.
+    const spot = await page.evaluate(() => {
+      const canvas = document.querySelector(".maplibregl-canvas");
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      for (let y = 100; y < rect.height; y += 20) {
+        for (let x = 50; x < rect.width; x += 20) {
+          if (document.elementFromPoint(rect.left + x, rect.top + y) === canvas) return { x, y };
+        }
+      }
+      return null;
+    });
+    expect(spot).not.toBeNull();
+    await page.locator(".maplibregl-canvas").click({ position: spot! });
 
     // Popup should be gone, sheet should remain
     await expect(page.locator("[data-testid='stop-popup']")).not.toBeVisible();

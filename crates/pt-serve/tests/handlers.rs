@@ -71,7 +71,7 @@ fn color_config_200_serves_verbatim() {
         } => {
             assert_eq!(status, 200);
             assert_eq!(content_type, "application/json");
-            assert_eq!(cache_control, "public, max-age=3600");
+            assert_eq!(cache_control, "public, max-age=86400");
             assert!(etag.is_none(), "color-config has no ETag (matches backend)");
             assert!(!gzipped);
         }
@@ -125,6 +125,26 @@ fn shapes_304_on_if_none_match() {
         shapes(&gen, &artifact, Some(&etag), false),
         Resp::NotModified { .. }
     ));
+}
+
+#[test]
+fn shapes_304_on_weak_listed_or_proxy_suffixed_tags() {
+    let (_tmp, gen) = gen_with_artifacts();
+    let hash = gen.shapes_json_sha256.clone().unwrap();
+    let artifact = format!("shapes-{hash}.json");
+    for header in [
+        format!("W/\"{hash}\""),
+        format!("\"other\", \"{hash}\""),
+        format!("\"{hash}-gzip\""),
+    ] {
+        assert!(
+            matches!(
+                shapes(&gen, &artifact, Some(&header), true),
+                Resp::NotModified { .. }
+            ),
+            "{header} must 304",
+        );
+    }
 }
 
 #[test]

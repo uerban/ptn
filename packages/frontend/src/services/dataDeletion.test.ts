@@ -35,14 +35,14 @@ async function seedUserRows(): Promise<void> {
     endpoint: { kind: "stop", stopId: "s1", name: "Stop", lat: 1, lon: 2 },
     usedAt: 1,
     usedAsOrigin: true,
-  });
+  } as never);
   await db.savedLocations.put({
     id: "saved",
     endpoint: { kind: "stop", stopId: "s1", name: "Stop", lat: 1, lon: 2 },
     alias: "Home",
     savedAt: 1,
     encrypted: false,
-  });
+  } as never);
   await db.usageStats.put({ stopId: "s1", tapCount: 1, lastTapped: 1 });
 }
 
@@ -88,6 +88,10 @@ describe("privacy data deletion boundaries", () => {
       lastSeen: Date.now(),
     });
     await db.gtfsStops.put({ id: "g1", name: "GTFS", lat: 1, lon: 2 });
+    await db.offlineCities.put({cityId: "vilnius", city: {id: "vilnius"} as never, preparedAt: 1, sizeBytes: 1, tables: {}});
+    await db.offlineCityMetadata.put({cityId: "vilnius", state: "legacy"});
+    await db.offlineTransfers.put({hash: "transfer", bytes: new Uint8Array([1])});
+    await db.cityShapes.put({hash: "shape", bytes: new Uint8Array([2])});
     const caches = fakeCaches([
       "api-general-cache",
       "carto-tiles",
@@ -104,6 +108,10 @@ describe("privacy data deletion boundaries", () => {
 
     expect(await db.stops.count()).toBe(0);
     expect(await db.gtfsStops.count()).toBe(0);
+    expect(await db.offlineCities.count()).toBe(0);
+    expect(await db.offlineCityMetadata.count()).toBe(0);
+    expect(await db.offlineTransfers.count()).toBe(0);
+    expect(await db.cityShapes.count()).toBe(0);
     expect(await db.recentLocations.count()).toBe(1);
     expect(await db.savedLocations.count()).toBe(1);
     expect(await db.usageStats.count()).toBe(1);
@@ -126,6 +134,25 @@ describe("privacy data deletion boundaries", () => {
     if (mode === "downloaded") await clearDownloadedData({cacheStorage, stopDownloadedRuntime: async () => {}});
     else await resetPtnCompletely({cacheStorage, stopRuntime: async () => {}, resetMemory: () => {}, reload: () => {}});
     expect(await getStoredWalkGraph("oslo")).toBeUndefined();
+  });
+
+  it("complete reset clears network decisions and the setup record, so setup runs next launch", async () => {
+    localStorage.setItem("ptn-onboarding", JSON.stringify({ version: 1 }));
+    localStorage.setItem("ptn-network-decisions", JSON.stringify({ state: { decisions: {} }, version: 1 }));
+    localStorage.setItem("ptn-realtime-availability", "{}");
+    await resetPtnCompletely({
+      localStorage,
+      sessionStorage,
+      cacheStorage: fakeCaches([]).storage,
+      stopRuntime: async () => {},
+      resetMemory: () => {},
+      reload: () => {},
+    });
+    expect(localStorage.getItem("ptn-onboarding")).toBeNull();
+    expect(localStorage.getItem("ptn-network-decisions")).toBeNull();
+    const { classifyInstallation } = await import("./installClassifier.ts");
+    expect(classifyInstallation(localStorage)?.install.kind).toBe("new");
+    localStorage.clear();
   });
 
   it("complete reset removes only PTN keys/caches, deletes the DB, and reloads", async () => {
@@ -161,6 +188,7 @@ describe("privacy data deletion boundaries", () => {
 
   it("uses explicit ownership allowlists", () => {
     expect(isPtnOwnedCacheName("carto-tiles")).toBe(true);
+    expect(isPtnOwnedCacheName("map-assets")).toBe(true);
     expect(isPtnOwnedCacheName("api-stops-cache-v1")).toBe(true);
     expect(isPtnOwnedCacheName("api-stops-cache")).toBe(true);
     const ownScope = `${location.origin}/`;

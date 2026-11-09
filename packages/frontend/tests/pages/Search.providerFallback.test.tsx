@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -9,6 +10,7 @@ import { useRoutingStore } from "../../src/stores/routingStore.ts";
 import { useGtfsDataStore } from "../../src/stores/gtfsDataStore.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
 
 const emptyRaptorIndex: RaptorIndex = {
@@ -22,13 +24,16 @@ const emptyRaptorIndex: RaptorIndex = {
 // `provider-fallback` mode an on-device failure OR empty result AUTO-re-runs the
 // SAME query on the server with `{ remote: true }` — NO button click. The setting
 // itself is the routing choice. The default `on-device` mode keeps the recovery button
-// path (S2a) and never auto-falls-back. Gated by the privacy ceiling
-// (`routingAdapter !== "local-only"`); at `standard` routingAdapter is
-// "user-choice", so `remoteAllowed` is true.
+// path and never auto-falls-back. Gated by the operator routing decision
+// (`canUse("operator.remote-routing")`), allowed in these cases.
 describe("Search provider-fallback auto-fallback", () => {
   beforeEach(async () => {
-    // `standard` keeps routingAdapter = "user-choice" → remoteAllowed === true.
+    // The standing remote mode was chosen in Settings, which allowed the
+    // routing flows it uses.
     usePrivacyStore.setState({ level: "standard", overrides: {} });
+    resetFlows();
+    allowFlow("operator.remote-routing");
+    allowFlow("external.remote-routing", "transitous");
     useSettingsStore.setState({
       routingMode: "provider-fallback",
       routingProvider: "operator",
@@ -42,6 +47,7 @@ describe("Search provider-fallback auto-fallback", () => {
       syncing: false,
     });
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.gtfsStops.bulkPut([
       { id: "stop-a", name: "Alpha", lat: 50.1, lon: 19.9 },
       { id: "stop-b", name: "Beta", lat: 50.2, lon: 20.0 },
@@ -220,14 +226,12 @@ describe("Search provider-fallback auto-fallback", () => {
     expect(remoteCalls).toHaveLength(1);
   });
 
-  // Privacy-ceiling gate regression: with `provider-fallback`
-  // as the standing mode, the auto-fallback effect must NOT fire a remote call when
-  // the privacy ceiling is `local-only` (`hardened` floors routingAdapter to
-  // "local-only"). The `remoteAllowed &&` guard in the auto-fallback condition is
-  // the load-bearing gate this test validates.
-  it("does NOT auto-fallback when privacy is local-only (hardened)", async () => {
-    // Override to hardened: floors routingAdapter → "local-only", remoteAllowed === false.
-    usePrivacyStore.setState({ level: "hardened", overrides: {} });
+  // Decision gate regression: with `provider-fallback` as the standing mode,
+  // the auto-fallback effect must NOT fire a remote call while the operator's
+  // routing is denied. The `remoteAllowed &&` guard in the auto-fallback
+  // condition is the load-bearing gate this test validates.
+  it("does NOT auto-fallback while remote routing is denied", async () => {
+    denyFlow("operator.remote-routing");
 
     const searchSpy = vi.fn().mockImplementation(async (_from, _to, _at, opts?: { remote?: boolean }) => {
       if (opts?.remote) {
@@ -257,7 +261,7 @@ describe("Search provider-fallback auto-fallback", () => {
     await waitFor(() => expect(searchSpy).toHaveBeenCalledTimes(1));
     // Give any (incorrect) auto-fallback a tick to fire.
     await new Promise((r) => setTimeout(r, 0));
-    // With local-only privacy the auto-fallback MUST NOT fire a remote call,
+    // With remote routing denied the auto-fallback MUST NOT fire a remote call,
     // even though routingMode is provider-fallback.
     expect(
       searchSpy.mock.calls.some((c) => (c[3] as { remote?: boolean } | undefined)?.remote === true),

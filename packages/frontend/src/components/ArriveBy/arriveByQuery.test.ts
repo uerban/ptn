@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../test-helpers/cityData.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../db/index.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
@@ -22,6 +23,7 @@ const router = {
 
 beforeEach(async () => {
   await db.gtfsStops.clear();
+  await seedLegacyCityProjection();
   await db.gtfsStops.bulkAdd([
     { id: "S1", name: "First", lat: 54.68, lon: 25.28 },
     { id: "S3", name: "Third", lat: 54.70, lon: 25.28 },

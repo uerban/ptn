@@ -4,6 +4,7 @@
 //! `tiny_http::ResponseBox` at the single seam.
 
 pub mod address_search;
+pub mod alerts;
 pub mod bytes;
 pub mod client_report;
 pub mod color_config;

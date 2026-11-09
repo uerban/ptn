@@ -1,6 +1,7 @@
 // packages/frontend/src/services/routingSource.ts
-import type { PrivacyPolicy, PlanRequest, RaptorItinerary, RaptorQuery } from "@pt/shared";
+import type { PlanRequest, RaptorItinerary, RaptorQuery } from "@pt/shared";
 import { engineMobilityProfile } from "@pt/shared/routing";
+import { canUse } from "../privacy/canUse.ts";
 
 /**
  * A StopPlanner runs an already-resolved, stop-anchored RaptorQuery to a Pareto set by POSTing
@@ -19,32 +20,31 @@ export type StopPlanner = (
   date: string,
 ) => Promise<RaptorItinerary[]>;
 
-/** Thrown when remote routing is attempted above the privacy ceiling. */
+/** Thrown when remote routing is attempted while its flow is not allowed. */
 export class RoutingNotAllowedError extends Error {
   constructor() {
-    super("remote routing is not allowed at this privacy level");
+    super("remote routing is not allowed");
     this.name = "RoutingNotAllowedError";
   }
 }
 
 /**
- * The `routingAdapter` axis is the routing residency ceiling. Remote routing is allowed only at
- * `user-choice` (baseline/standard); `local-only` (hardened/strict/paranoid) forbids it.
+ * Remote routing by the operator (`operator.remote-routing`). Allowed only by a recorded
+ * decision: a Settings choice of a remote strategy or an explicit "Search on the server".
  */
-export function isRemoteRoutingAllowed(policy: PrivacyPolicy): boolean {
-  return policy.routingAdapter !== "local-only";
+export function isRemoteRoutingAllowed(): boolean {
+  return canUse("operator.remote-routing");
 }
 
 /**
- * The single **privacy-ceiling** choke-point every remote routing call passes through. It
- * enforces ONLY the ceiling; the *consent* is external — the caller's explicit user action (the
- * "Search on the server" click). On-device planners do NOT pass through here (no egress).
+ * The single choke-point every operator remote routing call passes through, resolving the flow
+ * at call time. On-device planners do NOT pass through here (no egress).
  */
 export async function gateRemoteRouting<T>(
   run: () => Promise<T>,
-  policy: PrivacyPolicy,
+  isAllowed: () => boolean = isRemoteRoutingAllowed,
 ): Promise<T> {
-  if (!isRemoteRoutingAllowed(policy)) throw new RoutingNotAllowedError();
+  if (!isAllowed()) throw new RoutingNotAllowedError();
   return run();
 }
 
@@ -70,17 +70,17 @@ export function planRequestFromQuery(query: RaptorQuery, date: string): PlanRequ
 /**
  * Build a remote StopPlanner from the pt-serve `/plan` transport
  * (`api.plan`). The returned planner maps the query → PlanRequest and runs it
- * through `gateRemoteRouting` (reading the policy at call time). Results flow
+ * through `gateRemoteRouting` (resolving the flow at call time). Results flow
  * back through the orchestrator's compose→overlay→rank tail unchanged.
  */
 export function makeRemoteStopPlanner(
   plan: (req: PlanRequest) => Promise<RaptorItinerary[]>,
-  getPolicy: () => PrivacyPolicy,
+  isAllowed: () => boolean = isRemoteRoutingAllowed,
 ): StopPlanner {
   return (query, date) => {
     if (query.excludedRouteIds?.length) {
       return Promise.reject(new Error("Use on-device planning for bus and minibus filters."));
     }
-    return gateRemoteRouting(() => plan(planRequestFromQuery(query, date)), getPolicy());
+    return gateRemoteRouting(() => plan(planRequestFromQuery(query, date)), isAllowed);
   };
 }

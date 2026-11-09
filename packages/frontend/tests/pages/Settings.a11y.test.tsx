@@ -46,7 +46,7 @@ describe("Settings — every control has an accessible name", () => {
   it("names each switch after its visible title and describes it with its hint", () => {
     renderEverything("default");
     const switches: [string, RegExp][] = [
-      ["Schedule-only mode", /Text-based view without map/],
+      ["Start in Text mode", /without a map\. Show map opens a map/],
       ["Nearby departures cards", /next departures near you/],
       ["Center on my location at startup", /Fly to your GPS location/],
       ["Run to catch", /running pace/],

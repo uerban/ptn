@@ -12,18 +12,21 @@ import {
   type RoutingMode,
   type RemoteRoutingProvider,
 } from "../stores/settingsStore.ts";
-import { usePolicy } from "../stores/privacyStore.ts";
-import { isRemoteRoutingAllowed } from "../services/routingSource.ts";
+import {
+  chooseRoutingMode,
+  chooseRoutingProvider,
+  chooseSearchProvider,
+} from "../services/routingAccess.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
 import { useTranslation } from "../i18n/index.ts";
+import { usePresentationText } from "../i18n/presentationStrings.ts";
 import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
 import { LanguagePicker } from "../components/Settings/LanguagePicker.tsx";
 import { MapModeSection } from "../components/Settings/MapModeSection.tsx";
 import { ProjectLinks } from "../components/Settings/ProjectLinks.tsx";
 import { TransitAttribution } from "../components/Settings/TransitAttribution.tsx";
-import { isTransitousAllowed } from "../services/transitousAvailability.ts";
 import { getRoutingProvider } from "../config/routingProviders.ts";
 import {
   HUYLO_FLASH_LABEL,
@@ -32,6 +35,8 @@ import {
   nextOverthrowLine,
   type OverthrowLine,
 } from "../components/Settings/overthrow.ts";
+
+const CitySavesSection = lazy(() => import("../components/Settings/CitySavesSection.tsx").then(m => ({default: m.CitySavesSection})));
 
 const AdvancedSettings = lazy(() =>
   import("../components/Settings/AdvancedSettings.tsx").then((m) => ({
@@ -120,6 +125,7 @@ const WALK_SPEED_KMH_MAX = 10.8;
 
 export function SettingsPage() {
   const { t } = useTranslation();
+  const presentationText = usePresentationText();
   const {
     theme, setTheme,
     departuresPerLine, setDeparturesPerLine,
@@ -136,21 +142,17 @@ export function SettingsPage() {
     startupLocate, setStartupLocate,
     tripNotificationsEnabled, setTripNotificationsEnabled,
     routeSearchVariant, setRouteSearchVariant,
-    searchProvider, setSearchProvider,
-    setRoutingMode, setRoutingProvider,
+    searchProvider,
   } = useSettingsStore();
   const routingMode = useSettingsStore((s) => s.routingMode);
   const routingProvider = useSettingsStore((s) => s.routingProvider);
   // Rounded to the slider's 0.1 km/h step, so the thumb, the label and the
   // screen-reader value agree (wheelchair 0.8 m/s reads 2.9 km/h).
   const walkSpeedKmh = Math.round(walkSpeedMps * 36) / 10;
-  const privacyPolicy = usePolicy();
-  const remoteForbidden = !isRemoteRoutingAllowed(privacyPolicy);
-  const transitousForbidden = !isTransitousAllowed(privacyPolicy);
-  // Availability of the remote routing source — a cached,
-  // fail-closed up/down hint. Distinct from `remoteForbidden`: a mode can be
-  // ALLOWED (user-choice) yet currently DOWN, in which case it stays selectable
-  // but is flagged "currently unavailable".
+  // Every option is offered; choosing a remote one grants its flow.
+  // Availability of the remote routing source — a cached, fail-closed up/down
+  // hint. A remote mode that is currently DOWN stays selectable but is
+  // flagged "currently unavailable".
   const cityId = useCityStore((s) => s.activeCity.id);
   const remoteRoutingAvailable = useRemoteRoutingAvailable(cityId);
 
@@ -194,6 +196,10 @@ export function SettingsPage() {
         <h1 className="text-xl font-bold text-fg">
           {t("settings.title", "Settings")}
         </h1>
+
+        <p className="text-sm text-fg-muted">
+          {t("settings.city_scope_description", "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city.")}
+        </p>
 
         <GpsSettings />
 
@@ -256,31 +262,17 @@ export function SettingsPage() {
             className="bg-surface-raised rounded-xl border border-divider"
           >
             {(["local", "remote"] as const).map((provider) => {
-              // "Search online" reaches transitous through the operator proxy, so
-              // it passes the same third-party egress gate as remote routing —
-              // the proxy hop does not exempt it. Local stays selectable so a
-              // user can always withdraw the remote choice, mirroring the
-              // routing-provider list below.
-              const disabled = provider === "remote" && transitousForbidden;
               return (
               <label
                 key={provider}
-                className={`flex items-center justify-between gap-3 px-4 py-3
-                  border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                className="flex items-center justify-between gap-3 px-4 py-3
+                  border-b border-divider last:border-b-0 cursor-pointer"
               >
                 <div className="min-w-0">
                   <span className="text-sm text-fg block">
                     {provider === "local"
                       ? t("settings.search_provider_local", "Search this device only")
                       : t("settings.search_provider_remote", "Search online")}
-                    {disabled ? (
-                      <span className="ml-2 text-xs text-fg-muted italic">
-                        {t(
-                          "settings.routing_provider_blocked",
-                          "Off at your privacy level",
-                        )}
-                      </span>
-                    ) : null}
                   </span>
                   <p className="text-xs text-fg-muted">
                     {provider === "local"
@@ -299,8 +291,7 @@ export function SettingsPage() {
                   name="searchProvider"
                   value={provider}
                   checked={searchProvider === provider}
-                  disabled={disabled}
-                  onChange={() => setSearchProvider(provider satisfies SearchProvider)}
+                  onChange={() => chooseSearchProvider(provider satisfies SearchProvider)}
                   className="accent-accent"
                 />
               </label>
@@ -325,28 +316,18 @@ export function SettingsPage() {
             className="bg-surface-raised rounded-xl border border-divider"
           >
             {ROUTING_MODES.map((mode) => {
-              // Both remote modes are gated by the privacy ceiling; only
-              // `on-device` is always available.
-              const disabled = mode !== "on-device" && remoteForbidden;
               const copy = ROUTING_MODE_COPY[mode];
               return (
                 <label
                   key={mode}
-                  className={`flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
                 >
                   <div className="min-w-0">
                     <span className="text-sm text-fg block">
                       {t(copy.label[0], copy.label[1])}
-                      {disabled && (
-                        <span className="ml-2 text-xs text-fg-muted italic">
-                          {t("settings.routing_source_blocked", "Off at your privacy level")}
-                        </span>
-                      )}
-                      {/* Mutually exclusive with the blocked hint: `disabled` ⇒
-                          privacy-blocked; allowed-but-down ⇒ currently unavailable.
-                          The remote modes stay selectable (a user choice) — this
+                      {/* The remote modes stay selectable (a user choice) — this
                           is a hint, not a gate. */}
-                      {!disabled && mode !== "on-device" && !remoteRoutingAvailable && (
+                      {mode !== "on-device" && !remoteRoutingAvailable && (
                         <span className="ml-2 text-xs text-warning italic" data-testid={`routing-mode-${mode}-unavailable`}>
                           {t("settings.routing_source_unavailable", "Server unavailable right now")}
                         </span>
@@ -360,8 +341,7 @@ export function SettingsPage() {
                     value={mode}
                     data-testid={`routing-mode-${mode}`}
                     checked={routingMode === mode}
-                    onChange={() => setRoutingMode(mode satisfies RoutingMode)}
-                    disabled={disabled}
+                    onChange={() => chooseRoutingMode(mode satisfies RoutingMode)}
                     className="accent-accent"
                   />
                 </label>
@@ -381,27 +361,16 @@ export function SettingsPage() {
           >
             {REMOTE_ROUTING_PROVIDERS.map((providerId) => {
               const isTransitous = providerId === "transitous";
-              // Operator is always selectable so a user can withdraw the
-              // third-party provider even while all remote routing is inert.
-              const disabled = isTransitous && transitousForbidden;
               return (
                 <label
                   key={providerId}
-                  className={`flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                  className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
                 >
                   <span className="flex flex-col gap-1">
                     <span className="text-sm text-fg">
                       {isTransitous
                         ? TRANSITOUS_PROVIDER.name
                         : t("settings.routing_provider_operator", "PTN operator")}
-                      {disabled ? (
-                        <span className="ml-2 text-xs text-fg-muted italic">
-                          {t(
-                            "settings.routing_provider_blocked",
-                            "Off at your privacy level",
-                          )}
-                        </span>
-                      ) : null}
                     </span>
                     <span className="text-xs text-fg-muted">
                       {isTransitous
@@ -436,11 +405,10 @@ export function SettingsPage() {
                     data-testid={`routing-provider-${providerId}`}
                     checked={routingProvider === providerId}
                     onChange={() =>
-                      setRoutingProvider(
+                      chooseRoutingProvider(
                         providerId satisfies RemoteRoutingProvider,
                       )
                     }
-                    disabled={disabled}
                     className="accent-accent mt-1"
                   />
                 </label>
@@ -479,8 +447,10 @@ export function SettingsPage() {
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
             <div className="flex items-center justify-between py-3 border-b border-divider">
               <div>
-                <span id="settings-schedule-mode-label" className="text-sm text-fg">{t("settings.schedule_mode", "Schedule-only mode")}</span>
-                <p id="settings-schedule-mode-desc" className="text-xs text-fg-muted">{t("settings.schedule_mode_desc", "Text-based view without map — faster on slow connections, works with screen readers")}</p>
+                <span id="settings-schedule-mode-label" className="text-sm text-fg">{presentationText("presentation.settingsLabel")}</span>
+                <p id="settings-schedule-mode-desc" className="text-xs text-fg-muted">
+                  {presentationText("presentation.settingsDescription")} {presentationText("presentation.settingsVisionNote")}
+                </p>
               </div>
               <button
                 role="switch"
@@ -889,11 +859,13 @@ export function SettingsPage() {
 
         {/* Advanced toggle */}
         <button
+          type="button"
+          aria-expanded={showAdvanced}
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="w-full py-3 text-sm font-medium text-accent hover:bg-accent/10 rounded-lg transition-colors flex items-center justify-center gap-1"
         >
           {t("settings.advanced", "Advanced")}
-          <span className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`}>▼</span>
+          <span aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${showAdvanced ? "rotate-180" : ""}`}>▼</span>
         </button>
 
         {showAdvanced && (
@@ -966,6 +938,10 @@ export function SettingsPage() {
             </ErrorBoundary>
           </>
         )}
+
+        <ErrorBoundary fallback={<p>{t("settings.saved_places_error", "Could not load saved-place recovery.")}</p>}>
+          <Suspense fallback={null}><CitySavesSection /></Suspense>
+        </ErrorBoundary>
 
         {/* About */}
         <section>

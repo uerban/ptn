@@ -167,34 +167,37 @@ fn main() {
     // "stale generation" surface).
     //
     // Only unconfigured legacy roots may omit their old stat sentinel.
-    // Configured roots must be explicitly bound, including before first publish.
-    if let Err(e) = verify_producer_sentinel(&config.data_root) {
-        let reason = match &e {
-            SentinelError::Identity(_) => "data_root_identity",
-            SentinelError::StatDataRoot { .. } => "stat_data_root",
-            SentinelError::ReadFile { .. } => "read_file",
-            SentinelError::Malformed { .. } => "malformed",
-            SentinelError::Mismatch { .. } => "mismatch",
-        };
-        log_event(
-            config.log_format,
-            LogLevel::Error,
-            "sentinel_verify_failed",
-            &[
-                ("reason", reason),
-                ("detail", &e.to_string()),
-                ("dataRoot", &config.data_root.to_string_lossy()),
-            ],
-        );
-        eprintln!("pt-serve: sentinel verification failed: {e}");
-        std::process::exit(1);
-    } else {
-        log_event(
-            config.log_format,
-            LogLevel::Info,
-            "sentinel_verify_ok",
-            &[("dataRoot", &config.data_root.to_string_lossy())],
-        );
+    // Configured producer roots must be bound; installed selections use their
+    // independent authenticated activation and do not bind a producer root.
+    if config.transit_store_root.is_none() {
+        if let Err(e) = verify_producer_sentinel(&config.data_root) {
+            let reason = match &e {
+                SentinelError::Identity(_) => "data_root_identity",
+                SentinelError::StatDataRoot { .. } => "stat_data_root",
+                SentinelError::ReadFile { .. } => "read_file",
+                SentinelError::Malformed { .. } => "malformed",
+                SentinelError::Mismatch { .. } => "mismatch",
+            };
+            log_event(
+                config.log_format,
+                LogLevel::Error,
+                "sentinel_verify_failed",
+                &[
+                    ("reason", reason),
+                    ("detail", &e.to_string()),
+                    ("dataRoot", &config.data_root.to_string_lossy()),
+                ],
+            );
+            eprintln!("pt-serve: sentinel verification failed: {e}");
+            std::process::exit(1);
+        } else {
+            log_event(
+                config.log_format,
+                LogLevel::Info,
+                "sentinel_verify_ok",
+                &[("dataRoot", &config.data_root.to_string_lossy())],
+            );
+        }
     }
 
     // Deploy-ordering: advertise this binary's PTB READ-CAPABILITY at STARTUP,
@@ -211,35 +214,42 @@ fn main() {
     // The value is the binary's own PTB_VERSION and is overwritten every startup.
     // A failed write is a WARN, not fatal; the producer fails closed for the
     // current PTB v1 contract.
-    if let Err(e) = pt_serve::ops::version_sentinel::write_pt_serve_version(
-        &config.data_root,
-        pt_core::PTB_VERSION,
-    ) {
-        log_event(
-            config.log_format,
-            LogLevel::Warn,
-            "version_sentinel_write_failed",
-            &[("detail", &e.to_string())],
-        );
+    if config.transit_store_root.is_none() {
+        if let Err(e) = pt_serve::ops::version_sentinel::write_pt_serve_version(
+            &config.data_root,
+            pt_core::PTB_VERSION,
+        ) {
+            log_event(
+                config.log_format,
+                LogLevel::Warn,
+                "version_sentinel_write_failed",
+                &[("detail", &e.to_string())],
+            );
+        }
     }
 
-    // P4 is data-root-only. The reload runner reads `<data_root>/current.json` on startup to pick
-    // the initial generation; P3's `--bundle` direct mode is gone. Boot the initial generation via
-    // the loader, NOT via `Generation::from_paths` (which is now test-only).
+    // Installed mode resolves a signed immutable selection. Producer mode retains
+    // its current/last-good loader. Both validate before opening listeners.
     let metrics = Metrics::new();
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
 
-    let initial = pt_serve::bundle::load_initial_generation_with_force_and_page_warm(
-        &config.data_root,
-        &config.city_slug,
-        clock.as_ref(),
-        &metrics,
-        config.force_current.as_deref(),
-        config.log_format,
-        config.city_tz_iana_default.as_deref(),
-        config.pattern_mode.into(),
-        config.page_warm_mode.enabled(),
-    )
+    let initial = if config.transit_store_root.is_some() {
+        pt_serve::bundle::installed::load(&config, clock.as_ref(), &metrics)
+            .map_err(pt_serve::bundle::loader::LoadError::from)
+    } else {
+        pt_serve::bundle::load_initial_generation_with_geometry(
+            &config.data_root,
+            &config.city_slug,
+            clock.as_ref(),
+            &metrics,
+            config.force_current.as_deref(),
+            config.log_format,
+            config.city_tz_iana_default.as_deref(),
+            config.pattern_mode.into(),
+            config.page_warm_mode.enabled(),
+            !config.without_geometry,
+        )
+    }
     .unwrap_or_else(|e| {
         eprintln!("pt-serve: startup load failed: {e}");
         std::process::exit(1);
@@ -450,6 +460,53 @@ fn main() {
                     &[
                         ("feeds", &feed_count.to_string()),
                         ("interval_ms", &ctx.config.rt_poll_interval_ms.to_string()),
+                    ],
+                );
+            }
+
+            // GTFS-RT ServiceAlerts poll thread: same fetch, retry and
+            // loop shell as TripUpdates, on its own cadence, publishing the
+            // pre-built /api/<city>/alerts reply into ctx.alerts.
+            if ctx.alerts.enabled() {
+                let urls = ctx.config.alerts_urls();
+                let feed_count = urls.len();
+                let poller = pt_serve::rt::alerts_state::AlertsPoller::new(urls)
+                    .expect("alerts_urls() yields non-empty, no-empty-string urls");
+                let alerts_state = Arc::clone(&ctx.alerts);
+                let alerts_clock: Arc<dyn Clock> = Arc::clone(&clock);
+                let alerts_shutdown = Arc::clone(&shutdown);
+                let alerts_log_format = ctx.config.log_format;
+                let alerts_interval =
+                    Duration::from_millis(ctx.config.rt_service_alerts_poll_interval_ms);
+                let city = ctx.config.city_slug.clone();
+                let agent = pt_serve::rt::fetch::rt_agent();
+                let alerts_ctx = Arc::clone(&ctx);
+                std::thread::Builder::new()
+                    .name("pt-serve-alerts-poll".into())
+                    .spawn(move || {
+                        pt_serve::rt::alerts_state::run_alerts_poll_loop(
+                            poller,
+                            alerts_state,
+                            city,
+                            alerts_clock,
+                            alerts_log_format,
+                            alerts_interval,
+                            alerts_shutdown,
+                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url),
+                            move || Some(alerts_ctx.current_generation()),
+                        )
+                    })
+                    .expect("spawn alerts-poll thread");
+                log_event(
+                    ctx.config.log_format,
+                    LogLevel::Info,
+                    "alerts_poll_thread_armed",
+                    &[
+                        ("feeds", &feed_count.to_string()),
+                        (
+                            "interval_ms",
+                            &ctx.config.rt_service_alerts_poll_interval_ms.to_string(),
+                        ),
                     ],
                 );
             }

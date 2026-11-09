@@ -90,6 +90,33 @@ const RAW_DATA_FLOW_REGISTRY: PrivacyDataFlowDescriptor[] = [
     inactiveStatus: "not-shared",
   },
   {
+    // City-wide service alerts (/api/<city>/alerts). The request names only
+    // the city; which stops, lines or trips concern the rider is worked out
+    // on the device.
+    id: "operator.service-alerts",
+    nameKey: "privacy.flow.operator.serviceAlerts.name",
+    purposeKey: "privacy.flow.operator.serviceAlerts.purpose",
+    destination: "operator",
+    networkPath: "operator",
+    trigger: "automatic",
+    data: [
+      ...OPERATOR_NETWORK_METADATA,
+      {
+        category: "transit-resource",
+        precision: "public-id",
+        recipient: "operator",
+      },
+    ],
+    requestFields: ["city"],
+    controls: { policyAxes: [], settingKeys: [] },
+    retention: {
+      device: "none",
+      operator: "operator-manifest",
+      provider: "none",
+    },
+    inactiveStatus: "not-shared",
+  },
+  {
     id: "operator.nearby-stop-centroid",
     nameKey: "privacy.flow.operator.nearbyStopCentroid.name",
     purposeKey: "privacy.flow.operator.nearbyStopCentroid.purpose",
@@ -339,6 +366,36 @@ const RAW_DATA_FLOW_REGISTRY: PrivacyDataFlowDescriptor[] = [
     },
     inactiveStatus: "not-shared",
   },
+  {
+    // Live bike-share stations (GBFS), fetched straight from the city's
+    // bike-share operator. Not a stored decision: the Bikes button on the map
+    // turns it on for the current visit only, and nothing is requested until
+    // it is pressed. The requests name the operator's public feeds; the
+    // viewer's position is never sent.
+    id: "external.bike-share",
+    nameKey: "privacy.flow.external.bikeShare.name",
+    purposeKey: "privacy.flow.external.bikeShare.purpose",
+    destination: "external",
+    networkPath: "direct-external",
+    trigger: "explicit-action",
+    data: [
+      ...PROVIDER_NETWORK_METADATA,
+      {
+        category: "transit-resource",
+        precision: "public-id",
+        recipient: "provider",
+      },
+    ],
+    requestFields: ["resource"],
+    controls: { policyAxes: [], settingKeys: [] },
+    retention: {
+      device: "none",
+      operator: "none",
+      provider: "provider-policy",
+    },
+    providerKind: "bike-share",
+    inactiveStatus: "not-shared",
+  },
 ];
 
 export function validateDataFlowRegistry(
@@ -406,6 +463,11 @@ export const DATA_FLOW_REGISTRY: readonly Readonly<PrivacyDataFlowDescriptor>[] 
 const DATA_FLOW_BY_ID = new Map(
   DATA_FLOW_REGISTRY.map((flow) => [flow.id, flow] as const),
 );
+
+/** The registered description of a flow, if it has one. */
+export function findDataFlow(id: string): Readonly<PrivacyDataFlowDescriptor> | undefined {
+  return DATA_FLOW_BY_ID.get(id as PrivacyDataFlowId);
+}
 
 export function getDataFlow(
   id: PrivacyDataFlowId,

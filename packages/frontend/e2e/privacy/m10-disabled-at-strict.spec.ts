@@ -25,24 +25,29 @@ const PROVIDER_ENDPOINTS = [
 
 test.describe("M10 T-14: Provider disabled at Strict/Paranoid @mock-api", () => {
   for (const level of ["strict", "paranoid"] as const) {
-    test(`Settings third-party section is locked at ${level}`, async ({
+    test(`carried-over profile denies every third-party geocoder at ${level}`, async ({
       page,
     }) => {
       await bootAtPrivacyLevel(page, level);
       await mockApi(page);
 
-      await page.goto("/settings");
+      await page.goto("/");
       await page.waitForLoadState("networkidle");
 
-      const lockedSection = page.locator(
-        "text=Third-party geocoding is disabled",
-      );
-      await expect(lockedSection).toBeVisible({ timeout: 10_000 });
-
-      const providerRadios = page.locator(
-        'input[name="third-party-provider"]',
-      );
-      await expect(providerRadios).toHaveCount(0);
+      const decisions = await page.evaluate(() => {
+        const raw = localStorage.getItem("ptn-network-decisions");
+        const parsed = raw
+          ? (JSON.parse(raw) as {
+              state?: { decisions?: Record<string, { value: string }> };
+            })
+          : {};
+        return Object.fromEntries(
+          Object.entries(parsed.state?.decisions ?? {}).map(([k, v]) => [k, v.value]),
+        );
+      });
+      for (const provider of ["mapbox", "nominatim", "photon"]) {
+        expect(decisions[`external.place-search@${provider}`]).toBe("denied");
+      }
     });
 
     test(`ThirdPartyGeocoderAdapter.isAvailable() returns false at ${level}`, async ({
@@ -59,7 +64,6 @@ test.describe("M10 T-14: Provider disabled at Strict/Paranoid @mock-api", () => 
           ThirdPartyGeocoderAdapter: new (
             config: { provider: string; endpoint: string },
             getPolicy: () => {
-              m10ThirdPartyEnabled: boolean;
               m10CoarsenGridDefaultMeters: number;
             },
           ) => {
@@ -73,7 +77,6 @@ test.describe("M10 T-14: Provider disabled at Strict/Paranoid @mock-api", () => 
             endpoint: "https://nominatim.openstreetmap.org",
           },
           () => ({
-            m10ThirdPartyEnabled: false,
             m10CoarsenGridDefaultMeters: 500,
           }),
         );

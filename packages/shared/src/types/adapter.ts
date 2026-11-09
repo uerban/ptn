@@ -3,7 +3,6 @@ import type {
   TripResult,
   Stop,
   Departure,
-  Alert,
   VehiclePosition,
   LatLon,
   TransportMode,
@@ -68,16 +67,6 @@ export interface RoutingAdapter {
    * @returns Stops sorted by relevance descending.
    */
   searchStops(query: string, limit?: number): Promise<Stop[]>;
-
-  /**
-   * Get active service alerts affecting routes or stops.
-   *
-   * Returns all currently active alerts. Severity is one of INFO, WARNING,
-   * or CANCELLATION. Times are ISO 8601 UTC.
-   *
-   * @returns All active alerts. Empty array if none.
-   */
-  getAlerts(): Promise<Alert[]>;
 
   /**
    * Get current vehicle positions within a bounding box.

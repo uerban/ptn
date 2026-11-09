@@ -4,16 +4,16 @@ import type { StopWithLines } from "@pt/shared";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
 
 // Hoisted mock handles — each test case resets the selector return values.
-const stopStoreState = { stops: [] as StopWithLines[] };
+const stopStoreState = { stops: [] as StopWithLines[], cityId: null as string | null };
 const settingsState = { urbanMode: false, urbanLookaheadHours: 2 };
-const gtfsDataState: { raptorIndex: RaptorIndex | null; syncing: boolean } = {
+const gtfsDataState: { raptorIndex: RaptorIndex | null; syncing: boolean; loadedCityId?: string } = {
   raptorIndex: null,
   syncing: false,
 };
 // Feed timezone of the active city — threaded into `stopMaybeActive` as the
 // 5th arg so a cross-tz device resolves the feed's wall clock.
 const FEED_TZ = "Europe/Vilnius";
-const cityState = { activeCity: { tz: FEED_TZ } };
+const cityState = { activeCity: { id: "vilnius", tz: FEED_TZ } };
 
 vi.mock("../../src/stores/stopStore.ts", () => ({
   useStopStore: (selector: (s: typeof stopStoreState) => unknown) =>
@@ -106,6 +106,15 @@ const stopA: StopWithLines = {
 const fakeIndex = {} as unknown as RaptorIndex;
 
 describe("useVisibleStops", () => {
+  it("hides another city's resident API stops before lifecycle effects reset them", () => {
+    stopStoreState.cityId = "other";
+    stopStoreState.stops = [stopS];
+    try {
+      const {result, unmount} = renderHook(() => useVisibleStops());
+      expect(result.current).toEqual([]);
+      unmount();
+    } finally {stopStoreState.cityId = null;}
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     // Pin the clock: useVisibleStops derives `now` from Date.now() (minuteBucket),
@@ -120,6 +129,7 @@ describe("useVisibleStops", () => {
     settingsState.urbanLookaheadHours = 2;
     gtfsDataState.raptorIndex = null;
     gtfsDataState.syncing = false;
+    gtfsDataState.loadedCityId = undefined;
   });
 
   afterEach(() => {
@@ -137,15 +147,15 @@ describe("useVisibleStops", () => {
     settingsState.urbanMode = true;
     gtfsDataState.raptorIndex = null;
     const { result } = renderHook(() => useVisibleStops());
-    expect(result.current).toEqual([stopS]);
+    expect(result.current).toEqual([{ ...stopS, lines: [] }]);
   });
 
   it("returns all stops when urban mode is on but gtfs is still syncing", () => {
     settingsState.urbanMode = true;
-    gtfsDataState.raptorIndex = fakeIndex;
+    gtfsDataState.raptorIndex = null;
     gtfsDataState.syncing = true;
     const { result } = renderHook(() => useVisibleStops());
-    expect(result.current).toEqual([stopS]);
+    expect(result.current).toEqual([{ ...stopS, lines: [] }]);
   });
 
   it("drops a stop with no in-window departure (stopMaybeActive false)", () => {
@@ -156,6 +166,16 @@ describe("useVisibleStops", () => {
     gtfsDataState.raptorIndex = index();
     const { result } = renderHook(() => useVisibleStops());
     expect(result.current.map((s) => s.id)).toEqual(["S"]);
+  });
+
+  it("does not use the previous city's resident index after selection changes", () => {
+    settingsState.urbanMode = true;
+    stopStoreState.stops = [stopA];
+    gtfsDataState.raptorIndex = index();
+    gtfsDataState.loadedCityId = "krakow";
+    const { result } = renderHook(() => useVisibleStops());
+    expect(result.current.map(stop => stop.id)).toEqual(["A"]);
+    expect(result.current[0].lines).toEqual([]);
   });
 
   it("narrows badges to the tile-active set when available", () => {
@@ -170,21 +190,21 @@ describe("useVisibleStops", () => {
     expect(stopS.lines).toHaveLength(2); // original never mutated
   });
 
-  it("fails open to full lines when tile activity is unavailable", () => {
+  it("keeps names without speculative badges when tile activity is unavailable", () => {
     settingsState.urbanMode = true;
     gtfsDataState.raptorIndex = index();
     useBadgeActivityStore.getState().set("S", { state: "unavailable" });
     const { result } = renderHook(() => useVisibleStops());
     const s = result.current.find((x) => x.id === "S")!;
-    expect(s.lines!.map((l) => l.routeId)).toEqual(["R1", "R2"]);
+    expect(s.lines!.map((l) => l.routeId)).toEqual([]);
   });
 
-  it("fails open to full lines when there is no activity entry", () => {
+  it("keeps names without speculative badges when there is no activity entry", () => {
     settingsState.urbanMode = true;
     gtfsDataState.raptorIndex = index();
     const { result } = renderHook(() => useVisibleStops());
     const s = result.current.find((x) => x.id === "S")!;
-    expect(s.lines!.map((l) => l.routeId)).toEqual(["R1", "R2"]);
+    expect(s.lines!.map((l) => l.routeId)).toEqual([]);
   });
 
   it("hides a stop the tile confirms is serviceless (ready + empty route set)", () => {
@@ -216,6 +236,33 @@ describe("useVisibleStops", () => {
     useBadgeActivityStore.getState().set("S", { state: "ready", routeIds: new Set() });
     const { result } = renderHook(() => useVisibleStops());
     expect(result.current).toEqual([]);
+  });
+
+  it("keeps pending badges empty through timetable loading, then reveals resolved routes", () => {
+    settingsState.urbanMode = true;
+    gtfsDataState.raptorIndex = index();
+    const { result, rerender } = renderHook(() => useVisibleStops());
+    const routes = () => result.current.find((s) => s.id === "S")?.lines?.map((l) => l.routeId);
+    expect(routes()).toEqual([]);
+
+    useBadgeActivityStore.getState().set("S", { state: "loading" });
+    rerender();
+    expect(routes()).toEqual([]);
+
+    // Refreshing the timetable must not restore speculative full badges.
+    gtfsDataState.syncing = true;
+    rerender();
+    expect(routes()).toEqual([]);
+
+    useBadgeActivityStore.getState().set("S", { state: "ready", routeIds: new Set(["R1"]) });
+    gtfsDataState.syncing = false;
+    gtfsDataState.loadedCityId = undefined;
+    rerender();
+    expect(routes()).toEqual(["R1"]);
+
+    useBadgeActivityStore.getState().set("S", { state: "ready", routeIds: new Set() });
+    rerender();
+    expect(result.current.find((s) => s.id === "S")).toBeUndefined();
   });
 
   it("holds badges (empty lines) while loading", () => {
@@ -277,6 +324,7 @@ describe("useVisibleStops — pattern-exact index", () => {
     settingsState.urbanLookaheadHours = 2;
     gtfsDataState.raptorIndex = null;
     gtfsDataState.syncing = false;
+    gtfsDataState.loadedCityId = undefined;
   });
 
   afterEach(() => {
@@ -350,12 +398,12 @@ describe("useVisibleStops — pattern-exact index", () => {
     expect(result.current.map((s) => s.id)).toEqual([]);
   });
 
-  it("keeps an active reverse-only stop with full lines when no tile verdict exists (badge fail-open)", () => {
+  it("keeps an active reverse-only stop name-only until tile activity resolves", () => {
     settingsState.urbanMode = true;
     gtfsDataState.raptorIndex = patternIndex(IN_WINDOW);
     const { result } = renderHook(() => useVisibleStops());
     const s = result.current.find((x) => x.id === "S")!;
-    expect(s.lines!.map((l) => l.routeId)).toEqual(["R1", "R2"]);
+    expect(s.lines!.map((l) => l.routeId)).toEqual([]);
   });
 
   it("keeps an index-active stop visible (name-only) when a divergent tile verdict says ready+empty", () => {

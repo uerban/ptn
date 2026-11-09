@@ -5,11 +5,14 @@
 //! path with last-good fallback.
 pub mod generation;
 pub mod handle;
+pub mod installed;
 pub mod integrity;
 pub mod loader;
 
 pub use generation::Generation;
-pub use handle::{build_generation, build_generation_with_page_warm, BuildInputs};
+pub use handle::{
+    build_generation, build_generation_with_geometry, build_generation_with_page_warm, BuildInputs,
+};
 
 use crate::ops::config::LogFormat;
 use crate::ops::log::{log_event, Level};
@@ -108,6 +111,34 @@ pub fn load_initial_generation_with_force_and_page_warm(
     pattern_mode: pt_core::PatternMode,
     page_warm_enabled: bool,
 ) -> Result<Generation, loader::LoadError> {
+    load_initial_generation_with_geometry(
+        data_root,
+        city,
+        clock,
+        metrics,
+        force_current,
+        log_format,
+        city_tz_iana_default,
+        pattern_mode,
+        page_warm_enabled,
+        true,
+    )
+}
+
+/// Startup policy shared by normal and forced-current generation loading.
+#[allow(clippy::too_many_arguments)]
+pub fn load_initial_generation_with_geometry(
+    data_root: &Path,
+    city: &str,
+    clock: &dyn Clock,
+    metrics: &Arc<Metrics>,
+    force_current: Option<&str>,
+    log_format: LogFormat,
+    city_tz_iana_default: Option<&str>,
+    pattern_mode: pt_core::PatternMode,
+    page_warm_enabled: bool,
+    geometry_enabled: bool,
+) -> Result<Generation, loader::LoadError> {
     if let Some(forced_id) = force_current {
         // DR mode. Operator-invoked recovery — they typed --force-current
         // intentionally — so WARN (not ERROR) matches the actual severity:
@@ -130,7 +161,7 @@ pub fn load_initial_generation_with_force_and_page_warm(
         // Sticky flag for the process lifetime — surfaced in /ready and
         // /metrics. Operators clear it by restarting without --force-current.
         metrics.set_forced_current_mode_active(true);
-        let g = build_generation_with_page_warm(
+        let g = build_generation_with_geometry(
             BuildInputs {
                 manifest: &loaded.manifest,
                 bundle_path: &loaded.bundle_path,
@@ -145,6 +176,7 @@ pub fn load_initial_generation_with_force_and_page_warm(
             },
             page_warm_enabled,
             Some(log_format),
+            geometry_enabled,
         )?;
         return Ok(g);
     }
@@ -193,7 +225,7 @@ pub fn load_initial_generation_with_force_and_page_warm(
         metrics.set_startup_fallback_active(true);
         metrics.inc_startup_generation_fallback_total();
     }
-    let g = build_generation_with_page_warm(
+    let g = build_generation_with_geometry(
         BuildInputs {
             manifest: &loaded.manifest,
             bundle_path: &loaded.bundle_path,
@@ -208,6 +240,7 @@ pub fn load_initial_generation_with_force_and_page_warm(
         },
         page_warm_enabled,
         Some(log_format),
+        geometry_enabled,
     )?;
     Ok(g)
 }

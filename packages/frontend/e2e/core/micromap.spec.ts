@@ -128,7 +128,7 @@ test.describe("Offline micromap @mock-api", () => {
     expect((await styleLayerIds(page)).filter((id) => id.startsWith("micromap-"))).toEqual([]);
   });
 
-  test("one Settings control switches the map and the privacy axis together", async ({
+  test("one Settings control switches the map without rewriting the provider decision", async ({
     page,
   }) => {
     await mockApi(page);
@@ -146,13 +146,15 @@ test.describe("Offline micromap @mock-api", () => {
         page.evaluate(() => {
           const settings = JSON.parse(localStorage.getItem("ptn-settings") ?? "{}");
           const privacy = JSON.parse(localStorage.getItem("ptn-privacy") ?? "{}");
+          const network = JSON.parse(localStorage.getItem("ptn-network-decisions") ?? "{}");
           return {
             mode: settings?.state?.mapDetailMode,
             axis: privacy?.state?.overrides?.basemapMode,
+            basemap: network?.state?.decisions?.["external.detailed-basemap@carto"]?.value,
           };
         }),
       )
-      .toEqual({ mode: "micromap", axis: "local-only" });
+      .toEqual({ mode: "micromap", axis: undefined, basemap: "allowed" });
 
     // The privacy centre keeps the axis copy but must not offer a second
     // control for the same decision.

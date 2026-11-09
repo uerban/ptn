@@ -66,10 +66,10 @@ function departureDelaySeconds(d: Departure): number | undefined {
  * whenever either is known.
  *
  * While open, the trip's route is held for live data (`useRetainRoutes`, a
- * counted hold). The poller reads the `realTimePolling` privacy axis on every
- * poll, so at the schedule-only level the hold makes no `/rt/<routeId>` call;
- * the tile read skips the rt-tile at that level too, so the pill carries no
- * delay and the sheet reads the timetable alone.
+ * counted hold). The poller resolves live departures on every poll, so
+ * without them the hold makes no `/rt/<routeId>` call; the tile read skips the
+ * rt-tile then too, so the pill carries no delay and the sheet reads the
+ * timetable alone.
  * A cancelled trip gets a neutral banner, a DELETED one a neutral "no longer
  * scheduled" banner (the `useFirstRideLive` split); neither shows an estimate.
  *

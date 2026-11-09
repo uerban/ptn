@@ -1,9 +1,9 @@
 /**
- * The adapter shim — one cityless Node process owning the three routes that are
+ * The adapter shim — one cityless Node process owning the two routes that are
  * NOT part of the serving plane.
  *
- * `/stops/search`, `/nearby` and `/alerts` never read the GTFS bundle. All three
- * are thin proxies over the routing-adapter registry (`adapters/registry.ts`:
+ * `/stops/search` and `/nearby` never read the GTFS bundle. Both are thin
+ * proxies over the routing-adapter registry (`adapters/registry.ts`:
  * MOTIS against `MOTIS_URL`, optional OTP against `OTP_BASE_URL`), selected
  * per-request by `?adapter=`. Porting them to pt-serve would give a server that
  * has been self-contained over a local bundle an outbound third-party HTTP layer
@@ -37,7 +37,6 @@ import { createAdapterRegistry, type AdapterRegistry } from "./adapters/registry
 import { getCityProfile } from "./harness/cities/index.js";
 import { searchStops } from "./routes/search.js";
 import { getNearby } from "./routes/nearby.js";
-import { getAlerts } from "./routes/alerts.js";
 import { registerRateLimit, rateLimitForRoute } from "./plugins/rateLimit.js";
 import { installHttpDurationHook } from "./metrics/httpDurationHook.js";
 import { installProductionHttpHook } from "./plugins/productionHttp.js";
@@ -128,10 +127,10 @@ export async function buildShim() {
     { config: { rateLimit: rateLimitForRoute("stopsBbox") } },
     withCityRegistry(getNearby as never),
   );
-  // No rate limit, matching the per-city backend: `/api/alerts` takes no
-  // caller-controlled parameters beyond `?adapter=`, so it has no bucket in
-  // RATE_LIMIT_DEFAULTS. nginx's read_burst zone still applies in front.
-  app.get<{ Params: CityParams }>("/api/:city/alerts", withCityRegistry(getAlerts as never));
+  // Service alerts are not served here: `GET /api/<city>/alerts` belongs to
+  // pt-serve, which ingests the city's GTFS-RT ServiceAlerts feeds. The routing
+  // adapters have no alert source, so a second implementation could only ever
+  // answer an empty list that contradicts the real one.
 
   // Liveness only. There is no readiness to report: this process holds no
   // bundle, no generation and no feed, so it is serving the moment it binds.

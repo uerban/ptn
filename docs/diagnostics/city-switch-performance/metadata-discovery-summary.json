@@ -1,0 +1,51 @@
+{
+  "scenario": "100 empty, eight legacy and eight indexed metadata lookups per engine; 21 MiB payload per city",
+  "browsers": [
+    {
+      "browser": "chromium",
+      "payloadBytesPerCity": 22020096,
+      "payloadReads": 0,
+      "empty": {
+        "samples": 100,
+        "p50Ms": 0.10000002384185791,
+        "p95Ms": 0.20000004768371582,
+        "maxMs": 0.699999988079071
+      },
+      "legacy": {
+        "samples": 100,
+        "p50Ms": 0.10000002384185791,
+        "p95Ms": 0.20000004768371582,
+        "maxMs": 0.699999988079071
+      },
+      "indexed": {
+        "samples": 100,
+        "p50Ms": 0.10000002384185791,
+        "p95Ms": 0.20000004768371582,
+        "maxMs": 0.30000001192092896
+      }
+    },
+    {
+      "browser": "webkit",
+      "payloadBytesPerCity": 22020096,
+      "payloadReads": 0,
+      "empty": {
+        "samples": 100,
+        "p50Ms": 0,
+        "p95Ms": 1,
+        "maxMs": 2
+      },
+      "legacy": {
+        "samples": 100,
+        "p50Ms": 0,
+        "p95Ms": 1,
+        "maxMs": 1.0000000000000284
+      },
+      "indexed": {
+        "samples": 100,
+        "p50Ms": 0,
+        "p95Ms": 1,
+        "maxMs": 1.0000000000000284
+      }
+    }
+  ]
+}

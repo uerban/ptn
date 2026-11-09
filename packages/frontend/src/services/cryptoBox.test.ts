@@ -1,16 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import "fake-indexeddb/auto";
-import Dexie, { type Table } from "dexie";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   encrypt,
   decrypt,
-  writeRecord,
-  readRecord,
   CryptoBoxError,
   RECORD_VERSION,
-  __clearRamStoreForTests,
   type EncryptedRecord,
-  type EncryptedRow,
 } from "./cryptoBox.ts";
 
 let key: CryptoKey;
@@ -140,103 +134,5 @@ describe("cryptoBox error taxonomy", () => {
     expect(new Set(errors)).toEqual(
       new Set(["key-missing", "version-mismatch", "ciphertext-corrupted"]),
     );
-  });
-});
-
-interface TestRecord {
-  id: string;
-  payload: { name: string; n: number };
-}
-
-describe("cryptoBox tier dispatch", () => {
-  let testDb: Dexie & { records: Table<unknown, string> };
-
-  beforeEach(async () => {
-    __clearRamStoreForTests();
-    testDb = new Dexie("ptn-cryptoBox-tier-test") as Dexie & {
-      records: Table<unknown, string>;
-    };
-    testDb.version(1).stores({ records: "id" });
-    await testDb.open();
-  });
-
-  afterEach(async () => {
-    testDb.close();
-    await Dexie.delete("ptn-cryptoBox-tier-test");
-    __clearRamStoreForTests();
-  });
-
-  it("plaintext tier stores the value as-is", async () => {
-    const value: TestRecord = { id: "r1", payload: { name: "alpha", n: 1 } };
-    await writeRecord(testDb.records, value, { tier: "plaintext" });
-    const stored = await testDb.records.get("r1");
-    expect(stored).toEqual(value);
-    const read = await readRecord<TestRecord>(testDb.records, "r1", {
-      tier: "plaintext",
-    });
-    expect(read).toEqual(value);
-  });
-
-  it("encrypted tier stores an EncryptedRecord and round-trips through read", async () => {
-    const value: TestRecord = { id: "r2", payload: { name: "beta", n: 2 } };
-    await writeRecord(testDb.records, value, { tier: "encrypted", key });
-    const raw = (await testDb.records.get("r2")) as EncryptedRow | undefined;
-    expect(raw).toBeDefined();
-    expect(raw!.id).toBe("r2");
-    expect(raw!.encrypted.iv.byteLength).toBe(12);
-    expect(raw!.encrypted.ct.byteLength).toBeGreaterThan(0);
-    // Plaintext payload must NOT be visible on the stored row.
-    expect(JSON.stringify(raw)).not.toContain("beta");
-
-    const read = await readRecord<TestRecord>(testDb.records, "r2", {
-      tier: "encrypted",
-      key,
-    });
-    expect(read).toEqual(value);
-  });
-
-  it("encrypted write requires a key, otherwise throws CryptoBoxError('key-missing')", async () => {
-    const value: TestRecord = { id: "r3", payload: { name: "g", n: 3 } };
-    await expect(
-      writeRecord(testDb.records, value, { tier: "encrypted" }),
-    ).rejects.toMatchObject({ code: "key-missing" });
-    await expect(
-      readRecord<TestRecord>(testDb.records, "r3", { tier: "encrypted" }),
-    ).rejects.toBeInstanceOf(CryptoBoxError);
-  });
-
-  it("ram-only tier never hits the Dexie table and is read back via memory", async () => {
-    const value: TestRecord = { id: "r4", payload: { name: "ram", n: 4 } };
-    await writeRecord(testDb.records, value, { tier: "ram-only" });
-    const tableCount = await testDb.records.count();
-    expect(tableCount).toBe(0);
-    const read = await readRecord<TestRecord>(testDb.records, "r4", {
-      tier: "ram-only",
-    });
-    expect(read).toEqual(value);
-  });
-
-  it("ram-only entries are namespaced per table and cleared between resets", async () => {
-    const value: TestRecord = { id: "r5", payload: { name: "ns", n: 5 } };
-    await writeRecord(testDb.records, value, { tier: "ram-only" });
-    __clearRamStoreForTests();
-    const read = await readRecord<TestRecord>(testDb.records, "r5", {
-      tier: "ram-only",
-    });
-    expect(read).toBeNull();
-  });
-
-  it("read returns null when no row is present (plaintext + encrypted)", async () => {
-    expect(
-      await readRecord<TestRecord>(testDb.records, "missing", {
-        tier: "plaintext",
-      }),
-    ).toBeNull();
-    expect(
-      await readRecord<TestRecord>(testDb.records, "missing", {
-        tier: "encrypted",
-        key,
-      }),
-    ).toBeNull();
   });
 });

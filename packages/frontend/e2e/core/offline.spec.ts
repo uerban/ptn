@@ -30,6 +30,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Step 3: Reload -- should serve from cache
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -77,6 +79,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Track any network requests that escape (should be none for routing)
     const networkRequests: string[] = [];
@@ -121,7 +125,7 @@ test.describe("Offline behavior @offline", () => {
 
     // Wait for schedule view to render with nearby stops
     await expect(
-      page.locator("main[aria-label='Schedule view']"),
+      page.locator("section[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Wait for GTFS data to sync into IndexedDB
@@ -135,6 +139,8 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 2: Go offline
     await context.setOffline(true);
+    // API fixtures must not make an uncached offline request succeed.
+    await page.route("**/api/**", route => route.abort());
 
     // Track network requests to verify no map tiles requested
     const tileRequests: string[] = [];
@@ -150,7 +156,7 @@ test.describe("Offline behavior @offline", () => {
 
     // Step 4: Schedule view should render from cache
     await expect(
-      page.locator("main[aria-label='Schedule view']"),
+      page.locator("section[aria-label='Text mode']"),
     ).toBeVisible({ timeout: 10_000 });
 
     // Step 5: Nearby stops list should be visible (data from IndexedDB)

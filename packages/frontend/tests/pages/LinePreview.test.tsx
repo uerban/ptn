@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -31,11 +32,14 @@ vi.mock("../../src/utils/buildLinePatterns.ts", () => ({
 }));
 
 // Don't actually initialize the GTFS store (no fetch in tests).
-vi.mock("../../src/stores/gtfsDataStore.ts", () => ({
-  useGtfsDataStore: {
-    getState: () => ({ init: vi.fn() }),
-  },
-}));
+vi.mock("../../src/stores/gtfsDataStore.ts", () => {
+  const state = { init: vi.fn(), raptorIndex: null };
+  const useGtfsDataStore = Object.assign(
+    (selector: (s: typeof state) => unknown) => selector(state),
+    { getState: () => state },
+  );
+  return { useGtfsDataStore };
+});
 
 import { LinePreviewPage } from "../../src/pages/LinePreview.tsx";
 import { useRtStore } from "../../src/stores/rtStore.ts";
@@ -56,6 +60,7 @@ describe("LinePreviewPage", () => {
   beforeEach(async () => {
     if (!db.isOpen()) await db.open();
     await db.gtfsRoutes.clear();
+    await seedLegacyCityProjection();
     await db.gtfsRoutes.add({
       id: "route-42",
       shortName: "42",
@@ -88,6 +93,7 @@ describe("LinePreviewPage", () => {
 
   it("renders 'Line not found' when the route is absent in Dexie", async () => {
     await db.gtfsRoutes.clear();
+    await seedLegacyCityProjection();
     renderLinePreview("missing-id");
     await waitFor(() => {
       expect(screen.getByText(/line not found/i)).toBeInTheDocument();

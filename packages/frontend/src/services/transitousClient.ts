@@ -1,6 +1,5 @@
 import type {
   LatLon,
-  PrivacyPolicy,
   RoutingRequirement,
   RoutingRequirements,
   TripResult,
@@ -81,9 +80,9 @@ export function buildTransitousQuery(
  */
 export async function planViaTransitous(
   args: TransitousPlanArgs,
-  getPolicy: () => PrivacyPolicy,
+  isAllowed: () => boolean = isTransitousAllowed,
 ): Promise<TripResult> {
-  if (!isTransitousAllowed(getPolicy())) throw new RoutingNotAllowedError();
+  if (!isAllowed()) throw new RoutingNotAllowedError();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRANSITOUS_TIMEOUT_MS);

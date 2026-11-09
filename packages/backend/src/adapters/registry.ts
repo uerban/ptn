@@ -19,7 +19,7 @@ export interface AdapterRegistry {
  * city from a single process — so it decorates a registry per request, chosen
  * from the city slug in the path.
  *
- * Preferring the request-scoped one keeps `search`/`nearby`/`alerts` as a
+ * Preferring the request-scoped one keeps `search`/`nearby` as a
  * single implementation across both. Note the fallback is NOT dead code while
  * the per-city backends still exist: they never set the request decorator.
  */

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCityDataQuery } from "../../hooks/useCityDataQuery.ts";
 import type { TransportMode } from "@pt/shared";
 import type * as maplibregl from "maplibre-gl";
-import { db } from "../../db/index.ts";
+import { captureCityData } from "../../services/cityData.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useEffectiveMapMode } from "../../map/mapMode.ts";
 import { readGtfsBundle, type RaptorBundleWire } from "../../services/gtfsBundle.ts";
@@ -196,13 +196,14 @@ function corridorsFromBundle(
 export async function loadGtfsCorridorFeatureCollection(
   cityId: string,
 ): Promise<GtfsCorridorFeatureCollection> {
-  const meta = await db.gtfsSyncMeta.get("current");
+  const data = captureCityData(cityId);
+  const meta = await data.gtfsSyncMeta.get("current");
   if (meta?.cityId === cityId) {
     const [shapes, trips, routes, stops] = await Promise.all([
-      db.gtfsShapes.toArray(),
-      db.gtfsTrips.toArray(),
-      db.gtfsRoutes.toArray(),
-      db.gtfsStops.toArray(),
+      data.gtfsShapes.toArray(),
+      data.gtfsTrips.toArray(),
+      data.gtfsRoutes.toArray(),
+      data.gtfsStops.toArray(),
     ]);
     const fromTables = buildGtfsCorridorFeatureCollection({
       shapes,
@@ -214,6 +215,7 @@ export async function loadGtfsCorridorFeatureCollection(
   }
 
   const wire = await readGtfsBundle(cityId);
+  data.assertCurrent();
   return wire ? corridorsFromBundle(wire) : EMPTY_GTFS_CORRIDORS;
 }
 
@@ -229,14 +231,13 @@ export function GtfsCorridorLayer({ map }: GtfsCorridorLayerProps) {
   const enabled = useEffectiveMapMode() !== "detailed";
   const dataRef = useRef<GtfsCorridorFeatureCollection>(EMPTY_GTFS_CORRIDORS);
 
-  const corridors = useLiveQuery(
+  const corridors = useCityDataQuery(
     async () => {
       if (!enabled) return EMPTY_GTFS_CORRIDORS;
       return loadGtfsCorridorFeatureCollection(activeCityId);
     },
     [enabled, activeCityId],
-    EMPTY_GTFS_CORRIDORS,
-  );
+  ) ?? EMPTY_GTFS_CORRIDORS;
 
   useEffect(() => {
     dataRef.current = corridors;

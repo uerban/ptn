@@ -6,8 +6,9 @@ import re
 import tempfile
 from zoneinfo import ZoneInfo
 
-PUBLIC_FIELDS = ('id', 'name', 'tz', 'center', 'bbox', 'transitSources', 'routeGroups',
-                 'defaultExcludedModes', 'poiFetchMode', 'sharedMobility', 'poiCityIds')
+PUBLIC_FIELDS = ('id', 'name', 'countryCode', 'tz', 'center', 'bbox', 'transitSources',
+                 'routeGroups', 'defaultExcludedModes', 'poiFetchMode', 'sharedMobility',
+                 'poiCityIds')
 
 
 def descriptor(config):

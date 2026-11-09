@@ -1,5 +1,7 @@
+import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
+import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
-import { requestNotificationPermission } from "../services/tripNotifications.ts";
+import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
 import { excludedRouteIdsForGroups, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -11,7 +13,6 @@ import { useTranslation } from "../i18n/index.ts";
 import { searchResultSubtext } from "../services/searchResultSubtext.ts";
 import { pluralize } from "../i18n/plurals.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
-import { useGuidanceStore } from "../stores/guidanceStore.ts";
 import { useRoutingStore } from "../stores/routingStore.ts";
 import { StaleWasmInitError } from "../services/raptorWasm.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
@@ -31,6 +32,11 @@ import "../styles/searchPicker.css";
 import { PinnedSavesSection, type ResolvedSave } from "../components/Search/PinnedSavesSection.tsx";
 import { OptionalStorageChoice } from "../components/Privacy/OptionalStorageChoice.tsx";
 import {
+  PLACE_SEARCH_FLOW,
+  ServerPlaceSearchOffer,
+} from "../components/Search/ServerPlaceSearchOffer.tsx";
+import { useCanUse } from "../privacy/canUse.ts";
+import {
   searchSuggestions,
   searchSuggestionsStream,
   SUGGESTION_PAGE_SIZE,
@@ -41,9 +47,8 @@ import { runViewportPrefetch } from "../services/poiSearchStream.ts";
 import { buildSearchPrefetchDriver } from "../services/poiSearchDriver.ts";
 import { getCityPoiTiling } from "../services/poiManifest.ts";
 import { PREFETCH_EST_TILE_BYTES } from "@pt/shared/poi";
-import { getPolicy, usePolicy } from "../stores/privacyStore.ts";
-import { isRemoteRoutingAllowed } from "../services/routingSource.ts";
-import { isTransitousAllowed } from "../services/transitousAvailability.ts";
+import { getPolicy } from "../stores/privacyStore.ts";
+import { grantRemoteRouting, useCanUseRemoteRouting } from "../services/routingAccess.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { isDeviceOnline } from "../hooks/useConnectivity.ts";
 import { getActiveTileLoader } from "../services/poiSync.ts";
@@ -160,7 +165,8 @@ export async function convertRaptorResults(
   queryServiceDateYmd: number,
   endpointLabels: EndpointLabels,
 ): Promise<Itinerary[]> {
-  const allStops = await db.gtfsStops.toArray();
+  const data = captureCityData();
+  const allStops = await data.gtfsStops.toArray();
   const stopMap = new Map(allStops.map((s) => [s.id, s]));
 
   // Backfill transit-leg display fields (route short name / colour / headsign)
@@ -174,13 +180,14 @@ export async function convertRaptorResults(
       if (leg.type === "transit") tripIds.add(leg.tripId);
     }
   }
-  const routeRecords = await db.gtfsRoutes.toArray();
+  const routeRecords = await data.gtfsRoutes.toArray();
   const routeMap = new Map(routeRecords.map((r) => [r.id, r]));
-  const tripRecords = tripIds.size > 0 ? await db.gtfsTrips.bulkGet([...tripIds]) : [];
+  const tripRecords = tripIds.size > 0 ? await data.gtfsTrips.bulkGet([...tripIds]) : [];
   const tripMap = new Map(
     tripRecords.filter((t): t is NonNullable<typeof t> => t != null).map((t) => [t.tripId, t]),
   );
 
+  data.assertCurrent();
   return results.map((itin) => {
     // Project each time once, in the feed tz, against the query service date. Overnight-fallback
     // results carry the engine's -86400-rewritten secs and project correctly against the query date
@@ -305,6 +312,7 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const tripStart = useTripStart(useCallback(() => navigate("/"), [navigate]));
   const [searchParams] = useSearchParams();
   const { location: userLocation, loading: locating, error: locationError } = useGeolocation();
   const requestedGpsField = useRef<"from" | "to" | null>(null);
@@ -328,11 +336,10 @@ export function SearchPage() {
   const routingProvider = useSettingsStore((s) => s.routingProvider);
   const ranking = useRoutingStore((s) => s.ranking);
   const setRanking = useRoutingStore((s) => s.setRanking);
-  const excludedModes = useSettingsStore((s) => s.excludedModes);
+  const excludedModes = useEffectiveExcludedModes();
   const excludedRouteGroupsByCity = useSettingsStore((s) => s.excludedRouteGroupsByCity);
   const toggleRouteGroup = useSettingsStore((s) => s.toggleRouteGroup);
   const toggleMode = useSettingsStore((s) => s.toggleMode);
-  const applyCityModeDefaults = useSettingsStore((s) => s.applyCityModeDefaults);
 
   // Derive which transit modes exist in the current city's GTFS data
   const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
@@ -425,13 +432,10 @@ export function SearchPage() {
     return groups.filter((g) => present.has(g.id));
   }, [cityRouteGroups, raptorIndex]);
   const feedTz = useCityStore((s) => s.activeCity.tz);
-  const cityDefaultExcludedModes = useCityStore((s) => s.activeCity.defaultExcludedModes);
-  const privacyPolicy = usePolicy();
-  // Privacy ceiling for remote routing: when the policy's
-  // routingAdapter is "local-only", the engine-failure surface must NOT offer
-  // "Search on the server". "user-choice" permits a user-initiated request.
-  const remoteAllowed = isRemoteRoutingAllowed(privacyPolicy);
-  const transitousAllowed = isTransitousAllowed(privacyPolicy);
+  // Standing remote use needs an allowed routing flow; a per-search grant on
+  // an on-device setup must not turn into automatic remote searches.
+  const remoteAllowed = useCanUseRemoteRouting("operator") && routingMode !== "on-device";
+  const transitousAllowed = useCanUseRemoteRouting("transitous") && routingMode !== "on-device";
   // Availability of the remote routing source — a cached,
   // fail-closed up/down hint refreshed OFF the search hot path. Gates only the
   // recovery affordance; the standing modes are NOT gated on it.
@@ -460,13 +464,6 @@ export function SearchPage() {
     }
   }, [preferredAdapter, cityId]);
 
-  // Seed the active city's default-excluded modes (e.g. Vilnius ferry) before
-  // the auto-search effect below fires, so the first itinerary search already
-  // skips them. Idempotent per session; the chip stays toggleable.
-  useEffect(() => {
-    applyCityModeDefaults(cityId, cityDefaultExcludedModes ?? []);
-  }, [cityId, cityDefaultExcludedModes, applyCityModeDefaults]);
-
   // Use user location as from by default (only on initial mount, before user edits)
   useEffect(() => {
     if (userLocation && !fromEndpoint && fromText === null && !fromTouchedRef.current) {
@@ -488,10 +485,11 @@ export function SearchPage() {
     // gtfsSyncing=true, so they fall through immediately.)
     if (preferredAdapter === "raptor" && gtfsSyncing) return;
 
+    const data = captureCityData(cityId);
     let cancelled = false;
     (async () => {
       if (fromStopId) {
-        const stop = await db.gtfsStops.get(fromStopId);
+        const stop = await data.gtfsStops.get(fromStopId);
         if (stop && !cancelled) {
           fromTouchedRef.current = true;
           setFromText(stop.name);
@@ -505,7 +503,7 @@ export function SearchPage() {
         }
       }
       if (toStopId) {
-        const stop = await db.gtfsStops.get(toStopId);
+        const stop = await data.gtfsStops.get(toStopId);
         if (stop && !cancelled) {
           setToText(stop.name);
           setToEndpoint({
@@ -524,7 +522,7 @@ export function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, gtfsSyncing, preferredAdapter]);
+  }, [searchParams, gtfsSyncing, preferredAdapter, cityId]);
 
   // Endpoints handed off from a surface outside this page — today the map
   // long-press action sheet, which reduces the pin through `mapTapStore`,
@@ -671,7 +669,7 @@ export function SearchPage() {
           if (stale()) return;
           // Superseded on-device search (reset/city-switch/refresh) — drop it
           // silently rather than showing a search error.
-          if (err instanceof StaleWasmInitError) return;
+          if (err instanceof StaleWasmInitError || err instanceof StaleCityDataError) return;
           setItineraries([]);
           setSearchError(err instanceof Error ? err.message : "Route search failed");
         })
@@ -877,7 +875,7 @@ export function SearchPage() {
           // A stale wasm init means a reset/city-switch/refresh superseded this
           // search; a fresh one is already in flight. Drop it silently — do NOT
           // show an error surface.
-          if (err instanceof StaleWasmInitError) return;
+          if (err instanceof StaleWasmInitError || err instanceof StaleCityDataError) return;
           setItineraries([]);
           setSearchError(err instanceof Error ? err.message : "Route search failed");
         })
@@ -896,19 +894,21 @@ export function SearchPage() {
 }, [fromEndpoint, toEndpoint, preferredAdapter, raptorReady, ptRouterReady, gtfsSyncing, cityId, paginationTime, excludedModes, excludedRouteGroupsByCity, ranking, feedTz, hasRouteRestrictions, routingMode, routingProvider, remoteAllowed, transitousAllowed, transitousQueryKey, failedTransitousPrimaryKey, handleSearchOnServer, handleRemotePrimarySearch, endpointLabels]);
 
   // The RECOVERY affordance (engine-failure "Search on the server") is the no-wasm user's only
-  // route — gate on the privacy ceiling ONLY, never on the availability probe. If the source is
-  // truly down, the real plan() rejection drives the signalled fallback; a wrong/transient probe
-  // must never strand the user with no action.
-  const remoteSearch = remoteAllowed && routingProvider === "operator"
-    ? { onSearchOnServer: handleSearchOnServer }
+  // route — never gated on the availability probe. If the source is truly down, the real plan()
+  // rejection drives the signalled fallback; a wrong/transient probe must never strand the user
+  // with no action. The explicit "Search on the server" click is the action that allows it.
+  const handleSearchOnServerRequest = useCallback(() => {
+    if (grantRemoteRouting("operator", "contextual")) handleSearchOnServer();
+  }, [handleSearchOnServer]);
+  const remoteSearch = routingProvider === "operator"
+    ? { onSearchOnServer: handleSearchOnServerRequest }
     : undefined;
   // The empty-state nicety (on-device ran and found nothing) — cheap to suppress
   // on a hint, so it DOES gate on availability (don't offer a dead button).
   const emptyRemoteSearch =
-    remoteAllowed &&
     routingProvider === "operator" &&
     remoteRoutingAvailable
-    ? { onSearchOnServer: handleSearchOnServer }
+    ? { onSearchOnServer: handleSearchOnServerRequest }
     : undefined;
 
   const handleTransitousPrimaryFallback = useCallback(() => {
@@ -975,6 +975,9 @@ export function SearchPage() {
       toInputRef.current.focus();
     }
   }, []);
+
+  // Granting or revoking the operator's address search reruns the suggestions.
+  const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
 
   // One request identity per field/query/provider. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
@@ -1047,7 +1050,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, userLocation?.lat, userLocation?.lon]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, userLocation?.lat, userLocation?.lon]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
@@ -1280,10 +1283,7 @@ export function SearchPage() {
   }, []);
 
   function handleItinerarySelect(itinerary: Itinerary) {
-    liveLocation.request("navigation");
-    if (useSettingsStore.getState().tripNotificationsEnabled) void requestNotificationPermission();
-    useGuidanceStore.getState().startNavigation(itinerary);
-    navigate("/");
+    tripStart.request(itinerary);
   }
 
   function handleSwap() {
@@ -1677,6 +1677,7 @@ export function SearchPage() {
                 {t("search.show_more", "Show more")}
               </button>
             )}
+            <ServerPlaceSearchOffer cityId={cityId} query={activeQuery} />
             <PinnedSavesSection onSelect={selectSave} query={activeQuery} compact={compactRows} />
             {!activeQuery.trim() && <>
             <OptionalStorageChoice
@@ -1707,6 +1708,7 @@ export function SearchPage() {
           normalResults
         )}
       </div>
+      {tripStart.dialog}
     </div>
   );
 }

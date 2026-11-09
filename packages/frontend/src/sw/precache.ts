@@ -29,6 +29,20 @@ export const LAZY_LOCALE_CODES = [
 
 export type LazyLocaleCode = (typeof LAZY_LOCALE_CODES)[number];
 
+/**
+ * Map-only assets: the MapLibre chunk, its worker and the bundled label
+ * glyphs. Text mode never needs them, so they are fetched when the user
+ * chooses Map (or first opens a temporary map) and kept by a CacheFirst rule
+ * from then on, which still makes the map usable offline.
+ */
+export const MAP_ONLY_PRECACHE_IGNORES: string[] = [
+  "assets/vendor-map-*.js",
+  // The small module that loads MapLibre and registers its worker.
+  "assets/maplibre-*.js",
+  "assets/maplibre-gl-worker-*.js",
+  "glyphs/*/*.pbf",
+];
+
 export const precacheGlobIgnores: string[] = [
   "deployment-config.js",
   ...LAZY_LOCALE_CODES.map((code) => `assets/${code}-*.js`),
@@ -38,6 +52,7 @@ export const precacheGlobIgnores: string[] = [
   // built file and can be checked against the runtime rule.
   "assets/privacy-*.js",
   ...LAZY_LOCALE_CODES.map((code) => `assets/privacy.${code}-*.js`),
+  ...MAP_ONLY_PRECACHE_IGNORES,
 ];
 
 /**

@@ -99,6 +99,10 @@ export interface PtbBundleWire {
     mode: TransportMode;
     color?: string;
     textColor?: string;
+    /** GTFS `agency_id`, omitted when the route has none. */
+    agencyId?: string;
+    /** GTFS `route_type` (`mode` is derived from it). */
+    routeType?: number;
     stopIds: string[];
     trips: Array<{
       tripId: string;
@@ -541,6 +545,8 @@ function emitWireRoute(
     mode: routeTypeToMode(route.routeType),
     color: route.routeColor || undefined,
     textColor: route.routeTextColor || undefined,
+    ...(route.agencyId ? { agencyId: route.agencyId } : {}),
+    routeType: route.routeType,
     stopIds,
     trips,
   };

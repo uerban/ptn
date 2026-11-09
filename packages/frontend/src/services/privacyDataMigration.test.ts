@@ -22,7 +22,7 @@ describe("runPrivacyDataMigration", () => {
       endpoint: { kind: "stop", stopId: "s1", name: "Stop", lat: 1, lon: 2 },
       usedAt: 1,
       usedAsOrigin: true,
-    });
+    } as never);
     await db.usageStats.put({ stopId: "s1", tapCount: 3, lastTapped: 1 });
     await db.savedLocations.put({
       id: "home",
@@ -30,7 +30,7 @@ describe("runPrivacyDataMigration", () => {
       alias: "Home",
       savedAt: 1,
       encrypted: false,
-    });
+    } as never);
     await db.stops.put({
       id: "s1",
       name: "Stop",

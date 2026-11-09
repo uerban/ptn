@@ -2,8 +2,11 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL;
 const usePreviewServer = process.env.E2E_PREVIEW === "1";
+// The preview port can be moved when 4173 is taken by another checkout.
+const previewPort = process.env.E2E_PREVIEW_PORT ?? "4173";
+const previewURL = `http://localhost:${previewPort}`;
 const managedServerURL = usePreviewServer
-  ? "http://localhost:4173"
+  ? previewURL
   : "http://localhost:5173";
 
 /** Specs under e2e/perf/ must only run in the `perf` project — they rely on
@@ -46,7 +49,7 @@ export default defineConfig({
   ...(!baseURL && {
     webServer: {
       command: usePreviewServer
-        ? "pnpm preview --port 4173 --strictPort"
+        ? `pnpm preview --port ${previewPort} --strictPort`
         : "pnpm dev",
       url: managedServerURL,
       reuseExistingServer: !process.env.CI && !usePreviewServer,
@@ -72,7 +75,7 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         ...CHROMIUM_GL_LAUNCH,
-        baseURL: "http://localhost:4173",
+        baseURL: previewURL,
         serviceWorkers: "allow",
       },
       testIgnore: IGNORE_PERF,

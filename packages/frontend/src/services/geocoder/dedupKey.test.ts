@@ -1,16 +1,28 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import "fake-indexeddb/auto";
 import type { GeocoderProviderId } from "@pt/shared";
 import { coarsen, _resetSessionJitter } from "../coordPrivacy.ts";
+import { db } from "../../db/index.ts";
+import { __resetInstallKeyCacheForTests } from "../installKey.ts";
+import { __resetDegradedModeForTests } from "../installKeyDegrade.ts";
 import { dedupKey } from "./dedupKey.ts";
 
 const PROVIDER: GeocoderProviderId = "third-party-nominatim";
 
 describe("dedupKey", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetSessionJitter();
+    if (!db.isOpen()) await db.open();
+    await db.installKey.clear();
+    __resetInstallKeyCacheForTests();
+    __resetDegradedModeForTests();
   });
 
-  it("returns a 64-char lowercase hex SHA-256 string", async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns a 64-char lowercase hex HMAC-SHA-256 string", async () => {
     const c = coarsen({ lat: 54.35, lon: 18.65 }, 500);
     const hash = await dedupKey("gdansk glowny", c, PROVIDER);
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
@@ -54,7 +66,7 @@ describe("dedupKey", () => {
     expect(a).not.toBe(b);
   });
 
-  it("matches a precomputed SHA-256 of the canonical payload", async () => {
+  it("is not the unkeyed SHA-256 of the payload, so a guessed search cannot be confirmed", async () => {
     const c = coarsen({ lat: 54.35, lon: 18.65 }, 500);
     const payload = JSON.stringify({
       query: "test",
@@ -63,13 +75,29 @@ describe("dedupKey", () => {
       gridMeters: c.gridMeters,
       providerId: PROVIDER,
     });
-    const encoded = new TextEncoder().encode(payload);
-    const digest = await crypto.subtle.digest("SHA-256", encoded);
-    const expected = Array.from(new Uint8Array(digest))
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+    const unkeyed = Array.from(new Uint8Array(digest))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
     const actual = await dedupKey("test", c, PROVIDER);
-    expect(actual).toBe(expected);
+    expect(actual).not.toBe(unkeyed);
+  });
+
+  it("differs between installs (each has its own key)", async () => {
+    const c = coarsen({ lat: 54.35, lon: 18.65 }, 500);
+    const first = await dedupKey("test", c, PROVIDER);
+    await db.installKey.clear();
+    __resetInstallKeyCacheForTests();
+    const second = await dedupKey("test", c, PROVIDER);
+    expect(second).not.toBe(first);
+  });
+
+  it("disables caching when the key cannot be stored", async () => {
+    vi.spyOn(db.installKey, "add").mockRejectedValue(
+      Object.assign(new Error("quota"), { name: "QuotaExceededError" }),
+    );
+    const c = coarsen({ lat: 54.35, lon: 18.65 }, 500);
+    expect(await dedupKey("test", c, PROVIDER)).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import { LeaveHint } from "../RouteResults/shared/LeaveHint.tsx";
 import { LeadingWaitBanner, shouldShowLeadingWaitBanner } from "../RouteResults/shared/LeadingWaitBanner.tsx";
 import { TzIndicator } from "../RouteResults/shared/TzIndicator.tsx";
 import { transferRisk, peakDelayMinutes } from "../RouteResults/shared/legHelpers.ts";
+import { useTripServiceAlerts } from "../../hooks/useServiceAlertSelection.ts";
 
 interface StepListProps {
   onLegTap: (legIndex: number) => void;
@@ -28,6 +29,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
   // The guidance itinerary's leg/arrival ISO times are feed-tz-anchored true
   // instants (produced by convertRaptorResults), so render them in the feed tz.
   const feedTz = useCityStore((s) => s.activeCity.tz);
+  const cityId = useCityStore((s) => s.activeCity.id);
   const [height, setHeight] = useState<SheetHeight>("half");
   const legListRef = useRef<HTMLDivElement>(null);
   const activeLegRef = useRef<HTMLElement | null>(null);
@@ -66,6 +68,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
   const walkingProgress = useGuidanceStore((s) => s.walkingProgress);
   const transitProgress = useGuidanceStore((s) => s.transitProgress);
   const currentLegIndex = useGuidanceStore((s) => s.currentLegIndex);
+  const legAlerts = useTripServiceAlerts(cityId, phase === "idle" ? null : itinerary);
 
   // US-037: when the active step advances (e.g. user crossed a stop boundary),
   // move keyboard focus to the new "current" leg row so screen-reader/keyboard
@@ -246,6 +249,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
             walkingProgress={i === currentLegIndex ? walkingProgress : null}
             transitProgress={i === currentLegIndex ? transitProgress : null}
             connectionStatus={connectionStatuses[i] ?? null}
+            serviceAlerts={legAlerts[i]}
             onTap={() => onLegTap(i)}
           />
         ))}

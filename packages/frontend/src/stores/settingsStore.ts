@@ -2,6 +2,12 @@ import { toggleRouteGroupSelection, type RouteGroup } from "../services/routeGro
 import { create } from "zustand";
 import { LOOSE_POI_CATEGORIES, sanitizePoiCategories, type LoosePoiCategory } from "../config/poiCategories.ts";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
+import {
+  isMapDetailMode,
+  MAP_DETAIL_MODES,
+  type MapDetailMode,
+} from "../services/preferenceValues.ts";
 import type { TransportMode } from "@pt/shared";
 import {
   DEFAULT_URBAN_LOOKAHEAD_HOURS,
@@ -17,6 +23,8 @@ import {
   type AccessibilityScheme,
 } from "../utils/routeColor.ts";
 import { effectiveVariant } from "../utils/appearance.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
+import { CITIES } from "../config/cities.ts";
 import { useCityStore } from "./cityStore.ts";
 import type { ThirdPartyProviderId } from "../config/geocoderProviders.ts";
 import { GEOCODER_PROVIDERS } from "../config/geocoderProviders.ts";
@@ -28,18 +36,7 @@ import {
 
 export type ThemeMode = "light" | "dark" | "system";
 export type LanguageSetting = "auto" | SupportedLocale;
-/**
- * What the map canvas draws underneath the transit overlays. One choice, three
- * rungs of decreasing external dependence:
- *   - detailed : external street basemap (only when the privacy policy allows)
- *   - micromap : the on-device city micromap artifact (water, major roads,
- *                green areas, district labels) — no network at all
- *   - gtfs-only: nothing but GTFS-derived transit corridors
- * `src/map/mapMode.ts` owns the mapping between this setting and the
- * `basemapMode` privacy axis; the two used to be separate controls.
- */
-export const MAP_DETAIL_MODES = ["detailed", "micromap", "gtfs-only"] as const;
-export type MapDetailMode = (typeof MAP_DETAIL_MODES)[number];
+export { MAP_DETAIL_MODES, type MapDetailMode };
 /**
  * Route-search layout variant:
  *   - consumer   : Citymapper-style card with time-proportional timeline bar (default)
@@ -91,10 +88,6 @@ function isPoiFetchMode(x: unknown): x is PoiFetchMode {
   return typeof x === "string" && (POI_FETCH_MODES as readonly string[]).includes(x);
 }
 
-function isMapDetailMode(x: unknown): x is MapDetailMode {
-  return typeof x === "string" && (MAP_DETAIL_MODES as readonly string[]).includes(x);
-}
-
 // Use-time clamp (Search/Settings/indicator + the gateRemoteRouting dispatch backstop) keeps the
 // remote modes inert at the `local-only` privacy ceiling without a destructive merge() demotion
 // (S2b-1 precedent) — the preference survives a later privacy-lowering.
@@ -128,6 +121,7 @@ interface SettingsState {
   maxPopupLines: number;
   urbanMode: boolean;
   urbanLookaheadHours: number;
+  /** The starting view is Text mode (the persisted name predates the term). */
   scheduleMode: boolean;
   accessibilityScheme: AccessibilityScheme;
   highContrastEnabled: boolean;
@@ -144,6 +138,8 @@ interface SettingsState {
    *  opt-in to skip the external basemap even when policy allows it. */
   mapDetailMode: MapDetailMode;
   excludedModes: TransportMode[];
+  /** Global explicit opt-ins that take precedence over a city default. */
+  enabledModes: TransportMode[];
   excludedRouteGroupsByCity: Record<string, string[]>;
   getOffAlarmEnabled: boolean;
   etaCardsEnabled: boolean;
@@ -203,17 +199,6 @@ interface SettingsState {
   setExcludedModes: (modes: TransportMode[]) => void;
   toggleRouteGroup: (cityId: string, group: RouteGroup, groups: readonly RouteGroup[]) => void;
   toggleMode: (mode: TransportMode) => void;
-  /**
-   * Seed a city's default-excluded modes into `excludedModes`, once per
-   * session per city. For modes that should start OFF yet stay
-   * user-toggleable — e.g. the Vilnius ferry, which is technically
-   * scheduled but so unreliable (skips stops; riders usually can't board)
-   * that defaulting it out of itineraries is the safer behaviour. The seed
-   * is in-memory, so a per-session opt-in resets to the default on reload.
-   * No-op when the city declares no defaults or was already seeded this
-   * session.
-   */
-  applyCityModeDefaults: (cityId: string, defaultModes: readonly TransportMode[]) => void;
   setGetOffAlarmEnabled: (enabled: boolean) => void;
   setEtaCardsEnabled: (enabled: boolean) => void;
   setEtaCardsLayout: (layout: EtaCardsLayout) => void;
@@ -234,14 +219,6 @@ interface SettingsState {
   setThirdPartyProvider: (provider: ThirdPartyProviderId) => void;
   setThirdPartyApiKey: (provider: ThirdPartyProviderId, key: string) => void;
 }
-
-/**
- * Cities whose `defaultExcludedModes` have already been seeded into
- * `excludedModes` this session. Module-scoped (not part of the persisted
- * store) so it resets on reload — that's what makes the ferry opt-in
- * per-session: re-seeded every fresh load, user can flip it on until then.
- */
-const seededCityModeDefaults = new Set<string>();
 
 function clamp(value: number, min: number, max: number): number {
   // NaN guard: `Math.min(NaN, x)` returns NaN, which would silently slip
@@ -405,6 +382,7 @@ export const useSettingsStore = create<SettingsState>()(
       routeSearchVariant: "consumer" satisfies RouteSearchVariant,
       mapDetailMode: "detailed" satisfies MapDetailMode,
       excludedModes: [],
+      enabledModes: [],
       excludedRouteGroupsByCity: {},
       getOffAlarmEnabled: true,
       etaCardsEnabled: true,
@@ -549,7 +527,8 @@ export const useSettingsStore = create<SettingsState>()(
       setMapDetailMode: (mode) => {
         if (isMapDetailMode(mode)) set({ mapDetailMode: mode });
       },
-      setExcludedModes: (modes) => set({ excludedModes: modes }),
+      setExcludedModes: (modes) => set({ excludedModes: modes,
+        enabledModes: VALID_TRANSPORT_MODES.filter(mode => !modes.includes(mode as TransportMode)) as TransportMode[] }),
       setGetOffAlarmEnabled: (enabled) => set({ getOffAlarmEnabled: enabled }),
       setEtaCardsEnabled: (enabled) => set({ etaCardsEnabled: enabled }),
       setEtaCardsLayout: (layout) => {
@@ -595,37 +574,28 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
       toggleRouteGroup: (cityId, group, groups) => set((state) => {
-        const next = toggleRouteGroupSelection(state.excludedModes, state.excludedRouteGroupsByCity[cityId] ?? [], group, groups);
-        return { excludedModes: next.excludedModes,
-          excludedRouteGroupsByCity: { ...state.excludedRouteGroupsByCity, [cityId]: next.excludedGroups } };
-      }),
-      toggleMode: (mode) => set((state) => {
-        const current = state.excludedModes;
+        const activeCity = useCityStore.getState().activeCity;
+        const defaults = (activeCity.id === cityId ? activeCity : CITIES.find(city => city.id === cityId))?.defaultExcludedModes ?? [];
+        const effective = effectiveExcludedModes(state, defaults);
+        const wasExcluded = effective.includes(group.parentMode);
+        const next = toggleRouteGroupSelection(effective, state.excludedRouteGroupsByCity[cityId] ?? [], group, groups);
         return {
-          excludedModes: current.includes(mode)
-            ? current.filter((m) => m !== mode)
-            : [...current, mode],
+          excludedModes: wasExcluded ? state.excludedModes.filter(mode => mode !== group.parentMode) : state.excludedModes,
+          enabledModes: wasExcluded ? [...new Set([...state.enabledModes, group.parentMode])] : state.enabledModes,
+          excludedRouteGroupsByCity: {...state.excludedRouteGroupsByCity, [cityId]: next.excludedGroups},
         };
       }),
-      applyCityModeDefaults: (cityId, defaultModes) => {
-        if (seededCityModeDefaults.has(cityId)) return;
-        seededCityModeDefaults.add(cityId);
-        if (defaultModes.length === 0) return;
-        set((state) => {
-          const merged = [...state.excludedModes];
-          for (const mode of defaultModes) {
-            if (!merged.includes(mode)) merged.push(mode);
-          }
-          // Reference-stable when nothing was added — avoids a needless
-          // re-render / search re-fire on the common already-seeded path.
-          return merged.length === state.excludedModes.length
-            ? {}
-            : { excludedModes: merged };
-        });
-      },
+      toggleMode: (mode) => set((state) => {
+        const excluded = effectiveExcludedModes(state, useCityStore.getState().activeCity.defaultExcludedModes ?? []).includes(mode);
+        return {
+          excludedModes: excluded ? state.excludedModes.filter(value => value !== mode) : [...state.excludedModes, mode],
+          enabledModes: excluded ? [...new Set([...state.enabledModes, mode])] : state.enabledModes.filter(value => value !== mode),
+        };
+      }),
     }),
     {
       name: "ptn-settings",
+      storage: createTolerantJSONStorage(),
       merge: (persisted, current) => {
         const stored = persisted as Partial<SettingsState> & { accessibilityScheme?: string } | undefined;
         const validThemes: ThemeMode[] = ["light", "dark", "system"];
@@ -690,10 +660,10 @@ export const useSettingsStore = create<SettingsState>()(
           highContrastEnabled: typeof migratedHighContrast === "boolean"
             ? migratedHighContrast
             : current.highContrastEnabled,
-          modeColorOverrides: sanitizePerCityOverrides(
+          modeColorOverrides: migrateCityColors(sanitizePerCityOverrides(
             stored?.modeColorOverrides,
             (current as SettingsState).modeColorOverrides,
-          ),
+          )),
           mobilityProfile: VALID_MOBILITY_PROFILES.includes(stored?.mobilityProfile as MobilityProfile)
             ? (stored!.mobilityProfile as MobilityProfile)
             : current.mobilityProfile,
@@ -716,11 +686,16 @@ export const useSettingsStore = create<SettingsState>()(
           mapDetailMode: isMapDetailMode(stored?.mapDetailMode)
             ? stored.mapDetailMode
             : current.mapDetailMode,
-          excludedRouteGroupsByCity: Object.fromEntries(Object.entries(stored?.excludedRouteGroupsByCity ?? {})
-            .filter(([, value]) => Array.isArray(value)).map(([city, value]) => [city, [...new Set((value as unknown[]).filter((v): v is string => typeof v === "string"))]])),
+          excludedRouteGroupsByCity: Object.entries(stored?.excludedRouteGroupsByCity ?? {}).reduce<Record<string, string[]>>((result, [city, value]) => {
+            if (!Array.isArray(value)) return result;
+            const owner = canonicalCityId(city);
+            result[owner] = [...new Set([...(result[owner] ?? []), ...value.filter((item): item is string => typeof item === "string")])];
+            return result;
+          }, {}),
           excludedModes: Array.isArray(stored?.excludedModes)
             ? migrateExcludedModes(stored!.excludedModes as unknown[])
             : current.excludedModes,
+          enabledModes: Array.isArray(stored?.enabledModes) ? migrateExcludedModes(stored.enabledModes) : [],
           getOffAlarmEnabled: coerceBool(stored?.getOffAlarmEnabled, current.getOffAlarmEnabled),
           etaCardsEnabled: coerceBool(stored?.etaCardsEnabled, current.etaCardsEnabled),
           etaCardsLayout: isEtaCardsLayout(stored?.etaCardsLayout)
@@ -788,31 +763,6 @@ function applyVariant(variant: RouteSearchVariant, mobility: MobilityProfile) {
   document.documentElement.setAttribute("data-variant", effectiveVariant(variant, mobility));
 }
 
-/** Auto-enable schedule mode on slow connections (2G/slow-2G) */
-export function autoDetectScheduleMode(): void {
-  const conn = (navigator as Navigator & {
-    connection?: { effectiveType?: string; saveData?: boolean };
-  }).connection;
-  if (!conn) return; // Safari/Firefox don't support Network Information API
-  // Only auto-enable if the user hasn't explicitly toggled schedule mode
-  const state = useSettingsStore.getState();
-  if (state.scheduleMode) return; // Already enabled, don't override
-  // Check if user has ever explicitly set this preference
-  try {
-    const stored = localStorage.getItem("ptn-settings");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed?.state?.scheduleMode !== undefined) return; // User has set an explicit preference
-    }
-  } catch {
-    // If we can't read localStorage, skip auto-detection
-    return;
-  }
-  if (conn.effectiveType === "2g" || conn.effectiveType === "slow-2g" || conn.saveData === true) {
-    useSettingsStore.getState().setScheduleMode(true);
-  }
-}
-
 // Apply theme and accessibility scheme on load
 if (typeof window !== "undefined") {
   const stored = localStorage.getItem("ptn-settings");
@@ -877,4 +827,21 @@ export function selectPreStopBufferSeconds(state: SettingsState): number {
 export function selectRunSpeedRatio(state: SettingsState): number | undefined {
   if (!state.runToCatch || state.mobilityProfile === "wheelchair") return undefined;
   return runSpeedMps(state.walkSpeedMps) / state.walkSpeedMps;
+}
+
+
+/** City policy is derived; visiting a city never changes global preferences. */
+export function effectiveExcludedModes(
+  state: {excludedModes: TransportMode[]; enabledModes?: TransportMode[]},
+  defaults: readonly TransportMode[] = [],
+): TransportMode[] {
+  const additions = defaults.filter(mode => !state.excludedModes.includes(mode) && !state.enabledModes?.includes(mode));
+  return additions.length ? [...state.excludedModes, ...additions] : state.excludedModes;
+}
+
+
+function migrateCityColors(colors: Record<string, Record<string, string>>): Record<string, Record<string, string>> {
+  if (!colors.gdansk) return colors;
+  const {gdansk, ...others} = colors;
+  return {...others, tricity: {...gdansk, ...others.tricity}};
 }

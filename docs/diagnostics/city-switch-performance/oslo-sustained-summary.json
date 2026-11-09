@@ -1,0 +1,74 @@
+{
+  "workload": "100 alternating city arrivals, native clocks, identical replayed transit bytes",
+  "percentileMethod": "nearest rank",
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "fixtureMode": "replay",
+  "fixtureMisses": 0,
+  "switches": 100,
+  "cities": {
+    "vilnius": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 437.89999997615814,
+        "p95": 458.19999998807907,
+        "max": 464.9000000357628
+      },
+      "authoritativeActivityMs": {
+        "p50": 502.10000002384186,
+        "p95": 526.3999999761581,
+        "max": 531.8000000119209
+      },
+      "lastCardChangeMs": {
+        "p50": 530.6000000238419,
+        "p95": 556.0999999642372,
+        "max": 569.1999999880791
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 137460136,
+        "max": 137755804
+      },
+      "observedSlowStopCacheWrites": 0
+    },
+    "oslo": {
+      "samples": 50,
+      "indexMs": {
+        "p50": 1004.0999999642372,
+        "p95": 1065.3999999761581,
+        "max": 1075
+      },
+      "authoritativeActivityMs": {
+        "p50": 1270,
+        "p95": 1342.4000000357628,
+        "max": 1367.800000011921
+      },
+      "lastCardChangeMs": {
+        "p50": 1299,
+        "p95": 1379.199999988079,
+        "max": 1403
+      },
+      "allActivityComplete": true,
+      "allStabilityWindowsConfirmed": true,
+      "last20HeapBytes": {
+        "min": 214252832,
+        "max": 216130032
+      },
+      "observedSlowStopCacheWrites": 0
+    }
+  },
+  "warmGate": {
+    "limitMs": 1000,
+    "valid": true,
+    "passed": false
+  },
+  "panFrames": {
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "limits": "Synthetic arrivals on the reference desktop; does not establish live staging or phone performance. Heap ranges are observations, not a universal leak proof. API write count includes only transactions at least 20 ms."
+}

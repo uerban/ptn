@@ -1,3 +1,5 @@
+import { StaleCityDataError } from "./cityData.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 import { db } from "../db/index.ts";
 import type { DecodedTransfers, RouteDirectionPattern, TransportMode } from "@pt/shared";
 import { PatternMode, PATTERN_MODE, patternsEnabled } from "@pt/shared/raptor";
@@ -12,6 +14,10 @@ export interface RaptorIndexRoute {
   mode: TransportMode;
   color?: string;
   textColor?: string;
+  /** GTFS `agency_id` and `route_type`, when the source carried them
+   * (matching service alerts); never consulted by the RAPTOR scan. */
+  agencyId?: string;
+  routeType?: number;
   stopIds: string[];
   trips: {
     tripId: string;
@@ -284,6 +290,8 @@ interface Raw {
     mode: TransportMode;
     color?: string;
     textColor?: string;
+    agencyId?: string;
+    routeType?: number;
     stopIds: string[];
     directionPatterns?: RouteDirectionPattern[];
     /**
@@ -629,6 +637,8 @@ export function hydrate(
     mode: r.mode,
     color: r.color,
     textColor: r.textColor,
+    ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
+    ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
     stopIds: r.stopIds,
     trips: (r.trips ?? [])
       .slice()
@@ -810,6 +820,8 @@ export function rawFromBundle(
     mode: r.mode as TransportMode,
     color: r.color,
     textColor: r.textColor,
+    ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
+    ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
     stopIds: r.stopIds,
     directionPatterns: r.directionPatterns,
     // Inline trips for THIS record only (per-pattern safe — no id regroup).
@@ -906,37 +918,44 @@ const BUNDLE_READ_ENABLED =
   (import.meta.env.VITE_GTFS_BUNDLE_READ as string | undefined) !== "0";
 
 export async function buildRaptorIndex(
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; cityId?: string; wire?: RaptorBundleWire } = {},
 ): Promise<RaptorIndex> {
+  const cityId = canonicalCityId(opts.cityId ?? useCityStore.getState().activeCity.id);
+  const assertCurrent = () => {
+    opts.signal?.throwIfAborted();
+    if (canonicalCityId(useCityStore.getState().activeCity.id) !== cityId) throw new StaleCityDataError();
+  };
+  async function fromWire(wire: RaptorBundleWire): Promise<RaptorIndex> {
+    assertCurrent();
+    if (wire.meta.cityId && canonicalCityId(wire.meta.cityId) !== cityId) throw new Error("Catalog belongs to a different city");
+    const footTransfers = await loadFootTransfers(wire, opts.signal);
+    assertCurrent();
+    const index = hydrate(rawFromBundle(wire, PATTERN_MODE), footTransfers, PATTERN_MODE);
+    if (wire.meta.cityTzIana !== undefined) index.cityTzIana = wire.meta.cityTzIana;
+    return index;
+  }
+  // The activation path already decoded these bytes in the worker. Never gzip,
+  // persist, reread and parse them merely to build the same in-memory index.
+  if (opts.wire) return fromWire(opts.wire);
   if (BUNDLE_READ_ENABLED) {
     try {
-      const cityId = useCityStore.getState().activeCity.id;
       const wire = await readGtfsBundle(cityId);
-      if (wire) {
-        const footTransfers = await loadFootTransfers(wire, opts.signal);
-        // Pass PATTERN_MODE so per-pattern wire (Unbounded) builds
-        // patterns[]/patternsAtStop and aggregates the display model.
-        const index = hydrate(rawFromBundle(wire, PATTERN_MODE), footTransfers, PATTERN_MODE);
-        // Surface the bundle's agency tz so the warm-start drift guard can cross-check it against
-        // CityConfig.tz. `hydrate` consumes only the projected `Raw` — the raw `wire.meta` is
-        // dropped — so we attach it here on the blob path. `undefined` on the Dexie fallback.
-        if (wire.meta.cityTzIana !== undefined) {
-          index.cityTzIana = wire.meta.cityTzIana;
-        }
-        return index;
-      }
+      assertCurrent();
+      if (wire) return await fromWire(wire);
     } catch (err) {
+      assertCurrent();
+      if (err instanceof StaleCityDataError) throw err;
       console.warn("gtfsBundle read failed, falling back to Dexie tables:", err);
     }
   }
-
-  const [rawRouteRecords, rawTripRecords, serviceRecords, stopRecords, syncMeta] = await Promise.all([
-    db.gtfsRoutes.toArray(),
-    db.gtfsTrips.toArray(),
-    db.gtfsServices.toArray(),
-    db.gtfsStops.toArray(),
-    db.gtfsSyncMeta.get("current"),
-  ]);
+  const [rawRouteRecords, rawTripRecords, serviceRecords, stopRecords, syncMeta] = await db.transaction("r", [
+    db.gtfsRoutes, db.gtfsTrips, db.gtfsServices, db.gtfsStops, db.gtfsSyncMeta,
+  ], () => Promise.all([
+    db.gtfsRoutes.toArray(), db.gtfsTrips.toArray(), db.gtfsServices.toArray(),
+    db.gtfsStops.toArray(), db.gtfsSyncMeta.get("current"),
+  ]));
+  assertCurrent();
+  if (!syncMeta || canonicalCityId(syncMeta.cityId) !== cityId) throw new Error("No verified timetable projection for this city");
   const tripRecords = rawTripRecords.map((t, i) => ({
     ...t,
     ptbTripIdx: t.ptbTripIdx ?? i,

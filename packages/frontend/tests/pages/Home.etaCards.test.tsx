@@ -17,7 +17,6 @@ import type { NearbyDirections, UseNearbyDirectionsArgs } from "../../src/hooks/
 // ─── Mutable mock state ──────────────────────────────────────────────────────
 
 const settingsState = vi.hoisted(() => ({
-  scheduleMode: false,
   etaCardsEnabled: true,
   etaCardsLayout: "rows",
   startupLocate: false,
@@ -93,10 +92,6 @@ vi.mock("../../src/hooks/useVisibleStops.ts", () => ({
 
 vi.mock("../../src/hooks/useViewportBadgeActivity.ts", () => ({
   useViewportBadgeActivity: () => undefined,
-}));
-
-vi.mock("../../src/pages/ScheduleHome.tsx", () => ({
-  ScheduleHome: () => <div data-testid="schedule-home-sentinel">ScheduleHome</div>,
 }));
 
 vi.mock("../../src/components/Map/TransitMap.tsx", () => ({
@@ -203,7 +198,6 @@ vi.mock("../../src/stores/lineViewStore.ts", () => ({
 
 vi.mock("../../src/stores/settingsStore.ts", () => ({
   useSettingsStore: (sel: any) => sel(settingsState),
-  autoDetectScheduleMode: vi.fn(),
 }));
 
 vi.mock("../../src/hooks/useStopPreloader.ts", () => ({ useStopPreloader: () => undefined }));
@@ -243,7 +237,8 @@ import { useBikeShareStore } from "../../src/stores/bikeShareStore.ts";
 import { useMapObstaclesStore } from "../../src/stores/mapObstaclesStore.ts";
 import { useMapTapStore } from "../../src/stores/mapTapStore.ts";
 import { useRtStore } from "../../src/stores/rtStore.ts";
-import { getPolicy, usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
 import { HomePage } from "../../src/pages/Home.tsx";
 
 // ─── Geometry (metres from the grid origin) and fixtures ────────────────────
@@ -343,7 +338,6 @@ function rtRequests(): string[] {
 beforeEach(() => {
   locationState.snapshot = { ...locationState.snapshot, position: null };
   vi.clearAllMocks();
-  settingsState.scheduleMode = false;
   settingsState.etaCardsEnabled = true;
   settingsState.etaCardsLayout = "rows";
   guidanceState.phase = "idle";
@@ -363,6 +357,8 @@ beforeEach(() => {
   useBikeShareStore.setState({ stations: [], selectedStationId: null });
   useMapTapStore.getState().clear();
   usePrivacyStore.setState({ level: "standard", overrides: {} });
+  resetFlows();
+  allowFlow("operator.realtime");
   // jsdom has no RT backend: every request is answered 503 (a failed poll the
   // poller logs and retries on its next tick), and every URL is recorded.
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(null, { status: 503 }));
@@ -507,17 +503,6 @@ describe("Home – ETA strip", () => {
       geolocate(USER);
       expect(lastHookArgs().enabled).toBe(false);
       expect(screen.queryByTestId("eta-cards")).toBeNull();
-    });
-
-    it("in schedule mode, although the last GPS fix is still known", () => {
-      const view = renderHome();
-      geolocate(USER);
-      expect(lastHookArgs().enabled).toBe(true);
-
-      settingsState.scheduleMode = true;
-      rerenderHome(view);
-      expect(screen.getByTestId("schedule-home-sentinel")).toBeTruthy();
-      expect(lastHookArgs()).toEqual({ enabled: false, position: USER, visibleStops: [S, R] });
     });
   });
 });
@@ -893,7 +878,7 @@ describe("Home – trip sheet", () => {
   });
 });
 
-// ─── The trip sheet's live data under the realTimePolling axis ──────────────
+// ─── The trip sheet's live data under the real-time decision ────────────────
 
 describe("Home – trip sheet live data", () => {
   beforeEach(() => {
@@ -928,19 +913,15 @@ describe("Home – trip sheet live data", () => {
   });
 
   it.each([
-    ["the strict level", () => usePrivacyStore.setState({ level: "strict", overrides: {} })],
-    [
-      "a realTimePolling override",
-      () => usePrivacyStore.getState().setOverride("realTimePolling", "disabled-schedule-only"),
-    ],
-  ])("makes no /rt/<routeId> request at the schedule-only level (%s)", async (_name, apply) => {
+    ["unset", () => resetFlows()],
+    ["denied", () => denyFlow("operator.realtime")],
+  ])("makes no /rt/<routeId> request while real-time updates are %s", async (_name, apply) => {
     apply();
-    expect(getPolicy().realTimePolling).toBe("disabled-schedule-only");
     const subscribe = vi.spyOn(useRtStore.getState().poller, "subscribe");
     renderHome();
     geolocate(USER);
     tapPill("Centre");
-    // The sheet does hold its route: the policy, read at every poll, is what
+    // The sheet does hold its route: the decision, read at every poll, is what
     // keeps the request from being made.
     expect(subscribe).toHaveBeenCalledWith("1", expect.any(Function));
 

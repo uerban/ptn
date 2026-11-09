@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 // here fails every core spec at module load. Matches `catalogPtb.ts`.
 import { PATTERN_MODE } from "../../../shared/src/raptor/patternMode.ts";
 import { buildCatalogPtb } from "../fixtures/catalogPtb.ts";
+import { seedCompletedSetup } from "./setup-complete.ts";
 import {
   FIXTURE_BUNDLE_HASH,
   buildFixtureManifest,
@@ -107,14 +108,7 @@ function catalogPtbFor(now: Date, shapes: "advertised" | "absent"): Buffer {
   return bytes;
 }
 
-/**
- * The mock's generation id IS the bundle ETag, unquoted: `fetchCatalog`
- * refuses any bundle whose ETag is not exactly `"${servingBundleSha256}"`,
- * which defaults to `servingGenerationId` when the mock omits it, and
- * `parsePtbCatalogGeneration` requires 64 lowercase hex. A truncated digest
- * (the pre-cutover mock used 32 chars) fails the second check, so both bundles
- * are keyed by their full sha256.
- */
+/** Raw catalog content digest, independent of the publication ID used by tiles. */
 function generationIdFor(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -155,6 +149,18 @@ interface MockApiOptions {
    * the primary path.
    */
   scheduleTile?: "served" | "unavailable";
+  /**
+   * `"complete"` (default) seeds a finished first-run setup so the spec starts
+   * in the app (see `seedCompletedSetup`). `"fresh"` leaves the profile new,
+   * for specs that drive setup themselves.
+   */
+  setup?: "complete" | "fresh";
+  /**
+   * `X-PT-Realtime` value on manifest responses: the realtime kinds the city
+   * offers (`"departures, alerts"`). Absent sends an empty header, as the
+   * server does for a city without realtime kinds.
+   */
+  realtime?: string;
 }
 
 /**
@@ -218,6 +224,7 @@ function makeDepartures(now: Date = new Date()) {
 
 /** Set up API route interception before navigation. Call this before page.goto(). */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
+  if (options.setup !== "fresh") await seedCompletedSetup(page);
   // These specs start inside a selected city. Model discovery and the saved
   // selection explicitly; production no longer chooses a default city.
   await page.route("**/api/cities", route => route.fulfill({json: {
@@ -225,7 +232,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
       center: {lat: 54.6872, lon: 25.2797},
       bbox: {minLat: 54.6, minLon: 25.1, maxLat: 54.8, maxLon: 25.5}}],
   }}));
-  await page.addInitScript(() => {
+  if (options.setup !== "fresh") await page.addInitScript(() => {
     if (!localStorage.getItem("ptn-city")) {
       localStorage.setItem("ptn-city", JSON.stringify({state: {activeCity: {id: "vilnius"}}, version: 0}));
     }
@@ -303,7 +310,11 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
         status: 200,
         contentType: "application/json",
         // The read path reads the bundle hash from this header, not the body.
-        headers: { "X-PT-Bundle-Hash": FIXTURE_BUNDLE_HASH, etag: `"${FIXTURE_BUNDLE_HASH}"` },
+        headers: {
+          "X-PT-Bundle-Hash": FIXTURE_BUNDLE_HASH,
+          etag: `"${FIXTURE_BUNDLE_HASH}"`,
+          "X-PT-Realtime": options.realtime ?? "",
+        },
         body: JSON.stringify(buildFixtureManifest()),
       })
     );
@@ -356,7 +367,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
     options.routingFixture === "ptb-matched"
       ? PTB_BYTES
       : catalogPtbFor(options.catalogNow ?? new Date(), options.catalogShapes ?? "advertised");
-  const catalogGenerationId =
+  const catalogBundleSha256 =
     options.routingFixture === "ptb-matched"
       ? PTB_MATCHED_GENERATION_ID
       : generationIdFor(catalogBytes);
@@ -373,7 +384,8 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
       json: {
         status: "ready",
         city,
-        servingGenerationId: catalogGenerationId,
+        servingGenerationId: FIXTURE_BUNDLE_HASH,
+        servingBundleSha256: catalogBundleSha256,
         // Fixed rather than 0: `parsePtbCatalogGeneration` derives
         // `generatedAt` from `nowUnixSecs - generationAgeSecs`, and a zero age
         // would date every fixture generation to the instant of the request.
@@ -410,7 +422,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
       status: 200,
       contentType: "application/octet-stream",
       headers: {
-        etag: `"${catalogGenerationId}"`,
+        etag: `"${catalogBundleSha256}"`,
         vary: "Accept-Encoding",
         "cache-control": "public, max-age=0, must-revalidate",
       },

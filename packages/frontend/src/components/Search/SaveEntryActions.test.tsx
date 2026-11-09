@@ -12,14 +12,15 @@ beforeEach(() => {
 });
 
 describe("SaveEntryActions visibility by policy axis", () => {
-  test("shows both export and share at Baseline (opt-in)", () => {
-    render(<SaveEntryActions saveId="s1" axisOverride="opt-in" />);
+  test("shows both export and share when saves are always encrypted", () => {
+    render(<SaveEntryActions saveId="s1" axisOverride="always" />);
     expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Share" })).toBeTruthy();
   });
 
-  test("shows both at Standard (default)", () => {
-    render(<SaveEntryActions saveId="s1" axisOverride="default" />);
+  test("shows both at Standard", () => {
+    usePrivacyStore.getState().reset();
+    render(<SaveEntryActions saveId="s1" />);
     expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Share" })).toBeTruthy();
   });
@@ -58,7 +59,7 @@ describe("SaveEntryActions visibility by policy axis", () => {
     render(
       <SaveEntryActions
         saveId="s1"
-        axisOverride="default"
+        axisOverride="always"
         onExport={onExport}
         onShare={onShare}
       />,

@@ -10,6 +10,7 @@ import { db } from "../db/index.ts";
 import { decompressBrotli } from "./brotliDecode.ts";
 import { fetchScheduleTile, type FetchScheduleTileResult } from "./api.ts";
 import { reportError } from "./errorReporter.ts";
+import {measureCityStage} from "./cityPerformance.ts";
 import { notifyWriteGrew } from "./storagePolicy.ts";
 
 function cacheKey(bundleHash: string, tileSize: string, tileCoords: string): string {
@@ -69,7 +70,13 @@ function fireStorageWatchdog(): void {
 }
 
 function memoGet(key: string): DecodedScheduleTile | undefined {
-  return memoMap.get(key);
+  const tile = memoMap.get(key);
+  if (tile) {
+    const index = memoKeys.indexOf(key);
+    if (index !== -1) memoKeys.splice(index, 1);
+    memoKeys.push(key);
+  }
+  return tile;
 }
 
 function memoSet(key: string, tile: DecodedScheduleTile): void {
@@ -96,6 +103,67 @@ type DecodedTileResult =
   | { tile: DecodedScheduleTile; bytesDownloaded: number }
   | { fetchResult: FetchScheduleTileResult };
 
+interface TileFlight {
+  promise: Promise<DecodedTileResult>;
+  downloadStarted: boolean;
+  prewarm: boolean;
+  listeners: Set<() => void>;
+}
+const inFlight = new Map<string, TileFlight>();
+
+function notifyDownload(listener: () => void): void {
+  // One subscriber's UI callback cannot break the shared download for others.
+  try { listener(); } catch { /* best-effort progress notification */ }
+}
+
+/** Share cache lookup, decompression and network work across badges, sheets and
+ * prewarming. Callers may discard their result without aborting another reader.
+ * Only the initiating caller accounts downloaded bytes; joiners account zero. */
+export async function getDecodedTile(
+  bundleHash: string,
+  tileSize: string,
+  tileCoords: string,
+  opts: GetDecodedTileOpts = {},
+): Promise<DecodedTileResult> {
+  if (!TILE_COORD_RE.test(tileCoords)) return {fetchResult: {status: 0}};
+  const key = cacheKey(bundleHash, tileSize, tileCoords);
+  const existing = inFlight.get(key);
+  if (existing) {
+    if (!opts.prewarm) existing.prewarm = false;
+    if (opts.onTileDownloadStart && !existing.listeners.has(opts.onTileDownloadStart)) {
+      existing.listeners.add(opts.onTileDownloadStart);
+      if (existing.downloadStarted) notifyDownload(opts.onTileDownloadStart);
+    }
+    const result = await existing.promise;
+    // A foreground reader joining a prewarm near its commit still promotes it.
+    if (!opts.prewarm && "tile" in result) {
+      void db.scheduleTileCache.update(key, {loadedAt: Date.now()}).catch(() => {});
+    }
+    return "tile" in result ? {...result, bytesDownloaded: 0} : result;
+  }
+  const flight: TileFlight = {
+    promise: undefined!, downloadStarted: false, prewarm: opts.prewarm === true,
+    listeners: new Set(opts.onTileDownloadStart ? [opts.onTileDownloadStart] : []),
+  };
+  flight.promise = loadDecodedTile(bundleHash, tileSize, tileCoords, {
+    get prewarm() { return flight.prewarm; },
+    onTileDownloadStart: () => {
+      flight.downloadStarted = true;
+      for (const listener of flight.listeners) notifyDownload(listener);
+    },
+  }).finally(() => {
+    if (inFlight.get(key) === flight) inFlight.delete(key);
+  });
+  inFlight.set(key, flight);
+  return flight.promise;
+}
+
+/** Bounded local timing entry, with no tile coordinates or stop identities. */
+function decodeTile(bytes: ArrayBuffer): Promise<DecodedScheduleTile> {
+  return measureCityStage(null, "tile-decode", async () =>
+    decodeScheduleTileFromText(await decompressBrotli(bytes)));
+}
+
 /** Cache hit (decompress+decode) or fetch → re-validate coord (C5) → decode-then-
  *  cache the COMPRESSED bytes. Returns the raw FetchScheduleTileResult on a non-200
  *  fetch so the read path can run its cascade.
@@ -114,7 +182,7 @@ type DecodedTileResult =
  *
  *  onTileDownloadStart: fired immediately before a cache-miss fetch — lets callers
  *  start a hedge timer without reaching into the tile-cache internals. */
-export async function getDecodedTile(
+async function loadDecodedTile(
   bundleHash: string,
   tileSize: string,
   tileCoords: string,
@@ -139,8 +207,7 @@ export async function getDecodedTile(
   const hit = await db.scheduleTileCache.get(key);
   if (hit) {
     try {
-      const text = await decompressBrotli(hit.compressedBytes);
-      const tile = decodeScheduleTileFromText(text);
+      const tile = await decodeTile(hit.compressedBytes);
       memoSet(key, tile);
       if (!opts.prewarm) {
         // C2 — true LRU: bump recency on a successful hit (no schema change).
@@ -169,8 +236,7 @@ export async function getDecodedTile(
   // C1 — validate BEFORE caching: only `put` after a successful decode.
   let tile: DecodedScheduleTile;
   try {
-    const text = await decompressBrotli(fetchResult.bytes);
-    tile = decodeScheduleTileFromText(text);
+    tile = await decodeTile(fetchResult.bytes);
   } catch (error) {
     reportError(error instanceof Error ? error : new Error(String(error)), {
       context: { source: "scheduleTileCache.getDecodedTile.freshDecode", key },
@@ -207,12 +273,12 @@ export async function getDecodedTile(
 /** Roll-prune (R20): delete every row whose key prefix != `${bundleHash}/`.
  *  Also evicts stale keys from the in-memory memo (optional memory hygiene —
  *  not a correctness requirement; the hash prefix already prevents stale hits). */
-export async function pruneToBundleHash(bundleHash: string): Promise<void> {
+export async function pruneToBundleHash(bundleHash: string, previousBundleHash?: string): Promise<void> {
   const prefix = `${bundleHash}/`;
   const dead: string[] = [];
   let deadBytes = 0;
   await db.scheduleTileCache.each((row) => {
-    if (!row.key.startsWith(prefix)) {
+    if (!row.key.startsWith(prefix) && (previousBundleHash === undefined || row.key.startsWith(`${previousBundleHash}/`))) {
       dead.push(row.key);
       deadBytes += row.byteSize;
     }

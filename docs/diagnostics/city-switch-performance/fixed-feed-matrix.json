@@ -1,0 +1,107 @@
+{
+  "scenario": "Vilnius to Krakow animated flight, then all-stops urban-off four-direction pan at zoom 16",
+  "baselineRevision": "e4420d996b66b97593db7aedd8474cc521f220eb",
+  "candidate": "uncommitted city-cache performance worktree based on the same revision",
+  "runsPerCell": 1,
+  "fixedTime": "2026-11-07T12:41:28.991Z",
+  "apiBodiesSha256": "e1025ad6f1f445601cb5a945b469e6f6a7027783d069886ed4e745c3c2896f5c",
+  "legacyTemplateSha256": "5a1d37db57def1c84cdee0cc8f6b57311cadceca7b7882ba51163f9a4caa4591",
+  "legacyRowsPerPackage": {
+    "gtfsRoutes": 114,
+    "gtfsTrips": 20451,
+    "gtfsServices": 222,
+    "gtfsStops": 1546,
+    "gtfsShapes": 684,
+    "gtfsSyncMeta": 1,
+    "stopGroups": 862
+  },
+  "graphics": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+  },
+  "viewport": {
+    "width": 1000,
+    "height": 700
+  },
+  "serviceWorkers": "blocked for exact API interception",
+  "limitations": [
+    "One run per cell; no confidence intervals",
+    "Local development builds, replayed API latency, live external map styles/tiles",
+    "Inert legacy archive fixtures share one identical serialized timetable; archives are not opened as real cities",
+    "Desktop GPU result; no physical mobile or SW/offline conclusion"
+  ],
+  "results": [
+    {
+      "version": "base",
+      "retainedPackages": 0,
+      "arrivalToIndexReadyMs": 17946.1,
+      "metadataDiscoveryMs": 0.2,
+      "projectionWriteObserved": true,
+      "projectionTransactionMs": 15731.5,
+      "panFrames": 244,
+      "panP95Ms": 17.5,
+      "panP99Ms": 17.7,
+      "fixtureMisses": 0
+    },
+    {
+      "version": "candidate",
+      "retainedPackages": 0,
+      "arrivalToIndexReadyMs": 1398.9,
+      "metadataDiscoveryMs": 4.2,
+      "projectionWriteObserved": false,
+      "projectionTransactionMs": 0,
+      "panFrames": 244,
+      "panP95Ms": 17.4,
+      "panP99Ms": 17.7,
+      "fixtureMisses": 0
+    },
+    {
+      "version": "base",
+      "retainedPackages": 1,
+      "arrivalToIndexReadyMs": 18541.8,
+      "metadataDiscoveryMs": 17.6,
+      "projectionWriteObserved": true,
+      "projectionTransactionMs": 16044,
+      "panFrames": 244,
+      "panP95Ms": 17.5,
+      "panP99Ms": 17.6,
+      "fixtureMisses": 0
+    },
+    {
+      "version": "candidate",
+      "retainedPackages": 1,
+      "arrivalToIndexReadyMs": 1404.3,
+      "metadataDiscoveryMs": 0.9,
+      "projectionWriteObserved": false,
+      "projectionTransactionMs": 0,
+      "panFrames": 244,
+      "panP95Ms": 17.6,
+      "panP99Ms": 17.7,
+      "fixtureMisses": 0
+    },
+    {
+      "version": "base",
+      "retainedPackages": 8,
+      "arrivalToIndexReadyMs": 18612.0,
+      "metadataDiscoveryMs": 157.9,
+      "projectionWriteObserved": true,
+      "projectionTransactionMs": 16008.3,
+      "panFrames": 244,
+      "panP95Ms": 17.3,
+      "panP99Ms": 17.6,
+      "fixtureMisses": 0
+    },
+    {
+      "version": "candidate",
+      "retainedPackages": 8,
+      "arrivalToIndexReadyMs": 1296.6,
+      "metadataDiscoveryMs": 0.4,
+      "projectionWriteObserved": false,
+      "projectionTransactionMs": 0,
+      "panFrames": 244,
+      "panP95Ms": 17.4,
+      "panP99Ms": 17.6,
+      "fixtureMisses": 0
+    }
+  ]
+}

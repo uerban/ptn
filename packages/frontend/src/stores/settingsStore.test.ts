@@ -1,50 +1,41 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { useSettingsStore } from "./settingsStore.ts";
+import { useCityStore } from "./cityStore.ts";
+import { effectiveExcludedModes, useSettingsStore } from "./settingsStore.ts";
 
 beforeEach(() => {
   globalThis.localStorage?.removeItem("ptn-settings");
   useSettingsStore.getState().setExcludedModes([]);
 });
 
-// `applyCityModeDefaults` seeds a city's default-excluded modes once per
-// session. The session tracker is module-scoped (not resettable from a test),
-// so each case uses a distinct cityId to start from an un-seeded state; the
-// idempotency case calls twice with the same id within the one test.
-describe("settingsStore — applyCityModeDefaults", () => {
-  it("seeds the city's default-excluded modes into excludedModes", () => {
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-a", ["FERRY"]);
-    expect(useSettingsStore.getState().excludedModes).toEqual(["FERRY"]);
+describe("global mode choices and city defaults", () => {
+  it("derives city defaults without persisting them into global exclusions", () => {
+    useSettingsStore.setState({excludedModes: ["TRAM"], enabledModes: []});
+    expect(effectiveExcludedModes(useSettingsStore.getState(), ["FERRY"])).toEqual(["TRAM", "FERRY"]);
+    expect(effectiveExcludedModes(useSettingsStore.getState(), [])).toEqual(["TRAM"]);
+    expect(useSettingsStore.getState().excludedModes).toEqual(["TRAM"]);
   });
-
-  it("is a no-op when the city declares no defaults", () => {
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-b", []);
-    expect(useSettingsStore.getState().excludedModes).toEqual([]);
+  it("keeps explicit opt-ins and disabled modes global through city switches and rehydration", () => {
+    const original = useCityStore.getState().activeCity;
+    try {
+      useSettingsStore.setState({excludedModes: ["TRAM"], enabledModes: []});
+      useCityStore.setState({activeCity: {...original, id: "a", defaultExcludedModes: ["FERRY"]}});
+      useSettingsStore.getState().toggleMode("FERRY");
+      expect(useSettingsStore.getState().excludedModes).toEqual(["TRAM"]);
+      expect(effectiveExcludedModes(useSettingsStore.getState(), ["FERRY"])).toEqual(["TRAM"]);
+      useCityStore.setState({activeCity: {...original, id: "b", defaultExcludedModes: ["FERRY"]}});
+      expect(effectiveExcludedModes(useSettingsStore.getState(), ["FERRY"])).toEqual(["TRAM"]);
+      const stored = JSON.parse(localStorage.getItem("ptn-settings")!).state;
+      const merged = useSettingsStore.persist.getOptions().merge!(stored, useSettingsStore.getInitialState());
+      expect(effectiveExcludedModes(merged, ["FERRY"])).toEqual(["TRAM"]);
+      useSettingsStore.getState().toggleMode("FERRY");
+      expect(useSettingsStore.getState().excludedModes).toEqual(["TRAM", "FERRY"]);
+      expect(effectiveExcludedModes(useSettingsStore.getState(), [])).toEqual(["TRAM", "FERRY"]);
+    } finally { useCityStore.setState({activeCity: original}); }
   });
-
-  it("preserves pre-existing exclusions and does not duplicate", () => {
-    useSettingsStore.getState().setExcludedModes(["TRAM", "FERRY"]);
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-c", ["FERRY"]);
-    expect(useSettingsStore.getState().excludedModes).toEqual(["TRAM", "FERRY"]);
-  });
-
-  it("only seeds once per city per session — a later opt-in is not undone", () => {
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-d", ["FERRY"]);
-    expect(useSettingsStore.getState().excludedModes).toEqual(["FERRY"]);
-
-    // User opts back in (toggles ferry on), then the seeding effect re-runs
-    // for the same city (e.g. navigating back to Search). The default must
-    // NOT be re-applied — the opt-in stands for the rest of the session.
-    useSettingsStore.getState().toggleMode("FERRY");
-    expect(useSettingsStore.getState().excludedModes).toEqual([]);
-
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-d", ["FERRY"]);
-    expect(useSettingsStore.getState().excludedModes).toEqual([]);
-  });
-
-  it("seeds distinct cities independently", () => {
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-e", ["FERRY"]);
-    useSettingsStore.getState().applyCityModeDefaults("seed-city-f", ["METRO"]);
-    expect(useSettingsStore.getState().excludedModes).toEqual(["FERRY", "METRO"]);
+  it("preserves historical global exclusions without guessing their origin", () => {
+    const merged = useSettingsStore.persist.getOptions().merge!({excludedModes: ["FERRY", "TRAM"]}, useSettingsStore.getInitialState());
+    expect(merged.excludedModes).toEqual(["FERRY", "TRAM"]);
+    expect(merged.enabledModes).toEqual([]);
   });
 });
 
@@ -146,4 +137,18 @@ describe("loose POI category preferences", () => {
     expect(rehydrated.poiLooseCategories).toEqual([]);
     expect(rehydrated.poiIncludeLooseTier).toBe(false);
   });
+});
+
+
+it("migrates city aliases in colour/group maps while preserving current and unavailable-city choices", () => {
+  const merged = useSettingsStore.persist.getOptions().merge!({
+    modeColorOverrides: {gdansk: {BUS: "#112233", TRAM: "#223344"}, tricity: {BUS: "#445566"}, unavailable: {BUS: "#778899"}},
+    excludedRouteGroupsByCity: {gdansk: ["old"], tricity: ["new"], unavailable: ["kept"]},
+    excludedModes: ["METRO"],
+  }, useSettingsStore.getInitialState());
+  expect(merged.modeColorOverrides.tricity).toEqual({BUS: "#445566", TRAM: "#223344"});
+  expect(merged.modeColorOverrides.unavailable).toEqual({BUS: "#778899"});
+  expect(merged.excludedRouteGroupsByCity.tricity).toEqual(["old", "new"]);
+  expect(merged.excludedRouteGroupsByCity.unavailable).toEqual(["kept"]);
+  expect(merged.excludedModes).toEqual(["METRO"]);
 });

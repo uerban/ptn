@@ -376,3 +376,37 @@ fn osm_only_address_publication_adopts_and_rolls_back_with_same_ptb() {
         original_sha
     );
 }
+
+#[test]
+fn geometry_policy_survives_reload_with_unusable_shapes() {
+    let h = reload_harness("vilnius");
+    let mut config = common::default_test_config(h.data_root.clone());
+    config.city_slug = "vilnius".into();
+    config.without_geometry = true;
+    let runner = pt_serve::ReloadRunner::new(
+        h.gen_handle.clone(),
+        std::sync::Arc::new(config),
+        h.metrics.clone(),
+        h.clock.clone(),
+    );
+    let created_at = publisher::rfc3339_format(common::RELOAD_HARNESS_ANCHOR + 60);
+    let id = publisher::publish_generation_with_artifacts(
+        &h.data_root,
+        "vilnius",
+        &canary_ptb_path(),
+        &created_at,
+        &publisher::SidecarArtifacts {
+            shapes_bin: Some(b"SHPBcorrupt".to_vec()),
+            ..Default::default()
+        },
+    );
+    let manifest_path = publisher::manifest_path_for(&h.data_root, &id);
+    let before = std::fs::read(&manifest_path).unwrap();
+    assert!(runner.trigger_reload().is_adopted());
+    let current = h.gen_handle.load();
+    assert_eq!(current.generation_id, id);
+    assert!(current.shapes_json_bytes().is_none());
+    assert!(current.shapes_json_sha256.is_none());
+    assert!(current.route_geometry_etag.is_none());
+    assert_eq!(std::fs::read(manifest_path).unwrap(), before);
+}

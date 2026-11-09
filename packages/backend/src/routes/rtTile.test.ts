@@ -97,6 +97,7 @@ describe("rtTile route", () => {
 
     const res = await app.inject({ method: "GET", url: `/api/gtfs/rt-tile/${HASH}/${SCHEDULE_TILE_SIZE_LABEL}/${coords}` });
     expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("public, max-age=5, s-maxage=5");
     const body = JSON.parse(res.payload);
     const byId = Object.fromEntries(body.trips.map((t: any) => [t.tripId, t]));
     expect(body.trips).toHaveLength(2);
@@ -119,17 +120,18 @@ describe("rtTile route", () => {
       expect(first.statusCode).toBe(200);
       expect(JSON.parse(first.payload).trips).toHaveLength(1);
 
-      // Expire the 10 s merged-body TTL and change both the RT overlay and
+      // Expire the 5 s merged-body TTL and change both the RT overlay and
       // the disk state: the tile file is gone (janitor / roll window). The
       // trip membership is immutable per (bundleHash, coords), so the route
       // must serve a FRESH merge from cached membership — not 409/503, and
       // not the stale first body.
       rmSync(tilePath);
       rtByTripId.set("T1", [{ delaySeconds: 120, cancelled: false }]);
-      vi.advanceTimersByTime(11_000);
+      vi.advanceTimersByTime(5_001);
 
       const second = await app.inject({ method: "GET", url });
       expect(second.statusCode).toBe(200);
+      expect(second.headers["cache-control"]).toBe("public, max-age=5, s-maxage=5");
       expect(JSON.parse(second.payload).trips).toEqual([
         { tripId: "T1", delaySeconds: 120, cancelled: false },
       ]);
@@ -275,6 +277,7 @@ describe("rtTile route", () => {
     // Leaf 3's tile carries only T2 → only T2 is emitted; T1 (in leaf 0) is absent.
     const res = await app.inject({ method: "GET", url: `/api/gtfs/rt-tile/${HASH}/${SCHEDULE_TILE_SIZE_LABEL}/${cellKey}-3` });
     expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("public, max-age=5, s-maxage=5");
     const body = JSON.parse(res.payload);
     expect(body.trips.map((t: any) => t.tripId)).toEqual(["T2"]);
   });

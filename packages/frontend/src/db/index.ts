@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from "dexie";
+import Dexie, { type EntityTable, type Transaction } from "dexie";
 import type {
   BaseEndpoint,
   PoiEntry,
@@ -17,6 +17,7 @@ import { migrationCoordinator } from "./migrationCoordinator.ts";
 
 interface StopRecord {
   id: string;
+  cityId?: string;
   name: string;
   location: LatLon;
   parentStationId?: string;
@@ -132,11 +133,25 @@ export interface StopGroupRecord {
  * WebCrypto CryptoKey persisted via IndexedDB's structured-clone.
  */
 export interface InstallKeyRecord {
-  id: "current";
+  /** `current`: AES-GCM sealing key; `hmac`: keyed lookup identifiers. */
+  id: "current" | "hmac";
   key: CryptoKey;
 }
 
 /**
+ * Personal record at rest: an opaque random id plus ciphertext. Everything
+ * else (endpoints, labels, timestamps, counts, stop IDs) is inside `sealed`;
+ * see `services/personalStorage.ts`.
+ */
+export interface SealedPersonalRow {
+  id: string;
+  sealed: EncryptedRecord;
+}
+
+/**
+ * Legacy row shape, read only by the encrypted-storage migration: rows are now
+ * `SealedPersonalRow`s.
+ *
  * Recent route endpoints (M8b). Endpoint coordinates live in `endpoint`, which
  * carries a `BaseEndpoint` at `plaintext` tier or an `EncryptedRecord` at
  * `encrypted` tier. Metadata (`id`, `usedAt`, `usedAsOrigin`) stays plaintext
@@ -146,12 +161,16 @@ export interface InstallKeyRecord {
  */
 export interface RecentLocationRecord {
   id: string;
+  cityId?: string;
   endpoint: BaseEndpoint | EncryptedRecord;
   usedAt: number;
   usedAsOrigin: boolean;
 }
 
 /**
+ * Legacy row shape, read only by the encrypted-storage migration: rows are now
+ * `SealedPersonalRow`s.
+ *
  * Saved locations (M8c) — user-pinned places. Like recents, the endpoint is
  * polymorphic across encryption tier: a `BaseEndpoint` when stored plaintext,
  * an `EncryptedRecord` when sealed via cryptoBox. The plaintext metadata
@@ -166,6 +185,8 @@ export interface RecentLocationRecord {
  */
 export interface SavedLocationRecord {
   id: string;
+  /** Absent on legacy saves whose city has not been established. */
+  cityId?: string;
   endpoint: BaseEndpoint | EncryptedRecord;
   destinationEndpoint?: BaseEndpoint | EncryptedRecord;
   alias: string;
@@ -480,13 +501,60 @@ export interface OfflineCityRecord {
   sizeBytes: number;
   tables: Record<string, object[]>;
 }
+/** Small download-list row. Legacy placeholders deliberately contain no payload. */
+export interface OfflineCityMetadata {
+  cityId: string;
+  state: "legacy" | "complete";
+  city?: import("../config/cities.ts").CityConfig;
+  preparedAt?: number;
+  sizeBytes?: number;
+  generationId?: string;
+  transfersHash?: string;
+  artifactKey?: string;
+  shapesHash?: string;
+}
 export interface OfflineTransferRecord { hash: string; bytes: Uint8Array }
+export interface SharedArtifactMetadata {
+  key: string; kind: "transfers" | "shapes"; hash: string;
+  /** Missing for key-only legacy discovery until this payload is accessed. */
+  sizeBytes?: number;
+  lastUsedAt: number;
+}
+
+/** Immutable verified PTB generation. No decoded per-trip projection is stored. */
+export interface CityArtifactRecord {
+  key: string;
+  cityId: string;
+  generation: import("../services/ptbCatalog.ts").PtbCatalogGeneration;
+  ptb: import("../services/gtfsBundleBytes.ts").FetchPtbBytesResult;
+}
+/** Payload-free inventory for budget accounting and reference collection. */
+export interface CityArtifactMetadata {
+  key: string; cityId: string; sizeBytes: number; createdAt: number;
+  generationId: string;
+  transfersHash?: string;
+  shapesArtifact?: {url: string; hash: string; sizeBytes: number};
+  ptbSizeBytes?: number;
+  transfersSizeBytes?: number;
+}
+export interface CityCachePointer { cityId: string; artifactKey: string; lastUsedAt: number }
+
+export interface CityUsageStatRecord extends UsageStatRecord { id: string; cityId: string }
 
 interface PtnTables {
+  sharedArtifactMetadata: EntityTable<SharedArtifactMetadata, "key">;
+  cityShapes: EntityTable<OfflineTransferRecord, "hash">;
+  cityArtifacts: EntityTable<CityArtifactRecord, "key">;
+  cityArtifactMetadata: EntityTable<CityArtifactMetadata, "key">;
+  cityCachePointers: EntityTable<CityCachePointer, "cityId">;
   offlineCities: EntityTable<OfflineCityRecord, "cityId">;
+  offlineCityMetadata: EntityTable<OfflineCityMetadata, "cityId">;
   offlineTransfers: EntityTable<OfflineTransferRecord, "hash">;
   stops: EntityTable<StopRecord, "id">;
   usageStats: EntityTable<UsageStatRecord, "stopId">;
+  personalUsage: EntityTable<SealedPersonalRow, "id">;
+  /** Legacy per-city usage rows, read only by the encrypted-storage migration. */
+  cityUsageStats: EntityTable<CityUsageStatRecord, "id">;
   gtfsRoutes: EntityTable<GtfsRouteRecord, "id">;
   gtfsTrips: EntityTable<GtfsTripRecord, "tripId">;
   gtfsServices: EntityTable<GtfsServiceRecord, "serviceId">;
@@ -494,8 +562,8 @@ interface PtnTables {
   gtfsStops: EntityTable<GtfsStopRecord, "id">;
   stopGroups: EntityTable<StopGroupRecord, "groupId">;
   installKey: EntityTable<InstallKeyRecord, "id">;
-  recentLocations: EntityTable<RecentLocationRecord, "id">;
-  savedLocations: EntityTable<SavedLocationRecord, "id">;
+  recentLocations: EntityTable<SealedPersonalRow, "id">;
+  savedLocations: EntityTable<SealedPersonalRow, "id">;
   poiIndex: EntityTable<PoiIndexRecord, "id">;
   poiSyncMeta: EntityTable<PoiSyncMetaRecord, "cityId">;
   geocoderDedup: EntityTable<GeocoderDedupRecord, "queryHash">;
@@ -510,11 +578,11 @@ interface PtnTables {
 }
 
 export type PtnTableName = keyof PtnTables;
-export type TableKind = "server-derived" | "user-owned";
+export type TableKind = "server-derived" | "user-owned" | "retained-download";
 
 /**
  * Classifies every Dexie table as server-derived (safe to wipe on a
- * data-schema bump) or user-owned (must survive every wipe). The
+ * data-schema bump), user-owned, or retained-download (both survive cache wipes). The
  * `satisfies Record<PtnTableName, TableKind>` clause forces a compile
  * error if a new table is added to `PtnTables` without classifying it
  * here — making the deployed/user-owned split a load-bearing
@@ -523,8 +591,15 @@ export type TableKind = "server-derived" | "user-owned";
  * Consumed by `dataSchemaVersion.ts` to derive the wipe set.
  */
 export const TABLE_KIND = {
+  sharedArtifactMetadata: "retained-download",
+  cityShapes: "retained-download",
+  cityArtifacts: "retained-download",
+  cityArtifactMetadata: "retained-download",
+  cityCachePointers: "retained-download",
   stops: "server-derived",
   usageStats: "user-owned",
+  personalUsage: "user-owned",
+  cityUsageStats: "user-owned",
   gtfsRoutes: "server-derived",
   gtfsTrips: "server-derived",
   gtfsServices: "server-derived",
@@ -536,7 +611,8 @@ export const TABLE_KIND = {
   savedLocations: "user-owned",
   poiIndex: "server-derived",
   poiSyncMeta: "server-derived",
-  geocoderDedup: "server-derived",
+  // Searches the rider made, keyed by an install-keyed HMAC.
+  geocoderDedup: "user-owned",
   poiTileCache: "server-derived",
   poiTileGenerations: "server-derived",
   gtfsBundle: "server-derived",
@@ -545,18 +621,27 @@ export const TABLE_KIND = {
   scheduleTileCache: "server-derived",
   gbfsSystems: "server-derived",
   addressSearchArtifacts: "server-derived",
-  offlineCities: "server-derived",
-  offlineTransfers: "server-derived",
+  offlineCities: "retained-download",
+  offlineTransfers: "retained-download",
+  offlineCityMetadata: "retained-download",
 } as const satisfies Record<PtnTableName, TableKind>;
 
 const db = new Dexie("ptn") as Dexie & PtnTables;
 
 /** The complete Dexie schema: table → primary key and indexes. */
 export const STORES = {
+  sharedArtifactMetadata: "key",
+  cityShapes: "hash",
+  cityArtifacts: "key",
+  cityArtifactMetadata: "key, cityId",
+  cityCachePointers: "cityId",
   offlineCities: "cityId",
   offlineTransfers: "hash",
+  offlineCityMetadata: "cityId",
   stops: "id, lastSeen",
-  usageStats: "stopId, lastTapped",
+  usageStats: "stopId",
+  personalUsage: "id",
+  cityUsageStats: "id",
   gtfsRoutes: "id",
   gtfsTrips: "tripId, routeId",
   gtfsServices: "serviceId",
@@ -564,8 +649,8 @@ export const STORES = {
   gtfsStops: "id",
   stopGroups: "groupId, name",
   installKey: "id",
-  recentLocations: "id, usedAt",
-  savedLocations: "id, savedAt",
+  recentLocations: "id",
+  savedLocations: "id",
   poiIndex: "id, [cityId+name], [cityId+geoBucket]",
   poiSyncMeta: "cityId",
   geocoderDedup: "queryHash, [providerId+createdAt]",
@@ -585,11 +670,74 @@ export const STORES = {
 migrationCoordinator.reserve({
   id: "ptn",
   version: 1,
-  stores: Object.fromEntries(Object.entries(STORES).filter(([name]) => !["offlineCities", "offlineTransfers"].includes(name))),
+  stores: {
+    ...Object.fromEntries(Object.entries(STORES).filter(([name]) => ![
+      "offlineCities", "offlineTransfers", "offlineCityMetadata", "personalUsage", "cityUsageStats",
+      "cityArtifacts", "cityArtifactMetadata", "cityCachePointers", "cityShapes", "sharedArtifactMetadata",
+    ].includes(name))),
+    // Version-1 shape of the personal tables (changed in version 3 below).
+    usageStats: "stopId, lastTapped",
+    recentLocations: "id, usedAt",
+    savedLocations: "id, savedAt",
+  },
 });
 
 migrationCoordinator.reserve({id: "offline-city-packages", version: 2,
   stores: {offlineCities: "cityId", offlineTransfers: "hash"}});
+
+// Key-only discovery avoids cloning every timetable during the version upgrade.
+// Details are filled only when the corresponding city is opened or downloaded.
+async function addLegacyOfflineCityMetadata(tx: Transaction): Promise<void> {
+  const cityIds = await tx.table("offlineCities").toCollection().primaryKeys();
+  const known = new Set(await tx.table("offlineCityMetadata").toCollection().primaryKeys());
+  await tx.table("offlineCityMetadata").bulkPut(
+    cityIds.filter(cityId => !known.has(cityId)).map(cityId => ({cityId, state: "legacy"})));
+}
+
+// Personal records keep only an opaque id outside their ciphertext, so their
+// timestamp indexes go and stop usage moves to opaque-keyed rows. Rows are
+// converted by services/personalStorageMigration.ts, not by this upgrade.
+// Databases already at version 3 through the encrypted-storage schema hold
+// personalUsage: it must stay declared from version 3 on, or IndexedDB would
+// drop it while replaying later versions.
+const PERSONAL_SHAPES = {personalUsage: "id", recentLocations: "id", savedLocations: "id", usageStats: "stopId"};
+
+migrationCoordinator.reserve({id: "offline-city-metadata", version: 3,
+  stores: {offlineCityMetadata: "cityId", ...PERSONAL_SHAPES},
+  upgrade: addLegacyOfflineCityMetadata,
+});
+
+// Per-city stop usage. Saves and recents carry their city inside the sealed
+// payload, so no ownership index is added to personal tables.
+migrationCoordinator.reserve({id: "city-user-data", version: 4,
+  stores: {cityUsageStats: "id"},
+});
+
+migrationCoordinator.reserve({id: "city-artifacts", version: 5,
+  stores: {cityArtifacts: STORES.cityArtifacts, cityArtifactMetadata: STORES.cityArtifactMetadata,
+    cityCachePointers: STORES.cityCachePointers},
+});
+
+migrationCoordinator.reserve({id: "city-shape-artifacts", version: 6, stores: {cityShapes: STORES.cityShapes}});
+
+migrationCoordinator.reserve({id: "shared-artifact-inventory", version: 7,
+  stores: {sharedArtifactMetadata: STORES.sharedArtifactMetadata},
+  upgrade: async tx => {
+    for (const [kind, name] of [["transfers", "offlineTransfers"], ["shapes", "cityShapes"]] as const) {
+      const hashes = await tx.table(name).toCollection().primaryKeys();
+      await tx.table("sharedArtifactMetadata").bulkPut(hashes.map(hash => ({key: `${kind}:${hash}`, kind, hash, lastUsedAt: 0})));
+    }
+  },
+});
+
+// Reached from either earlier version 3 or later: city ownership indexes on
+// personal tables go, and a database that reached version 3 through the
+// encrypted-storage schema never ran the offline-city-metadata upgrade, so it
+// runs here too.
+migrationCoordinator.reserve({id: "personal-encrypted-storage", version: 8,
+  stores: {...PERSONAL_SHAPES, cityUsageStats: "id"},
+  upgrade: addLegacyOfflineCityMetadata,
+});
 
 for (const decl of migrationCoordinator.declaredMigrations()) {
   const v = db.version(decl.version).stores(decl.stores);

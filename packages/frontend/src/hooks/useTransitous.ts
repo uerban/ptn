@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getPolicy } from "../stores/privacyStore.ts";
 import { isDeviceOnline } from "./useConnectivity.ts";
 import { reportTelemetry } from "../services/errorReporter.ts";
 import { planViaTransitous, type TransitousPlanArgs } from "../services/transitousClient.ts";
@@ -35,7 +34,7 @@ export function useTransitous() {
     setState({ status: "pending" });
     let outcome: TransitousOutcome;
     try {
-      const result = await planViaTransitous(args, getPolicy);
+      const result = await planViaTransitous(args);
       outcome = classifyTransitousResult(mapTripResult(result));
     } catch (err) {
       if (err instanceof RoutingNotAllowedError) {

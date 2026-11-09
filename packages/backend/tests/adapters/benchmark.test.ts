@@ -26,7 +26,6 @@ function createFakeAdapter(
     async getNearbyStops() { return []; },
     async getDepartures() { return []; },
     async searchStops() { return []; },
-    async getAlerts() { return []; },
     async healthCheck() { return true; },
   };
 }
@@ -63,7 +62,6 @@ describe("benchmarkAdapters", () => {
       async getNearbyStops() { return []; },
       async getDepartures() { return []; },
       async searchStops() { return []; },
-      async getAlerts() { return []; },
       async healthCheck() { return false; },
     };
 

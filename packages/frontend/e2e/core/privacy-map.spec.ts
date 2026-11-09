@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+import { seedNetworkDecisions } from "../helpers/setup-complete";
 
 const CARTO_TILE_TEMPLATE =
   "https://basemaps.cartocdn.com/privacy-test/{z}/{x}/{y}.png";
@@ -70,6 +71,7 @@ test.describe("Privacy: external basemap @mock-api", () => {
   }) => {
     const cartoRequests = await interceptCarto(page);
     await mockApi(page);
+    await seedNetworkDecisions(page, { "external.detailed-basemap@carto": "allowed" });
 
     await page.goto("/");
     await expect(page.locator(".maplibregl-canvas")).toBeVisible();

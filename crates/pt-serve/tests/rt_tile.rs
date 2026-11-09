@@ -205,7 +205,7 @@ fn success_200_overlays_rt_for_each_trip() {
             ..
         } => {
             assert_eq!(content_type, "application/json");
-            assert_eq!(cache_control, Some("no-cache"));
+            assert_eq!(cache_control, Some("public, max-age=5, s-maxage=5"));
             assert_eq!(bundle_hash.as_deref(), Some(gen_id.as_str()));
             assert!(vary_accept_encoding);
         }

@@ -10,11 +10,17 @@ import { registerScheduleTileEvictor } from "./services/scheduleTileEvictor.ts";
 import { startRecentsSweep } from "./services/recents.ts";
 import { startStopUsageSweep } from "./services/stopUsage.ts";
 import { runPrivacyDataMigration } from "./services/privacyDataMigration.ts";
+import { runPersonalStorageMigration } from "./services/personalStorageMigration.ts";
+import { mapViewportItem } from "./services/sealedLocalStorage.ts";
 import { startDedupSweep } from "./services/geocoder/dedupCache.ts";
 import { listenForSwUpdates } from "./services/poiLoader.ts";
 import { loadGeocoderConfig, syncPoi } from "./bootPoi.ts";
 import { useCityStore } from "./stores/cityStore.ts";
 import { useSettingsStore } from "./stores/settingsStore.ts";
+import {
+  applyPendingOnboardingJournal,
+  installPrivacyStateSync,
+} from "./stores/onboardingStore.ts";
 import { ensureDataSchemaUpToDate } from "./db/dataSchemaVersion.ts";
 import { scheduleIdle } from "./utils/idle.ts";
 import "./index.css";
@@ -57,6 +63,24 @@ async function bootApp(): Promise<void> {
       context: { where: "main.runPrivacyDataMigration" },
     });
   }
+
+  // Personal data written by earlier versions is encrypted before anything
+  // reads it. A failure is reported in the app; transit keeps working and
+  // personal writes are kept for this session only until a retry succeeds.
+  try {
+    await runPersonalStorageMigration();
+  } catch (err) {
+    reportError(err instanceof Error ? err : new Error(String(err)), {
+      context: { where: "main.runPersonalStorageMigration" },
+    });
+  }
+  // The map reads its last area synchronously at start-up.
+  await mapViewportItem.load().catch(() => {});
+
+  // A committed setup journal must reach the preference stores before any
+  // optional feature reads them.
+  await applyPendingOnboardingJournal();
+  installPrivacyStateSync();
 
   registerScheduleTileEvictor();
 

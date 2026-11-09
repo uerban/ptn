@@ -8,8 +8,7 @@ import {
   __clearRamRecentsForTests,
   __getRamRecentsForTests,
 } from "../../services/recents.ts";
-import { __clearRamStoreForTests } from "../../services/cryptoBox.ts";
-import { __resetInstallKeyCacheForTests } from "../../services/installKey.ts";
+import { resetPersonalStorage } from "../../test-helpers/personalStorage.ts";
 import { usePrivacyChoicesStore } from "../../stores/privacyChoicesStore.ts";
 import {
   PRIVACY_DATA_MIGRATION_KEY,
@@ -19,7 +18,6 @@ import {
 afterEach(() => {
   cleanup();
   __clearRamRecentsForTests();
-  __clearRamStoreForTests();
   localStorage.setItem(
     PRIVACY_DATA_MIGRATION_KEY,
     PRIVACY_DATA_MIGRATION_VERSION,
@@ -28,12 +26,8 @@ afterEach(() => {
 });
 
 beforeEach(async () => {
-  if (!db.isOpen()) await db.open();
-  await db.recentLocations.clear();
-  await db.installKey.clear();
-  __resetInstallKeyCacheForTests();
-  __clearRamRecentsForTests();
-  __clearRamStoreForTests();
+  await resetPersonalStorage();
+  usePrivacyChoicesStore.getState().setChoice("recents", "enabled");
 });
 
 describe("RecentsPurgeControl", () => {
@@ -63,14 +57,14 @@ describe("RecentsPurgeControl", () => {
   test("end-to-end: confirmed click clears persisted + RAM recents", async () => {
     await recordRecent(
       { kind: "stop", stopId: "S1", name: "C", lat: 0, lon: 0 },
-      { usedAsOrigin: true, now: () => 1, tier: "plaintext" },
+      { usedAsOrigin: true, now: () => 1, tier: "encrypted" },
     );
     await recordRecent(
       { kind: "stop", stopId: "S2", name: "D", lat: 0, lon: 0 },
       { usedAsOrigin: false, now: () => 2, tier: "ram-only" },
     );
     expect(await db.recentLocations.count()).toBe(1);
-    expect(__getRamRecentsForTests().size).toBe(1);
+    expect((await __getRamRecentsForTests()).size).toBe(1);
 
     render(<RecentsPurgeControl confirmFn={() => true} />);
     fireEvent.click(screen.getByRole("button", { name: /purge/i }));
@@ -78,7 +72,7 @@ describe("RecentsPurgeControl", () => {
     await waitFor(async () => {
       expect(await db.recentLocations.count()).toBe(0);
     });
-    expect(__getRamRecentsForTests().size).toBe(0);
+    expect((await __getRamRecentsForTests()).size).toBe(0);
   });
 
   test("shows a confirmation message after a successful purge", async () => {

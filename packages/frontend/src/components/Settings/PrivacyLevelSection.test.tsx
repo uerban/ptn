@@ -1,12 +1,16 @@
+import { LEVEL_FLOORS } from "@pt/shared/privacy";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { PrivacyLevelSection } from "./PrivacyLevelSection.tsx";
 import { getPolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
+import { getNetworkDecision } from "../../privacy/canUse.ts";
+import { resetFlows } from "../../test-helpers/networkDecisions.ts";
 
 afterEach(() => cleanup());
 
 beforeEach(() => {
   usePrivacyStore.getState().reset();
+  resetFlows();
 });
 
 describe("PrivacyLevelSection", () => {
@@ -59,34 +63,48 @@ describe("PrivacyLevelSection", () => {
     }
   });
 
-  test("renders the nearby-stop control", () => {
+  test("renders one decision control per optional network flow, not policy axes", () => {
     const { container } = render(<PrivacyLevelSection />);
-    expect(
-      container.querySelector('input[name="policy-axis-nearbyStopLookup"]'),
-    ).not.toBeNull();
+    for (const group of [
+      "operator.realtime",
+      "external.detailed-basemap@carto",
+      "operator.place-search",
+      "external.stop-search",
+      "operator.remote-routing",
+      "external.remote-routing@transitous",
+    ]) {
+      expect(container.querySelector(`[data-flow-group="${group}"]`)).not.toBeNull();
+    }
+    for (const axis of ["nearbyStopLookup", "basemapMode", "realTimePolling", "m10ThirdPartyEnabled"]) {
+      expect(container.querySelector(`[data-axis-group="${axis}"]`)).toBeNull();
+      expect(container.querySelector(`input[name="policy-axis-${axis}"]`)).toBeNull();
+    }
+    // Nearby-stop lookup is local: never offered as a network service.
+    expect(container.querySelector('[data-flow-group="operator.nearby-stop-centroid"]')).toBeNull();
   });
 
-  // basemapMode is driven by the single Map control (MapModeSection); the
-  // privacy centre keeps the axis copy but must not render a second radio
-  // group for the same decision.
-  test("shows basemapMode read-only with a pointer to the Map control", () => {
+  test("a network row writes only its own decision", () => {
     const { container } = render(<PrivacyLevelSection />);
-    expect(
-      container.querySelector('input[name="policy-axis-basemapMode"]'),
-    ).toBeNull();
-    const group = container.querySelector('[data-axis-group="basemapMode"]');
-    expect(group).not.toBeNull();
-    expect(group?.querySelector('a[href="#settings-map-mode"]')).not.toBeNull();
-    expect(group?.textContent ?? "").toMatch(/external-detailed|Detailed/i);
-  });
-
-  test("locks centroid lookup at Hardened", () => {
-    usePrivacyStore.getState().setLevel("hardened");
-    const { container } = render(<PrivacyLevelSection />);
-    const nearby = container.querySelector(
-      'input[name="policy-axis-nearbyStopLookup"][value="centroid-server"]',
+    const on = container.querySelector(
+      '[data-flow-group="operator.realtime"] input[value="allowed"]',
     ) as HTMLInputElement;
-    expect(nearby.disabled).toBe(true);
+    fireEvent.click(on);
+    expect(getNetworkDecision("operator.realtime")).toEqual({ value: "allowed", source: "settings" });
+    expect(getNetworkDecision("operator.remote-routing").value).toBe("unset");
+    expect(getPolicy()).toEqual(LEVEL_FLOORS.standard);
+    expect(usePrivacyStore.getState().overrides).toEqual({});
+  });
+
+  test("network rows stay editable at every level", () => {
+    usePrivacyStore.getState().setLevel("paranoid");
+    const { container } = render(<PrivacyLevelSection />);
+    const on = container.querySelector(
+      '[data-flow-group="external.detailed-basemap@carto"] input[value="allowed"]',
+    ) as HTMLInputElement;
+    expect(on.disabled).toBe(false);
+    fireEvent.click(on);
+    expect(getNetworkDecision("external.detailed-basemap", "carto").value).toBe("allowed");
+    expect(getPolicy()).toEqual(LEVEL_FLOORS.paranoid);
   });
 
   test("axis below floor is disabled at hardened level with locked copy", () => {
@@ -107,7 +125,7 @@ describe("PrivacyLevelSection", () => {
       screen.getByText(/Shareable URLs can carry coordinates/i),
     ).toBeDefined();
     expect(
-      screen.getByText(/per-install encryption key/i),
+      screen.getByText(/per-install key/i),
     ).toBeDefined();
     expect(
       screen.getByText(/area-of-interest tiles from the PTN backend/i),

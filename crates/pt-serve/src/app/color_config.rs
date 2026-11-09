@@ -9,7 +9,7 @@ pub fn color_config(gen: &Generation) -> Resp {
             status: 200,
             body: ByteBody::Raw(Arc::clone(bytes)),
             content_type: "application/json",
-            cache_control: "public, max-age=3600",
+            cache_control: "public, max-age=86400",
             etag: None, // backend sets no ETag on /color-config
             gzipped: false,
         },

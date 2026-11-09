@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
@@ -25,6 +26,7 @@ beforeEach(async () => {
   clearShapeDecodeCache();
   await db.delete();
   await db.open();
+  await seedLegacyCityProjection();
   useGtfsDataStore.setState({ syncing: false } as any);
 });
 

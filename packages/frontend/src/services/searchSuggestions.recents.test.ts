@@ -1,3 +1,4 @@
+import { seedLegacyCityProjection } from "../test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { ApiResponse, RecentRef, Stop } from "@pt/shared";
@@ -102,6 +103,7 @@ describe("searchSuggestionsStream — recents integration", () => {
     await db.open();
     await db.poiIndex.clear();
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.stopGroups.clear();
     await db.usageStats.clear();
     vi.mocked(listRecents).mockReset();

@@ -1,8 +1,7 @@
 import { POI_FETCH_MODES, type PoiFetchMode } from "@pt/shared/poi";
-import type { PrivacyPolicy } from "@pt/shared/privacy";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { CITIES, type CityConfig } from "../config/cities.ts";
-import { getPolicy } from "../stores/privacyStore.ts";
+import { canUse } from "../privacy/canUse.ts";
 
 function isPoiFetchMode(x: unknown): x is PoiFetchMode {
   return typeof x === "string" && (POI_FETCH_MODES as readonly string[]).includes(x);
@@ -34,16 +33,16 @@ function perCityOperatorMode(
   return city?.poiFetchMode;
 }
 
-/** Clamp a resolved POI fetch mode to the privacy policy's residency ceiling.
- *  Privacy governs local-vs-remote ONLY: when poiResidency is "local-only", the
- *  remote "server-side" mode is clamped to the local floor "eager-bundle". The
- *  eager-vs-lazy distinction is privacy-neutral (threat model: byte-budget is not
- *  a privacy win) and is intentionally left untouched. */
-export function clampPoiFetchModeToPolicy(
+/** Clamp a resolved POI fetch mode to the operator place-search flow.
+ *  The decision governs local-vs-remote ONLY: unless `operator.place-search` is
+ *  allowed, the remote "server-side" mode is clamped to the local floor
+ *  "eager-bundle". The eager-vs-lazy distinction is privacy-neutral (threat
+ *  model: byte-budget is not a privacy win) and is intentionally left untouched. */
+export function clampPoiFetchModeToDecision(
   mode: PoiFetchMode,
-  policy: PrivacyPolicy,
+  placeSearchAllowed: boolean,
 ): PoiFetchMode {
-  if (policy.poiResidency === "local-only" && mode === "server-side") return "eager-bundle";
+  if (!placeSearchAllowed && mode === "server-side") return "eager-bundle";
   return mode;
 }
 
@@ -70,12 +69,15 @@ function resolveRawPoiFetchMode(cityId: string): PoiFetchMode {
 }
 
 /**
- * Resolve the effective POI fetch mode for a city, then clamp it to the user's privacy
- * residency ceiling (poiResidency: "local-only" forbids remote). The raw ladder is
- * user-override > per-city operator > global default > "eager-bundle"; the privacy clamp
- * governs local-vs-remote ONLY (eager-vs-lazy is privacy- neutral) and can only move the result
- * toward MORE local, never less.
+ * Resolve the effective POI fetch mode for a city, then clamp it to the operator place-search
+ * decision (remote only while `operator.place-search` is allowed). The raw ladder is
+ * user-override > per-city operator > global default > "eager-bundle"; the clamp governs
+ * local-vs-remote ONLY (eager-vs-lazy is privacy- neutral) and can only move the result toward
+ * MORE local, never less.
  */
 export function resolvePoiFetchMode(cityId: string): PoiFetchMode {
-  return clampPoiFetchModeToPolicy(resolveRawPoiFetchMode(cityId), getPolicy());
+  return clampPoiFetchModeToDecision(
+    resolveRawPoiFetchMode(cityId),
+    canUse("operator.place-search"),
+  );
 }

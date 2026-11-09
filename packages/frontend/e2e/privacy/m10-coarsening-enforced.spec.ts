@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
+import { decideAfterSetup } from "../helpers/setup-complete";
 
 const ADAPTER_MODULE = "/src/services/geocoder/ThirdPartyGeocoderAdapter.ts";
 const EARTH_LAT_METERS_PER_DEG = 111_320;
@@ -53,7 +54,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
   for (const { label, gridMeters } of GRID_CASES) {
     test(`forward geocode coords coarsened at ${label}`, async ({ page }) => {
       await bootAtPrivacyLevel(page, "standard", {
-        m10ThirdPartyEnabled: true,
         m10CoarsenGridDefaultMeters: gridMeters,
       });
       await mockApi(page);
@@ -66,6 +66,10 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
 
       await page.goto("/");
       await page.waitForLoadState("networkidle");
+      await decideAfterSetup(page, {
+        "external.place-search@nominatim": "allowed",
+        "external.place-search@photon": "allowed",
+      });
 
       await page.evaluate(
         async ({ modulePath, hint, grid }) => {
@@ -73,7 +77,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
             ThirdPartyGeocoderAdapter: new (
               config: { provider: string; endpoint: string },
               getPolicy: () => {
-                m10ThirdPartyEnabled: boolean;
                 m10CoarsenGridDefaultMeters: number;
               },
             ) => {
@@ -90,7 +93,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
               endpoint: "https://nominatim.openstreetmap.org",
             },
             () => ({
-              m10ThirdPartyEnabled: true,
               m10CoarsenGridDefaultMeters: grid,
             }),
           );
@@ -107,7 +109,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
 
     test(`reverse geocode coords coarsened at ${label}`, async ({ page }) => {
       await bootAtPrivacyLevel(page, "standard", {
-        m10ThirdPartyEnabled: true,
         m10CoarsenGridDefaultMeters: gridMeters,
       });
       await mockApi(page);
@@ -120,6 +121,10 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
 
       await page.goto("/");
       await page.waitForLoadState("networkidle");
+      await decideAfterSetup(page, {
+        "external.place-search@nominatim": "allowed",
+        "external.place-search@photon": "allowed",
+      });
 
       await page.evaluate(
         async ({ modulePath, coord, grid }) => {
@@ -127,7 +132,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
             ThirdPartyGeocoderAdapter: new (
               config: { provider: string; endpoint: string },
               getPolicy: () => {
-                m10ThirdPartyEnabled: boolean;
                 m10CoarsenGridDefaultMeters: number;
               },
             ) => {
@@ -143,7 +147,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
               endpoint: "https://photon.komoot.io",
             },
             () => ({
-              m10ThirdPartyEnabled: true,
               m10CoarsenGridDefaultMeters: grid,
             }),
           );

@@ -8,8 +8,9 @@ import { UpdatePrompt } from "./components/UpdatePrompt.tsx";
 import { useServerTimeSync } from "./hooks/useServerTimeSync.ts";
 import { registerVisibilityChangeAlivenessGuard } from "./services/wasmLifecycle.ts";
 
+// The dispatcher picks the Text or Map surface, each its own lazy chunk.
 const HomePage = lazy(() =>
-  import("./pages/Home.tsx").then((m) => ({ default: m.HomePage }))
+  import("./pages/HomeDispatcher.tsx").then((m) => ({ default: m.HomeDispatcher }))
 );
 const SearchPage = lazy(() =>
   import("./pages/Search.tsx").then((m) => ({ default: m.SearchPage }))
@@ -63,7 +64,7 @@ export function App() {
             path="/"
             element={
               <ErrorBoundary fallback={({ reset }) => <RouteErrorFallback onReset={reset} />} context="home">
-                <Suspense fallback={<div className="flex-1 bg-surface-overlay" aria-label="Loading map" />}>
+                <Suspense fallback={<div className="flex-1 bg-surface-overlay" aria-label="Loading" />}>
                   <HomePage />
                 </Suspense>
               </ErrorBoundary>

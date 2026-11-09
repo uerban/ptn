@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { BUNDLE_HASH_HEADER } from "./scheduleTile.js";
+import {
+  BUNDLE_HASH_HEADER,
+  REALTIME_HEADER,
+  formatRealtimeHeader,
+  parseRealtimeHeader,
+} from "./scheduleTile.js";
 import type {
   TileSubdividedBody,
   TileNotFoundBody,
@@ -17,6 +22,36 @@ describe("bundle-hash header name", () => {
   // route-parity gate to notice the two planes disagree.
   it("is the wire literal both serving planes emit", () => {
     expect(BUNDLE_HASH_HEADER).toBe("X-PT-Bundle-Hash");
+  });
+});
+
+describe("realtime availability header", () => {
+  it("is the wire literal both serving planes emit", () => {
+    expect(REALTIME_HEADER).toBe("X-PT-Realtime");
+  });
+
+  it("parses a missing or empty value as no kinds", () => {
+    expect(parseRealtimeHeader(null)).toEqual([]);
+    expect(parseRealtimeHeader(undefined)).toEqual([]);
+    expect(parseRealtimeHeader("")).toEqual([]);
+    expect(parseRealtimeHeader(" , ")).toEqual([]);
+  });
+
+  it("parses known kinds in canonical order, tolerating spacing and case", () => {
+    expect(parseRealtimeHeader("departures, alerts")).toEqual(["departures", "alerts"]);
+    expect(parseRealtimeHeader("alerts,departures")).toEqual(["departures", "alerts"]);
+    expect(parseRealtimeHeader(" Alerts ")).toEqual(["alerts"]);
+    expect(parseRealtimeHeader("departures,departures")).toEqual(["departures"]);
+  });
+
+  it("ignores unknown tokens", () => {
+    expect(parseRealtimeHeader("vehicles, alerts, x-future")).toEqual(["alerts"]);
+  });
+
+  it("formats canonically and round-trips", () => {
+    expect(formatRealtimeHeader([])).toBe("");
+    expect(formatRealtimeHeader(["alerts", "departures", "alerts"])).toBe("departures, alerts");
+    expect(parseRealtimeHeader(formatRealtimeHeader(["alerts"]))).toEqual(["alerts"]);
   });
 });
 

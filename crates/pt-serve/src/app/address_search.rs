@@ -6,7 +6,7 @@
 //! bounded prefix scan plus JSON serialization.
 
 use crate::app::query::decode_form_component;
-use crate::app::response::{ByteBody, Resp};
+use crate::app::response::{if_none_match_hits, ByteBody, Resp};
 use crate::bundle::Generation;
 use serde_json::json;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ pub fn manifest(gen: &Generation, if_none_match: Option<&str>) -> Resp {
     let Some(sidecar) = gen.address_search.as_ref() else {
         return Resp::NotFoundEmpty;
     };
-    if if_none_match == Some(sidecar.etag.as_str()) {
+    if if_none_match_hits(if_none_match, &sidecar.etag) {
         return Resp::NotModified {
             etag: sidecar.etag.clone(),
             provenance: None,
@@ -65,7 +65,7 @@ pub fn bundle(gen: &Generation, if_none_match: Option<&str>, accept_gzip: bool) 
     let Some(sidecar) = gen.address_search.as_ref() else {
         return Resp::NotFoundEmpty;
     };
-    if if_none_match == Some(sidecar.etag.as_str()) {
+    if if_none_match_hits(if_none_match, &sidecar.etag) {
         return Resp::NotModified {
             etag: sidecar.etag.clone(),
             provenance: None,

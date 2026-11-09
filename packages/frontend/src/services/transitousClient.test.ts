@@ -1,6 +1,4 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { PrivacyPolicy } from "@pt/shared";
-import { LEVEL_FLOORS } from "@pt/shared/privacy";
 import {
   buildTransitousQuery,
   planViaTransitous,
@@ -8,8 +6,8 @@ import {
 } from "./transitousClient.ts";
 import { RoutingNotAllowedError } from "./routingSource.ts";
 
-const allow = (): PrivacyPolicy => LEVEL_FLOORS.baseline;
-const deny = (): PrivacyPolicy => LEVEL_FLOORS.hardened;
+const allow = (): boolean => true;
+const deny = (): boolean => false;
 const args = { from: { lat: 1, lon: 2 }, to: { lat: 3, lon: 4 }, departAtIso: "2026-06-26T08:00:00Z" };
 
 afterEach(() => { vi.resetAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -79,7 +77,7 @@ describe("planViaTransitous", () => {
     );
   });
 
-  it("throws RoutingNotAllowedError (backstop) when the double-gate is closed, firing NO fetch", async () => {
+  it("throws RoutingNotAllowedError (backstop) when Transitous routing is not allowed, firing NO fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     await expect(planViaTransitous(args, deny)).rejects.toBeInstanceOf(RoutingNotAllowedError);

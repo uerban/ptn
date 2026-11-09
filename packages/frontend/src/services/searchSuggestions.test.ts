@@ -1,5 +1,8 @@
+import { seedLegacyCityProjection } from "../test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { clearPersonal, putPersonal } from "./personalStorage.ts";
 import "fake-indexeddb/auto";
+import { useCityStore } from "../stores/cityStore.ts";
 import { db, type AddressSearchArtifactRecord, type PoiIndexRecord } from "../db/index.ts";
 import type { Stop, ApiResponse, PoiManifestBundle } from "@pt/shared";
 import { scorePoiRecord, candidateToSuggestion } from "./searchSuggestions.ts";
@@ -120,9 +123,12 @@ describe("searchSuggestions", () => {
   beforeEach(async () => {
     await db.poiIndex.clear();
     await db.poiSyncMeta.clear();
+    await clearPersonal("personalUsage");
     await db.usageStats.clear();
+    await db.cityUsageStats.clear();
     await db.stopGroups.clear();
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     await db.addressSearchArtifacts.clear();
     mockSearchStops.mockReset();
     mockSearchStops.mockResolvedValue({ data: [] });
@@ -460,7 +466,8 @@ describe("searchSuggestions", () => {
       gtfsStop("stop-substring-tapped", "Stepono Batoro st."),
       gtfsStop("stop-prefix-cold", "Oro uostas"),
     ]);
-    await db.usageStats.put({
+    await putPersonal("personalUsage", crypto.randomUUID(), {
+      cityId: useCityStore.getState().activeCity.id,
       stopId: "stop-substring-tapped",
       tapCount: 5,
       lastTapped: Date.now() - 3600_000,
@@ -505,7 +512,7 @@ describe("searchSuggestions", () => {
       gtfsStop("stop-recent", "Dworzec A"),
       gtfsStop("stop-old", "Dworzec B"),
     ]);
-    await db.usageStats.put({ stopId: "stop-recent", tapCount: 5, lastTapped: Date.now() - 3600_000 });
+    await putPersonal("personalUsage", crypto.randomUUID(), { cityId: useCityStore.getState().activeCity.id, stopId: "stop-recent", tapCount: 5, lastTapped: Date.now() - 3600_000 });
 
     const { searchSuggestions } = await import("./searchSuggestions.ts");
     const results = await searchSuggestions("dworz", "gdansk", null, new AbortController().signal, "local");
@@ -2184,6 +2191,7 @@ describe("remote stop search third-party egress gate", () => {
     vi.restoreAllMocks();
     await db.open();
     await db.gtfsStops.clear();
+    await seedLegacyCityProjection();
     mockSearchStops.mockReset();
     mockSearchStops.mockResolvedValue({ data: [makeStop("remote-1", "Stotis Remote")] });
     localStorage.setItem(

@@ -68,6 +68,10 @@ function runtimeOptionalMetadata(city: Record<string, unknown>): Partial<import(
   const https = (value: unknown): boolean => {
     try { return text(value) && new URL(value).protocol === "https:"; } catch { return false; }
   };
+  // Display context only: a missing or malformed code is left out, not fatal.
+  if (typeof city.countryCode === "string" && /^[A-Za-z]{2}$/.test(city.countryCode)) {
+    result.countryCode = city.countryCode.toUpperCase();
+  }
   if (city.poiCityIds !== undefined) {
     if (!Array.isArray(city.poiCityIds) || !city.poiCityIds.length || city.poiCityIds.some(id => typeof id !== "string" || !/^[a-z][a-z0-9-]*$/.test(id))) throw new Error("Invalid city POI areas");
     result.poiCityIds = [...city.poiCityIds];

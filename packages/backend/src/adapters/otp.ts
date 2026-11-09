@@ -4,7 +4,6 @@ import type {
   TripResult,
   Stop,
   Departure,
-  Alert,
   VehiclePosition,
   Itinerary,
   Leg,
@@ -109,10 +108,6 @@ export class OtpAdapter implements RoutingAdapter {
     const data = await response.json();
 
     return (data ?? []).slice(0, limit).map(mapGeocodeResult);
-  }
-
-  async getAlerts(): Promise<Alert[]> {
-    return [];
   }
 
   async getVehiclePositions(_bbox: {

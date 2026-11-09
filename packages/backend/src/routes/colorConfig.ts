@@ -11,7 +11,7 @@ export function createColorConfigHandler(store: GtfsStore) {
       return reply.status(503).send({ error: "Color config not yet computed" });
     }
 
-    reply.header("Cache-Control", "public, max-age=3600");
+    reply.header("Cache-Control", "public, max-age=86400");
     return reply.send(config);
   };
 }

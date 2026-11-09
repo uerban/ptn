@@ -1,10 +1,15 @@
+import { useCityStore } from "../stores/cityStore.ts";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { Departure } from "@pt/shared";
 import { REALTIME_POLL_INTERVAL_MS } from "@pt/shared/constants";
 import { api } from "../services/api.ts";
 import { isScheduleTileEnabled } from "../services/scheduleTileFlag.ts";
 import { reportTelemetry } from "../services/errorReporter.ts";
-import { backendDeparturesAllowed } from "../services/departuresPolicy.ts";
+import {
+  backendDeparturesAllowed,
+  REALTIME_FLOW,
+} from "../services/departuresPolicy.ts";
+import { useCanUse } from "../privacy/canUse.ts";
 import {
   HEDGE_MS,
   DEFAULT_SCHEDULE_TILE_LIMIT,
@@ -23,6 +28,14 @@ interface UseDeparturesResult {
    * reads only once this stop's tile has been resolved.
    */
   settledStopId: string | null;
+  /**
+   * True when the stop's timetable is not on this device and live departures
+   * are not allowed, so nothing could be shown: an empty list then means
+   * "unavailable", not "no departures".
+   */
+  unavailable: boolean;
+  /** Epoch ms when the shown list was last fetched, or null before that. */
+  updatedAt: number | null;
   refresh: () => Promise<void>;
 }
 
@@ -40,10 +53,17 @@ export function useDepartures(
   lookAheadHours?: number,
   opts?: UseDeparturesOpts,
 ): UseDeparturesResult {
+  const cityId = useCityStore(state => state.activeCity.id);
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settledStopId, setSettledStopId] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  // A grant or revocation of live departures (here or in another tab)
+  // refetches: a grant brings live times in, a revocation drops the
+  // predictions already on screen. Reads in flight are made stale.
+  const realtimeAllowed = useCanUse(REALTIME_FLOW);
   // Reset while rendering, not in an effect: a caller must never see the
   // previous stop's "settled", departures or error together with the new stop
   // id — not for the frame before the new read starts, and not after that
@@ -53,11 +73,15 @@ export function useDepartures(
   // never come here and keep their list. (`prevStopId` is the stop the state
   // above belongs to: React's "adjusting state when a prop changes".)
   const [prevStopId, setPrevStopId] = useState(stopId);
-  if (prevStopId !== stopId) {
+  const [prevCityId, setPrevCityId] = useState(cityId);
+  if (prevStopId !== stopId || prevCityId !== cityId) {
+    setPrevCityId(cityId);
     setPrevStopId(stopId);
     setSettledStopId(null);
     setDepartures([]);
     setError(null);
+    setUnavailable(false);
+    setUpdatedAt(null);
     setLoading(stopId !== null);
   }
   const pollingRef = useRef(polling);
@@ -83,8 +107,10 @@ export function useDepartures(
   // for the old stop. A fetch or poll of a stop no longer on screen (an
   // interval or `refresh` from before the change) starts nothing.
   const shownStopRef = useRef(stopId);
+  const shownCityRef = useRef(cityId);
   useLayoutEffect(() => {
     shownStopRef.current = stopId;
+    shownCityRef.current = cityId;
     return () => {
       ++latestTokenRef.current;
       ++latestFgTokenRef.current;
@@ -93,17 +119,17 @@ export function useDepartures(
         hedgeTimerRef.current = null;
       }
     };
-  }, [stopId]);
+  }, [stopId, cityId]);
 
   const fetchDepartures = useCallback(async (background = false) => {
-    if (!stopId || stopId !== shownStopRef.current) return;
+    if (!stopId || stopId !== shownStopRef.current || cityId !== shownCityRef.current) return;
     // J11: bump BEFORE the first await so every path carries the current token.
     const token = ++latestTokenRef.current;
     const foreground = !background;
     // fg-only token: only bumped (and only checked) for foreground fetches.
     const fgToken = foreground ? ++latestFgTokenRef.current : 0;
     // `fresh` guards DATA writes — applies to both fg and bg fetches.
-    const fresh = () => token === latestTokenRef.current;
+    const fresh = () => token === latestTokenRef.current && cityId === useCityStore.getState().activeCity.id;
     // `freshFg` guards LOADING/ERROR state — only foreground can own those.
     const freshFg = () => foreground && fgToken === latestFgTokenRef.current;
 
@@ -126,10 +152,13 @@ export function useDepartures(
     const settle = (
       deps: Departure[],
       source: "tile_warm" | "tile_cold" | "hedge_legacy" | "fallback_legacy",
+      nothingAvailable = false,
     ) => {
       if (!fresh() || rendered) return;
       rendered = true;
       setDepartures(deps);
+      setUnavailable(nothingAvailable);
+      setUpdatedAt(Date.now());
       reportTelemetry("schedule_tile_served", { stopId, source, hedgeFired: hedgeDidFire });
       if (freshFg()) setLoading(false);
     };
@@ -163,6 +192,7 @@ export function useDepartures(
         // J3/G9: dynamic import keeps the Dexie/brotli read-path graph out of the
         // eager entry chunk. The factory is NOT invoked at module load time.
         const { departuresForStop } = await import("../services/scheduleTileReadPath.ts");
+        if (!fresh()) return;
         // The hedge fires ONLY on a signalled cache MISS (cold download). Warm
         // opens (memo/IDB hits) never call onTileDownloadStart → never hit
         // the backend. ETA cards / background polls never arm it.
@@ -200,22 +230,31 @@ export function useDepartures(
           // unavailable | stop_not_in_tile — fall through to api.getDepartures if allowed.
           reportTelemetry("schedule_tile_fallback", { stopId, reason: r.state });
         } catch {
+          if (!fresh()) return;
           // Any throw from the tile path — fall through to api.getDepartures if allowed.
           clearHedge();
           reportTelemetry("schedule_tile_fallback", { stopId, reason: "throw" });
         }
         // If the hedge already rendered the legacy result, we're done.
-        if (rendered) return;
+        if (!fresh() || rendered) return;
         // Privacy gate: when the backend departures call is disallowed (e.g. paranoid level),
         // serve empty rather than leaking the exact stop identity.
+        // A missing tile never widens what is sent: without live departures
+        // the stop's departures are reported unavailable.
         if (!allowBackend) {
-          settle([], tileDownloaded ? "tile_cold" : "tile_warm");
+          settle([], tileDownloaded ? "tile_cold" : "tile_warm", true);
           return;
         }
         settle(await callLegacy(), "fallback_legacy");
         return;
       }
-      // Global-off override: always hit the backend regardless of privacy.
+      // Tiles switched off globally (rollback): the network route is the only
+      // source, and it names the exact stop, so it still needs live
+      // departures to be allowed.
+      if (!allowBackend) {
+        settle([], "fallback_legacy", true);
+        return;
+      }
       settle(await callLegacy(), "fallback_legacy");
     } catch (err) {
       if (freshFg() && !rendered) {
@@ -232,7 +271,9 @@ export function useDepartures(
         setLoading(false);
       }
     }
-  }, [stopId, lookAheadHours, hedgeWanted]);
+    // `realtimeAllowed` is read through `backendDeparturesAllowed` and the
+    // read path; listing it refetches when the decision changes.
+  }, [stopId, cityId, lookAheadHours, hedgeWanted, realtimeAllowed]);
 
   // Initial fetch
   useEffect(() => {
@@ -289,5 +330,13 @@ export function useDepartures(
     return () => window.removeEventListener("online", handleOnline);
   }, [stopId, polling, fetchDepartures]);
 
-  return { departures, loading, error, settledStopId, refresh: fetchDepartures };
+  return {
+    departures,
+    loading,
+    error,
+    settledStopId,
+    unavailable,
+    updatedAt,
+    refresh: fetchDepartures,
+  };
 }

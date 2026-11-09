@@ -20,12 +20,17 @@ import { stopDedupSweep } from "./geocoder/dedupCache.ts";
 import { osrmClient } from "./osrmWasm.ts";
 import { walkGraphClient } from "./walkGraphClient.ts";
 import { clearWalkRouteCache } from "./walkRouteCache.ts";
+import { clearPersonal } from "./personalStorage.ts";
+import { removeSealedItem } from "./sealedLocalStorage.ts";
 import { stopRecentsSweep } from "./recents.ts";
 import { stopStopUsageSweep } from "./stopUsage.ts";
+import {clearCityArtifactMemory} from "./cityArtifactMemory.ts";
+import {clearTransferArtifactMemory} from "./transfersArtifact.ts";
 import {
   clearLocalReportsData,
   clearPersonalizationData,
   clearRecentsData,
+  clearSearchCacheData,
   clearViewportData,
 } from "./optionalStorageData.ts";
 
@@ -45,6 +50,7 @@ const PTN_RUNTIME_CACHE_NAMES = new Set([
   "api-general-cache",
   "carto-style",
   "carto-tiles",
+  "map-assets",
 ]);
 
 /** Versioned runtime caches (see `src/sw/runtimeCaching.ts`). Matching the
@@ -111,9 +117,9 @@ async function runEveryCleanup(
 async function clearSavedPlacesData(
   storage: Pick<Storage, "removeItem"> | undefined = globalThis.localStorage,
 ): Promise<void> {
-  await db.savedLocations.clear();
+  await clearPersonal("savedLocations");
   useFavoritesStore.setState({ favorites: [] });
-  storage?.removeItem(LEGACY_FAVORITES_KEY);
+  removeSealedItem(LEGACY_FAVORITES_KEY, storage);
 }
 
 /** Deletes rider-created history while preserving settings and public downloads. */
@@ -126,6 +132,7 @@ export async function deletePersonalHistory(
     clearPersonalizationData,
     () => clearLocalReportsData(storage),
     () => clearViewportData(storage),
+    clearSearchCacheData,
   ]);
 }
 
@@ -158,9 +165,9 @@ export async function unregisterPtnServiceWorker(
   );
 }
 
-function serverDerivedTableNames(): PtnTableName[] {
+function downloadedTableNames(): PtnTableName[] {
   return (Object.entries(TABLE_KIND) as Array<[PtnTableName, string]>)
-    .filter(([, kind]) => kind === "server-derived")
+    .filter(([, kind]) => kind === "server-derived" || kind === "retained-download")
     .map(([name]) => name);
 }
 
@@ -176,16 +183,19 @@ export interface ClearDownloadedDataOptions {
 export async function clearDownloadedData(
   opts: ClearDownloadedDataOptions = {},
 ): Promise<void> {
+  clearTransferArtifactMemory();
+  clearCityArtifactMemory();
   const stopRuntime =
     opts.stopDownloadedRuntime ??
     (async () => {
       await useGtfsDataStore.getState().reset();
+      useStopStore.getState().reset();
       useStopStore.setState({ stops: [], hydrated: false });
       useBadgeActivityStore.getState().clear();
     });
   await stopRuntime();
   await runEveryCleanup([
-    ...serverDerivedTableNames().map(
+    ...downloadedTableNames().map(
       (name) => () => db.table(name).clear(),
     ),
     async () => {await (await import("./walkGraphStore.ts")).clearWalkGraphStore();},
@@ -206,6 +216,7 @@ function resetInMemoryStores(): void {
     backendAssist: false,
   });
   useRtStore.getState().unsubscribeAll();
+  useStopStore.getState().reset();
   useStopStore.setState({ stops: [], hydrated: false });
   useFavoritesStore.setState({ favorites: [] });
   useDelayReportStore.setState({ reports: [] });

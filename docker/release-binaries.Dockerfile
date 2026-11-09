@@ -15,6 +15,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked -p pt-serve -p pt-producer -p pt-artifacts -p pt-walk --features pt-walk/build && \
     mkdir /out && cp target/release/pt-serve target/release/pt-producer \
       target/release/pt-build-transfers target/release/pt-artifacts \
-      target/release/pt-walk-build target/release/pt-artifact-publish /out/
+      target/release/pt-walk-build target/release/pt-artifact-publish \
+      target/release/pt-transit target/release/pt-pack-inspect \
+      target/release/pt-pack-export target/release/pt-pack-catalog \
+      target/release/pt-pack-publish target/release/pt-pack-discovery /out/
 FROM scratch AS binaries
 COPY --from=build /out/ /

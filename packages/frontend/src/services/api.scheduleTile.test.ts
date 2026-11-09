@@ -4,7 +4,10 @@ import type { BundleManifest } from "@pt/shared";
 // Mock cityStore so getBaseUrl() returns a predictable value
 vi.mock("../stores/cityStore.ts", () => ({
   useCityStore: {
-    getState: () => ({ getApiUrl: () => "/api/vilnius" }),
+    getState: () => ({
+      getApiUrl: () => "/api/vilnius",
+      activeCity: { id: "vilnius" },
+    }),
   },
 }));
 
@@ -45,6 +48,64 @@ function makeArrayBufferResponse(
 ): Response {
   return new Response(bytes, { status, headers: new Headers(headers) });
 }
+
+describe("fetchManifest realtime availability", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("stores the X-PT-Realtime value of a 200 for the active city", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeResponse(200, makeManifest(), { "X-PT-Realtime": "departures, alerts" }),
+      ),
+    );
+    const { fetchManifest } = await import("./api.ts");
+    const { getRealtimeAvailability } = await import("./realtimeAvailability.ts");
+    await fetchManifest();
+    expect(getRealtimeAvailability("vilnius")).toEqual(["departures", "alerts"]);
+  });
+
+  it("updates the stored value from a 304 and keeps it when the header is missing", async () => {
+    const { fetchManifest } = await import("./api.ts");
+    const { getRealtimeAvailability, recordRealtimeHeader } = await import(
+      "./realtimeAvailability.ts"
+    );
+    recordRealtimeHeader("vilnius", "alerts");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 304 })),
+    );
+    await fetchManifest({ manifest: makeManifest(), etag: '"e1"' });
+    expect(getRealtimeAvailability("vilnius")).toEqual(["alerts"]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(null, { status: 304, headers: { "X-PT-Realtime": "" } }),
+      ),
+    );
+    await fetchManifest({ manifest: makeManifest(), etag: '"e1"' });
+    expect(getRealtimeAvailability("vilnius")).toEqual([]);
+  });
+
+  it("keeps the stored value when the manifest is unavailable", async () => {
+    const { fetchManifest } = await import("./api.ts");
+    const { getRealtimeAvailability, recordRealtimeHeader } = await import(
+      "./realtimeAvailability.ts"
+    );
+    recordRealtimeHeader("vilnius", "alerts");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+    await fetchManifest({ manifest: makeManifest(), etag: '"e1"' });
+    expect(getRealtimeAvailability("vilnius")).toEqual(["alerts"]);
+  });
+});
 
 describe("fetchManifest", () => {
   beforeEach(() => {

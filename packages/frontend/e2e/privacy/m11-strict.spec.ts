@@ -3,11 +3,11 @@ import { runPaddingScenario } from "../helpers/m11-padding";
 
 // M11 T-16 — Strict tile padding.
 //
-// At `strict`, `policy.m11TileDefense` is `"prefetch-padding-decoy"`. The per-call padding behavior
-// is identical to Hardened (≥ 2 outside-viewport decoys per dynamic load) — the additional axis at
-// Strict is the background decoy-on-timer loop, which the Paranoid spec verifies. This spec focuses
-// on the per-call assertion so a regression that silently drops padding when the timer strategy is
-// active is caught here rather than slipping past the Paranoid timing assertions.
+// At `strict`, `policy.m11TileDefense` is `"prefetch-padding"`, like Hardened (≥ 2 outside-viewport
+// decoys per dynamic load). The background decoy-on-timer loop belongs to Paranoid, which its own
+// spec verifies; installations that were at Strict before keep it as a carried-over override. This
+// spec focuses on the per-call assertion so a regression that silently drops padding at Strict is
+// caught here.
 //
 // The UI wiring for the defense dispatcher is deferred (notes); this spec orchestrates the
 // production `dispatchTileLoad` directly against the real `/api/gtfs/poi-tile/...` URL shape to

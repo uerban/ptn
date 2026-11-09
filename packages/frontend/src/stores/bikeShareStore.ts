@@ -45,6 +45,13 @@ import { readGbfsSystem, writeGbfsSystem } from "../db/index.ts";
  * type has no availability fields).
  */
 
+/**
+ * The registered data flow these requests belong to. It holds no stored
+ * decision: the map's Bikes button is the per-visit choice, so every
+ * request below follows a tap in this session.
+ */
+export const BIKE_SHARE_FLOW = "external.bike-share";
+
 /** station_status repoll period (Cyclocity serves TTL 1 s; 60 s is polite). */
 export const STATUS_POLL_INTERVAL_MS = 60_000;
 /** station_information re-fetch period (client-side constant, not feed TTL). */

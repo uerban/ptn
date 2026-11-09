@@ -180,6 +180,13 @@ pub enum Resp {
         /// carry no `Vary`). `schedule_tile` never sets this to `true`.
         vary_accept_encoding: bool,
     },
+    /// Any other response plus extra headers, appended after the inner
+    /// response's own. Used by `/gtfs/manifest` for `X-PT-Realtime`, so its
+    /// body and ETag come from the unchanged inner response.
+    WithHeaders {
+        inner: Box<Resp>,
+        headers: Vec<(&'static str, String)>,
+    },
     /// Byte or JSON-error response for the poi-tile route. Distinct from
     /// [`Resp::WithBundleHash`]: no `X-PT-Bundle-Hash` (POI bundles carry
     /// no GTFS bundle-hash concept) and no `Vary: Accept-Encoding` (Node's
@@ -202,4 +209,68 @@ pub enum Resp {
         /// reaches that chain in Node.
         attribution: bool,
     },
+}
+
+/// Suffixes compressing proxies append to an ETag they pass through.
+const ENCODING_SUFFIXES: [&str; 4] = ["-gzip", "-br", "-zstd", "-deflate"];
+
+/// Whether an `If-None-Match` header matches `etag`, using weak comparison
+/// (RFC 9110 §13.1.2): any listed tag, `*`, and weak (`W/`) tags count.
+/// Proxies that compress the body may hand the client a tag with an encoding
+/// suffix; it names the same representation, so it matches too.
+fn etag_matches(header: &str, etag: &str) -> bool {
+    let wanted = etag.trim_matches('"');
+    header.split(',').map(str::trim).any(|candidate| {
+        if candidate == "*" {
+            return true;
+        }
+        let opaque = candidate
+            .strip_prefix("W/")
+            .unwrap_or(candidate)
+            .trim_matches('"');
+        let opaque = ENCODING_SUFFIXES
+            .iter()
+            .find_map(|suffix| opaque.strip_suffix(suffix))
+            .unwrap_or(opaque);
+        opaque == wanted
+    })
+}
+
+/// `etag_matches` for an optional `If-None-Match` header.
+pub(crate) fn if_none_match_hits(if_none_match: Option<&str>, etag: &str) -> bool {
+    if_none_match.is_some_and(|header| etag_matches(header, etag))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{etag_matches, if_none_match_hits};
+
+    const TAG: &str = "\"abc123\"";
+
+    #[test]
+    fn exact_tag_matches() {
+        assert!(etag_matches("\"abc123\"", TAG));
+        assert!(!etag_matches("\"abc124\"", TAG));
+    }
+
+    #[test]
+    fn lists_wildcards_and_weak_tags_match() {
+        assert!(etag_matches("\"x\", \"abc123\"", TAG));
+        assert!(etag_matches("*", TAG));
+        assert!(etag_matches("W/\"abc123\"", TAG));
+        assert!(!etag_matches("\"x\", W/\"y\"", TAG));
+    }
+
+    #[test]
+    fn tags_a_compressing_proxy_suffixed_match() {
+        assert!(etag_matches("\"abc123-gzip\"", TAG));
+        assert!(etag_matches("W/\"abc123-br\"", TAG));
+        assert!(!etag_matches("\"abc123-other\"", TAG));
+    }
+
+    #[test]
+    fn a_missing_header_never_matches() {
+        assert!(!if_none_match_hits(None, TAG));
+        assert!(if_none_match_hits(Some("W/\"abc123\""), TAG));
+    }
 }

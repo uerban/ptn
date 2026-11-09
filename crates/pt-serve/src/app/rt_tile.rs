@@ -187,7 +187,7 @@ pub fn rt_tile(
         return Resp::WithBundleHash {
             status: 200,
             content_type: "application/json",
-            cache_control: Some("no-cache"),
+            cache_control: Some(super::route_rt::RT_CACHE_CONTROL),
             body: None,
             json_body: Some(cached_body),
             etag: None,
@@ -322,7 +322,7 @@ pub fn rt_tile(
     Resp::WithBundleHash {
         status: 200,
         content_type: "application/json",
-        cache_control: Some("no-cache"),
+        cache_control: Some(super::route_rt::RT_CACHE_CONTROL),
         body: None,
         json_body: Some(json_body),
         etag: None,

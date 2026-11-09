@@ -48,3 +48,10 @@ it("saves a newly validated update only after the planner is ready", async () =>
   await waitFor(() => expect(mocks.save).toHaveBeenCalledWith(mocks.city));
   expect(mocks.ready.mock.invocationCallOrder[0]).toBeLessThan(mocks.save.mock.invocationCallOrder[0]);
 });
+
+it("shows a legacy download without inventing its size or preparation date", async () => {
+  mocks.list.mockResolvedValue([{cityId: "custom", state: "legacy"}]);
+  render(<DeviceCitiesSection />);
+  expect((await screen.findByRole("button", {name: "Open Custom"}) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.queryByText(/NaN|Invalid Date|undefined/)).toBeNull();
+});

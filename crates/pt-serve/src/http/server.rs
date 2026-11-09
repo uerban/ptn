@@ -5,11 +5,11 @@
 
 use crate::app::query::decode_form_component;
 use crate::app::{
-    address_search as app_address_search, bytes as app_bytes, client_report as app_client_report,
-    color_config as app_color_config, departures_for_stop as app_departures_for_stop,
-    gtfs_manifest as app_gtfs_manifest, metrics as app_metrics, plan as app_plan,
-    poi_tile as app_poi_tile, route_rt as app_route_rt, rt_health as app_rt_health,
-    rt_tile as app_rt_tile, schedule_tile as app_schedule_tile,
+    address_search as app_address_search, alerts as app_alerts, bytes as app_bytes,
+    client_report as app_client_report, color_config as app_color_config,
+    departures_for_stop as app_departures_for_stop, gtfs_manifest as app_gtfs_manifest,
+    metrics as app_metrics, plan as app_plan, poi_tile as app_poi_tile, route_rt as app_route_rt,
+    rt_health as app_rt_health, rt_tile as app_rt_tile, schedule_tile as app_schedule_tile,
     scheduled_departures as app_scheduled, shapes as app_shapes, stops as app_stops,
     version as app_version,
 };
@@ -128,6 +128,7 @@ fn status_label(resp: &crate::app::response::Resp) -> &'static str {
             503 => "503",
             _ => "other",
         },
+        Resp::WithHeaders { inner, .. } => status_label(inner),
         Resp::NotModified { .. } => "304",
         Resp::NotFoundEmpty => "404",
         Resp::NoContent => "204",
@@ -409,9 +410,18 @@ pub fn dispatch(
             adapter::to_tiny_http(resp)
         }
         Route::GtfsManifest => {
-            let resp = app_gtfs_manifest::gtfs_manifest(&gen, if_none_match(&req).as_deref());
+            let resp = app_gtfs_manifest::gtfs_manifest_with_realtime(
+                &gen,
+                if_none_match(&req).as_deref(),
+                &ctx.realtime_header,
+            );
             ctx.metrics
                 .inc_request("gtfs-manifest", status_label(&resp));
+            adapter::to_tiny_http(resp)
+        }
+        Route::ServiceAlerts => {
+            let resp = app_alerts::service_alerts(ctx, if_none_match(&req).as_deref());
+            ctx.metrics.inc_request("alerts", status_label(&resp));
             adapter::to_tiny_http(resp)
         }
         Route::ScheduleTile(ref hash, ref size, ref coords) => {

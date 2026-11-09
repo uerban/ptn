@@ -86,10 +86,23 @@ pub struct ServerConfig {
     #[arg(long, env = "PT_SERVE_PER_WORKER_OVERHEAD_BYTES")]
     pub per_worker_overhead_bytes: u64,
 
-    /// Producer-managed data root: holds `current.json`, `last-good.json`, and
-    /// `generations/<id>/{generation.json,bundle.ptb,transfers.bin}`. REQUIRED.
+    /// Writable runtime root. In producer mode it also holds current/last-good
+    /// pointers and generations. Installed transit uses transit-store-root for data.
     #[arg(long, env = "PT_SERVE_DATA_ROOT")]
     pub data_root: PathBuf,
+
+    /// Installer root containing transit/state and immutable transit releases.
+    /// When set, data-root holds runtime state only; producer pointers are ignored.
+    #[arg(
+        long,
+        env = "PT_SERVE_TRANSIT_STORE_ROOT",
+        conflicts_with = "force_current"
+    )]
+    pub transit_store_root: Option<PathBuf>,
+
+    /// Trusted transit publisher public keys, as lowercase 32-byte hex. Repeat for rotation.
+    #[arg(long, env = "PT_SERVE_TRANSIT_TRUSTED_KEY", value_delimiter = ',')]
+    pub transit_trusted_key: Vec<String>,
 
     /// Where the PidfileGuard takes its kernel-released advisory lock.
     #[arg(long, env = "PT_SERVE_PIDFILE_PATH")]
@@ -148,6 +161,10 @@ pub struct ServerConfig {
         default_value_t = PageWarmMode::WillNeed
     )]
     pub page_warm_mode: PageWarmMode,
+
+    /// Skip route geometry loading and serving; retain transit routing data.
+    #[arg(long, env = "PT_SERVE_WITHOUT_GEOMETRY", default_value_t = false)]
+    pub without_geometry: bool,
 
     /// Operator log format. `json` (default) is parseable by the k8s log
     /// pipeline; `text` is for local dev.
@@ -221,6 +238,23 @@ pub struct ServerConfig {
     #[arg(long, env = "PT_SERVE_RT_POLL_INTERVAL_MS", default_value_t = 12_000)]
     pub rt_poll_interval_ms: u64,
 
+    /// Comma-separated GTFS-RT ServiceAlerts feed URLs, parsed like
+    /// [`Self::rt_trip_updates_urls`]. Empty (the default) disables alerts:
+    /// no poll thread, `GET /api/<city>/alerts` answers 404, and the
+    /// `X-PT-Realtime` manifest header does not list `alerts`.
+    #[arg(long, env = "PT_SERVE_RT_SERVICE_ALERTS_URLS", default_value = "")]
+    pub rt_service_alerts_urls: String,
+
+    /// ServiceAlerts poll cadence in milliseconds. Alerts change on the scale
+    /// of minutes, so the default is slower than the TripUpdates cadence.
+    /// Must be ≥ 1 (enforced in `validate()`).
+    #[arg(
+        long,
+        env = "PT_SERVE_RT_SERVICE_ALERTS_POLL_INTERVAL_MS",
+        default_value_t = 60_000
+    )]
+    pub rt_service_alerts_poll_interval_ms: u64,
+
     /// Byte budget for the schedule-tile response cache
     /// (`ops/tile_cache.rs`), default 16 MiB (matches Node's hardcoded
     /// `TileLruCache` budget). Unlike Node, this is configurable: the
@@ -260,14 +294,13 @@ pub struct ServerConfig {
     )]
     pub rt_tile_response_cache_max_entries: u64,
 
-    /// TTL (milliseconds) for the rt-tile response cache, default 10_000
-    /// (matches Node's hardcoded `RT_TILE_TTL_MS`, `rtTile.ts:51` — a
-    /// route-local const, not a shared cross-language export, so this is a
-    /// hand-matched default with no build.rs pinning).
+    /// TTL (milliseconds) for the rt-tile response cache, default 5_000
+    /// (matches Node's `RT_TILE_TTL_MS`, derived from the shared RT cache
+    /// duration; this Rust default is hand-matched with no build.rs pinning).
     #[arg(
         long,
         env = "PT_SERVE_RT_TILE_RESPONSE_CACHE_TTL_MS",
-        default_value_t = 10_000
+        default_value_t = 5_000
     )]
     pub rt_tile_response_cache_ttl_ms: u64,
 
@@ -390,6 +423,8 @@ pub fn pattern_mode_token(m: pt_core::PatternMode) -> &'static str {
 /// is the operator-facing tag they'll see in the error log.
 #[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error("invalid installed transit configuration: {0}")]
+    TransitConfig(String),
     #[error("worker_pool_size must be >= 1 (got 0)")]
     WorkerPoolSizeZero,
     #[error("loopback_worker_count must be >= 1 (got 0)")]
@@ -402,6 +437,10 @@ pub enum ConfigError {
         "rt-poll-interval-ms / PT_SERVE_RT_POLL_INTERVAL_MS must be >= 1 (a zero interval would hot-spin the poll thread)"
     )]
     RtPollIntervalMsZero,
+    #[error(
+        "rt-service-alerts-poll-interval-ms / PT_SERVE_RT_SERVICE_ALERTS_POLL_INTERVAL_MS must be >= 1 (a zero interval would hot-spin the poll thread)"
+    )]
+    AlertsPollIntervalMsZero,
     #[error("city_slug must be non-empty")]
     CitySlugEmpty,
     #[error("data_root {0:?} does not exist or is not a directory")]
@@ -430,6 +469,8 @@ impl ServerConfig {
     /// `EROFS` where stat says "writable bits set" but the kernel will
     /// refuse the write.
     pub fn validate(&mut self) -> Result<(), ConfigError> {
+        crate::bundle::installed::validate_config(self)
+            .map_err(|e| ConfigError::TransitConfig(e.to_string()))?;
         if self.worker_pool_size == 0 {
             return Err(ConfigError::WorkerPoolSizeZero);
         }
@@ -444,6 +485,9 @@ impl ServerConfig {
         }
         if self.rt_poll_interval_ms == 0 {
             return Err(ConfigError::RtPollIntervalMsZero);
+        }
+        if self.rt_service_alerts_poll_interval_ms == 0 {
+            return Err(ConfigError::AlertsPollIntervalMsZero);
         }
         if self.city_slug.is_empty() {
             return Err(ConfigError::CitySlugEmpty);
@@ -512,13 +556,38 @@ impl ServerConfig {
     /// empties. Never yields empty strings, so `RtPoller::new`'s
     /// `EmptyStringInUrls` arm is unreachable from config-driven callers.
     pub fn rt_urls(&self) -> Vec<String> {
-        self.rt_trip_updates_urls
-            .split(',')
-            .map(str::trim)
-            .filter(|u| !u.is_empty())
-            .map(str::to_string)
-            .collect()
+        split_feed_urls(&self.rt_trip_updates_urls)
     }
+
+    /// ServiceAlerts feed URLs, split exactly like [`Self::rt_urls`].
+    pub fn alerts_urls(&self) -> Vec<String> {
+        split_feed_urls(&self.rt_service_alerts_urls)
+    }
+
+    /// The `X-PT-Realtime` manifest header value: the GTFS-RT kinds this
+    /// process is configured to serve, as a comma-separated list in the
+    /// canonical order of `REALTIME_KINDS`
+    /// (`packages/shared/src/types/scheduleTile.ts`), or empty. Configuration
+    /// is fixed for the process lifetime, so callers compute it once.
+    pub fn realtime_header_value(&self) -> String {
+        let mut kinds = Vec::new();
+        if !self.rt_urls().is_empty() {
+            kinds.push("departures");
+        }
+        if !self.alerts_urls().is_empty() {
+            kinds.push("alerts");
+        }
+        kinds.join(", ")
+    }
+}
+
+/// Split a comma-separated feed URL list: trim each entry, drop empties.
+fn split_feed_urls(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// Touch-and-delete a sentinel file inside `dir`. Surfaces filesystem-level
@@ -728,6 +797,78 @@ mod tests {
             Err(ConfigError::RtPollIntervalMsZero) => {}
             other => panic!("expected RtPollIntervalMsZero, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn alerts_urls_default_empty_and_split_like_rt_urls() {
+        use clap::Parser;
+        let mut c = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert_eq!(c.rt_service_alerts_urls, "");
+        assert!(c.alerts_urls().is_empty());
+        assert_eq!(c.rt_service_alerts_poll_interval_ms, 60_000);
+        c.rt_service_alerts_urls = " http://a.test/alerts.pb ,, http://b.test/x.pb ".to_string();
+        assert_eq!(
+            c.alerts_urls(),
+            vec![
+                "http://a.test/alerts.pb".to_string(),
+                "http://b.test/x.pb".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn alerts_poll_interval_rejects_zero() {
+        use clap::Parser;
+        let mut a = base_args();
+        a.push("--rt-service-alerts-poll-interval-ms".into());
+        a.push("0".into());
+        let mut cfg =
+            ServerConfig::try_parse_from(a).expect("clap accepts 0; validate() is the gate");
+        match cfg.validate() {
+            Err(ConfigError::AlertsPollIntervalMsZero) => {}
+            other => panic!("expected AlertsPollIntervalMsZero, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn realtime_header_lists_configured_kinds_in_canonical_order() {
+        use clap::Parser;
+        let mut c = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert_eq!(c.realtime_header_value(), "");
+        c.rt_service_alerts_urls = "http://a.test/alerts.pb".to_string();
+        assert_eq!(c.realtime_header_value(), "alerts");
+        c.rt_trip_updates_urls = "http://a.test/tu.pb".to_string();
+        assert_eq!(c.realtime_header_value(), "departures, alerts");
+        c.rt_service_alerts_urls = " , ".to_string();
+        assert_eq!(c.realtime_header_value(), "departures");
+    }
+
+    #[test]
+    fn installed_source_requires_keys_and_rejects_producer_recovery() {
+        use clap::Parser;
+        let mut args = base_args();
+        args.extend(["--transit-store-root".into(), "/tmp/transit".into()]);
+        let mut config = ServerConfig::try_parse_from(&args).unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::TransitConfig(_))
+        ));
+        args.extend(["--transit-trusted-key".into(), "ab".repeat(32)]);
+        let config = ServerConfig::try_parse_from(&args).unwrap();
+        assert!(crate::bundle::installed::validate_config(&config).is_ok());
+        args.extend(["--force-current".into(), "a".repeat(64)]);
+        assert!(ServerConfig::try_parse_from(&args).is_err());
+    }
+
+    #[test]
+    fn geometry_defaults_on_and_can_be_disabled() {
+        use clap::Parser;
+        let config = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert!(!config.without_geometry);
+        let mut args = base_args();
+        args.push("--without-geometry".into());
+        let config = ServerConfig::try_parse_from(args).unwrap();
+        assert!(config.without_geometry);
     }
 
     #[test]

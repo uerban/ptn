@@ -28,6 +28,7 @@ import {
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
+import { ServiceAlertTripNotes } from "../ServiceAlerts/ServiceAlertTripNotes.tsx";
 
 const EMPTY_OVERRIDES = {};
 
@@ -111,6 +112,7 @@ export function RouteResultsPower({
             ) : (
               it.timingUnreliable === true && <RtWarningBanner reason="unreliable" />
             )}
+            <ServiceAlertTripNotes itinerary={it} />
             <PowerCard
               it={it}
               fastest={i === 0}

@@ -1,3 +1,6 @@
+import {StopSourceCache, rememberStopSource, updateStopSource} from "./stopSource.ts";
+import {StopViewportIndex} from "./stopViewportIndex.ts";
+import {createPanCitySwitcher} from "./panCitySwitch.ts";
 import {
   useRef,
   useEffect,
@@ -8,6 +11,7 @@ import {
   useImperativeHandle,
 } from "react";
 import maplibregl from "../../map/maplibre.ts";
+import { StopFade } from "./stopFade.ts";
 import { LocateControl } from "./LocateControl.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { createRoot } from "react-dom/client";
@@ -32,7 +36,7 @@ import {
   splitBadgeRows,
 } from "./StopMarker.tsx";
 import { solveLabels, diffDimmed, translatePageRectToCanvas, type LabelDot, type ObstacleRect as PlacementObstacle } from "./cardPlacement.ts";
-import { deriveStopHints, polylinesServingStop, type PatternPolyline, type StopHint } from "./cardBearing.ts";
+import { deriveStopHintsAsync, polylinesServingStop, type PatternPolyline, type StopHint } from "./cardBearing.ts";
 import { projectGeoSideToScreen } from "./cardHintsScreen.ts";
 import { hardHideLabelsEnabled } from "./hardHideFlag.ts";
 import { installAttributionAutoHide } from "./attributionAutoHide.ts";
@@ -40,11 +44,12 @@ import { trackBottomControlInsets } from "./bottomControlInsets.ts";
 import { trackSheetControlLift } from "./sheetControlLift.ts";
 import { buildLinePatterns } from "../../utils/buildLinePatterns.ts";
 import { decodePolyline } from "../../utils/polyline.ts";
-import { db } from "../../db/index.ts";
+import { captureCityData, useCityDataStore } from "../../services/cityData.ts";
 import { resolveLabelOverlaps, type LabelItem } from "./labelOverlap.ts";
 import { reportError } from "../../services/errorReporter.ts";
 import { createStopMarkerElement, findMarkerStopId } from "./markerClickDelegation.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useMapTapStore } from "../../stores/mapTapStore.ts";
 import { useMapObstaclesStore } from "../../stores/mapObstaclesStore.ts";
@@ -66,14 +71,21 @@ import {
   localGlyphRequest,
   type CartoStyleJson,
 } from "../../map/styleBuilder.ts";
-import { fetchBasemapStyle } from "../../services/basemapPrivacy.ts";
-import { getPolicy, usePolicy } from "../../stores/privacyStore.ts";
+import {
+  fetchBasemapStyle,
+  guardMapRequest,
+  isExternalBasemapAllowed,
+  reportDetailedBasemapStatus,
+  useExternalBasemapAllowed,
+} from "../../services/basemapPrivacy.ts";
 import { useEffectiveMapMode } from "../../map/mapMode.ts";
 
 interface TransitMapProps {
   center?: LatLon;
   zoom?: number;
   stops?: StopWithLines[];
+  /** Full catalog geometry, independent of transient urban visibility/badges. */
+  geometryStops?: StopWithLines[];
   onStopClick?: (stop: StopWithLines) => void;
   onMapClick?: (location: LatLon) => void;
   onGeolocate?: (position: LatLon) => void;
@@ -211,6 +223,21 @@ function collectNewBasemapResources(
   };
 }
 
+interface CartoState {
+  status: "idle" | "loading" | "loaded" | "failed";
+  abortCtrl: AbortController | null;
+}
+
+/** Record the external basemap's fetch state and publish it for the map's
+ * status line. `idle` means no external style is (or stays) on the map. */
+function updateCartoState(
+  ref: { current: CartoState },
+  next: CartoState,
+): void {
+  ref.current = next;
+  reportDetailedBasemapStatus(next.status === "idle" ? "off" : next.status);
+}
+
 /** Remove only the resources introduced by the external basemap. Dynamic PTN
  * overlays (routes, selected stops, and user position) stay attached. */
 function removeExternalBasemap(
@@ -252,6 +279,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       center,
       zoom = DEFAULT_ZOOM,
       stops = [],
+      geometryStops,
       onStopClick,
       onMapClick,
       onGeolocate,
@@ -273,11 +301,14 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
     const onMapReadyRef = useRef(onMapReady);
     const autoLocateOnLoadRef = useRef(autoLocateOnLoad);
     const stopsRef = useRef(stops);
+    const stopSourceCache = useMemo(() => new StopSourceCache(), []);
+    const stopFadeRef = useRef<StopFade | null>(null);
     const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
     const markerRootsRef = useRef<Map<string, ReturnType<typeof createRoot>>>(
       new Map()
     );
     const geolocateRef = useRef<LocateControl | null>(null);
+    const placementFrameRef = useRef<number | null>(null);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const measureCacheRef = useRef<Map<string, { w: number; h: number }>>(new Map());
     // Phase 3 overlap resolver: stopId → anchor override (only entries that
@@ -300,31 +331,38 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
     // Stable geometry identity for the stop set. Include every input used by
     // hint derivation, but sort stops/routes so fresh equivalent arrays do not
     // trigger a reload. Pan/zoom never changes this key.
+    const hintStops = geometryStops ?? stops;
+    const hintIndex = useGtfsDataStore((s) => s.raptorIndex);
+    const hintCityId = useGtfsDataStore((s) => s.loadedCityId);
+    const cityDataRevision = useCityDataStore(state => state.revision);
     const stopSetKey = useMemo(
       () =>
-        stops
+        hintStops
           .map((s) =>
             `${s.id}:${s.name}:${s.location.lat}:${s.location.lon}:${s.parentStationId ?? ""}:` +
             (s.lines ?? []).map((l) => l.routeId).sort().join("|"),
           )
           .sort()
           .join(","),
-      [stops],
+      [hintStops],
     );
     const [mapReady, setMapReady] = useState(false);
     const theme = useSettingsStore((s) => s.theme);
     // Any mode other than `detailed` draws locally and never touches the
     // external basemap — see map/mapMode.ts for the single choice behind it.
     const localMapOnly = useEffectiveMapMode() !== "detailed";
-    const basemapMode = usePolicy().basemapMode;
+    const basemapAllowed = useExternalBasemapAllowed();
     const activeCity = useCityStore((s) => s.activeCity);
+    const fadeGeneration = useCityDataStore(state => state.active?.token.cityId === activeCity.id
+      ? state.active.token.generationId : null);
+    const fadeContext = useMemo(() => ({ cityId: activeCity.id, generation: fadeGeneration }), [activeCity.id, fadeGeneration]);
+    const viewportIndex = useMemo(() => new StopViewportIndex(hintStops), [hintStops, fadeContext]);
+    const activeStopsById = useMemo(() => new Map(stops.map(stop => [stop.id, stop])), [stops]);
+    const viewportDataRef = useRef({index: viewportIndex, active: activeStopsById});
     const currentMapThemeRef = useRef<"light" | "dark" | null>(null);
     const lastFlownCityRef = useRef<string>(activeCity.id);
     const hasFlownToLocationRef = useRef(false);
-    const cartoStateRef = useRef<{
-      status: "idle" | "loading" | "loaded" | "failed";
-      abortCtrl: AbortController | null;
-    }>({ status: "idle", abortCtrl: null });
+    const cartoStateRef = useRef<CartoState>({ status: "idle", abortCtrl: null });
     // Track what is actually installed in MapLibre separately from fetch
     // state. A theme swap changes status to "loading" while the old external
     // style is still live; privacy tightening must remove that style too.
@@ -347,6 +385,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       onMapReadyRef.current = onMapReady;
       autoLocateOnLoadRef.current = autoLocateOnLoad;
       stopsRef.current = stops;
+      viewportDataRef.current = {index: viewportIndex, active: activeStopsById};
     });
 
     useEffect(() => {
@@ -355,39 +394,28 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
 
     // Build GeoJSON from stops
     const buildGeoJSON = useCallback(
-      (stopsData: StopWithLines[]): GeoJSON.FeatureCollection => ({
-        type: "FeatureCollection",
-        features: [...cityOverviewFeatures(getAvailableCities()), ...stopsData.map((stop) => ({
-          type: "Feature" as const,
-          geometry: {
-            type: "Point" as const,
-            coordinates: [stop.location.lon, stop.location.lat],
-          },
-          properties: {
-            id: stop.id,
-            name: stop.name,
-            // Precomputed by the backend label-placement solver; the label
-            // layer's `text-anchor`/`text-offset` expressions read this. A Phase-3
-            // screen-space override (set on moveend) wins when present. Absent ⇒
-            // the expressions fall back to the legacy below-the-dot placement.
-            labelAnchor:
-              labelOverrideRef.current.get(stop.id) ?? stop.labelAnchor ?? null,
-          },
-        }))],
-      }),
-      []
+      (stopsData: StopWithLines[]): GeoJSON.FeatureCollection<GeoJSON.Point> => {
+        const activeIds = new Set(stopsData.map(stop => stop.id));
+        const exits = [...(stopFadeRef.current?.exiting.values() ?? [])]
+          .filter(({ stop }) => !activeIds.has(stop.id)).map(({ stop }) => stop);
+        return stopSourceCache.build(stopsData, exits, cityOverviewFeatures(getAvailableCities()), labelOverrideRef.current);
+      },
+      [stopSourceCache]
     );
 
     // Remove all station card markers
     const removeAllMarkers = useCallback(() => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current.clear();
-      markerRootsRef.current.forEach((root) => root.unmount());
+      // Markers are detached immediately. Dispose their independent React
+      // roots after the parent commit, rather than unmounting a root while
+      // React is still flushing this component's effects.
+      markerRootsRef.current.forEach((root) => queueMicrotask(() => root.unmount()));
       markerRootsRef.current.clear();
     }, []);
 
     // Update station card markers based on current viewport and zoom
-    const updateMarkers = useCallback(() => {
+    const resolveMarkers = useCallback(() => {
       const map = mapRef.current;
       if (!map) return;
       publishViewport(map);
@@ -404,7 +432,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       }
 
       const bounds = map.getBounds();
-      const currentStops = stopsRef.current;
+      const viewport = viewportDataRef.current;
 
       // Expand bounds by VIEWPORT_BUFFER so markers are pre-rendered beyond
       // the visible area and don't pop in during panning.
@@ -416,9 +444,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       );
 
       // Find stops visible in the buffered viewport
-      const visibleStops = currentStops.filter((stop) =>
-        buffered.contains([stop.location.lon, stop.location.lat])
-      );
+      const visibleStops = viewport.index.query({west: buffered.getWest(), east: buffered.getEast(),
+        south: buffered.getSouth(), north: buffered.getNorth()}).flatMap(id => {
+          const stop = viewport.active.get(id);
+          return stop ? [stop] : [];
+        });
 
       // Project stops to pixel coordinates and sort by line count (more lines = higher priority)
       const projected = visibleStops
@@ -558,12 +588,12 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
 
       // Remove markers that are no longer winners or left viewport
       markersRef.current.forEach((marker, id) => {
-        if (!winnersById.has(id)) {
+        if (!winnersById.has(id) && !stopFadeRef.current?.exiting.has(id)) {
           marker.remove();
           markersRef.current.delete(id);
           const root = markerRootsRef.current.get(id);
           if (root) {
-            root.unmount();
+            queueMicrotask(() => root.unmount());
             markerRootsRef.current.delete(id);
           }
         }
@@ -616,14 +646,32 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       // tracked set unchanged so the next solve re-emits the pending dims rather
       // than treating them as already applied (which would leave a hidden dot
       // un-dimmed once the source appears).
-      const { toSet, toClear } = diffDimmed(dimmedIdsRef.current, hidden);
+      const presentationHidden = new Set(hidden);
+      for (const id of dimmedIdsRef.current) {
+        if (stopFadeRef.current?.exiting.has(id)) presentationHidden.add(id);
+      }
+      const { toSet, toClear } = diffDimmed(dimmedIdsRef.current, presentationHidden);
       const src = map.getSource(SOURCE_ID);
       if (src) {
         for (const id of toClear) map.removeFeatureState({ source: SOURCE_ID, id }, "hidden");
         for (const id of toSet) map.setFeatureState({ source: SOURCE_ID, id }, { hidden: true });
-        dimmedIdsRef.current = hidden;
+        dimmedIdsRef.current = presentationHidden;
       }
     }, [removeAllMarkers]);
+
+    // Data, geometry and selection can change in the same React commit.
+    // Resolve once at the next paint using the latest committed refs.
+    const updateMarkers = useCallback(() => {
+      if (placementFrameRef.current !== null) return;
+      placementFrameRef.current = requestAnimationFrame(() => {
+        placementFrameRef.current = null;
+        resolveMarkers();
+      });
+    }, [resolveMarkers]);
+
+    useEffect(() => {
+      if (mapReady) updateMarkers();
+    }, [selectedStopId, mapReady, updateMarkers]);
 
     // Debounced marker update
     const debouncedUpdateMarkers = useCallback(() => {
@@ -657,7 +705,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         // later re-entry recomputes fresh against solver anchors.
         if (overrides.size > 0) {
           labelOverrideRef.current = new Map();
-          source.setData(buildGeoJSON(stopsRef.current));
+          updateStopSource(source, buildGeoJSON(stopsRef.current));
         }
         return;
       }
@@ -665,8 +713,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       const bounds = map.getBounds();
       const items: LabelItem[] = [];
       const ids: string[] = [];
-      for (const stop of stopsRef.current) {
-        if (!bounds.contains([stop.location.lon, stop.location.lat])) continue;
+      const viewport = viewportDataRef.current;
+      for (const id of viewport.index.query({west: bounds.getWest(), east: bounds.getEast(),
+        south: bounds.getSouth(), north: bounds.getNorth()})) {
+        const stop = viewport.active.get(id);
+        if (!stop) continue;
         const px = map.project([stop.location.lon, stop.location.lat]);
         items.push({
           x: px.x,
@@ -683,7 +734,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       if (items.length > LABEL_RESOLVE_MAX) {
         if (overrides.size > 0) {
           labelOverrideRef.current = new Map();
-          source.setData(buildGeoJSON(stopsRef.current));
+          updateStopSource(source, buildGeoJSON(stopsRef.current));
         }
         return;
       }
@@ -709,7 +760,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       if (same) return;
 
       labelOverrideRef.current = next;
-      source.setData(buildGeoJSON(stopsRef.current));
+      updateStopSource(source, buildGeoJSON(stopsRef.current));
     }, [buildGeoJSON]);
 
     const debouncedResolveLabels = useCallback(() => {
@@ -719,6 +770,22 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         labelResolveTimerRef.current = null;
       }, MARKER_DEBOUNCE_MS);
     }, [resolveVisibleLabels]);
+
+    useEffect(() => {
+      if (!mapReady || !document.fonts) return;
+      let cancelled = false;
+      const invalidateMeasurements = () => {
+        if (cancelled) return;
+        measureCacheRef.current.clear();
+        updateMarkers();
+        debouncedResolveLabels();
+      };
+      document.fonts.addEventListener("loadingdone", invalidateMeasurements);
+      return () => {
+        cancelled = true;
+        document.fonts.removeEventListener("loadingdone", invalidateMeasurements);
+      };
+    }, [mapReady, updateMarkers, debouncedResolveLabels]);
 
     // Re-place markers whenever the registered set of UI-overlay obstacles
     // changes (e.g. StepList opens, popup mounts, sheet height transitions).
@@ -768,7 +835,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       // immediately flies to the user's GPS position, so restoring first would
       // only cause a visible double-jump (and the locate animation would then
       // overwrite the saved viewport).
-      const saved = center || autoLocateOnLoadRef.current ? null : loadViewport();
+      const saved = center || autoLocateOnLoadRef.current ? null : loadViewport(useCityStore.getState().activeCity.id);
       const restore =
         saved && saved.cityId === useCityStore.getState().activeCity.id ? saved : null;
       const c = center ?? (restore ? { lat: restore.lat, lon: restore.lon } : getDefaultCenter());
@@ -780,10 +847,16 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         zoom: restore?.zoom ?? zoom,
         bearing: restore?.bearing ?? 0,
         pitch: restore?.pitch ?? 0,
-        transformRequest: (url, resourceType) =>
-          resourceType === "Glyphs"
+        // Every engine request passes the provider guard first: an external
+        // style, tile, glyph or sprite is only fetched while its provider is
+        // allowed, whatever source or style asked for it.
+        transformRequest: (url, resourceType) => {
+          const blocked = guardMapRequest(url, resourceType, window.location.origin);
+          if (blocked) return { url: blocked };
+          return resourceType === "Glyphs"
             ? { url: localGlyphRequest(url, window.location.origin) }
-            : undefined,
+            : undefined;
+        },
       });
 
       installAttributionAutoHide(
@@ -830,7 +903,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         const dark =
           document.documentElement.getAttribute("data-theme") === "dark";
         const ctrl = new AbortController();
-        cartoStateRef.current = { status: "loading", abortCtrl: ctrl };
+        updateCartoState(cartoStateRef, { status: "loading", abortCtrl: ctrl });
         const timer = setTimeout(
           () => ctrl.abort(new DOMException("basemap-timeout", "AbortError")),
           resolveBasemapTimeoutMs(),
@@ -840,14 +913,13 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             providerId: "carto",
             dark,
             signal: ctrl.signal,
-            getPolicy,
           });
           if (
             !cartoStyle ||
             localMapOnlyRef.current ||
-            getPolicy().basemapMode !== "external-detailed"
+            !isExternalBasemapAllowed()
           ) {
-            cartoStateRef.current = { status: "idle", abortCtrl: null };
+            updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
             return;
           }
           // Theme may have flipped during the fetch — drop stale result.
@@ -855,10 +927,10 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             dark ===
             (document.documentElement.getAttribute("data-theme") === "dark");
           if (!stillCurrent) {
-            cartoStateRef.current = {
+            updateCartoState(cartoStateRef, {
               status: cartoAppliedRef.current ? "loaded" : "idle",
               abortCtrl: null,
-            };
+            });
             void loadCarto();
             return;
           }
@@ -867,24 +939,24 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           mergeCartoIntoRunningMap(map, cartoStyle, stopsBeforeId);
           cartoResourcesRef.current = resources;
           cartoAppliedRef.current = true;
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
           setGlyphsReady(true);
         } catch {
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "failed"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } finally {
           clearTimeout(timer);
         }
@@ -983,7 +1055,8 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           const features = map.queryRenderedFeatures(e.point, {
             layers: queryLayers,
           });
-          if (features.length > 0) return;
+          if (features.some(feature => feature.layer.id === CITY_LAYER ||
+            stopsRef.current.some(stop => stop.id === feature.properties?.id))) return;
         }
         onMapClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
       });
@@ -1032,8 +1105,9 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       map.on("mouseleave", CITY_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
-      map.on("mouseenter", DOT_LAYER, () => {
-        map.getCanvas().style.cursor = "pointer";
+      map.on("mouseenter", DOT_LAYER, (e) => {
+        const id = e.features?.[0]?.properties?.id;
+        map.getCanvas().style.cursor = stopsRef.current.some(stop => stop.id === id) ? "pointer" : "";
       });
       map.on("mouseleave", DOT_LAYER, () => {
         map.getCanvas().style.cursor = "";
@@ -1083,7 +1157,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       });
 
       // Pan-to-switch: detect when viewport enters another city's bbox
-      let switchDebounce: ReturnType<typeof setTimeout> | null = null;
+      const citySwitcher = createPanCitySwitcher(map);
       let saveDebounce: ReturnType<typeof setTimeout> | null = null;
       let lastSavedKey = "";
       map.on("moveend", (e: maplibregl.MapLibreEvent & { originalEvent?: unknown }) => {
@@ -1099,7 +1173,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         //     and must NOT overwrite "where the user left off."
         //   - Tagged with the city the coordinates actually fall in, NOT the
         //     active city: a pan-to-switch settles in the new city's bbox while
-        //     setActiveCity is still 500ms away (debounce below), so reading the
+        //     setActiveCity runs in the next task, so reading the
         //     active city here would mis-tag a viewport in city B as city A and
         //     let it restore under A's data. findCityByLocation keeps the tag
         //     honest; fall back to the active city for centers in a bbox gap.
@@ -1125,21 +1199,51 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             }, 400);
           }
         }
-        if (switchDebounce) clearTimeout(switchDebounce);
-        switchDebounce = setTimeout(() => {
-          const mapCenter = map.getCenter();
-          const targetCity = findCityByLocation(mapCenter.lat, mapCenter.lng);
-          // Gate via getAvailableCities() rather than raw targetCity.available
-          // so the auto-switch shares one definition of "a city we can serve"
-          // with the rest of the app.
-          const availableIds = new Set(getAvailableCities().map((c) => c.id));
-          if (targetCity && targetCity.id !== useCityStore.getState().activeCity.id && availableIds.has(targetCity.id)) {
-            useCityStore.getState().setActiveCity(targetCity);
-          }
-        }, 500);
+        citySwitcher.schedule();
       });
 
       mapRef.current = map;
+      let renderedStops = new Set<string>();
+      let canvasRect = map.getCanvas().getBoundingClientRect();
+      stopFadeRef.current = new StopFade({
+        // One rendered-feature query per reconcile/frame, never per stop.
+        // MapLibre accounts for symbol collision and partially visible dots.
+        prepareVisibility: () => {
+          const canvas = map.getCanvas();
+          canvasRect = canvas.getBoundingClientRect();
+          const layers = [DOT_LAYER, LABEL_LAYER].filter(id => !!map.getLayer(id));
+          renderedStops = new Set(layers.length ? map.queryRenderedFeatures(
+            [[0, 0], [canvas.clientWidth, canvas.clientHeight]], {layers},
+          ).flatMap(feature => typeof feature.properties?.id === "string" ? [feature.properties.id] : []) : []);
+        },
+        onscreen: (stop) => {
+          if (renderedStops.has(stop.id)) return true;
+          const card = markersRef.current.get(stop.id)?.getElement().querySelector<HTMLElement>(".cursor-pointer");
+          const rect = card?.getBoundingClientRect();
+          return !!rect && rect.width > 0 && rect.height > 0 && rect.right > canvasRect.left &&
+            rect.left < canvasRect.right && rect.bottom > canvasRect.top && rect.top < canvasRect.bottom;
+        },
+        reducedMotion: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        opacity: (id, opacity, exiting) => {
+          if (map.getSource(SOURCE_ID)) map.setFeatureState({ source: SOURCE_ID, id }, { exitOpacity: opacity });
+          const marker = markersRef.current.get(id);
+          // MapLibre reapplies its own opacity during camera/render updates.
+          marker?.setOpacity(opacity, opacity * 0.2);
+          const el = marker?.getElement();
+          if (el) {
+            el.inert = exiting;
+            el.style.pointerEvents = exiting ? "none" : "";
+          }
+        },
+        changed: () => {
+          const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+          if (source) updateStopSource(source, buildGeoJSON(stopsRef.current));
+          updateMarkers();
+          debouncedResolveLabels();
+        },
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (id) => cancelAnimationFrame(id),
+      });
 
       // Expose map for e2e testing
       if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
@@ -1154,14 +1258,18 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           clearTimeout(labelResolveTimerRef.current);
         }
         if (prewarmDebounce) clearTimeout(prewarmDebounce);
-        if (switchDebounce) clearTimeout(switchDebounce);
+        citySwitcher.dispose();
         if (saveDebounce) clearTimeout(saveDebounce);
         cancelPress();
         canvasContainer.removeEventListener("click", onMarkerCardClick);
+        stopFadeRef.current?.dispose();
+        stopFadeRef.current = null;
+        if (placementFrameRef.current !== null) cancelAnimationFrame(placementFrameRef.current);
+        placementFrameRef.current = null;
         removeAllMarkers();
         window.removeEventListener("online", onOnline);
         cartoStateRef.current.abortCtrl?.abort();
-        cartoStateRef.current = { status: "idle", abortCtrl: null };
+        updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
         cartoAppliedRef.current = false;
         cartoResourcesRef.current = NO_BASEMAP_RESOURCES;
         loadCartoRef.current = null;
@@ -1182,10 +1290,10 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       const map = mapRef.current;
       if (!map || !mapReady) return;
 
-      if (basemapMode === "local-only" || localMapOnly) {
+      if (!basemapAllowed || localMapOnly) {
         const wasLoaded = cartoAppliedRef.current;
         cartoStateRef.current.abortCtrl?.abort();
-        cartoStateRef.current = { status: "idle", abortCtrl: null };
+        updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
         if (wasLoaded) {
           const isDark =
             document.documentElement.getAttribute("data-theme") === "dark";
@@ -1204,7 +1312,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       ) {
         void loadCartoRef.current?.();
       }
-    }, [basemapMode, localMapOnly, mapReady, debouncedResolveLabels]);
+    }, [basemapAllowed, localMapOnly, mapReady, debouncedResolveLabels]);
 
     // Update stops source and layers
     useEffect(() => {
@@ -1212,12 +1320,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       if (!map || !mapReady) return;
 
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      stopFadeRef.current?.reconcile(stops, geometryStops ?? stops, fadeContext, performance.now());
       const geojson = buildGeoJSON(stops);
 
       if (map.getSource(SOURCE_ID)) {
-        (map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource).setData(
-          geojson
-        );
+        updateStopSource(map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource, geojson);
       } else {
         // Stops plus one static marker per covered city. No clustering:
         // aggregates hid the streets of the city users were navigating.
@@ -1226,6 +1333,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           data: geojson,
           promoteId: "id",
         });
+        rememberStopSource(map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource, geojson);
 
         // Layer 1: covered-city markers, only when zoomed far out
         map.addLayer({
@@ -1264,8 +1372,8 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             "circle-color": "#ffffff",
             "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], ZOOM_DOTS_MIN, 1, 12, 2],
             "circle-stroke-color": "#1e40af",
-            "circle-opacity": ["case", ["boolean", ["feature-state", "hidden"], false], 0.35, 1],
-            "circle-stroke-opacity": ["case", ["boolean", ["feature-state", "hidden"], false], 0.35, 1],
+            "circle-opacity": ["*", ["coalesce", ["feature-state", "exitOpacity"], 1], ["case", ["boolean", ["feature-state", "hidden"], false], 0.35, 1]],
+            "circle-stroke-opacity": ["*", ["coalesce", ["feature-state", "exitOpacity"], 1], ["case", ["boolean", ["feature-state", "hidden"], false], 0.35, 1]],
           },
         });
       }
@@ -1311,6 +1419,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
               "text-anchor": LABEL_TEXT_ANCHOR_EXPR,
             },
             paint: {
+              "text-opacity": ["coalesce", ["feature-state", "exitOpacity"], 1],
               "text-color": isDark ? "#e5e7eb" : "#374151",
               "text-halo-color": isDark ? "#1f2937" : "#ffffff",
               "text-halo-width": 2.5,
@@ -1324,7 +1433,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       updateMarkers();
       // Re-resolve label overlaps for the new stop set (no-op outside the band).
       debouncedResolveLabels();
-    }, [stops, mapReady, glyphsReady, buildGeoJSON, updateMarkers, debouncedResolveLabels]);
+    }, [stops, geometryStops, fadeContext, mapReady, glyphsReady, buildGeoJSON, updateMarkers, debouncedResolveLabels]);
 
     // ── Stage 2 road-hint preload (async, cached) ───────────────────────────────
     // Derive each stop's curb `side` ONCE per city +
@@ -1345,21 +1454,23 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
     // `deriveStopHints` returns `{ side: null }` for them (graceful
     // Stage-1, no regression).
     //
-    // Cancellation: `cancelled` guards against a city / stop-set change landing a
-    // stale derivation into the ref. Dexie/index reads are async — this NEVER
-    // blocks `updateMarkers`; placement stays Stage-1 until hints resolve.
+    // Cancellation guards city/stop-set reads and incremental geometry batches.
+    // Geometry yields between small batches so rendering can continue; placement
+    // stays Stage-1 until a complete, current result is ready.
     useEffect(() => {
       if (!mapReady) return;
-      const stopsForRun = stops;
+      const stopsForRun = hintStops;
+      const data = captureCityData(activeCity.id);
       // Never let a prior city/stop-set hint leak into the first solve for the
       // new geometry while the asynchronous route/shape reads are in flight.
       hintsByStopIdRef.current = new Map();
-      if (stopsForRun.length === 0) {
+      if (stopsForRun.length === 0 || !hintIndex || hintCityId !== activeCity.id) {
         return;
       }
       updateMarkers();
 
       let cancelled = false;
+      const hintAbort = new AbortController();
 
       (async () => {
         try {
@@ -1378,7 +1489,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             if (cached !== undefined) return cached;
             let decoded: { lat: number; lon: number }[] | null = null;
             try {
-              const row = await db.gtfsShapes.get(shapeId);
+              const row = await data.gtfsShapes.get(shapeId);
               if (row?.encodedPolyline) decoded = decodePolyline(row.encodedPolyline);
             } catch {
               decoded = null; // DB closed / schema upgrade mid-flight → no shape
@@ -1435,10 +1546,14 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
 
           if (cancelled) return;
 
+          data.assertCurrent();
           // Pure derivation (geographic frame). `StopWithLines` already matches
           // the `StopLike` shape deriveStopHints reads ({ id, name, location,
           // parentStationId }).
-          hintsByStopIdRef.current = deriveStopHints(stopsForRun, shapesByStopId);
+          const hints = await deriveStopHintsAsync(stopsForRun, shapesByStopId, hintAbort.signal);
+          if (cancelled) return;
+          data.assertCurrent();
+          hintsByStopIdRef.current = hints;
 
           // Re-solve so the freshly-derived hints take effect on the current
           // viewport without waiting for the next pan/zoom.
@@ -1446,7 +1561,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         } catch (err) {
           // Hint derivation is best-effort: any failure leaves placement at
           // Stage-1. Report for telemetry but never throw into the effect.
-          if (!cancelled) {
+          if (!cancelled && !(err instanceof Error && err.name === "AbortError")) {
             reportError(err instanceof Error ? err : new Error(String(err)), {
               context: { where: "TransitMap.deriveStopHints" },
             });
@@ -1456,10 +1571,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
 
       return () => {
         cancelled = true;
+        hintAbort.abort();
       };
       // Keyed on the city + stop-set identity (ids+routes), NOT the `stops` array
       // identity and NOT pan/zoom. `updateMarkers` is stable (reads refs).
-    }, [stopSetKey, activeCity.id, mapReady, updateMarkers]);
+    }, [stopSetKey, activeCity.id, mapReady, updateMarkers, hintIndex, hintCityId, cityDataRevision]);
 
     // Fly to user's geolocation once when first available
     useEffect(() => {
@@ -1491,9 +1607,12 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       // (e.g. a programmatic / dev-override city switch).
       const ctr = mapRef.current.getCenter();
       if (findCityByLocation(ctr.lat, ctr.lng)?.id !== activeCity.id) {
+        const saved = loadViewport(activeCity.id);
         mapRef.current.flyTo({
-          center: [activeCity.center.lon, activeCity.center.lat],
-          zoom: DEFAULT_ZOOM,
+          center: saved ? [saved.lon, saved.lat] : [activeCity.center.lon, activeCity.center.lat],
+          zoom: saved?.zoom ?? DEFAULT_ZOOM,
+          bearing: saved?.bearing ?? 0,
+          pitch: saved?.pitch ?? 0,
         });
       }
     }, [activeCity.id, mapReady, removeAllMarkers]);
@@ -1534,7 +1653,7 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         cartoStateRef.current.abortCtrl?.abort();
 
         const ctrl = new AbortController();
-        cartoStateRef.current = { status: "loading", abortCtrl: ctrl };
+        updateCartoState(cartoStateRef, { status: "loading", abortCtrl: ctrl });
         const timer = setTimeout(
           () => ctrl.abort(new DOMException("basemap-timeout", "AbortError")),
           resolveBasemapTimeoutMs(),
@@ -1544,14 +1663,13 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
             providerId: "carto",
             dark: isDark,
             signal: ctrl.signal,
-            getPolicy,
           });
           if (
             !cartoStyle ||
             localMapOnlyRef.current ||
-            getPolicy().basemapMode !== "external-detailed"
+            !isExternalBasemapAllowed()
           ) {
-            cartoStateRef.current = { status: "idle", abortCtrl: null };
+            updateCartoState(cartoStateRef, { status: "idle", abortCtrl: null });
             return;
           }
 
@@ -1586,27 +1704,27 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           // briefly un-dim until the next pan/zoom. Harmless no-op when hard-hide
           // is rolled back off (just an extra end-of-gesture-class solve).
           map.once("idle", () => debouncedResolveLabels());
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed" &&
+              isExternalBasemapAllowed() &&
               cartoAppliedRef.current
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } catch {
           // Theme swap fetch failed — the old Carto basemap is still on
           // screen for the previous theme. Not ideal, but better than a
           // teardown that leaves the user with a blank map.
-          cartoStateRef.current = {
+          updateCartoState(cartoStateRef, {
             status:
               !localMapOnlyRef.current &&
-              getPolicy().basemapMode === "external-detailed"
+              isExternalBasemapAllowed()
                 ? "loaded"
                 : "idle",
             abortCtrl: null,
-          };
+          });
         } finally {
           clearTimeout(timer);
         }

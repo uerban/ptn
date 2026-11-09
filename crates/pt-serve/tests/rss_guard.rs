@@ -72,6 +72,15 @@ fn rss_guard_pins_2x_factor_exactly() {
                 * pt_serve::ops::rss_guard::RT_POLLER_ASSUMED_MAX_ENTRIES_PER_FEED
                 * pt_serve::ops::rss_guard::RT_POLLER_SNAPSHOT_ENTRY_BYTES_ASSUMED
     };
+    // ServiceAlerts poller: gated on a non-empty `rt_service_alerts_urls`.
+    let alerts_poller_overhead = if cfg.alerts_urls().is_empty() {
+        0
+    } else {
+        pt_serve::ops::rss_guard::ALERTS_POLLER_PROCESS_FIXED_BYTES
+            + cfg.alerts_urls().len() as u64
+                * pt_serve::rt::alerts::MAX_FEED_TEXT_BYTES as u64
+                * pt_serve::ops::rss_guard::ALERTS_FEED_TEXT_RSS_FACTOR_ASSUMED
+    };
     let overhead = cfg.process_fixed_overhead_bytes
         + ((cfg.worker_pool_size + cfg.loopback_worker_count) as u64
             + pt_serve::ops::rss_guard::AUXILIARY_WORKER_COUNT)
@@ -82,7 +91,8 @@ fn rss_guard_pins_2x_factor_exactly() {
         + cfg.rt_tile_response_cache_max_entries
             * pt_serve::ops::rss_guard::RT_TILE_RESPONSE_ENTRY_BYTES_ASSUMED
         + poi_overhead
-        + rt_poller_overhead;
+        + rt_poller_overhead
+        + alerts_poller_overhead;
     let max_rss = cfg.max_rss_bytes;
 
     // Sanity precondition: the default test config has enough headroom that
@@ -253,6 +263,8 @@ fn enforce_reject_carries_full_breakdown() {
                 "rtPollerAssumedMaxEntriesPerFeed",
                 "rtPollerSnapshotEntryBytes",
                 "rtPollerTermBytes",
+                "alertsPollerFeedCount",
+                "alertsPollerTermBytes",
             ] {
                 assert!(json.contains(needle), "json missing {needle}: {json}");
             }

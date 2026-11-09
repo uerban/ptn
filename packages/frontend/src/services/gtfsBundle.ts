@@ -1,3 +1,5 @@
+import { useCityDataStore } from "./cityData.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 /**
  * Compressed-blob storage helper for the GTFS canonical bundle.
  *
@@ -23,6 +25,7 @@ export interface RaptorBundleWire {
   version?: number;
   meta: {
     generatedAt: string;
+    cityId?: string;
     /**
      * IANA timezone of the feed's agency (mirrors RoutingBundleData.meta
      * .cityTzIana). Populated on BOTH ingestion paths (PTB sidecar meta +
@@ -50,6 +53,10 @@ export interface RaptorBundleWire {
     mode: string;
     color?: string;
     textColor?: string;
+    /** GTFS `agency_id`, when the route has one. */
+    agencyId?: string;
+    /** GTFS `route_type`; absent on bundles stored by older builds. */
+    routeType?: number;
     stopIds: string[];
     trips: Array<{
       tripId: string;
@@ -194,6 +201,8 @@ export function getTransfersManifest(
 export async function readGtfsBundle(
   cityId: string,
 ): Promise<RaptorBundleWire | null> {
+  const active = useCityDataStore.getState().active;
+  if (active?.token.cityId === canonicalCityId(cityId)) return active.wire;
   const rec = await db.gtfsBundle.get(cityId);
   if (!rec) return null;
   if (rec.format !== "gzip") {

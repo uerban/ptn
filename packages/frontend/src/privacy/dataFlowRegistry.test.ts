@@ -20,6 +20,7 @@ describe("dataFlowRegistry", () => {
     expect(DATA_FLOW_REGISTRY.map((flow) => flow.id)).toEqual([
       "operator.transit-data",
       "operator.realtime",
+      "operator.service-alerts",
       "operator.nearby-stop-centroid",
       "external.detailed-basemap",
       "operator.place-search",
@@ -28,8 +29,28 @@ describe("dataFlowRegistry", () => {
       "operator.remote-routing",
       "external.remote-routing",
       "operator.client-report",
+      "external.bike-share",
     ]);
     expect(() => validateDataFlowRegistry(DATA_FLOW_REGISTRY)).not.toThrow();
+  });
+
+  it("declares service alerts as a city-only automatic operator request", () => {
+    const flow = getDataFlow("operator.service-alerts");
+    expect(flow.destination).toBe("operator");
+    expect(flow.networkPath).toBe("operator");
+    expect(flow.trigger).toBe("automatic");
+    expect(flow.requestFields).toEqual(["city"]);
+    expect(flow.data.every((item) => item.recipient === "operator")).toBe(true);
+  });
+
+  it("declares bike share as an explicit, direct request to its operator", () => {
+    const flow = getDataFlow("external.bike-share");
+    expect(flow.destination).toBe("external");
+    expect(flow.networkPath).toBe("direct-external");
+    expect(flow.trigger).toBe("explicit-action");
+    expect(flow.providerKind).toBe("bike-share");
+    expect(flow.requestFields).toEqual(["resource"]);
+    expect(flow.data.every((item) => item.recipient === "provider")).toBe(true);
   });
 
   it("rejects duplicate flow IDs", () => {

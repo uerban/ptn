@@ -28,6 +28,9 @@ export interface CityConfig {
   readonly center: { readonly lat: number; readonly lon: number };
   readonly bbox: { readonly minLat: number; readonly minLon: number; readonly maxLat: number; readonly maxLon: number };
   readonly available: boolean;
+  /** ISO 3166-1 alpha-2 country, shown as context in city lists. Optional:
+   * hosts that leave it out still work, and the city is shown without one. */
+  readonly countryCode?: string;
   /** Schedule-source credits shown in Settings for the active city. */
   readonly transitSources?: readonly { readonly name: string; readonly url: string }[];
   /**
@@ -53,10 +56,10 @@ export interface CityConfig {
   readonly geocoder?: SelfHostedGeocoderConfig;
   /**
    * Modes that start excluded from routing for this city (the filter chip
-   * still shows, so the user can opt in for the session). For services that
+   * still shows, so the user can explicitly opt in globally). For services that
    * exist in the feed but are unreliable enough that defaulting them out is
-   * the safer behaviour. Seeded once per session by
-   * `settingsStore.applyCityModeDefaults`.
+   * the safer behaviour. Resolved as a city policy without changing global
+   * exclusions; explicit global choices take precedence.
    */
   readonly routeGroups?: readonly RouteGroup[];
   readonly defaultExcludedModes?: readonly TransportMode[];

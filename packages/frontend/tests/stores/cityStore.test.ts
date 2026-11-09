@@ -1,17 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// Mock the gtfsBundleBytes module BEFORE importing cityStore so the
-// eviction call on setActiveCity is observable. cityStore eagerly
-// imports `evictPtbBytes` at module load. `vi.hoisted` is required
-// because vi.mock is hoisted above all top-level statements — a
-// plain `const` declaration would TDZ-trap when the factory runs.
-const { evictPtbBytesMock } = vi.hoisted(() => ({
-  evictPtbBytesMock: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock("../../src/services/gtfsBundleBytes.ts", () => ({
-  evictPtbBytes: evictPtbBytesMock,
-}));
-
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { CITIES } from "../../src/config/cities.ts";
 import { db } from "../../src/db/index.ts";
@@ -19,7 +7,6 @@ import { db } from "../../src/db/index.ts";
 describe("cityStore", () => {
   beforeEach(() => {
     useCityStore.setState({ activeCity: CITIES[0] });
-    evictPtbBytesMock.mockClear();
   });
 
   it("defaults to first city (vilnius)", () => {
@@ -56,39 +43,21 @@ describe("cityStore", () => {
     expect(merged.activeCity.id).toBe("krakow");
   });
 
-  it("evicts the previous city's PTB bytes on city switch (panel DB F3)", async () => {
-    // Cache-poison guard: db.ptbBytes is keyed by cityId, so a `put` for
-    // the new city doesn't overwrite the prior city's ~5 MB row. Without
-    // this eviction, hopping between cities accumulates bytes indefinitely.
-    const tricity = CITIES.find((c) => c.id === "tricity")!;
-    useCityStore.getState().setActiveCity(tricity);
-    // setActiveCity fires-and-forgets the eviction; await a microtask
-    // tick so the mocked promise's `.then` has a chance to run before
-    // we assert.
-    await Promise.resolve();
-    expect(evictPtbBytesMock).toHaveBeenCalledTimes(1);
-    expect(evictPtbBytesMock).toHaveBeenCalledWith("vilnius");
-  });
-
-  it("does not evict when setActiveCity is called with the same city", () => {
-    // Idempotent re-selection of the same city must not delete bytes —
-    // the next RAPTOR query would have to re-download the full PTB
-    // bundle for no reason.
-    const vilnius = CITIES[0];
-    useCityStore.getState().setActiveCity(vilnius);
-    expect(evictPtbBytesMock).not.toHaveBeenCalled();
-  });
-
-  it("swallows eviction errors so the city switch still succeeds", async () => {
-    // A transient IDB error (quota, locked tab, schema-upgrade race) must
-    // not block the UI swap; the next visit recovers via the network-
-    // first PTB fetcher. We just log + drop the error.
-    evictPtbBytesMock.mockRejectedValueOnce(new Error("idb down"));
-    const tricity = CITIES.find((c) => c.id === "tricity")!;
-    expect(() => useCityStore.getState().setActiveCity(tricity)).not.toThrow();
-    expect(useCityStore.getState().activeCity.id).toBe("tricity");
-    // Drain the rejected promise so the unhandled-rejection tracker is happy.
-    await new Promise((r) => setTimeout(r, 0));
+  it("changes only the selected reference and preserves legacy recovery bytes", async () => {
+    await db.open();
+    await db.ptbBytes.bulkPut([
+      {cityId: "vilnius", bytes: new Uint8Array([1]), etag: '"a"', firstStoredAt: 1, lastValidatedAt: 1},
+      {cityId: "tricity", bytes: new Uint8Array([2]), etag: '"b"', firstStoredAt: 1, lastValidatedAt: 1},
+    ] as never);
+    await db.gtfsBundle.bulkPut([{cityId: "vilnius"}, {cityId: "tricity"}] as never);
+    const rawDelete = vi.spyOn(db.ptbBytes, "delete");
+    const bundleDelete = vi.spyOn(db.gtfsBundle, "delete");
+    useCityStore.getState().setActiveCity(CITIES.find(city => city.id === "tricity")!);
+    expect(rawDelete).not.toHaveBeenCalled();
+    expect(bundleDelete).not.toHaveBeenCalled();
+    expect(await db.ptbBytes.toCollection().primaryKeys()).toEqual(["tricity", "vilnius"]);
+    expect(await db.gtfsBundle.toCollection().primaryKeys()).toEqual(["tricity", "vilnius"]);
+    rawDelete.mockRestore(); bundleDelete.mockRestore();
   });
 
   it("drops persisted activeCity if its CITIES entry is no longer available", () => {
@@ -101,36 +70,16 @@ describe("cityStore", () => {
     expect(merged.activeCity.id).toBe(current.activeCity.id);
     expect(merged.activeCity.id).not.toBe("retired-city");
   });
-  it("rehydrate evicts other cities' cached bytes (F10)", async () => {
-    // Cold start straight into city B bypasses setActiveCity's transition
-    // eviction — the persist onRehydrateStorage hook must sweep instead.
-    //
-    // The module-import-time rehydrate hook (active city vilnius) is parked
-    // on db-ready; opening the DB here releases it. Flush it BEFORE seeding
-    // so its eviction can't race the rows this test asserts on.
-    await db.open();
-    await new Promise((r) => setTimeout(r, 25));
 
-    await db.ptbBytes.bulkPut([
-      { cityId: "vilnius", bytes: new ArrayBuffer(8), etag: '"a"', firstStoredAt: 1, lastValidatedAt: 1 },
-      { cityId: "tricity", bytes: new ArrayBuffer(8), etag: '"b"', firstStoredAt: 1, lastValidatedAt: 1 },
-    ] as never);
-    await db.gtfsBundle.bulkPut([
-      { cityId: "vilnius" },
-      { cityId: "tricity" },
-    ] as never);
+});
 
-    const { onRehydrateStorage } = (
-      useCityStore as unknown as {
-        persist: { getOptions: () => { onRehydrateStorage: () => (state: unknown) => void } };
-      }
-    ).persist.getOptions();
-    const tricity = CITIES.find((c) => c.id === "tricity")!;
-    onRehydrateStorage()({ activeCity: tricity });
-
-    await vi.waitFor(async () => {
-      expect(await db.ptbBytes.toCollection().primaryKeys()).toEqual(["tricity"]);
-      expect(await db.gtfsBundle.toCollection().primaryKeys()).toEqual(["tricity"]);
-    });
-  });
+it("persists only city identity and resolves new and legacy identities from the catalog", () => {
+  const city = CITIES.find(c => c.id === "krakow")!;
+  useCityStore.getState().setActiveCity(city);
+  expect(JSON.parse(localStorage.getItem("ptn-city")!).state).toEqual({currentCityId: city.id});
+  const merge = useCityStore.persist.getOptions().merge!;
+  for (const persisted of [{currentCityId: city.id}, {activeCity: {...city, tz: "UTC", name: "stale"}}]) {
+    expect(merge(persisted, useCityStore.getState()).activeCity).toBe(city);
+  }
+  expect(merge({currentCityId: "gdansk"}, useCityStore.getState()).activeCity.id).toBe("tricity");
 });

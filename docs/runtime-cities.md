@@ -34,7 +34,8 @@ Multi-city deployment generators can call `catalog.publish_catalog` with all
 accepted city configurations. Keep internal addresses, keys and feed
 credentials outside the public descriptor.
 
-Optional public metadata includes `transitSources`, `routeGroups`,
+Optional public metadata includes `countryCode` (ISO 3166-1 alpha-2, shown
+next to the city name during setup), `transitSources`, `routeGroups`,
 `defaultExcludedModes`, `poiFetchMode`, `poiCityIds` and `sharedMobility`.
 These are explicitly validated by the client. Schema-2 cities do not inherit
 hidden behavior based on a compiled city ID. GBFS requests still require the
@@ -81,15 +82,14 @@ There is no deployment-level default city.
 ## First launch
 
 The frontend loads and validates discovery before starting transit services.
-First launch shows a world map and accessible city buttons. Location lookup
-starts only after the user presses **Use my location**. One unambiguous covered
-city can be selected from the fix; overlapping or uncovered regions leave the
-user in control. A previous valid user selection is restored on return.
-
-Dots scale gently with geographic coverage area and stay between 6 and 16
-pixels in radius. The selector clusters overlapping dots and retains a city
-list and 44-pixel hit targets. Bundled public-domain Natural Earth land outlines
-keep the overview independent of third-party map services.
+First launch opens a short setup: a keyboard-accessible city list (with a
+filter for long catalogs and a suggestion from the device's time zone), then a
+choice of privacy preset and start mode. Location lookup starts only after the
+user presses **Use my location**; the fix stays on the device and only narrows
+the list. One unambiguous covered city can be selected from it; overlapping or
+uncovered regions leave the user in control. A previous valid user selection
+is restored on return. No network service beyond discovery and the chosen
+city's timetable is contacted until setup is complete.
 
 ## Offline use and device management
 

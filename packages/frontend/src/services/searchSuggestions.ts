@@ -1,3 +1,5 @@
+import { captureCityData } from "./cityData.ts";
+import { useCityStore } from "../stores/cityStore.ts";
 import Dexie from "dexie";
 import { isPoiCategoryEnabled } from "./poiCategoryPreferences.ts";
 import type { Stop, LatLon, GeocoderCandidate, PoiFetchMode } from "@pt/shared";
@@ -335,7 +337,7 @@ export function __resetGeocoderPresentAccessorForTests(): void {
 }
 
 // Third injected accessor: "may this device egress to a third party?" Wired from
-// bootPoi.ts over isTransitousAllowed, alongside the two mode accessors above —
+// bootPoi.ts over the `external.stop-search` flow, alongside the two mode accessors above —
 // same leaf-module reason (importing privacyStore here would pull the store graph
 // into a leaf that tests instantiate directly).
 //
@@ -682,14 +684,16 @@ export async function searchStopsWithGroups(
   signal: AbortSignal,
   provider: SearchProvider,
 ): Promise<SearchSuggestion[]> {
+  const usageCityId = useCityStore.getState().activeCity.id;
+  const data = captureCityData(usageCityId);
   const stops = await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal);
 
   if (stops.length === 0) return [];
 
-  const tapCounts = await loadTapCounts(stops.map((s) => s.id));
+  const tapCounts = await loadTapCounts(stops.map((s) => s.id), usageCityId);
 
   const stopIds = new Set(stops.map((s) => s.id));
-  const groups = await db.stopGroups
+  const groups = await data.stopGroups
     .filter((g) => g.stopIds.some((id) => stopIds.has(id)) && g.stopIds.length > 1)
     .toArray();
 
@@ -732,6 +736,7 @@ export async function searchStopsWithGroups(
     });
   }
 
+  data.assertCurrent();
   return suggestions;
 }
 
@@ -749,10 +754,10 @@ async function fetchStopsForProvider(
 
   // Call-time third-party egress backstop, mirroring planViaTransitous
   // (services/transitousClient.ts): the remote provider reaches transitous even
-  // though the PTN backend proxies the call, so it needs m10ThirdPartyEnabled —
-  // the operator hop does NOT exempt it (services/transitousAvailability.ts).
-  // Settings disables the radio, but a stale render or a persisted "remote"
-  // choice made before the level tightened must not egress either.
+  // though the PTN backend proxies the call, so it needs its own flow
+  // (`external.stop-search`) — the operator hop does NOT exempt it. A stale
+  // render or a persisted "remote" choice made before a revocation must not
+  // egress either.
   //
   // Degrade to the local scan rather than returning nothing: the user asked for
   // stop results, and the local path reads the already-loaded stops table, so
@@ -786,7 +791,7 @@ async function searchLocalStops(
 ): Promise<Stop[]> {
   if (!normalizedQuery) return [];
 
-  const records = await db.gtfsStops.toArray();
+  const records = await captureCityData().gtfsStops.toArray();
   throwIfAborted(signal);
   if (records.length === 0) return [];
 
@@ -843,8 +848,9 @@ function scoreStop(
 
 async function loadTapCounts(
   stopIds: string[],
+  cityId: string,
 ): Promise<Map<string, { tapCount: number; lastTapped: number }>> {
-  return loadStopUsage(stopIds);
+  return loadStopUsage(stopIds, Date.now, cityId);
 }
 
 async function searchPoi(

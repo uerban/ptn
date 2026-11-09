@@ -1,52 +1,50 @@
-import type { BaseEndpoint } from "@pt/shared";
-import { LEVEL_FLOORS, type PrivacyLevel, type PrivacyPolicy } from "@pt/shared/privacy";
-import { db, type SavedLocationRecord } from "../db/index.ts";
-import { decrypt, encrypt, type EncryptedRecord } from "./cryptoBox.ts";
-import { getOrCreateInstallKey } from "./installKey.ts";
-import { getPolicy, registerLevelChangeListener } from "../stores/privacyStore.ts";
+import type { BaseEndpoint, FavoritePlace, PrivacyPolicy } from "@pt/shared";
+import {
+  deletePersonal,
+  listPersonal,
+  newPersonalId,
+  putPersonal,
+  putPersonalMany,
+  resolvePersonalRows,
+  type PersonalEntry,
+  type PersonalWriteResult,
+} from "./personalStorage.ts";
+import { useCityStore } from "../stores/cityStore.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 
-export type SavesTier = "plaintext" | "encrypted";
-
-/**
- * Collapse the 5-way `savesEncryption` axis onto the 2 storage tiers relevant
- * at the T-19 save-this-pair level. "opt-in" leaves encryption off by default;
- * every stricter axis forces encryption.
- */
-export function tierForSavesAxis(
-  axis: PrivacyPolicy["savesEncryption"],
-): SavesTier {
-  if (axis === "opt-in") return "plaintext";
-  return "encrypted";
-}
+const TABLE = "savedLocations";
 
 /**
- * Whether the per-save "sensitive" toggle is user-controllable at this axis.
- * Baseline ("opt-in") and Standard ("default") let the user choose per save;
- * Hardened+ always encrypts and surfaces no toggle.
+ * Everything about a save, sealed whole when persisted: endpoints, label,
+ * time and colour. Pair saves carry `destination`; single-place saves
+ * (map-tap saves, migrated favorites) do not.
  */
-export function isSensitiveToggleAvailable(
-  axis: PrivacyPolicy["savesEncryption"],
-): boolean {
-  return axis === "opt-in" || axis === "default";
+export interface SavePayload {
+  origin: BaseEndpoint;
+  destination?: BaseEndpoint;
+  alias: string;
+  savedAt: number;
+  pinColor?: string;
+  /** Kind of a save migrated from favorites (home, work, ...). */
+  placeType?: FavoritePlace["type"];
+  /**
+   * City that owns the save, sealed with the rest of the payload. Absent on
+   * legacy saves whose city has not been established.
+   */
+  cityId?: string;
 }
 
-/** Default checkbox state for the user-facing "sensitive" toggle. */
-export function defaultSensitiveForAxis(
-  axis: PrivacyPolicy["savesEncryption"],
-): boolean {
-  return tierForSavesAxis(axis) === "encrypted";
-}
-
-/**
- * Whether the alias (user-visible label) must be sealed inside the encrypted
- * payload rather than persisted as a queryable plaintext column. Only the
- * Paranoid axis (`always-no-share`) requires this; every other axis keeps the
- * alias readable for sort/filter.
- */
-export function shouldEncryptAlias(
-  axis: PrivacyPolicy["savesEncryption"],
-): boolean {
-  return axis === "always-no-share";
+export interface ResolvedSave {
+  id: string;
+  cityId?: string;
+  alias: string;
+  origin: BaseEndpoint;
+  destination?: BaseEndpoint;
+  savedAt: number;
+  pinColor?: string;
+  placeType?: FavoritePlace["type"];
+  /** False when the save is kept for this session only. */
+  durable: boolean;
 }
 
 /**
@@ -71,26 +69,11 @@ export function canShareSaves(
   return axis !== "always-no-share";
 }
 
-function genId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `save-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 export interface SaveRoutePairInput {
   origin: BaseEndpoint;
   destination: BaseEndpoint;
   /** Optional user-visible label; empty string is treated as absent. */
   alias?: string;
-  /**
-   * Per-save "sensitive" toggle (M8c T-21). When set, forces the encryption
-   * tier regardless of the current policy default: `true` → encrypted,
-   * `false` → plaintext. Only meaningful at axes where
-   * `isSensitiveToggleAvailable()` is true (Baseline / Standard); stricter
-   * axes always encrypt and ignore this hint. Omitted → follow policy.
-   */
-  sensitive?: boolean;
 }
 
 export interface SavePlaceInput {
@@ -98,58 +81,59 @@ export interface SavePlaceInput {
   endpoint: BaseEndpoint;
   /** Optional user-visible label; empty string is treated as absent. */
   alias?: string;
-  /** Per-save "sensitive" toggle — same semantics as `SaveRoutePairInput`. */
-  sensitive?: boolean;
+  placeType?: FavoritePlace["type"];
 }
 
-export interface SaveRoutePairOptions {
+export interface SaveOptions {
   /** Test hook: override the clock. */
   now?: () => number;
-  /** Test hook: override the resolved tier (bypasses policy lookup). */
-  tier?: SavesTier;
-  /** Test hook: override the generated id. */
+  /** Override the generated id (migrations keep a record's id). */
   id?: string;
-  /**
-   * Test hook: override whether to seal the alias inside the encrypted payload
-   * (bypasses the policy-axis lookup). Only meaningful at `encrypted` tier;
-   * ignored at `plaintext`.
-   */
-  encryptAlias?: boolean;
+}
+
+/** True when a save belongs to `cityId`, accepting historical city aliases. */
+export function saveBelongsToCity(save: { cityId?: string }, cityId: string): boolean {
+  return !!save.cityId && canonicalCityId(save.cityId) === canonicalCityId(cityId);
+}
+
+export interface SaveResult {
+  save: ResolvedSave;
+  /** `session` when the save is kept only until the app closes. */
+  stored: PersonalWriteResult;
 }
 
 /**
  * One-tap save of an (origin, destination, alias?) tuple from the route
- * results view. Encryption follows the current `savesEncryption` policy:
- * plaintext at Baseline/Standard (opt-in), encrypted from Hardened upward.
- * The record is stored in `savedLocations` with both endpoints; pair saves
- * always carry `destinationEndpoint` set.
+ * results view. Sealed whole under the install key at every privacy level.
  */
 export async function saveRoutePair(
   input: SaveRoutePairInput,
-  opts: SaveRoutePairOptions = {},
-): Promise<SavedLocationRecord> {
-  return writeSave(input, opts);
+  opts: SaveOptions = {},
+): Promise<SaveResult> {
+  return writeSave(
+    {
+      origin: input.origin,
+      destination: input.destination,
+      alias: input.alias,
+    },
+    opts,
+  );
 }
 
 /**
  * Save of a single location (no destination leg) — the map long-press
- * "Save with label" flow. Stored in the same `savedLocations` table at the
- * same encryption tier as a pair save; readers distinguish the two by the
- * absence of `destinationEndpoint` (`PinnedSavesSection`).
+ * "Save with label" flow. Readers distinguish it from a pair save by the
+ * absence of `destination`.
  *
  * The caller owns the precision seam: pass an endpoint already reduced by
  * `mapTapStore`, never a raw tap coord.
  */
 export async function savePlace(
   input: SavePlaceInput,
-  opts: SaveRoutePairOptions = {},
-): Promise<SavedLocationRecord> {
+  opts: SaveOptions = {},
+): Promise<SaveResult> {
   return writeSave(
-    {
-      origin: input.endpoint,
-      ...(input.alias !== undefined ? { alias: input.alias } : {}),
-      ...(input.sensitive !== undefined ? { sensitive: input.sensitive } : {}),
-    },
+    { origin: input.endpoint, alias: input.alias, placeType: input.placeType },
     opts,
   );
 }
@@ -159,192 +143,114 @@ async function writeSave(
     origin: BaseEndpoint;
     destination?: BaseEndpoint;
     alias?: string;
-    sensitive?: boolean;
+    placeType?: FavoritePlace["type"];
   },
-  opts: SaveRoutePairOptions,
-): Promise<SavedLocationRecord> {
-  const axis = getPolicy().savesEncryption;
-  const policyTier = tierForSavesAxis(axis);
-  // Per-save override is honored only at axes that expose the toggle; at
-  // Hardened+ the axis is authoritative and `sensitive` is a no-op.
-  const sensitiveTier: SavesTier | undefined =
-    input.sensitive !== undefined && isSensitiveToggleAvailable(axis)
-      ? input.sensitive
-        ? "encrypted"
-        : "plaintext"
-      : undefined;
-  const tier = opts.tier ?? sensitiveTier ?? policyTier;
-  const savedAt = opts.now ? opts.now() : Date.now();
-  const id = opts.id ?? genId();
-  const alias = (input.alias ?? "").trim();
-  const encryptAlias =
-    tier === "encrypted" &&
-    (opts.encryptAlias ?? shouldEncryptAlias(axis));
+  opts: SaveOptions & { savedAt?: number },
+): Promise<SaveResult> {
+  // Capture ownership before encryption yields to a possible city switch.
+  const cityId = canonicalCityId(useCityStore.getState().activeCity.id);
+  const id = opts.id ?? newPersonalId();
+  const payload: SavePayload = {
+    origin: input.origin,
+    ...(input.destination !== undefined ? { destination: input.destination } : {}),
+    alias: (input.alias ?? "").trim(),
+    savedAt: opts.savedAt ?? (opts.now ? opts.now() : Date.now()),
+    ...(input.placeType !== undefined ? { placeType: input.placeType } : {}),
+    cityId,
+  };
+  const stored = await putPersonal(TABLE, id, payload);
+  return { save: toResolved({ id, value: payload, durable: stored === "stored" }), stored };
+}
 
-  let storedOrigin: BaseEndpoint | EncryptedRecord = input.origin;
-  let storedDest: BaseEndpoint | EncryptedRecord | undefined = input.destination;
-  let aliasCipher: EncryptedRecord | undefined;
-  let storedAlias = alias;
-  if (tier === "encrypted") {
-    const key = await getOrCreateInstallKey();
-    storedOrigin = await encrypt(input.origin, key);
-    if (input.destination !== undefined) {
-      storedDest = await encrypt(input.destination, key);
-    }
-    if (encryptAlias && alias !== "") {
-      aliasCipher = await encrypt(alias, key);
-      storedAlias = "";
-    }
-  }
+/** Writes saves that already have ids and times, all or none (migrations). */
+export async function restoreSaves(
+  saves: readonly { id: string; payload: SavePayload }[],
+): Promise<PersonalWriteResult> {
+  return putPersonalMany(
+    TABLE,
+    saves.map(({ id, payload }) => ({ id, value: payload })),
+  );
+}
 
-  const record: SavedLocationRecord = {
+/** Writes a save that already has an id and time (used by migrations). */
+export async function restoreSave(
+  id: string,
+  payload: SavePayload,
+): Promise<PersonalWriteResult> {
+  return putPersonal(TABLE, id, payload);
+}
+
+function isSavePayload(value: unknown): value is SavePayload {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<SavePayload>;
+  return (
+    !!v.origin &&
+    typeof v.origin === "object" &&
+    typeof v.alias === "string" &&
+    typeof v.savedAt === "number"
+  );
+}
+
+function toResolved(entry: PersonalEntry<SavePayload>): ResolvedSave {
+  const v = entry.value;
+  return {
+    id: entry.id,
+    ...(v.cityId !== undefined ? { cityId: v.cityId } : {}),
+    alias: v.alias,
+    origin: v.origin,
+    ...(v.destination !== undefined ? { destination: v.destination } : {}),
+    savedAt: v.savedAt,
+    ...(v.pinColor !== undefined ? { pinColor: v.pinColor } : {}),
+    ...(v.placeType !== undefined ? { placeType: v.placeType } : {}),
+    durable: entry.durable,
+  };
+}
+
+function resolveEntries(entries: PersonalEntry<unknown>[]): ResolvedSave[] {
+  return entries
+    .filter((e): e is PersonalEntry<SavePayload> => isSavePayload(e.value))
+    .map(toResolved)
+    .sort((a, b) => b.savedAt - a.savedAt);
+}
+
+/** Every readable save, newest first. */
+export async function listSaves(): Promise<ResolvedSave[]> {
+  return resolveEntries(await listPersonal<unknown>(TABLE));
+}
+
+/**
+ * Readable saves owned by `cityId`, newest first. Ownership is sealed, so
+ * every save is decrypted and then filtered.
+ */
+export async function listCitySaves(cityId: string): Promise<ResolvedSave[]> {
+  return (await listSaves()).filter((save) => saveBelongsToCity(save, cityId));
+}
+
+/**
+ * Explicit recovery action for a legacy save without a city. A save that
+ * already has an owner is never relabelled.
+ */
+export async function assignSaveCity(id: string, cityId: string): Promise<void> {
+  const entry = (await listPersonal<unknown>(TABLE)).find((e) => e.id === id);
+  if (!entry || !isSavePayload(entry.value) || entry.value.cityId) return;
+  await putPersonal<SavePayload>(
+    TABLE,
     id,
-    endpoint: storedOrigin,
-    // Omitted entirely for single-place saves — readers branch on presence.
-    ...(storedDest !== undefined ? { destinationEndpoint: storedDest } : {}),
-    alias: storedAlias,
-    savedAt,
-    encrypted: tier === "encrypted",
-    ...(aliasCipher ? { aliasCipher } : {}),
-  };
-  await db.savedLocations.put(record);
-  return record;
+    { ...entry.value, cityId: canonicalCityId(cityId) },
+    { sessionOnly: !entry.durable },
+  );
 }
 
 /**
- * The on-disk shape a saved row takes for a given `savesEncryption` axis.
- * Three states are distinguishable from the user's perspective:
- * - `plaintext`: endpoints raw, alias plaintext (Baseline opt-in).
- * - `encrypted`: endpoints sealed, alias still plaintext for sort/filter.
- * - `encrypted-sealed-alias`: endpoints sealed AND alias migrated inside the
- *   ciphertext (Paranoid only — see `shouldEncryptAlias`).
+ * Decrypts rows read through a Dexie live query (plus this session's saves),
+ * newest first.
  */
-export type SavesState =
-  | "plaintext"
-  | "encrypted"
-  | "encrypted-sealed-alias";
-
-export function stateForSavesAxis(
-  axis: PrivacyPolicy["savesEncryption"],
-): SavesState {
-  if (axis === "opt-in") return "plaintext";
-  if (axis === "always-no-share") return "encrypted-sealed-alias";
-  return "encrypted";
+export async function resolveSavedRows(
+  rows: readonly unknown[],
+): Promise<ResolvedSave[]> {
+  return resolveEntries(await resolvePersonalRows<unknown>(TABLE, rows));
 }
 
-function isEncryptedShape(x: unknown): x is EncryptedRecord {
-  if (typeof x !== "object" || x === null) return false;
-  const r = x as Record<string, unknown>;
-  return "iv" in r && "ct" in r && "v" in r;
+export async function deleteSave(id: string): Promise<void> {
+  await deletePersonal(TABLE, [id]);
 }
-
-/**
- * Re-encodes every saved location so it lives at the storage state implied by
- * `next`. Triggered by the privacyStore level-change listener (registered
- * below). Behaviour by transition:
- * - plaintext ↔ encrypted: rewrites endpoints at the new tier in place.
- * - encrypted ↔ encrypted-sealed-alias: seals or unseals the alias only; the
- *   endpoint ciphertext is rotated as well so the row is internally consistent.
- * - encrypted → plaintext (downgrade): decrypts endpoints and any sealed alias
- *   back to clear form. The user-facing warning is delivered upstream by the
- *   privacyStore confirm callback; this function only performs the rewrite.
- *
- * Rows whose endpoint shape doesn't match the inferred prev tier (e.g. a row
- * seeded by a test bypassing `saveRoutePair`) are passed through best-effort
- * rather than failing the whole migration.
- */
-export async function migrateSavesForLevelChange(
-  prev: PrivacyLevel,
-  next: PrivacyLevel,
-): Promise<void> {
-  const prevState = stateForSavesAxis(LEVEL_FLOORS[prev].savesEncryption);
-  const nextState = stateForSavesAxis(LEVEL_FLOORS[next].savesEncryption);
-  if (prevState === nextState) return;
-
-  const rows = await db.savedLocations.toArray();
-  if (rows.length === 0) return;
-
-  let key: CryptoKey | null = null;
-  const ensureKey = async (): Promise<CryptoKey> => {
-    if (key === null) key = await getOrCreateInstallKey();
-    return key;
-  };
-
-  const rewritten: SavedLocationRecord[] = [];
-
-  for (const row of rows) {
-    let origin: BaseEndpoint;
-    if (isEncryptedShape(row.endpoint)) {
-      try {
-        origin = (await decrypt(row.endpoint, await ensureKey())) as BaseEndpoint;
-      } catch {
-        continue;
-      }
-    } else {
-      origin = row.endpoint;
-    }
-
-    let destination: BaseEndpoint | undefined;
-    if (row.destinationEndpoint !== undefined) {
-      if (isEncryptedShape(row.destinationEndpoint)) {
-        try {
-          destination = (await decrypt(
-            row.destinationEndpoint,
-            await ensureKey(),
-          )) as BaseEndpoint;
-        } catch {
-          continue;
-        }
-      } else {
-        destination = row.destinationEndpoint;
-      }
-    }
-
-    let alias: string;
-    if (row.aliasCipher !== undefined) {
-      try {
-        alias = (await decrypt(row.aliasCipher, await ensureKey())) as string;
-      } catch {
-        alias = row.alias;
-      }
-    } else {
-      alias = row.alias;
-    }
-
-    let storedOrigin: BaseEndpoint | EncryptedRecord = origin;
-    let storedDest: BaseEndpoint | EncryptedRecord | undefined = destination;
-    let storedAlias = alias;
-    let aliasCipher: EncryptedRecord | undefined;
-
-    if (nextState !== "plaintext") {
-      const k = await ensureKey();
-      storedOrigin = await encrypt(origin, k);
-      if (destination !== undefined) {
-        storedDest = await encrypt(destination, k);
-      }
-      if (nextState === "encrypted-sealed-alias" && alias !== "") {
-        aliasCipher = await encrypt(alias, k);
-        storedAlias = "";
-      }
-    }
-
-    const next: SavedLocationRecord = {
-      id: row.id,
-      endpoint: storedOrigin,
-      ...(storedDest !== undefined ? { destinationEndpoint: storedDest } : {}),
-      alias: storedAlias,
-      savedAt: row.savedAt,
-      ...(row.pinColor !== undefined ? { pinColor: row.pinColor } : {}),
-      encrypted: nextState !== "plaintext",
-      ...(aliasCipher ? { aliasCipher } : {}),
-    };
-    rewritten.push(next);
-  }
-
-  await db.savedLocations.clear();
-  for (const rec of rewritten) {
-    await db.savedLocations.put(rec);
-  }
-}
-
-registerLevelChangeListener(migrateSavesForLevelChange);

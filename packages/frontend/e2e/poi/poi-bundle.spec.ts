@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { seedCompletedSetup } from "../helpers/setup-complete";
 import { createHash } from "node:crypto";
 
 // Source of truth for the cityIds that buildAllBundles.ts emits is
@@ -7,6 +8,10 @@ import { createHash } from "node:crypto";
 const EXPECTED_CITY_IDS = ["gdansk", "gdynia", "sopot", "vilnius"] as const;
 
 test.describe("POI bundle availability", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedCompletedSetup(page, { cityId: "vilnius" });
+  });
+
   test("manifest covers every expected city and matches each bundle's hash", async ({ request }) => {
     const manifestRes = await request.get("/poi/manifest.json");
     expect(manifestRes.ok(), "GET /poi/manifest.json").toBe(true);

@@ -1,5 +1,5 @@
 import { useCityStore } from "../../stores/cityStore.ts";
-import { useBikeShareStore } from "../../stores/bikeShareStore.ts";
+import { BIKE_SHARE_FLOW, useBikeShareStore } from "../../stores/bikeShareStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 
 /**
@@ -10,7 +10,8 @@ import { useTranslation } from "../../i18n/index.ts";
  * PRIVACY: the chip starts OFF and merely rendering it fetches nothing —
  * the first tap is the user's explicit opt-in to contacting the operator
  * (`bikeShareStore.enable` performs the first request). State is
- * session-only, so there is never an auto-fetch on app start.
+ * session-only, so there is never an auto-fetch on app start. The requests
+ * are the registered `external.bike-share` flow, described in Settings.
  */
 export function BikeShareToggle() {
   const { t } = useTranslation();
@@ -32,6 +33,7 @@ export function BikeShareToggle() {
         rounded-full shadow-1
         text-xs font-medium transition-colors shrink-0"
       data-testid="bike-share-toggle"
+      data-flow={BIKE_SHARE_FLOW}
       aria-pressed={enabled}
       aria-label={label}
       title={label}

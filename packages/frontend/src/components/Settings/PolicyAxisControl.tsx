@@ -4,15 +4,16 @@ import {
   LEVEL_FLOORS,
   PRIVACY_LEVELS,
   type PrivacyLevel,
-  type PrivacyPolicy,
+  type ProtectionAxis,
+  type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import { usePolicy, usePrivacyStore } from "../../stores/privacyStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 
-interface Props<K extends keyof PrivacyPolicy> {
+interface Props<K extends ProtectionAxis> {
   axis: K;
   i18nKeyPrefix: string;
-  interceptChange?: (next: PrivacyPolicy[K]) => Promise<boolean>;
+  interceptChange?: (next: ProtectionPolicy[K]) => Promise<boolean>;
 }
 
 function formatOption(v: unknown): string {
@@ -24,10 +25,10 @@ function formatOption(v: unknown): string {
 // this axis is still <= the option index. That level is the maximum level
 // at which this option remains selectable — i.e. to enable the option the
 // user must drop their level to it (or lower).
-function minLevelForOption<K extends keyof PrivacyPolicy>(
+function minLevelForOption<K extends ProtectionAxis>(
   axis: K,
   optionIdx: number,
-  values: readonly PrivacyPolicy[K][],
+  values: readonly ProtectionPolicy[K][],
 ): PrivacyLevel {
   let best: PrivacyLevel = PRIVACY_LEVELS[0];
   for (const level of PRIVACY_LEVELS) {
@@ -38,7 +39,7 @@ function minLevelForOption<K extends keyof PrivacyPolicy>(
   return best;
 }
 
-export function PolicyAxisControl<K extends keyof PrivacyPolicy>({
+export function PolicyAxisControl<K extends ProtectionAxis>({
   axis,
   i18nKeyPrefix,
   interceptChange,
@@ -62,10 +63,10 @@ export function PolicyAxisControl<K extends keyof PrivacyPolicy>({
     );
   }
 
-  const values = order.values as readonly PrivacyPolicy[K][];
+  const values = order.values as readonly ProtectionPolicy[K][];
   const floorIdx = values.indexOf(floorValue);
 
-  const onSelect = async (value: PrivacyPolicy[K]) => {
+  const onSelect = async (value: ProtectionPolicy[K]) => {
     if (interceptChange) {
       const ok = await interceptChange(value);
       if (!ok) { setRevertKey((k) => k + 1); return; }

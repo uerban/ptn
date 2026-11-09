@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import type { StopGroupRecord } from "../../db/index.ts";
 import type { LatLon } from "@pt/shared";
 import { haversineDistance } from "../../utils/geo.ts";
@@ -7,6 +7,11 @@ import { resolveDirections } from "../../services/directionResolver.ts";
 import { StopCard } from "./StopCard.tsx";
 import { ExpandableStopGroup } from "./ExpandableStopGroup.tsx";
 import { useTranslation } from "../../i18n/index.ts";
+import { usePresentationText } from "../../i18n/presentationStrings.ts";
+import { useGeolocation } from "../../hooks/useGeolocation.ts";
+import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { useCityStore } from "../../stores/cityStore.ts";
+import { useNearbyAnchor, useNearbyAnchorStore } from "../../stores/nearbyAnchorStore.ts";
 
 // Based on Gallotti's 8-bit cognitive limit
 const MAX_VISIBLE_STOPS = 6;
@@ -22,7 +27,8 @@ export interface NearbyStopsListProps {
 
 interface SortedGroup {
   group: StopGroupRecord;
-  distanceMeters: number;
+  /** Null without a centre: no distance is claimed. */
+  distanceMeters: number | null;
 }
 
 export function NearbyStopsList({
@@ -32,23 +38,51 @@ export function NearbyStopsList({
   loading = false,
 }: NearbyStopsListProps) {
   const { t } = useTranslation();
+  const text = usePresentationText();
+  const filterId = useId();
   const [showAll, setShowAll] = useState(false);
+  const [query, setQuery] = useState("");
 
   const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
   const stopNames = useGtfsDataStore((s) => s.stopNames) ?? EMPTY_STOP_NAMES;
+  const gpsMode = useSettingsStore((s) => s.gpsMode);
+  const cityId = useCityStore((s) => s.activeCity.id);
+  const { error: locationError, requestLocation } = useGeolocation();
+  // Without a position, a stop the user chose stands in as the centre.
+  const anchor = useNearbyAnchor();
+  const center: LatLon | null = userLocation ?? anchor?.location ?? null;
 
   // All hooks must be called unconditionally (React Rules of Hooks).
-  // Sort by distance from user location (nearest first)
+  // Nearest first from the centre; without one, by name, filtered by the
+  // user's query — never sorted as if every stop were "near".
   const sorted: SortedGroup[] = useMemo(() => {
-    const result = groups.map((group) => {
-      const distanceMeters = userLocation
-        ? haversineDistance(userLocation, { lat: group.lat, lon: group.lon })
-        : 0;
-      return { group, distanceMeters };
-    });
+    if (!center) {
+      const needle = query.trim().toLocaleLowerCase();
+      return groups
+        .filter((group) => !needle || group.name.toLocaleLowerCase().includes(needle))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((group) => ({ group, distanceMeters: null }));
+    }
+    const result = groups.map((group) => ({
+      group,
+      distanceMeters: haversineDistance(center, { lat: group.lat, lon: group.lon }),
+    }));
     result.sort((a, b) => a.distanceMeters - b.distanceMeters);
     return result;
-  }, [groups, userLocation]);
+  }, [groups, center, query]);
+
+  // Choosing a stop without a position makes it the centre of "nearby".
+  const selectStop = (group: StopGroupRecord) => {
+    if (!userLocation && !anchor) {
+      useNearbyAnchorStore.getState().setAnchor({
+        cityId,
+        stopId: group.stopIds[0] ?? group.groupId,
+        name: group.name,
+        location: { lat: group.lat, lon: group.lon },
+      });
+    }
+    onStopSelect(group);
+  };
 
   if (loading) {
     return (
@@ -102,13 +136,74 @@ export function NearbyStopsList({
   // Codebase uses simple {token} placeholders with .replace() (no i18next
   // runtime). The fallback is "{count} nearby stops"; legacy callers in
   // existing tests still match because both the count and "Nearby stops"
-  // appear in the rendered string.
-  const listAriaLabel = t("schedule.stop_list", "{count} nearby stops").replace(
-    "{count}",
-    String(visible.length),
+  // appear in the rendered string. Only a real centre earns "nearby".
+  const listAriaLabel = userLocation
+    ? t("schedule.stop_list", "{count} nearby stops").replace("{count}", String(visible.length))
+    : anchor
+      ? text("nearby.stopsNear", { stop: anchor.name })
+      : text("nearby.allStops", { count: String(visible.length) });
+
+  const chooser = !userLocation && (
+    <div className="px-3 pt-3 pb-2 flex flex-col gap-2" data-testid="nearby-chooser">
+      {anchor ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-fg">{text("nearby.stopsNear", { stop: anchor.name })}</p>
+          <button
+            type="button"
+            data-testid="nearby-change-area"
+            onClick={() => {
+              useNearbyAnchorStore.getState().clear();
+              setShowAll(false);
+            }}
+            className="min-h-11 px-3 rounded-lg border border-divider text-sm text-fg shrink-0"
+          >
+            {text("nearby.changeArea")}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-fg" data-testid="nearby-no-location">
+            {locationError ? text("nearby.locationUnavailable") : text("nearby.noLocation")}
+          </p>
+          {gpsMode !== "disabled" && (
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                data-testid="nearby-use-location"
+                onClick={requestLocation}
+                aria-describedby={`${filterId}-locate`}
+                className="self-start min-h-11 px-3 rounded-lg border border-divider text-sm text-fg"
+              >
+                {text("nearby.useLocation")}
+              </button>
+              <p id={`${filterId}-locate`} className="text-xs text-fg-muted">{text("nearby.locateExplain")}</p>
+            </div>
+          )}
+          <label htmlFor={filterId} className="text-sm font-medium text-fg">
+            {text("nearby.filterLabel")}
+          </label>
+          <input
+            id={filterId}
+            type="search"
+            data-testid="nearby-stop-filter"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowAll(false);
+            }}
+            className="min-h-11 px-3 rounded-lg border border-divider bg-surface text-fg"
+          />
+          {query.trim() && sorted.length === 0 && (
+            <p className="text-sm text-fg-muted">{text("nearby.noMatches", { query: query.trim() })}</p>
+          )}
+        </>
+      )}
+    </div>
   );
 
   return (
+    <>
+    {chooser}
     <ul
       role="list"
       aria-label={listAriaLabel}
@@ -163,7 +258,7 @@ export function NearbyStopsList({
                     ...group,
                     stopIds: [stopId],
                   };
-                  onStopSelect(syntheticGroup);
+                  selectStop(syntheticGroup);
                 }}
               />
             </li>
@@ -179,7 +274,7 @@ export function NearbyStopsList({
               lineColors={lineColors}
               directionLabels={directionLabels}
               platformCodes={platformCodes}
-              onSelect={() => onStopSelect(group)}
+              onSelect={() => selectStop(group)}
             />
           </li>
         );
@@ -198,5 +293,6 @@ export function NearbyStopsList({
         </li>
       )}
     </ul>
+    </>
   );
 }

@@ -1,10 +1,11 @@
 import type { BaseEndpoint, FavoritePlace } from "@pt/shared";
-import { db, type SavedLocationRecord } from "../db/index.ts";
-import { encrypt, type EncryptedRecord } from "./cryptoBox.ts";
-import { getOrCreateInstallKey } from "./installKey.ts";
+import { listSaves, restoreSaves, type SavePayload } from "./saves.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
+import { readSealedItem, removeSealedItem } from "./sealedLocalStorage.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
+import { LEGACY_FAVORITES_KEY } from "./privacyStorageKeys.ts";
 
-export const LEGACY_FAVORITES_KEY = "ptn-favorites";
+export { LEGACY_FAVORITES_KEY };
 
 /**
  * Zustand-persist envelope for the legacy favoritesStore. Shape:
@@ -29,9 +30,8 @@ export interface MigrationOptions {
   force?: boolean;
 }
 
-function readLegacyFavorites(): FavoritePlace[] | null {
-  if (typeof localStorage === "undefined") return null;
-  const raw = localStorage.getItem(LEGACY_FAVORITES_KEY);
+async function readLegacyFavorites(): Promise<FavoritePlace[] | null> {
+  const raw = await readSealedItem(LEGACY_FAVORITES_KEY);
   if (!raw) return null;
   let parsed: LegacyFavoritesEnvelope;
   try {
@@ -43,8 +43,12 @@ function readLegacyFavorites(): FavoritePlace[] | null {
   return Array.isArray(list) ? list : null;
 }
 
-function isSensitiveType(type: FavoritePlace["type"]): boolean {
-  return type === "home" || type === "work";
+function readRawItem(name: string): string | null {
+  try {
+    return localStorage.getItem(name);
+  } catch {
+    return null;
+  }
 }
 
 function mapToEndpoint(fav: FavoritePlace): BaseEndpoint {
@@ -72,22 +76,13 @@ function parseSavedAt(createdAt: string): number {
   return Number.isFinite(t) ? t : Date.now();
 }
 
-async function buildRecord(
-  fav: FavoritePlace,
-): Promise<SavedLocationRecord> {
-  const endpoint = mapToEndpoint(fav);
-  const encrypted = isSensitiveType(fav.type);
-  let stored: BaseEndpoint | EncryptedRecord = endpoint;
-  if (encrypted) {
-    const key = await getOrCreateInstallKey();
-    stored = await encrypt(endpoint, key);
-  }
+function buildPayload(fav: FavoritePlace): SavePayload {
   return {
-    id: fav.id,
-    endpoint: stored,
+    origin: mapToEndpoint(fav),
+    ...(fav.cityId ? { cityId: canonicalCityId(fav.cityId) } : {}),
     alias: fav.name,
     savedAt: parseSavedAt(fav.createdAt),
-    encrypted,
+    placeType: fav.type,
   };
 }
 
@@ -96,7 +91,7 @@ async function buildRecord(
  * `savedLocations`. Gated behind `settingsStore.enableFavoritesMigration`
  * unless `opts.force` is set. Safe to re-run: a successful migration clears
  * the legacy key, so the second call is a no-op; on failure the legacy key is
- * left intact and already-written rows will be overwritten idempotently
+ * left intact. Writes commit atomically and retries preserve existing records
  * (ids are preserved from `FavoritePlace.id`).
  */
 export async function migrateFavoritesToSaves(
@@ -109,25 +104,28 @@ export async function migrateFavoritesToSaves(
     return { migrated: 0, legacyCleared: false, skipped: true };
   }
 
-  const favorites = readLegacyFavorites();
+  const legacySnapshot = readRawItem(LEGACY_FAVORITES_KEY);
+  const favorites = await readLegacyFavorites();
   if (!favorites || favorites.length === 0) {
     return { migrated: 0, legacyCleared: false, skipped: false };
   }
 
-  const records: SavedLocationRecord[] = [];
-  for (const fav of favorites) {
-    records.push(await buildRecord(fav));
-  }
+  // A retry must not overwrite a newer save or a user's city assignment.
+  const existing = new Set((await listSaves()).map((save) => save.id));
+  const pending = favorites
+    .filter((fav) => !existing.has(fav.id))
+    .map((fav) => ({ id: fav.id, payload: buildPayload(fav) }));
+  const durable = (await restoreSaves(pending)) === "stored";
+  const migrated = pending.length;
 
-  for (const rec of records) {
-    await db.savedLocations.put(rec);
-  }
-
-  localStorage.removeItem(LEGACY_FAVORITES_KEY);
+  // Favorites kept only for this session stay in their sealed source too, and
+  // a source rewritten while this ran is kept for the next attempt.
+  const legacyCleared = durable && readRawItem(LEGACY_FAVORITES_KEY) === legacySnapshot;
+  if (legacyCleared) removeSealedItem(LEGACY_FAVORITES_KEY);
 
   return {
-    migrated: records.length,
-    legacyCleared: true,
+    migrated,
+    legacyCleared,
     skipped: false,
   };
 }

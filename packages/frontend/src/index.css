@@ -134,3 +134,25 @@ body {
 .ptn-gps-pause[aria-pressed="true"] .gps-pause-slash { display: inline; }
 /* Muted dot: a paused fix is no longer current. */
 .user-position-marker[data-paused="true"] { filter: grayscale(1); opacity: 0.55; }
+
+/* Keyboard focus is always visible: an accent outline unless a component
+   draws its own ring (utilities win over this base layer). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion: no animation or transition carries meaning in the app, so
+   honour the preference everywhere instead of per component. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

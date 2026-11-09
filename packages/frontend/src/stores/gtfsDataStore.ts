@@ -1,13 +1,14 @@
-import {restoreDeviceCity, hasLiveDeviceCity} from "../services/deviceCities.ts";
+import { measureCityStage } from "../services/cityPerformance.ts";
 import { create } from "zustand";
-import { syncGtfsData, needsSync, clearGtfsData } from "../services/gtfsSync.ts";
 import { buildRaptorIndex, type RaptorIndex } from "../services/raptorIndex.ts";
-import { GTFS_CLIENT_REFRESH_INTERVAL_MS } from "@pt/shared/constants";
 import { osrmClient } from "../services/osrmWasm.ts";
 import { ensureDbReady } from "../db/migrationRunner.ts";
-import { db } from "../db/index.ts";
 import { initOrSwapPtRouter } from "../services/wasmLifecycle.ts";
 import { StaleWasmInitError, type PtRouterHandle } from "../services/raptorWasm.ts";
+import { activateCityData, invalidateCityData, useCityDataStore, updateCityShapes, StaleCityDataError } from "../services/cityData.ts";
+import {prepareCityActivation, type PreparedCity} from "../services/cityActivation.ts";
+import {fetchCityShapes} from "../services/cityShapes.ts";
+import {readLegacyCityShapes} from "../services/legacyCityShapes.ts";
 
 /**
  * Fire-and-forget per-city eager-init: OSRM walking-cache warm + PtRouter
@@ -22,6 +23,18 @@ function startEagerInitForCity(cityId: string): void {
     console.warn("OSRM eager init failed:", err);
   });
   startPtRouterBuild(cityId);
+}
+
+/** Direct Search/Settings activations must invalidate foreign handles too;
+ * switching does not always pass through the Home lifecycle hook. */
+function invalidateResidentCity(cityId: string): void {
+  const context = useCityDataStore.getState().active;
+  if (context && context.token.cityId !== cityId) invalidateCityData();
+  const previous = useGtfsDataStore.getState();
+  if (previous.loadedCityId === null || previous.loadedCityId === cityId) return;
+  useGtfsDataStore.setState({raptorIndex: null, stopNames: null, loadedCityId: null,
+    bundleCityTzIana: null, ptRouter: null, wasmEngine: idleWasmEngine(), error: null});
+  previous.ptRouter?.free();
 }
 
 /**
@@ -63,6 +76,8 @@ function idleWasmEngine(): WasmEngineState {
 }
 
 interface GtfsDataState {
+  persistence: "idle" | "pending" | "stored" | "failed";
+  refreshing: boolean;
   raptorIndex: RaptorIndex | null;
   /** Pre-built stop ID → name lookup (built once at sync/init time). */
   stopNames: Map<string, string> | null;
@@ -151,9 +166,9 @@ interface GtfsDataState {
 /**
  * Startup sequence:
  * 1. ensureDbReady() — open DB, run Dexie migrations, recover if corrupted
- * 2. needsSync() — check if GTFS data is stale or missing
- * 3. syncGtfsData() — fetch + transactionally write GTFS to IndexedDB
- * 4. buildRaptorIndex() — build in-memory RAPTOR structures from IndexedDB
+ * 2. prepareCityActivation() — selected local artifact or verified network catalog
+ * 3. buildRaptorIndex({wire}) — build directly from that decoded generation
+ * 4. activateCityData() — install the city; persistence and shapes run separately
  * 5. osrmClient.init() — eagerly load OSRM WASM (non-blocking)
  * 6. RT polling starts only after raptorIndex is non-null
  */
@@ -161,6 +176,7 @@ interface GtfsDataState {
 // Generation counter to discard results from stale init/refresh calls
 // after a reset() or newer init/refresh has started.
 let initGeneration = 0;
+let syncingCityId: string | null = null;
 
 /**
  * AbortController keyed to the CURRENT init generation (F9). Bumping the
@@ -203,17 +219,39 @@ function withInitTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-/** Build a stop ID → name map from IndexedDB (called once at sync/init). */
-async function buildStopNames(): Promise<Map<string, string>> {
-  const allStops = await db.gtfsStops.toArray();
-  const map = new Map<string, string>();
-  for (const s of allStops) {
-    map.set(s.id, s.name);
-  }
-  return map;
+/** Durability and optional geometry do not hold map/catalog readiness hostage. */
+function finishCityActivation(prepared: PreparedCity, gen: number): void {
+  const store = useGtfsDataStore;
+  store.setState({persistence: "pending"});
+  void prepared.persist().then(stored => {
+    if (gen === initGeneration) store.setState({persistence: stored ? "stored" : "failed"});
+  }).catch(error => {
+    if (gen === initGeneration) {
+      store.setState({persistence: "failed"});
+      console.warn("City cache persistence failed; active timetable remains available", error);
+    }
+  });
+  if (prepared.unchanged) return;
+  const shapes = prepared.context.wire.meta.shapesArtifact;
+  const recover = async (error?: unknown) => {
+    if (useCityDataStore.getState().active !== prepared.context) return;
+    const legacy = await readLegacyCityShapes(prepared.context);
+    if (legacy.length) { updateCityShapes(prepared.context, legacy); return; }
+    if (error && gen === initGeneration) console.warn("City shapes unavailable; stop geometry remains available", error);
+  };
+  if (shapes) void fetchCityShapes(shapes.url, shapes.hash).then(rows => {
+    updateCityShapes(prepared.context, rows);
+  }).catch(recover).catch(error => {
+    if (gen === initGeneration) console.warn("Legacy city geometry recovery failed", error);
+  });
+  else void recover().catch(error => {
+    if (gen === initGeneration) console.warn("Legacy city geometry recovery failed", error);
+  });
 }
 
 export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
+  persistence: "idle",
+  refreshing: false,
   raptorIndex: null,
   stopNames: null,
   loadedCityId: null,
@@ -365,107 +403,87 @@ export const useGtfsDataStore = create<GtfsDataState>()((set, get) => ({
   },
 
   async init(cityId: string, opts: {preferDownload?: boolean} = {}) {
-    if (get().syncing) return;
+    if (get().loadedCityId === cityId && get().raptorIndex && useCityDataStore.getState().active?.artifact && !opts.preferDownload) return;
+    if (get().syncing && syncingCityId === cityId) return;
+    syncingCityId = cityId;
     const gen = bumpInitGeneration();
     const signal = initAbort?.signal;
-    performance.mark("ptn:gtfs-init-start");
-    // Mark syncing immediately to prevent stale-index searches while
-    // the async needsSync check is in flight.
-    set({ syncing: true });
+    invalidateResidentCity(cityId);
+    set({syncing: true, refreshing: false, error: null});
     try {
-      // Ensure DB migrations are complete before any reads
-      const { recovered } = await ensureDbReady();
-      if (recovered) {
-        console.warn("DB was recovered — forcing full re-sync");
-      }
       if (gen !== initGeneration) return;
-
-      if ((opts.preferDownload || navigator.onLine === false) && (await restoreDeviceCity(cityId, signal) || await hasLiveDeviceCity(cityId))) {
-        const index = await buildRaptorIndex({signal});
-        const stopNames = await buildStopNames();
-        if (gen !== initGeneration) return;
-        set({raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false, error: null});
-        startPtRouterBuild(cityId);
-        return;
-      }
-      const needs = recovered || await needsSync(cityId, GTFS_CLIENT_REFRESH_INTERVAL_MS);
+      await ensureDbReady();
       if (gen !== initGeneration) return;
-      if (needs) {
-        // Inline the refresh work instead of calling refresh() to avoid
-        // a syncing false->true gap between set() calls.
-        set({ error: null });
-        await syncGtfsData(cityId);
-        if (gen !== initGeneration) return;
-        const index = await buildRaptorIndex({ signal });
-        if (gen !== initGeneration) return;
-        const stopNames = await buildStopNames();
-        if (gen !== initGeneration) return;
-        set({ raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false });
-        startEagerInitForCity(cityId);
-      } else if (!get().raptorIndex) {
-        // Warm start: the cached data is current, so build the engine now,
-        // alongside the JS index. The build reads its own cached bytes
-        // (`db.ptbBytes`, written by the same sync as the index's wire) and
-        // never uses the index, so waiting for the index and stop names only
-        // delayed it (H78: 0.8 s on a 2017 phone).
-        startPtRouterBuild(cityId);
-        const index = await buildRaptorIndex({ signal });
-        if (gen !== initGeneration) return;
-        const stopNames = await buildStopNames();
-        if (gen !== initGeneration) return;
-        set({ raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false });
-        startEagerInitForCity(cityId);
-      } else {
-        set({ syncing: false });
-      }
-      performance.mark("ptn:gtfs-init-end");
-      performance.measure("ptn:gtfs-init", "ptn:gtfs-init-start", "ptn:gtfs-init-end");
-    } catch (err) {
+      const prepared = await prepareCityActivation(cityId, {signal, preferDownload: opts.preferDownload});
       if (gen !== initGeneration) return;
-      // A failed online fetch may still use an explicitly downloaded package.
-      if (await restoreDeviceCity(cityId, signal).catch(() => false) || await hasLiveDeviceCity(cityId).catch(() => false)) {
-        try {
-          const index = await buildRaptorIndex({signal});
-          const stopNames = await buildStopNames();
-          if (gen !== initGeneration) return;
-          set({raptorIndex: index, stopNames, loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false, error: null});
-          startPtRouterBuild(cityId);
-          return;
-        } catch { /* Surface the original connection/data failure below. */ }
-      }
-      set({ error: String(err), syncing: false });
+      const index = await measureCityStage(cityId, "index-build", () => buildRaptorIndex({signal, cityId, wire: prepared.context.wire}));
+      if (gen !== initGeneration) return;
+      activateCityData(prepared.context);
+      set({raptorIndex: index, stopNames: new Map(prepared.context.wire.stops.map(stop => [stop.id, stop.name])),
+        loadedCityId: cityId, bundleCityTzIana: index.cityTzIana ?? null, syncing: false, error: null});
+      finishCityActivation(prepared, gen);
+      startEagerInitForCity(cityId);
+      if (prepared.fromCache && navigator.onLine !== false && !opts.preferDownload) void get().refresh(cityId);
+    } catch (error) {
+      if (gen !== initGeneration || signal?.aborted) return;
+      set({syncing: false, error: error instanceof StaleCityDataError ? null : String(error)});
     }
   },
 
   async refresh(cityId: string, opts: {requireNetwork?: boolean} = {}) {
+    syncingCityId = cityId;
     const gen = bumpInitGeneration();
     const signal = initAbort?.signal;
-    set({ syncing: true, error: null });
+    invalidateResidentCity(cityId);
+    const hasActiveCatalog = !!useCityDataStore.getState().active?.artifact && get().loadedCityId === cityId && !!get().raptorIndex;
+    set({syncing: !hasActiveCatalog, refreshing: true, error: null});
     try {
-      await syncGtfsData(cityId, opts);
       if (gen !== initGeneration) return;
-      const index = await buildRaptorIndex({ signal });
+      await ensureDbReady();
       if (gen !== initGeneration) return;
-      const stopNames = await buildStopNames();
+      const prepared = await prepareCityActivation(cityId, {signal, requireNetwork: opts.requireNetwork ?? true});
       if (gen !== initGeneration) return;
-      set({ raptorIndex: index, stopNames, loadedCityId: cityId, syncing: false, bundleCityTzIana: index.cityTzIana ?? null });
+      if (prepared.unchanged && prepared.context === useCityDataStore.getState().active && get().raptorIndex) {
+        const engine = get().wasmEngine;
+        // The verified raw generation and owning context are identical, so an
+        // already-ready engine remains valid under the new activation token.
+        if (get().ptRouter && engine.status === "ready" && engine.cityId === cityId) {
+          set({wasmEngine: {...engine, initGeneration: gen}});
+        }
+        set({syncing: false, refreshing: false, error: null});
+        finishCityActivation(prepared, gen);
+        startEagerInitForCity(cityId);
+        return;
+      }
+      const index = await measureCityStage(cityId, "index-build", () => buildRaptorIndex({signal, cityId, wire: prepared.context.wire}));
+      if (gen !== initGeneration) return;
+      activateCityData(prepared.context);
+      set({raptorIndex: index, stopNames: new Map(prepared.context.wire.stops.map(stop => [stop.id, stop.name])),
+        loadedCityId: cityId, syncing: false, refreshing: false, error: null, bundleCityTzIana: index.cityTzIana ?? null});
+      finishCityActivation(prepared, gen);
       startEagerInitForCity(cityId);
-    } catch (err) {
-      if (gen !== initGeneration) return;
-      set({ error: String(err), syncing: false });
+    } catch (error) {
+      if (gen !== initGeneration || signal?.aborted) return;
+      set({syncing: false, refreshing: false, error: error instanceof StaleCityDataError ? null : String(error)});
     }
   },
 
   async reset() {
     bumpInitGeneration();
+    invalidateCityData();
+    syncingCityId = null;
     // Free the live PtRouter BEFORE nulling so the wasm heap is
     // released promptly (panel qa HIGH — reset() is the only callsite
     // that frees synchronously; swapPtRouter defers for the in-flight
     // plan() race).
     const oldRouter = get().ptRouter;
     if (oldRouter) oldRouter.free();
-    await clearGtfsData();
+    // Invalidate handles synchronously. Switching cities performs no legacy
+    // projection writes: owned fallback readers reject foreign metadata, and
+    // the modern city is built directly from its immutable artifact.
     set({
+      persistence: "idle",
+      refreshing: false,
       raptorIndex: null,
       stopNames: null,
       loadedCityId: null,

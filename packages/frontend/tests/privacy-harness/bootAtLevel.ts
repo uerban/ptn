@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { PrivacyLevel, PrivacyPolicy } from "@pt/shared";
+import { seedCompletedSetup } from "../../e2e/helpers/setup-complete.ts";
 
 // Pre-seeds privacyStore persisted state via Playwright's `addInitScript`
 // so the app reads the requested level + overrides on its very first render
@@ -55,6 +56,8 @@ export async function bootAtPrivacyLevel(
     },
     version: 0,
   };
+  // A profile past first-run setup, so the scenario starts in the app.
+  await seedCompletedSetup(page);
   await page.addInitScript(
     ({ payload, cityPayload, settingsPayload }) => {
       localStorage.setItem("ptn-privacy", JSON.stringify(payload));

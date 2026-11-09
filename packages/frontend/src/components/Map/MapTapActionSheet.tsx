@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCityDataQuery } from "../../hooks/useCityDataQuery.ts";
 import type { BaseEndpoint } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
 import { useMapTapStore } from "../../stores/mapTapStore.ts";
 import { useRoutingStore } from "../../stores/routingStore.ts";
 import { usePolicy } from "../../stores/privacyStore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
-import { db } from "../../db/index.ts";
 import type { StopGroupRecord } from "../../db/index.ts";
 import { distanceMeters, findStopsInRadius } from "../../services/stopFinder.ts";
 import { geocoderRegistry } from "../../services/geocoder/instance.ts";
@@ -45,7 +44,7 @@ export function MapTapActionSheet({ picker }: {
   const walkSpeedMps = useSettingsStore((s) => s.walkSpeedMps);
   const maxWalkSecs = useSettingsStore((s) => s.maxWalkSecs);
   const stopGroups =
-    useLiveQuery(() => db.stopGroups.toArray(), []) ?? [];
+    useCityDataQuery(data => data.stopGroups.toArray(), []) ?? [];
   const [mode, setMode] = useState<"actions" | "save">("actions");
   const sheetRef = useRegisterMapObstacle<HTMLDivElement>(
     MAP_TAP_ACTIONS_OBSTACLE_ID,

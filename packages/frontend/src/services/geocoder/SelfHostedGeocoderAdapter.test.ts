@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SelfHostedGeocoderConfig } from "@pt/shared";
 import { SelfHostedGeocoderAdapter } from "./SelfHostedGeocoderAdapter.ts";
+import { allowFlow, denyFlow, resetFlows } from "../../test-helpers/networkDecisions.ts";
 import { _resetSessionJitter } from "../coordPrivacy.ts";
 
 const NOMINATIM_CONFIG: SelfHostedGeocoderConfig = {
@@ -28,6 +29,8 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   _resetSessionJitter();
+  resetFlows();
+  allowFlow("operator.place-search");
   fetchSpy = vi.fn();
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -128,7 +131,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Nominatim: /search?q=...&format=jsonv2&limit=5", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -146,7 +149,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Photon: /api?q=...&limit=5", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(photonForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PHOTON_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -165,7 +168,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, endpoint: "/geocoder/nominatim" },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -180,7 +183,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("PTN FST: endpoint is the search route itself", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(ptnFstForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PTN_FST_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -197,7 +200,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -217,7 +220,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...PHOTON_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -238,7 +241,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Nominatim: /reverse?lat=...&lon=...&format=jsonv2", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimReverseResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -257,7 +260,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Photon: /reverse?lat=...&lon=...", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(photonReverseResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PHOTON_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -275,7 +278,7 @@ describe("SelfHostedGeocoderAdapter", () => {
 
     test("PTN FST is forward-only", async () => {
       const adapter = new SelfHostedGeocoderAdapter(PTN_FST_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -290,28 +293,25 @@ describe("SelfHostedGeocoderAdapter", () => {
   });
 
   describe("privacy: isAvailable()", () => {
-    test("disabled policy → isAvailable() returns false", () => {
+    test("is unavailable while the place-search decision is unset or denied", () => {
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "disabled",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 200,
       }));
+      resetFlows();
+      expect(adapter.isAvailable()).toBe(false);
+      denyFlow("operator.place-search");
       expect(adapter.isAvailable()).toBe(false);
     });
 
-    test("respect-multitenant policy → isAvailable() returns true", () => {
-      const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
-        m10CoarsenGridDefaultMeters: 0,
-      }));
-      expect(adapter.isAvailable()).toBe(true);
-    });
-
-    test("always-coarsen policy → isAvailable() returns true", () => {
-      const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "always-coarsen",
-        m10CoarsenGridDefaultMeters: 100,
-      }));
-      expect(adapter.isAvailable()).toBe(true);
+    test("is available once the place search is allowed, at any coarsening floor", () => {
+      for (const floor of [0, 50, 100]) {
+        const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
+          m10CoarsenGridFloorMeters: floor,
+          m10CoarsenGridDefaultMeters: 100,
+        }));
+        expect(adapter.isAvailable()).toBe(true);
+      }
     });
   });
 
@@ -323,7 +323,7 @@ describe("SelfHostedGeocoderAdapter", () => {
         multiTenant: true,
       };
       const adapter = new SelfHostedGeocoderAdapter(config, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -346,7 +346,7 @@ describe("SelfHostedGeocoderAdapter", () => {
         multiTenant: false,
       };
       const adapter = new SelfHostedGeocoderAdapter(config, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -362,14 +362,14 @@ describe("SelfHostedGeocoderAdapter", () => {
       expect(lon).toBe(18.56017);
     });
 
-    test("multiTenant: false + always-coarsen still coarsens", async () => {
+    test("multiTenant: false + strict coarsening floor still coarsens", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimReverseResponse()));
       const config: SelfHostedGeocoderConfig = {
         ...NOMINATIM_CONFIG,
         multiTenant: false,
       };
       const adapter = new SelfHostedGeocoderAdapter(config, () => ({
-        m9SelfHosted: "always-coarsen",
+        m10CoarsenGridFloorMeters: 50,
         m10CoarsenGridDefaultMeters: 100,
       }));
 
@@ -390,7 +390,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("requests use credentials: omit, referrerPolicy: no-referrer, cache: no-store", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -406,7 +406,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const ctrl = new AbortController();
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -421,7 +421,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Nominatim forward → GeocoderCandidate[]", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -446,7 +446,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Photon forward → GeocoderCandidate[]", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(photonForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PHOTON_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -469,7 +469,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("PTN FST forward → GeocoderCandidate[]", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(ptnFstForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PTN_FST_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -496,7 +496,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -521,7 +521,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...PHOTON_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -544,7 +544,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("empty Nominatim response → []", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse([]));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -561,7 +561,7 @@ describe("SelfHostedGeocoderAdapter", () => {
         jsonResponse({ type: "FeatureCollection", features: [] }),
       );
       const adapter = new SelfHostedGeocoderAdapter(PHOTON_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
 
@@ -580,7 +580,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -597,7 +597,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("multiTenant: true coarsens forward hint coordinates", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(nominatimForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -617,7 +617,7 @@ describe("SelfHostedGeocoderAdapter", () => {
     test("Photon forward hint coarsened with multiTenant", async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(photonForwardResponse()));
       const adapter = new SelfHostedGeocoderAdapter(PHOTON_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 50,
       }));
 
@@ -641,7 +641,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: true },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 500,
         }),
       );
@@ -665,7 +665,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -689,7 +689,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -704,7 +704,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -723,7 +723,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...PHOTON_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -748,7 +748,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -779,7 +779,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...PHOTON_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -796,7 +796,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...NOMINATIM_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -824,7 +824,7 @@ describe("SelfHostedGeocoderAdapter", () => {
       const adapter = new SelfHostedGeocoderAdapter(
         { ...PHOTON_CONFIG, multiTenant: false },
         () => ({
-          m9SelfHosted: "respect-multitenant",
+          m10CoarsenGridFloorMeters: 0,
           m10CoarsenGridDefaultMeters: 0,
         }),
       );
@@ -840,7 +840,7 @@ describe("SelfHostedGeocoderAdapter", () => {
   describe("adapter metadata", () => {
     test("id is 'self-hosted' and privacyTier is 'self-hosted'", () => {
       const adapter = new SelfHostedGeocoderAdapter(NOMINATIM_CONFIG, () => ({
-        m9SelfHosted: "respect-multitenant",
+        m10CoarsenGridFloorMeters: 0,
         m10CoarsenGridDefaultMeters: 0,
       }));
       expect(adapter.id).toBe("self-hosted");

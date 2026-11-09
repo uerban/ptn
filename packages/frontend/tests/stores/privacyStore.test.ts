@@ -72,23 +72,20 @@ describe("getPolicy", () => {
     expect(getPolicy()).toEqual(effectivePolicy(level, overrides));
   });
 
-  it("allows Standard to disable external basemap and nearby-stop requests", () => {
-    usePrivacyStore.getState().setOverride("basemapMode", "local-only");
-    usePrivacyStore.getState().setOverride("nearbyStopLookup", "local-only");
-    expect(getPolicy().basemapMode).toBe("local-only");
-    expect(getPolicy().nearbyStopLookup).toBe("local-only");
-  });
-
-  it("does not let a Hardened override re-enable external location flows", () => {
-    usePrivacyStore.getState().setLevel("hardened");
-    usePrivacyStore
-      .getState()
-      .setOverride("basemapMode", "external-detailed");
-    usePrivacyStore
-      .getState()
-      .setOverride("nearbyStopLookup", "centroid-server");
-    expect(getPolicy().basemapMode).toBe("local-only");
-    expect(getPolicy().nearbyStopLookup).toBe("local-only");
+  it("holds no network axis: network use is decided per flow", () => {
+    usePrivacyStore.getState().setLevel("baseline");
+    const policy = getPolicy() as unknown as Record<string, unknown>;
+    for (const axis of [
+      "m9SelfHosted",
+      "m10ThirdPartyEnabled",
+      "routingAdapter",
+      "poiResidency",
+      "realTimePolling",
+      "basemapMode",
+      "nearbyStopLookup",
+    ]) {
+      expect(policy).not.toHaveProperty(axis);
+    }
   });
 });
 
@@ -130,6 +127,21 @@ describe("usePrivacyStore persistence", () => {
     expect(state.overrides.urlShare).toBe("disabled");
   });
 
+  it("drops former network-axis overrides on hydration", () => {
+    globalThis.localStorage?.setItem(
+      "ptn-privacy",
+      JSON.stringify({
+        state: {
+          level: "standard",
+          overrides: { basemapMode: "local-only", urlShare: "disabled" },
+        },
+        version: 0,
+      }),
+    );
+    usePrivacyStore.persist.rehydrate();
+    expect(usePrivacyStore.getState().overrides).toEqual({ urlShare: "disabled" });
+  });
+
   it("loads an old payload without materializing new-axis overrides", () => {
     globalThis.localStorage?.setItem(
       "ptn-privacy",
@@ -145,8 +157,6 @@ describe("usePrivacyStore persistence", () => {
 
     const state = usePrivacyStore.getState();
     expect(state.overrides).toEqual({ urlShare: "disabled" });
-    expect(getPolicy().basemapMode).toBe("local-only");
-    expect(getPolicy().nearbyStopLookup).toBe("local-only");
     expect(getPolicy().viewportPersistence).toBe("rounded-50m");
     expect(getPolicy().stopUsageRetention).toBe("7d");
   });

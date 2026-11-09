@@ -1,3 +1,4 @@
+import { effectiveExcludedModes } from "../../stores/settingsStore.ts";
 import { excludedRouteIdsForGroups } from "../../services/routeGroups.ts";
 /**
  * The arrive-by request for two endpoints and a deadline, resolved the way
@@ -57,8 +58,9 @@ export async function prepareArriveBy(
   arriveByRouteColors().catch(() => {});
   const table = await arriveByStopTable();
   const stopsRead = performance.now();
-  const { mobilityProfile, walkSpeedMps, maxWalkSecs, runToCatch, excludedModes, excludedRouteGroupsByCity } = useSettingsStore.getState();
+  const { mobilityProfile, walkSpeedMps, maxWalkSecs, runToCatch, excludedRouteGroupsByCity } = useSettingsStore.getState();
   const city = useCityStore.getState().activeCity;
+  const excludedModes = effectiveExcludedModes(useSettingsStore.getState(), city.defaultExcludedModes);
   const orchestrator = new SearchOrchestrator({
     raptorIndex, cityId: city.id, allStops: [...table.rows], getDelay: () => null, osrm: osrmClient,
     walkSpeedMps, maxWalkSecs, mobilityProfile, runToCatch,

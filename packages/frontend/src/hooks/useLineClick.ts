@@ -1,25 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { buildLinePatterns } from "../utils/buildLinePatterns.ts";
-import { patternDirKeys } from "../services/nearbyDirections.ts";
+import { tripDirectionId } from "../services/nearbyDirections.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { useLineViewStore, type LinePattern } from "../stores/lineViewStore.ts";
 
-/**
- * GTFS `direction_id` of `tripId`, or `undefined` when the index does not say
- * (unknown trip, a feed without direction_id). The trip's pattern decides when
- * the index has patterns: a trip folded into a longer pattern
- * (`PatternMode.CoveringMerge`) lost its own direction_id but rides its
- * pattern's (`patternDirKeys`). Otherwise the canonical route's trip.
- */
-function tripDirectionId(routeId: string, tripId: string): 0 | 1 | undefined {
+/** GTFS `direction_id` of `tripId` in the loaded index (see `tripDirectionId`). */
+function loadedTripDirectionId(routeId: string, tripId: string): 0 | 1 | undefined {
   const index = useGtfsDataStore.getState().raptorIndex;
-  if (!index) return undefined;
-  const key = patternDirKeys(index).byTrip.get(tripId);
-  if (key === "d0") return 0;
-  if (key === "d1") return 1;
-  const routeIdx = index.routeIdToIdx.get(routeId);
-  if (routeIdx === undefined) return undefined;
-  return index.routes[routeIdx]?.trips.find((t) => t.tripId === tripId)?.directionId;
+  return index ? tripDirectionId(index, routeId, tripId) : undefined;
 }
 
 /**
@@ -81,7 +69,7 @@ export function useLineClick() {
       try {
         // Read before the load's first await, as `buildLinePatterns` reads
         // the index: both from the same index.
-        const direction = tripId === undefined ? undefined : tripDirectionId(routeId, tripId);
+        const direction = tripId === undefined ? undefined : loadedTripDirectionId(routeId, tripId);
         const patterns = await buildLinePatterns(routeId);
         if (requestId !== idRef.current) return false;
         if (patterns.length === 0) {

@@ -76,7 +76,10 @@ class ToolValidationTests(unittest.TestCase):
         with patch.object(tools.subprocess, 'run', side_effect=execute), \
                 patch.object(tools, 'verify_native_tls') as tls:
             tools.verify_tools(['qemu-arm', '-cpu', 'arm1176'], Path('/fixture/bin'), 'arm-unknown-linux-musleabihf')
-            self.assertEqual(len(commands), 6)
+            self.assertEqual(len(commands), 12)
+            self.assertTrue({'pt-transit', 'pt-pack-inspect', 'pt-pack-export',
+                             'pt-pack-catalog', 'pt-pack-publish', 'pt-pack-discovery'}
+                            <= {Path(command[3]).name for command in commands})
             self.assertTrue(all(command[:3] == ['qemu-arm', '-cpu', 'arm1176'] for command in commands))
             tls.assert_called_once()
 

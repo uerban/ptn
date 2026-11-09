@@ -174,6 +174,27 @@ fn matching_if_none_match_yields_a_bare_304() {
 }
 
 #[test]
+fn weak_listed_or_proxy_suffixed_if_none_match_yields_a_304() {
+    let (_d, ctx, _) = ctx_with(|gen_dir, gid| write_manifest(gen_dir, &pretty_manifest(gid)));
+    let gen = ctx.current_generation();
+    let etag = parts_of(&gtfs_manifest(&gen, None))
+        .etag
+        .expect("200 has an ETag");
+    let opaque = etag.trim_matches('"');
+    for header in [
+        format!("W/{etag}"),
+        format!("\"other\", {etag}"),
+        format!("\"{opaque}-br\""),
+    ] {
+        assert_eq!(
+            parts_of(&gtfs_manifest(&gen, Some(&header))).status,
+            304,
+            "{header}"
+        );
+    }
+}
+
+#[test]
 fn stale_if_none_match_yields_a_fresh_200() {
     let (_d, ctx, _) = ctx_with(|gen_dir, gid| write_manifest(gen_dir, &pretty_manifest(gid)));
     let gen = ctx.current_generation();

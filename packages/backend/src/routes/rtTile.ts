@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import {
   BUNDLE_HASH_HEADER,
+  RT_CACHE_MAX_AGE_S,
   SCHEDULE_TILE_SIZE_LABEL,
   decodeScheduleTile,
   parseTileCoords,
@@ -49,9 +50,9 @@ interface RtTileParams {
 }
 
 const BUNDLE_HASH_RE = /^[0-9a-f]{64}$/;
-const RT_TILE_TTL_MS = 10_000;
+const RT_TILE_TTL_MS = RT_CACHE_MAX_AGE_S * 1000;
 // Leaf-aware: worst case `cells_touched × 4^MAX_SUBDIVISION_DEPTH` (= cells × 256)
-// within the 10 s TTL. Only a handful of cells subdivide, and only the densest
+// within the 5 s TTL. Only a handful of cells subdivide, and only the densest
 // cities subdivide at all. 4096 covers the densest city's leaf set within the TTL;
 // a too-small LRU silently re-decodes every poll.
 const RT_TILE_LRU_SIZE = 4096;
@@ -59,10 +60,10 @@ const RT_TILE_LRU_SIZE = 4096;
 export function createRtTileHandler(deps: RtTileDeps) {
   const cache = new TtlLru<string, RtTileResponse>({ maxSize: RT_TILE_LRU_SIZE, ttlMs: RT_TILE_TTL_MS });
   // Trip MEMBERSHIP is immutable per (bundleHash, coords) — only the RT
-  // overlay needs the 10 s freshness above. Cache the decoded trip-id list
+  // overlay needs the 5 s freshness above. Cache the decoded trip-id list
   // separately with no TTL so a body-TTL expiry re-merges RT from memory
   // instead of re-reading + brotli-decompressing + JSON-decoding the tile on
-  // the request thread every 10 s. Insertion-order LRU, single-hash: purged
+  // the request thread every 5 s. Insertion-order LRU, single-hash: purged
   // wholesale when the guard-validated bundle hash rolls (mirrors the
   // schedule-tile route's cache) so retired generations don't linger.
   const membership = new Map<string, string[]>();
@@ -133,7 +134,7 @@ export function createRtTileHandler(deps: RtTileDeps) {
     if (cached) {
       metricsRegistry.rtTileRequestTotal.inc({ status: "200", cache_hit: "hit" });
       reply.status(200)
-        .header("Cache-Control", "no-cache")
+        .header("Cache-Control", `public, max-age=${RT_CACHE_MAX_AGE_S}, s-maxage=${RT_CACHE_MAX_AGE_S}`)
         .header("Vary", "Accept-Encoding")
         .header(BUNDLE_HASH_HEADER, bundleHash)
         .send(cached);
@@ -213,7 +214,7 @@ export function createRtTileHandler(deps: RtTileDeps) {
 
     metricsRegistry.rtTileRequestTotal.inc({ status: "200", cache_hit: "miss" });
     reply.status(200)
-      .header("Cache-Control", "no-cache")
+      .header("Cache-Control", `public, max-age=${RT_CACHE_MAX_AGE_S}, s-maxage=${RT_CACHE_MAX_AGE_S}`)
       .header("Vary", "Accept-Encoding")
       .header(BUNDLE_HASH_HEADER, bundleHash)
       .send(body);
