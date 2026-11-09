@@ -14,7 +14,7 @@ import {
   PRIVACY_DATA_MIGRATION_VERSION,
 } from "./privacyDataMigrationState.ts";
 import { putPersonal } from "./personalStorage.ts";
-import { rawTableText, resetPersonalStorage } from "../test-helpers/personalStorage.ts";
+import { findLeaks, rawTableText, resetPersonalStorage } from "../test-helpers/personalStorage.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -65,9 +65,7 @@ describe("optional stop-use personalization", () => {
     expect(await db.personalUsage.count()).toBe(1);
     expect(await db.usageStats.count()).toBe(0);
     const raw = await rawTableText("personalUsage");
-    for (const leak of ["STOP-CENTRAL-4471", "1700000123999", "tapCount", "lastTapped"]) {
-      expect(raw).not.toContain(leak);
-    }
+    expect(findLeaks(raw, ["STOP-CENTRAL-4471", "1700000123999", "tapCount", "lastTapped"])).toEqual([]);
   });
 
   it("keeps the exact retention boundary and removes older rows", async () => {
@@ -147,7 +145,7 @@ describe("per-city stop use", () => {
       useCityStore.setState({activeCity: {...original, id: "vilnius"}});
       expect((await loadStopUsage(["same"], () => 100)).get("same")?.tapCount).toBe(2);
       // City ownership is sealed with the rest of the record.
-      expect(await rawTableText("personalUsage")).not.toContain("vilnius");
+      expect(findLeaks(await rawTableText("personalUsage"), ["vilnius"])).toEqual([]);
       expect(await sweepStopUsage({axis: "off"})).toBe(2);
       expect(await db.personalUsage.count()).toBe(0);
     } finally { useCityStore.setState({activeCity: original}); }
