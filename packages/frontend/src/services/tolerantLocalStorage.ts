@@ -12,6 +12,16 @@ export function safeLocalStorage(): Storage | undefined {
   }
 }
 
+let refusedWrites = 0;
+
+/**
+ * How many writes through `tolerantLocalStorage` storage has refused so far.
+ * Compare two readings to learn whether the writes in between were stored.
+ */
+export function refusedWriteCount(): number {
+  return refusedWrites;
+}
+
 /**
  * localStorage for persisted stores that never throws. When the browser
  * refuses a write (storage full, blocked or in a restricted mode), the state
@@ -28,9 +38,12 @@ export const tolerantLocalStorage: StateStorage = {
   },
   setItem: (name, value) => {
     try {
-      safeLocalStorage()?.setItem(name, value);
+      const storage = safeLocalStorage();
+      if (storage) storage.setItem(name, value);
+      else refusedWrites++;
     } catch {
       // Not stored: kept for this session only.
+      refusedWrites++;
     }
   },
   removeItem: (name) => {

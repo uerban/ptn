@@ -198,7 +198,8 @@ describe("setup commit: preset × presentation", () => {
       const applied = await useOnboardingStore
         .getState()
         .commitSetup({ presetId: "recommended" });
-      expect(applied.applied).toBe(true);
+      // Nothing was persisted: the journal is not acknowledged.
+      expect(applied.applied).toBe(false);
       expect(useOnboardingStore.getState().storageAvailable).toBe(false);
       expect(canUse("operator.realtime")).toBe(true);
     } finally {
@@ -235,6 +236,29 @@ describe("journal recovery", () => {
       .setDecision("operator.realtime", "denied", "settings");
     await applyPendingOnboardingJournal();
     expect(canUse("operator.realtime")).toBe(false);
+  });
+
+  it("keeps the journal pending when a preference write is refused after the journal was stored", async () => {
+    classifyInstallation(localStorage);
+    const original = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = (key: string, value: string) => {
+      if (key === "ptn-privacy") throw new Error("quota");
+      original(key, value);
+    };
+    try {
+      await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+    } finally {
+      localStorage.setItem = original;
+    }
+    expect(record().applied).toBe(false);
+
+    // Reload: the level comes back from storage, which never got Strict.
+    expect(localStorage.getItem("ptn-privacy") ?? "").not.toContain("strict");
+    usePrivacyStore.setState({ level: "standard" });
+    await reload();
+    await applyPendingOnboardingJournal();
+    expect(getCurrentLevel()).toBe("strict");
+    expect(record().applied).toBe(true);
   });
 
   it("survives a reload after commit: preference stores stay authoritative", async () => {
