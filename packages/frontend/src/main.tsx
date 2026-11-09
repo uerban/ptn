@@ -1,6 +1,9 @@
 import {discoverCities, catalogWasCached} from "./config/discovery.ts";
 import {classifyInstallation} from "./services/installClassifier.ts";
+import {applyIosStandaloneBlurWorkaround} from "./utils/iosStandaloneBlur.ts";
 import "./index.css";
+
+applyIosStandaloneBlurWorkaround();
 
 async function start(): Promise<void> {
   // Before any store module loads: hydration rewrites the stored state the
