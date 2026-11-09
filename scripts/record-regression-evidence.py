@@ -4,9 +4,14 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import statistics
 import sys
 
 BASELINE = Path(__file__).resolve().parent / 'regression' / 'baseline.json'
+# A change is flagged only when it is both relative and absolute enough to
+# exceed hosted-runner noise; tiny settle times otherwise swing by 100%.
+NOTABLE_PERCENT = 15
+NOTABLE_FLOOR = {'ms': 20, 'MB': 5}
 
 REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')
 LABELS = {
@@ -92,19 +97,36 @@ def compare_baseline(rows, baseline):
         row['baseline'] = base['value'] if base and base.get('unit') == row['unit'] else None
         if row['baseline']:
             row['deltaPercent'] = round((row['value'] - row['baseline']) / row['baseline'] * 100, 1)
+            row['notable'] = (abs(row['deltaPercent']) >= NOTABLE_PERCENT
+                              and abs(row['value'] - row['baseline']) >= NOTABLE_FLOOR.get(row['unit'], 0))
     return rows
 
 
-def update_baseline(report_path):
-    """Promote a regression.json from a passing run to the stored baseline."""
-    report = json.loads(Path(report_path).read_text())
-    if not report.get('passed'):
-        raise SystemExit(f'{report_path}: only a passing run can become the baseline')
-    baseline = {'schemaVersion': 1, 'revision': report['revision'], 'runId': report.get('runId'),
-                'measurements': {baseline_key(row): {'value': row['value'], 'unit': row['unit']}
-                                 for row in report['measurements']}}
+def update_baseline(report_paths):
+    """Store the per-measurement median of passing regression.json reports."""
+    reports = [json.loads(Path(path).read_text()) for path in report_paths]
+    for path, report in zip(report_paths, reports):
+        if not report.get('passed'):
+            raise SystemExit(f'{path}: only passing runs can become the baseline')
+    samples = {}
+    for report in reports:
+        for row in report['measurements']:
+            samples.setdefault((baseline_key(row), row['unit']), []).append(row['value'])
+    measurements = {}
+    for (key, unit), values in samples.items():
+        if key in measurements:
+            raise SystemExit(f'{key}: reports disagree on the unit')
+        measurements[key] = {'value': round(statistics.median(values), 3), 'unit': unit,
+                             'samples': len(values)}
+    baseline = {'schemaVersion': 2, 'revision': reports[-1]['revision'],
+                'runIds': [report.get('runId') for report in reports], 'measurements': measurements}
     BASELINE.write_text(json.dumps(baseline, indent=2) + '\n')
-    print(f"{BASELINE}: {len(baseline['measurements'])} measurements from run {baseline['runId']}")
+    print(f"{BASELINE}: {len(measurements)} measurements, median of runs {', '.join(map(str, baseline['runIds']))}")
+
+
+def baseline_runs(baseline):
+    runs = baseline.get('runIds') or ([baseline['runId']] if baseline.get('runId') else [])
+    return [str(run) for run in runs]
 
 
 def write_summary(report, steps):
@@ -118,15 +140,20 @@ def write_summary(report, steps):
         lines.append(f'| {label} | {outcome} |')
     if report['measurements']:
         base = report.get('baseline') or {}
+        runs = base.get('runIds') or []
+        notable = sum(1 for row in report['measurements'] if row.get('notable'))
+        source = f"median of runs {', '.join(runs)}" if runs else 'none'
         lines += ['', '### Measurements', '',
-                  f"Baseline: run {base.get('runId') or 'none'} at `{(base.get('revision') or 'none')[:12]}` "
+                  f"Baseline: {source} at `{(base.get('revision') or 'none')[:12]}` "
                   '(changes are informational; only budgets fail the gate).', '',
+                  f'Notable changes (⚠, at least {NOTABLE_PERCENT}% and above the absolute floor '
+                  + ', '.join(f'{v} {u}' for u, v in NOTABLE_FLOOR.items()) + f'): {notable}', '',
                   '| Gate | Measurement | Value | Baseline | Change | Budget |',
                   '| --- | --- | ---: | ---: | ---: | ---: |']
         for row in report['measurements']:
             budget = 'recorded only' if row['budget'] is None else f"{row['budget']} {row['unit']}"
             baseline = '—' if row.get('baseline') is None else f"{row['baseline']} {row['unit']}"
-            delta = '—' if row.get('deltaPercent') is None else f"{row['deltaPercent']:+}%"
+            delta = '—' if row.get('deltaPercent') is None else f"{row['deltaPercent']:+}%" + (' ⚠' if row.get('notable') else '')
             lines.append(f"| {row['gate']} | {row['name']} | {row['value']} {row['unit']} | {baseline} | {delta} | {budget} |")
         lines += ['', 'Routing parity and native RSS checks are pass/fail; their logs are in the evidence.']
     lines += ['', 'Failed, cancelled, skipped or missing required gates do not count as passed.', '',
@@ -143,9 +170,9 @@ def write_summary(report, steps):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv:
-        if len(argv) != 2 or argv[0] != '--update-baseline':
-            raise SystemExit('usage: record-regression-evidence.py [--update-baseline REGRESSION_JSON]')
-        update_baseline(argv[1])
+        if len(argv) < 2 or argv[0] != '--update-baseline':
+            raise SystemExit('usage: record-regression-evidence.py [--update-baseline REGRESSION_JSON...]')
+        update_baseline(argv[1:])
         return
     baseline = load_baseline()
     steps = json.loads(os.environ['STEP_RESULTS'])
@@ -156,7 +183,7 @@ def main(argv=None):
               'passed': not dirty and all(value == 'success' for value in checks.values()),
               'runner': os.environ.get('RUNNER_OS'), 'runId': os.environ.get('GITHUB_RUN_ID'),
               'measurements': compare_baseline(collect_measurements(), baseline),
-              'baseline': {'revision': baseline.get('revision'), 'runId': baseline.get('runId')}}
+              'baseline': {'revision': baseline.get('revision'), 'runIds': baseline_runs(baseline)}}
     Path('evidence').mkdir(exist_ok=True)
     Path('evidence/regression.json').write_text(json.dumps(report, indent=2) + '\n')
     write_summary(report, steps)
