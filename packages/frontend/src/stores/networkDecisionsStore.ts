@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
+import {
+  createTolerantJSONStorage,
+  tolerantLocalStorage,
+} from "../services/tolerantLocalStorage.ts";
 import {
   decisionKey,
   NETWORK_DECISIONS_SCHEMA_VERSION,
@@ -34,6 +37,24 @@ interface NetworkDecisionsState {
 }
 
 /**
+ * The decisions as last stored by any tab, or null when nothing readable is
+ * stored. Read synchronously right before a change is written, so a tab that
+ * has not yet seen another tab's change (its `storage` event is still
+ * queued) does not write back an older value for an unrelated flow.
+ */
+function storedDecisions(): NetworkDecisionMap | null {
+  try {
+    const raw = tolerantLocalStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY);
+    if (typeof raw !== "string") return null;
+    const parsed = JSON.parse(raw) as { state?: { decisions?: unknown } } | null;
+    if (!parsed || typeof parsed !== "object" || !parsed.state) return null;
+    return sanitizeNetworkDecisions(parsed.state.decisions);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Optional network decisions keyed by data flow. Kept separate from the
  * protection level (`privacyStore`) and from storage choices
  * (`privacyChoicesStore`): writing a decision never touches either.
@@ -48,7 +69,9 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
         const key = decisionKey(flowId, providerId);
         if (!key) return false;
         set((state) => {
-          const next: Record<string, NetworkDecision> = { ...state.decisions };
+          const next: Record<string, NetworkDecision> = {
+            ...(storedDecisions() ?? state.decisions),
+          };
           if (value === "unset") {
             delete next[key];
           } else {
