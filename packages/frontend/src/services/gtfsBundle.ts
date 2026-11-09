@@ -53,6 +53,10 @@ export interface RaptorBundleWire {
     mode: string;
     color?: string;
     textColor?: string;
+    /** GTFS `agency_id`, when the route has one. */
+    agencyId?: string;
+    /** GTFS `route_type`; absent on bundles stored by older builds. */
+    routeType?: number;
     stopIds: string[];
     trips: Array<{
       tripId: string;
