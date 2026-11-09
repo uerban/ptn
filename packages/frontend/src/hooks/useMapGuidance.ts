@@ -50,7 +50,6 @@ export function useMapGuidance(
           useMapObstaclesStore.getState().obstacles.get("step-list"),
           AUTO_FOLLOW_PADDING_PX,
         ),
-        retainPadding: false,
         maxZoom: 17,
         duration: 500,
       });
