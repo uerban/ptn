@@ -1,411 +1,518 @@
 {
-  "schemaVersion": 1,
-  "revision": "77aa7fd555b54db541b9c160f0b52596c184ebcb",
-  "runId": "42632554377",
+  "schemaVersion": 2,
+  "revision": "db4acb97ff99cbabee52734afa92270c605a4f7f",
+  "runIds": [
+    "42632554377",
+    "42635269053",
+    "42637645563",
+    "42637655962",
+    "42639067873"
+  ],
   "measurements": {
     "wasm/WASM gzip size": {
       "value": 239076,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "wasm/WASM raw size": {
       "value": 515763,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "index/hydrate patterns-ON index at pattern-fanout scale p99": {
-      "value": 23.66,
-      "unit": "ms"
+      "value": 30.24,
+      "unit": "ms",
+      "samples": 5
     },
     "bundle/First paint JS": {
       "value": 68833,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/Entry chunk": {
       "value": 9427,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/Text mode start (excludes vendor-map; graph checked by scripts/check-text-entry-chunks.mjs)": {
-      "value": 83019,
-      "unit": "bytes"
+      "value": 83015,
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/MapLibre chunk (lazy)": {
       "value": 257775,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/MapLibre worker (lazy)": {
       "value": 132598,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/pt-wasm chunk (lazy)": {
       "value": 242680,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/raptorWasm adapter + planner": {
       "value": 2992,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/PTB catalog decoder + worker (lazy)": {
       "value": 23174,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/Core non-wasm Total JS (separately-gated payloads excluded)": {
-      "value": 936843,
-      "unit": "bytes"
+      "value": 936814,
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/Offline glyphs (precached)": {
       "value": 66238,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "bundle/Per-locale i18n chunks (lazy, one locale per reader)": {
       "value": 217503,
-      "unit": "bytes"
+      "unit": "bytes",
+      "samples": 5
     },
     "heap/JS heap after load": {
       "value": 20.27,
-      "unit": "MB"
+      "unit": "MB",
+      "samples": 5
     },
     "coldstart/fast dynImport p95": {
-      "value": 105.0,
-      "unit": "ms"
+      "value": 21.2,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/fast instantiate p95": {
-      "value": 16,
-      "unit": "ms"
+      "value": 17.2,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/fast ptNew p95": {
-      "value": 6.3,
-      "unit": "ms"
+      "value": 6.6,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/fast plan p95": {
-      "value": 2.9,
-      "unit": "ms"
+      "value": 3.2,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/fast total p95": {
-      "value": 126.6,
-      "unit": "ms"
+      "value": 50.3,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/throttled dynImport p95": {
-      "value": 34.2,
-      "unit": "ms"
+      "value": 37.0,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/throttled instantiate p95": {
       "value": 13.3,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/throttled ptNew p95": {
-      "value": 6.9,
-      "unit": "ms"
+      "value": 7,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/throttled plan p95": {
-      "value": 6.2,
-      "unit": "ms"
+      "value": 7.1,
+      "unit": "ms",
+      "samples": 5
     },
     "coldstart/throttled total p95": {
-      "value": 81.5,
-      "unit": "ms"
+      "value": 90.3,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-north index ready p95": {
-      "value": 848.9,
-      "unit": "ms"
+      "value": 975,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-north badges resolved p95": {
-      "value": 1020.1,
-      "unit": "ms"
+      "value": 1153.4,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-north cards settled p95": {
-      "value": 1166.2,
-      "unit": "ms"
+      "value": 1261.5,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-south index ready p95": {
-      "value": 2040.9,
-      "unit": "ms"
+      "value": 2494.5,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-south badges resolved p95": {
-      "value": 2666.4,
-      "unit": "ms"
+      "value": 3072.9,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/synthetic-south cards settled p95": {
-      "value": 2803.2,
-      "unit": "ms"
+      "value": 3236.3,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 settle after last move": {
       "value": 8.8,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 stop dots": {
       "value": 896,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport all dots z12 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 frame p95": {
       "value": 50.1,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 settle after last move": {
-      "value": 2.6,
-      "unit": "ms"
+      "value": 4,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 stop dots": {
       "value": 84,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 stop labels": {
       "value": 80,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport all labels z14 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 settle after last move": {
-      "value": 0.6,
-      "unit": "ms"
+      "value": 0.7,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 stop dots": {
       "value": 8,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport all cards z16 stop cards": {
       "value": 18,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 frame p95": {
-      "value": 33.4,
-      "unit": "ms"
+      "value": 50,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 settle after last move": {
-      "value": 206.5,
-      "unit": "ms"
+      "value": 228.4,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 stop dots": {
       "value": 8,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-in z12 stop cards": {
       "value": 24,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 settle after last move": {
       "value": 8.2,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 stop dots": {
       "value": 896,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport all zoom-out z16 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 frame p95": {
-      "value": 49.9,
-      "unit": "ms"
+      "value": 50,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 settle after last move": {
-      "value": 5.8,
-      "unit": "ms"
+      "value": 6.9,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 stop dots": {
       "value": 710,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport urban dots z12 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 frame p95": {
       "value": 50.1,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 settle after last move": {
-      "value": 1.5,
-      "unit": "ms"
+      "value": 1.6,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 stop dots": {
       "value": 73,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 stop labels": {
       "value": 67,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport urban labels z14 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 settle after last move": {
-      "value": 0.4,
-      "unit": "ms"
+      "value": 0.7,
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 stop dots": {
       "value": 6,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport urban cards z16 stop cards": {
       "value": 15,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 settle after last move": {
       "value": 213.1,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 stop dots": {
       "value": 6,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-in z12 stop cards": {
       "value": 21,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 frame p95": {
       "value": 50,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 long-task count": {
       "value": 0,
-      "unit": "tasks"
+      "unit": "tasks",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 long-task total": {
       "value": 0,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 settle after last move": {
       "value": 5.3,
-      "unit": "ms"
+      "unit": "ms",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 stop dots": {
       "value": 710,
-      "unit": "dots"
+      "unit": "dots",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 stop labels": {
       "value": 0,
-      "unit": "labels"
+      "unit": "labels",
+      "samples": 5
     },
     "cityswitch/viewport urban zoom-out z16 stop cards": {
       "value": 0,
-      "unit": "cards"
+      "unit": "cards",
+      "samples": 5
     }
   }
 }
