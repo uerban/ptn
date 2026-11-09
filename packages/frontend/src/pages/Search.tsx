@@ -32,6 +32,11 @@ import "../styles/searchPicker.css";
 import { PinnedSavesSection, type ResolvedSave } from "../components/Search/PinnedSavesSection.tsx";
 import { OptionalStorageChoice } from "../components/Privacy/OptionalStorageChoice.tsx";
 import {
+  PLACE_SEARCH_FLOW,
+  ServerPlaceSearchOffer,
+} from "../components/Search/ServerPlaceSearchOffer.tsx";
+import { useCanUse } from "../privacy/canUse.ts";
+import {
   searchSuggestions,
   searchSuggestionsStream,
   SUGGESTION_PAGE_SIZE,
@@ -971,6 +976,9 @@ export function SearchPage() {
     }
   }, []);
 
+  // Granting or revoking the operator's address search reruns the suggestions.
+  const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
+
   // One request identity per field/query/provider. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
   useEffect(() => {
@@ -1042,7 +1050,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, userLocation?.lat, userLocation?.lon]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, userLocation?.lat, userLocation?.lon]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
@@ -1669,6 +1677,7 @@ export function SearchPage() {
                 {t("search.show_more", "Show more")}
               </button>
             )}
+            <ServerPlaceSearchOffer cityId={cityId} query={activeQuery} />
             <PinnedSavesSection onSelect={selectSave} query={activeQuery} compact={compactRows} />
             {!activeQuery.trim() && <>
             <OptionalStorageChoice
