@@ -106,13 +106,13 @@ class BaselineTests(unittest.TestCase):
 
     def test_summary_shows_baseline_and_pan_counts(self):
         self.baseline.write_text(json.dumps({'revision': 'c' * 40, 'runId': '9', 'measurements': {
-            'cityswitch/pan all z16 stop cards': {'value': 20, 'unit': 'cards'}}}))
+            'cityswitch/viewport all cards z16 stop cards': {'value': 20, 'unit': 'cards'}}}))
         previous = Path.cwd()
         try:
             os.chdir(self.directory.name)
             Path('evidence').mkdir()
             Path('evidence/viewport-pan.json').write_text(json.dumps({'runs': [
-                {'mode': 'all', 'zoom': 16, 'frameIntervalMs': {'p95': 9}, 'longTaskMs': {'samples': 2},
+                {'mode': 'all', 'level': 'cards', 'zoom': 16, 'dots': 40, 'settleMs': 31.5, 'frameIntervalMs': {'p95': 9}, 'longTaskMs': {'samples': 2},
                  'longTaskTotalMs': 120, 'labels': 0, 'cards': 18}]}))
             steps = {name: {'outcome': 'success'} for name in regression.LABELS}
             with patch.dict(os.environ, {'STEP_RESULTS': json.dumps(steps)}), \
@@ -126,9 +126,11 @@ class BaselineTests(unittest.TestCase):
             os.chdir(previous)
         self.assertEqual(report['baseline'], {'revision': 'c' * 40, 'runId': '9'})
         self.assertIn('Baseline: run 9 at `cccccccccccc`', content)
-        self.assertIn('| cityswitch | pan all z16 long-task count | 2 tasks | — | — | recorded only |', content)
-        self.assertIn('| cityswitch | pan all z16 long-task total | 120 ms | — | — | recorded only |', content)
-        self.assertIn('| cityswitch | pan all z16 stop cards | 18 cards | 20 cards | -10.0% | recorded only |', content)
+        self.assertIn('| cityswitch | viewport all cards z16 long-task count | 2 tasks | — | — | recorded only |', content)
+        self.assertIn('| cityswitch | viewport all cards z16 long-task total | 120 ms | — | — | recorded only |', content)
+        self.assertIn('| cityswitch | viewport all cards z16 settle after last move | 31.5 ms | — | — | recorded only |', content)
+        self.assertIn('| cityswitch | viewport all cards z16 stop dots | 40 dots | — | — | recorded only |', content)
+        self.assertIn('| cityswitch | viewport all cards z16 stop cards | 18 cards | 20 cards | -10.0% | recorded only |', content)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { ZOOM_CARDS_MIN, ZOOM_LABELS_MIN } from "@pt/shared";
+import { ZOOM_CARDS_MIN, ZOOM_DOTS_MIN, ZOOM_LABELS_MIN } from "@pt/shared";
 import { seedCompletedSetup } from "../helpers/setup-complete";
 
 // City switching and viewport panning against two synthetic cities served by
@@ -211,8 +211,19 @@ test.describe("@perf city switch and viewport pan", () => {
     expect(errors).toEqual([]);
   });
 
-  test("viewport pans keep labels responsive in all and urban modes", async ({ page }) => {
-    const zooms = [14, 16];
+  test("viewport pans and zooms stay responsive at dot, label and card levels in all and urban modes", async ({ page }) => {
+    // One zoom inside each stop rendering level: plain dots, dots with name
+    // labels, and DOM stop cards.
+    const levelZoom = { dots: Math.floor((ZOOM_DOTS_MIN + ZOOM_LABELS_MIN) / 2), labels: ZOOM_LABELS_MIN, cards: ZOOM_CARDS_MIN + 1 };
+    type Move = { pan: number[] } | { zoom: number };
+    // Four one-second pans around the centre, as in the investigation.
+    const pans: Move[] = [[150, 0], [0, 100], [-150, 0], [0, -100]].map(pan => ({ pan }));
+    // Zoom sweeps cross both level thresholds, one second per level.
+    const workloads: { level: string; zoom: number; moves: Move[]; end: keyof typeof levelZoom }[] = [
+      ...(["dots", "labels", "cards"] as const).map(level => ({ level, zoom: levelZoom[level], moves: pans, end: level })),
+      { level: "zoom-in", zoom: levelZoom.dots, moves: [{ zoom: levelZoom.labels }, { zoom: levelZoom.cards }], end: "cards" },
+      { level: "zoom-out", zoom: levelZoom.cards, moves: [{ zoom: levelZoom.labels }, { zoom: levelZoom.dots }], end: "dots" },
+    ];
     const modes: ("all" | "urban")[] = ["all", "urban"];
     const toggle = page.getByTestId("mode-toggle");
     const results = [];
@@ -221,9 +232,9 @@ test.describe("@perf city switch and viewport pan", () => {
       if ((await toggle.getAttribute("aria-label") === "All") !== all) await toggle.click();
       // Urban mode labels the toggle "Now · <hours>"; all-stops mode says "All".
       await expect(toggle).toHaveAttribute("aria-label", all ? "All" : /^(?!All$)/);
-      for (const zoom of zooms) {
-        const run = await page.evaluate(async ({ zoom, timeoutMs }) => {
-          type Map = { jumpTo: (o: object) => void; once: (type: string, fn: () => void) => void; panBy: (o: number[], options: object) => void;
+      for (const { level, zoom, moves, end } of workloads) {
+        const run = await page.evaluate(async ({ zoom, moves, end, timeoutMs }) => {
+          type Map = { jumpTo: (o: object) => void; once: (type: string, fn: () => void) => void; panBy: (o: number[], options: object) => void; zoomTo: (zoom: number, options: object) => void;
             getLayer: (id: string) => unknown; queryRenderedFeatures: (options: object) => unknown[] };
           const map = (window as unknown as { __ptnMap: Map }).__ptnMap;
           map.jumpTo({ zoom });
@@ -239,37 +250,51 @@ test.describe("@perf city switch and viewport pan", () => {
             requestAnimationFrame(frame);
           };
           requestAnimationFrame(frame);
-          // Four one-second pans around the centre, as in the investigation.
-          for (const offset of [[150, 0], [0, 100], [-150, 0], [0, -100]]) {
+          for (const move of moves) {
+            const options = { duration: 1000, essential: true };
             await Promise.race([
-              new Promise<void>(done => { map.once("moveend", () => done()); map.panBy(offset, { duration: 1000, essential: true }); }),
-              new Promise((_, fail) => setTimeout(() => fail(new Error(`pan at zoom ${zoom} timed out`)), timeoutMs)),
+              new Promise<void>(done => {
+                map.once("moveend", () => done());
+                if ("pan" in move) map.panBy(move.pan, options); else map.zoomTo(move.zoom, options);
+              }),
+              new Promise((_, fail) => setTimeout(() => fail(new Error(`move ${JSON.stringify(move)} from zoom ${zoom} timed out`)), timeoutMs)),
             ]);
           }
+          // Stop dots and labels are map symbols and cards are DOM markers; all
+          // can trail moveend, so time until the end level's content shows.
+          const rendered = (layer: string) => map.getLayer(layer) ? map.queryRenderedFeatures({ layers: [layer] }).length : 0;
+          const counts = () => ({ dots: rendered("stops-dot"), labels: rendered("stops-label"), cards: document.querySelectorAll("[data-stop-id]").length });
+          const moved = performance.now();
+          let settled = counts();
+          while (settled[end] === 0 && performance.now() - moved < timeoutMs) {
+            await new Promise(done => requestAnimationFrame(done));
+            settled = counts();
+          }
+          const settleMs = settled[end] > 0 ? performance.now() - moved : null;
           active = false;
-          const end = performance.now();
+          const finished = performance.now();
           const longTasks = (window as unknown as { __gateLongTasks: { startTime: number; duration: number }[] }).__gateLongTasks
-            .filter(task => task.startTime >= start && task.startTime <= end).map(task => task.duration);
-          // Stop names are map symbols below the card zoom and DOM cards from it.
-          const labels = map.getLayer("stops-label") ? map.queryRenderedFeatures({ layers: ["stops-label"] }).length : 0;
-          return { zoom, frames, longTasks, labels, cards: document.querySelectorAll("[data-stop-id]").length, durationMs: end - start };
-        }, { zoom, timeoutMs: STEP_TIMEOUT_MS });
-        results.push({ mode, zoom, frameIntervalMs: distribution(run.frames), longTaskMs: distribution(run.longTasks),
-          longTaskTotalMs: run.longTasks.reduce((sum, value) => sum + value, 0), labels: run.labels, cards: run.cards, durationMs: run.durationMs });
+            .filter(task => task.startTime >= start && task.startTime <= finished).map(task => task.duration);
+          return { zoom, frames, longTasks, ...settled, settleMs, durationMs: finished - start };
+        }, { zoom, moves, end, timeoutMs: STEP_TIMEOUT_MS });
+        results.push({ mode, level, zoom, end, frameIntervalMs: distribution(run.frames), longTaskMs: distribution(run.longTasks),
+          longTaskTotalMs: run.longTasks.reduce((sum, value) => sum + value, 0), dots: run.dots, labels: run.labels, cards: run.cards, settleMs: run.settleMs, durationMs: run.durationMs });
       }
     }
     const writes = await projectionWrites(page);
     writeMetrics("viewport-pan", {
-      workload: "four one-second pans per zoom/mode, first synthetic city",
+      workload: "four one-second pans per rendering level, zoom-in and zoom-out sweeps across levels, per mode, first synthetic city",
       percentileMethod: "nearest rank", timingGate: "recorded only (CI calibration pending)",
       runs: results, projectionWrites: writes, pageErrors: errors,
     });
     console.log(JSON.stringify(results));
 
-    for (const run of results) expect(run.frameIntervalMs.samples, `${run.mode} zoom ${run.zoom} rendered frames`).toBeGreaterThan(0);
     for (const run of results) {
-      if (run.zoom >= ZOOM_CARDS_MIN) expect(run.cards, `${run.mode} zoom ${run.zoom} stop cards`).toBeGreaterThan(0);
-      else if (run.zoom >= ZOOM_LABELS_MIN) expect(run.labels, `${run.mode} zoom ${run.zoom} stop labels`).toBeGreaterThan(0);
+      const name = `${run.mode} ${run.level} zoom ${run.zoom}`;
+      expect(run.frameIntervalMs.samples, `${name} rendered frames`).toBeGreaterThan(0);
+      expect(run.dots, `${name} stop dots`).toBeGreaterThan(0);
+      if (run.end === "labels") expect(run.labels, `${name} stop labels`).toBeGreaterThan(0);
+      if (run.end === "cards") expect(run.cards, `${name} stop cards`).toBeGreaterThan(0);
     }
     expect(writes).toEqual({ stages: [], tableWrites: [] });
     expect(errors).toEqual([]);

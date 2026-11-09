@@ -62,11 +62,14 @@ def collect_measurements():
             add('cityswitch', f'{city} {label} p95', (stats.get(metric) or {}).get('p95'), 'ms')
     pan = load('viewport-pan.json')
     for run in (pan or {}).get('runs') or []:
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} frame p95", (run.get('frameIntervalMs') or {}).get('p95'), 'ms')
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task count", (run.get('longTaskMs') or {}).get('samples'), 'tasks')
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task total", run.get('longTaskTotalMs'), 'ms')
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} stop labels", run.get('labels'), 'labels')
-        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} stop cards", run.get('cards'), 'cards')
+        prefix = f"viewport {run.get('mode')} {run.get('level', 'pan')} z{run.get('zoom')}"
+        add('cityswitch', f"{prefix} frame p95", (run.get('frameIntervalMs') or {}).get('p95'), 'ms')
+        add('cityswitch', f"{prefix} long-task count", (run.get('longTaskMs') or {}).get('samples'), 'tasks')
+        add('cityswitch', f"{prefix} long-task total", run.get('longTaskTotalMs'), 'ms')
+        add('cityswitch', f"{prefix} settle after last move", run.get('settleMs'), 'ms')
+        add('cityswitch', f"{prefix} stop dots", run.get('dots'), 'dots')
+        add('cityswitch', f"{prefix} stop labels", run.get('labels'), 'labels')
+        add('cityswitch', f"{prefix} stop cards", run.get('cards'), 'cards')
     return rows
 
 

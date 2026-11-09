@@ -89,9 +89,13 @@ The initial suite recovers these useful checks from the archive:
   them with `pt-producer republish` and serves each with its own `pt-serve`; the
   browser reaches them through the same API paths as a native host. Twelve
   alternating arrivals at zoom 16 must each complete index activation, resolve
-  every in-view badge and settle nonempty stop cards for 500 ms. Four one-second
-  pans per zoom (14, 16) in all-stops and urban modes must render frames, show
-  stop-name labels in the label band (zoom 14) and stop cards from zoom 15. Neither workload may run the legacy timetable projection write or
+  every in-view badge and settle nonempty stop cards for 500 ms. In all-stops
+  and urban modes, four one-second pans run at each stop rendering level (plain
+  dots at zoom 12, dots with name labels at 14, stop cards at 16), then a
+  zoom-in sweep 12 → 14 → 16 and a zoom-out sweep 16 → 14 → 12. Each run must
+  render frames and show the content of the level it ends on; the time from the
+  last move until that content shows is recorded as settle time, alongside
+  frame p95, long tasks and dot, label and card counts. Neither workload may run the legacy timetable projection write or
   write its tables after the first city is ready, and page errors fail the gate.
   Switch, badge, card-settlement, frame and long-task timings are recorded in
   `city-switch.json` and `viewport-pan.json` but do not fail yet: the
