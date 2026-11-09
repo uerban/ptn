@@ -130,4 +130,13 @@ describe("sealed localStorage values", () => {
     expect(await write).toBe(false);
     expect(localStorage.getItem(LEGACY_FAVORITES_KEY)).toBeNull();
   });
+
+  it("keeps the newest of two overlapping writes, whichever finishes last", async () => {
+    await readSealedItem(LEGACY_FAVORITES_KEY);
+    const older = writeSealedItem(LEGACY_FAVORITES_KEY, "older");
+    const newer = writeSealedItem(LEGACY_FAVORITES_KEY, "newer");
+    expect(await newer).toBe(true);
+    expect(await older).toBe(false);
+    expect(await readSealedItem(LEGACY_FAVORITES_KEY)).toBe("newer");
+  });
 });

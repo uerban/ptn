@@ -67,7 +67,13 @@ async function bootApp(): Promise<void> {
   // Personal data written by earlier versions is encrypted before anything
   // reads it. A failure is reported in the app; transit keeps working and
   // personal writes are kept for this session only until a retry succeeds.
-  await runPersonalStorageMigration();
+  try {
+    await runPersonalStorageMigration();
+  } catch (err) {
+    reportError(err instanceof Error ? err : new Error(String(err)), {
+      context: { where: "main.runPersonalStorageMigration" },
+    });
+  }
   // The map reads its last area synchronously at start-up.
   await mapViewportItem.load().catch(() => {});
 

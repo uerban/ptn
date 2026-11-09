@@ -22,7 +22,7 @@ import { LATEST_WHATS_NEW_ID } from "./whatsNew.ts";
 
 function record(overrides: Partial<OnboardingRecord> = {}): OnboardingRecord {
   return {
-    ...newInstallRecord({ kind: "new", classifiedAt: 1 }),
+    ...newInstallRecord({ kind: "new" }),
     applied: true,
     seenWhatsNew: LATEST_WHATS_NEW_ID,
     ...overrides,
@@ -103,5 +103,24 @@ describe("answerAlertsOffer", () => {
     const read = readOnboardingRecord();
     expect(read.status === "ok" && read.record.alertsNotNow).toBe(1);
     expect(useOnboardingStore.getState().record?.alertsNotNow).toBe(1);
+  });
+
+  it("counts on top of a Not now another tab stored meanwhile", () => {
+    // This tab still holds the record from before the other tab answered.
+    writeOnboardingRecord(record());
+    useOnboardingStore.setState({ record: record() });
+    localStorage.setItem("ptn-onboarding", JSON.stringify(record({ alertsNotNow: 1 })));
+
+    answerAlertsOffer("not-now");
+
+    const read = readOnboardingRecord();
+    expect(read.status === "ok" && read.record.alertsNotNow).toBe(ALERTS_OFFER_NOT_NOW_LIMIT);
+    expect(
+      alertsOfferOpen({
+        decision: "unset",
+        available: true,
+        record: useOnboardingStore.getState().record,
+      }),
+    ).toBe(false);
   });
 });

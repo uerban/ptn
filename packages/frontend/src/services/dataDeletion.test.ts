@@ -151,9 +151,7 @@ describe("privacy data deletion boundaries", () => {
     expect(localStorage.getItem("ptn-onboarding")).toBeNull();
     expect(localStorage.getItem("ptn-network-decisions")).toBeNull();
     const { classifyInstallation } = await import("./installClassifier.ts");
-    const result = classifyInstallation(localStorage);
-    expect(result.status).toBe("classified");
-    if (result.status === "classified") expect(result.record.install.kind).toBe("new");
+    expect(classifyInstallation(localStorage)?.install.kind).toBe("new");
     localStorage.clear();
   });
 
@@ -190,6 +188,7 @@ describe("privacy data deletion boundaries", () => {
 
   it("uses explicit ownership allowlists", () => {
     expect(isPtnOwnedCacheName("carto-tiles")).toBe(true);
+    expect(isPtnOwnedCacheName("map-assets")).toBe(true);
     expect(isPtnOwnedCacheName("api-stops-cache-v1")).toBe(true);
     expect(isPtnOwnedCacheName("api-stops-cache")).toBe(true);
     const ownScope = `${location.origin}/`;

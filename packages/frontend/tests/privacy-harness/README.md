@@ -1,21 +1,23 @@
 # Privacy threat-model harness
 
-Scaffolding (T-X-4a) for asserting that the app's outbound network behavior
-matches the active `PrivacyPolicy`. Used by per-level golden snapshots
-(T-X-4b) and CI integration (T-X-4c).
+Asserts that the app's outbound network behavior matches what the rider
+allowed. Every optional network service is gated by its own decision
+(`canUse` in `src/privacy/canUse.ts`); the privacy level adds stricter
+handling on top, such as coordinate rounding. The harness records each
+outbound request and compares it with per-level golden snapshots.
 
 ## Why this exists
 
-The app must behave differently at each privacy level — Hardened must not
-emit reverse-geocode requests, Strict must round coordinates before any
-external call, Paranoid must disable third-party providers entirely. Without
-a regression harness these guarantees rot the moment someone adds a new
-network call without re-checking each preset.
+A new network call that skips its decision check, or a level that stops
+tightening what it should, is easy to miss. This harness catches
+both by comparing every request against what each level is expected to send.
 
-This harness gives spec authors two primitives:
+It gives spec authors two primitives:
 
-1. Boot the app at any privacy level **before** the first render —
-   so every code path observes the configured policy from the start.
+1. Boot the app at any privacy level **before** the first render, on a
+   profile that has already completed first-run setup with the Recommended
+   decisions (`seedCompletedSetup`), so every code path observes the
+   configured state from the start.
 2. Capture every outbound request and assert against a declarative
    per-kind pattern.
 
@@ -49,7 +51,9 @@ test("Hardened: no reverse-geocode on map tap", async ({ page }) => {
 
 `bootAtPrivacyLevel` accepts a `Partial<PrivacyPolicy>` of overrides. The
 override-ratchet rule still applies: an override only takes effect if it is
-**stricter** than the chosen level's floor. Use overrides for tests that
+**stricter** than the chosen level's floor. Network services are not policy
+axes: the older network-related axes are kept only so state stored by earlier
+versions can still be read, and do not decide whether a request is sent. Use overrides for tests that
 need a non-preset axis combination — but prefer one of the five named levels
 when possible to keep snapshot files comparable across milestones.
 
@@ -101,13 +105,11 @@ UPDATE_PRIVACY_SNAPSHOTS=1 pnpm --filter @pt/frontend exec playwright test \
   --config=tests/privacy-harness/playwright.config.ts
 ```
 
-Drift without the env flag is a failure — CI never auto-writes goldens.
+Drift without the env flag is a failure; goldens are never written automatically.
 
-At M7a the five baselines are expected to be **identical**: no privacy
-axis currently gates a network surface (errorReporter is policy-gated in
-T-11 but never emits outbound traffic on its own). The baselines diverge
-once M9/M10/M11 introduce tier-gated reverse-geocode, POI, and tile
-surfaces — that is when this harness earns its keep.
+Every baseline boots with the same Recommended decisions, so the
+differences between levels come from level-specific handling (for example
+how many POI tiles a level fetches), not from which services are allowed.
 
 The captured pattern excludes the `other` bucket: dev-mode Vite serves
 every ES module individually and that count would thrash on every
@@ -138,20 +140,20 @@ tests/privacy-harness/
 ├── assertNetworkPattern.ts    ← record + classify + assert (T-X-4a)
 ├── snapshot.ts                ← captureNetworkPatternAt() (T-X-4b)
 ├── baseline.spec.ts           ← per-level baseline scenario (T-X-4b)
+├── service-alerts.spec.ts     ← alerts wait for a grant and name only the city
+├── referrer.spec.ts           ← no request carries the page address as referrer
+├── smoke.spec.ts              ← guards the harness primitives themselves
 ├── playwright.config.ts       ← scoped config for baseline snapshots (T-X-4b)
 └── __snapshots__/             ← per-level golden files (T-X-4b)
 ```
 
-## Wiring into CI
+## Running
 
-The `performance` job in `.github/workflows/ci.yml` runs
-`pnpm --filter @pt/frontend test:privacy-harness` on every push and pull
-request. A diff against any golden in `__snapshots__/` fails the job; the
-smoke spec also runs under this script and guards the harness primitives
-themselves.
-
-Run locally before pushing:
+No CI job runs this harness yet. Run it locally before pushing changes that
+add or gate a network request:
 
 ```sh
 pnpm --filter @pt/frontend test:privacy-harness
 ```
+
+A diff against any golden in `__snapshots__/` fails the run.

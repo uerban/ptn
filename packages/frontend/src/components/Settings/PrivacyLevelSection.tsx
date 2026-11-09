@@ -7,6 +7,7 @@ import {
 import { CarriedOverOverrides } from "./CarriedOverOverrides.tsx";
 import { NetworkDecisionsSection } from "./NetworkDecisionsSection.tsx";
 import { PolicyAxisControl } from "./PolicyAxisControl.tsx";
+import { PrivacyStatusSummary } from "./PrivacyStatusSummary.tsx";
 import { ThirdPartyProvidersSection } from "./ThirdPartyProvidersSection.tsx";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
 import { useTranslation, usePrivacyNamespace } from "../../i18n/index.ts";
@@ -16,27 +17,27 @@ const LEVEL_FALLBACKS: Record<PrivacyLevel, { name: string; description: string 
   baseline: {
     name: "Baseline",
     description:
-      "Default posture. If enabled, recents are encrypted on this device, and saves are always encrypted. Third-party geocoding is allowed and error reporting is on. Fastest and most convenient.",
+      "Least protection. History is kept until you delete it, map taps and shared links keep exact positions, and error reports are kept.",
   },
   standard: {
     name: "Standard",
     description:
-      "If enabled, recents are encrypted and the remembered map area is snapped to a stop centroid. Shared coordinates are rounded. Recommended default for most users.",
+      "Recommended. Map taps are snapped to the nearest stop and shared links use rounded positions. The city's place data downloads once instead of as you pan.",
   },
   hardened: {
     name: "Hardened",
     description:
-      "No third-party geocoding. Saves always encrypted. Map taps rounded to a 50 m grid. URL share omits coordinates. Error reporting off.",
+      "History is kept for 30 days. Map taps are rounded to 50 m, shared links leave out coordinates, and error reports are off. Place data requests come with cover requests.",
   },
   strict: {
     name: "Strict",
     description:
-      "Self-hosted geocoding disabled. 100 m coarsening floor. If enabled, recents are purged after 7 days. Real-time polling only in the foreground.",
+      "History is kept for 7 days. Stops are not personalized by how often you use them. Saved places cannot be exported. Shared links leave out coordinates. Place data requests come with cover requests.",
   },
   paranoid: {
     name: "Paranoid",
     description:
-      "If enabled, recents stay in RAM only. Saves can never be exported or shared. Reverse geocoding for map taps is disabled. Real-time polling disabled — schedule-only.",
+      "History stays in memory only. Saved places cannot be exported or shared, and links are not shared. Map taps are not turned into addresses. A cover request is also made every 2–5 minutes while the app is open.",
   },
 };
 
@@ -148,13 +149,28 @@ export function PrivacyLevelSection() {
         <p className="text-xs text-fg-secondary mb-2">
           {t("privacy.disclosure.atRest", DISCLOSURES.atRest)}
         </p>
-        <div className="bg-surface-raised rounded-xl border border-divider">
+        <PrivacyStatusSummary />
+        <h3 id="privacy-level-heading" className="text-sm font-semibold text-fg mt-4 mb-1">
+          {t("privacy.level.title", "Protection level")}
+        </h3>
+        <p id="privacy-level-scope" className="text-xs text-fg-secondary mb-2">
+          {t(
+            "privacy.level.scope",
+            "The level sets what is kept on this device and how precisely. Online services are chosen separately below.",
+          )}
+        </p>
+        <div
+          role="radiogroup"
+          aria-labelledby="privacy-level-heading"
+          aria-describedby="privacy-level-scope"
+          className="bg-surface-raised rounded-xl border border-divider"
+        >
           {PRIVACY_LEVELS.map((lvl) => (
             <label
               key={lvl}
-              className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
+              className="flex items-start justify-between gap-3 px-4 py-3 min-h-11 border-b border-divider last:border-b-0 cursor-pointer"
             >
-              <span className="flex flex-col gap-0.5">
+              <span className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-sm text-fg">
                   {t(`privacy.level.${lvl}.name`, LEVEL_FALLBACKS[lvl].name)}
                 </span>
@@ -187,6 +203,14 @@ export function PrivacyLevelSection() {
             </label>
           ))}
         </div>
+        <details className="mt-2">
+          <summary className="text-xs text-fg-muted cursor-pointer select-none">
+            {t("privacy.tileDefense.detailSummary", "Place data requests in full detail")}
+          </summary>
+          <p className="text-xs text-fg-secondary mt-1">
+            {t("privacy.disclosure.m11Tiles", DISCLOSURES.m11Tiles)}
+          </p>
+        </details>
       </section>
 
       <section className="space-y-4">
@@ -225,10 +249,6 @@ export function PrivacyLevelSection() {
           "external.place-search": t(
             "privacy.disclosure.m10DedupCache",
             DISCLOSURES.m10DedupCache,
-          ),
-          "external.detailed-basemap": t(
-            "privacy.disclosure.m11Tiles",
-            DISCLOSURES.m11Tiles,
           ),
         }}
       />

@@ -196,7 +196,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
         <span
           key={`${dep.tripId}_${dep.scheduledTime}`}
           data-countdown
-          className={`text-xs font-semibold ${dep.cancelled ? "text-danger line-through opacity-60" : "text-success"}`}
+          className={`text-xs font-semibold ${dep.cancelled ? "text-danger line-through" : "text-success"}`}
         >
           {dep.cancelled ? t("popup.cancelled", "Cancelled") : t("popup.due", "Due")}
         </span>
@@ -209,7 +209,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
             <span
               key={`${dep.tripId}_${dep.scheduledTime}`}
               data-countdown
-              className="text-xs font-medium text-danger line-through opacity-60"
+              className="text-xs font-medium text-danger line-through"
               title={t("popup.cancelled", "Cancelled")}
             >
               {mins}&thinsp;m
@@ -282,7 +282,7 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
     return (
       <div
         data-testid="schedule-row"
-        className="flex items-center justify-between opacity-60"
+        className="flex items-center justify-between"
         style={{ padding: "var(--variant-row-pad)", fontSize: "var(--variant-meta-text-size)" }}
       >
         <span data-testid="scheduled-time" data-countdown className="text-danger line-through">{clockTime}</span>

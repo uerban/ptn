@@ -15,11 +15,9 @@ function seed(key: string, state: Record<string, unknown>): void {
 }
 
 function classified(): OnboardingRecord {
-  const result = classifyInstallation(localStorage, 1000);
-  if (result.status !== "classified" && result.status !== "already-classified") {
-    throw new Error(`unexpected ${result.status}`);
-  }
-  return result.record;
+  const record = classifyInstallation(localStorage);
+  if (!record) throw new Error("storage unavailable");
+  return record;
 }
 
 function flows(record: OnboardingRecord): Record<string, string> {
@@ -37,7 +35,6 @@ describe("classifyInstallation", () => {
     const record = classified();
     expect(record.install.kind).toBe("new");
     expect(record.decisions).toBeNull();
-    expect(record.legacyMigrated).toBe(false);
     expect(readOnboardingRecord().status).toBe("ok");
   });
 
@@ -45,7 +42,8 @@ describe("classifyInstallation", () => {
     seed("ptn-city", { activeCity: { id: "gdansk" } });
     const record = classified();
     expect(record.install.kind).toBe("new");
-    expect(record.install.preselectedCityId).toBe("gdansk");
+    // Stored under its former id; preselected under the current one.
+    expect(record.install.preselectedCityId).toBe("tricity");
   });
 
   it.each([
@@ -58,22 +56,18 @@ describe("classifyInstallation", () => {
     localStorage.setItem(key, key === "ptn-privacy-data-migration" ? "1" : "{}");
     const record = classified();
     expect(record.install.kind).toBe("existing");
-    expect(record.legacyMigrated).toBe(true);
     expect(record.applied).toBe(false);
   });
 
   it("keeps the first classification after setup writes store state and the page reloads", () => {
     expect(classified().install.kind).toBe("new");
+    const text = localStorage.getItem(ONBOARDING_RECORD_KEY);
     // Setup writes preference stores (e.g. through the language picker)...
     seed("ptn-settings", { language: "pl" });
     seed("ptn-privacy", { level: "standard", overrides: {} });
     // ...and a reload mid-setup classifies again.
-    const result = classifyInstallation(localStorage, 2000);
-    expect(result.status).toBe("already-classified");
-    if (result.status === "already-classified") {
-      expect(result.record.install.kind).toBe("new");
-      expect(result.record.install.classifiedAt).toBe(1000);
-    }
+    expect(classifyInstallation(localStorage)?.install.kind).toBe("new");
+    expect(localStorage.getItem(ONBOARDING_RECORD_KEY)).toBe(text);
   });
 
   it("does not trust a corrupt record: setup runs again and nothing is granted", () => {
@@ -98,7 +92,7 @@ describe("classifyInstallation", () => {
         throw new Error("denied");
       },
     };
-    expect(classifyInstallation(broken, 1).status).toBe("unavailable");
+    expect(classifyInstallation(broken)).toBeNull();
   });
 
   it("reads stored network overrides that store hydration would drop", () => {
@@ -108,7 +102,6 @@ describe("classifyInstallation", () => {
     });
     seed("ptn-settings", { mapDetailMode: "detailed" });
     const record = classified();
-    expect(record.install.legacy?.network.realTimePolling).toBe("disabled-schedule-only");
     expect(flows(record)["operator.realtime"]).toBe("denied");
     expect(flows(record)["external.detailed-basemap@carto"]).toBe("allowed");
   });
@@ -117,8 +110,7 @@ describe("classifyInstallation", () => {
     seed("ptn-privacy", { level: "strict", overrides: {} });
     const first = classified();
     const text = localStorage.getItem(ONBOARDING_RECORD_KEY);
-    const again = classifyInstallation(localStorage, 5000);
-    expect(again.status).toBe("already-classified");
+    classifyInstallation(localStorage);
     expect(localStorage.getItem(ONBOARDING_RECORD_KEY)).toBe(text);
     expect(first.legacyOverrides).toEqual({ m11TileDefense: "prefetch-padding-decoy" });
   });
@@ -247,5 +239,55 @@ describe("mapLegacyNetworkDecisions", () => {
     expect(mapLegacyNetworkDecisions(standard, {})["operator.place-search"]?.value).toBe(
       "allowed",
     );
+  });
+
+  it("place search on the server stays off where residency was local-only", () => {
+    expect(
+      mapLegacyNetworkDecisions(LEGACY_NETWORK_FLOORS_V1.hardened, {})["operator.place-search"]
+        ?.value,
+    ).toBe("denied");
+    expect(
+      mapLegacyNetworkDecisions({ ...standard, poiResidency: "local-only" }, {})[
+        "operator.place-search"
+      ]?.value,
+    ).toBe("denied");
+  });
+});
+
+describe("legacy place search protections", () => {
+  it("denies place search for a standard install whose residency override was local-only", () => {
+    seed("ptn-privacy", { level: "standard", overrides: { poiResidency: "local-only" } });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
+
+  it("denies place search for a hardened install", () => {
+    seed("ptn-privacy", { level: "hardened", overrides: {} });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
+
+  it("keeps geocoder hints coarsened where an always-coarsen override was stored", () => {
+    for (const level of ["baseline", "standard"]) {
+      localStorage.clear();
+      seed("ptn-privacy", { level, overrides: { m9SelfHosted: "always-coarsen" } });
+      const record = classified();
+      expect(record.legacyOverrides).toEqual({ m10CoarsenGridFloorMeters: 50 });
+      expect(flows(record)["operator.place-search"]).toBe("allowed");
+    }
+  });
+
+  it("adds no coarsening floor where the level or a stored floor already coarsens", () => {
+    seed("ptn-privacy", { level: "hardened", overrides: { m9SelfHosted: "always-coarsen" } });
+    expect(classified().legacyOverrides).toEqual({});
+    localStorage.clear();
+    seed("ptn-privacy", {
+      level: "standard",
+      overrides: { m9SelfHosted: "always-coarsen", m10CoarsenGridFloorMeters: 100 },
+    });
+    expect(classified().legacyOverrides).toEqual({});
+  });
+
+  it("adds no coarsening floor without an always-coarsen override", () => {
+    seed("ptn-privacy", { level: "standard", overrides: {} });
+    expect(classified().legacyOverrides).toEqual({});
   });
 });

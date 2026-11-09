@@ -22,6 +22,8 @@
  *        served from the cache; the \bgtfs\b anchor prevents stealing
  *        /departures-for-stop /stops /version)
  *   5. address-search endpoints — NetworkOnly (verified + stored in IDB)
+ *   5a. service alerts — NetworkOnly (kept in memory only; a replayed answer
+ *        would hide a failed refresh)
  *   5b. micromap artifacts — CacheFirst
  *   5c. managed OSM discovery/artifacts — NetworkOnly (verified IDB fallback)
  *   6. /api/ catch-all — NetworkFirst
@@ -73,12 +75,12 @@ export const runtimeCaching = [
     // keeps them for offline use. Anchored on the exact chunk names and the
     // bundled glyph directory.
     urlPattern:
-      /\/(?:assets\/(?:vendor-map|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
+      /\/(?:assets\/(?:vendor-map|maplibre|maplibre-gl-worker)-[A-Za-z0-9_-]+\.js|glyphs\/[^/?#]+\/[^/?#]+\.pbf)$/,
     handler: "CacheFirst" as const,
     options: {
       cacheName: "map-assets",
       expiration: {
-        // One deploy's chunk, worker and glyph ranges, plus superseded hashes.
+        // One deploy's map chunks, worker and glyph ranges, plus superseded hashes.
         maxEntries: 16,
         maxAgeSeconds: 60 * 60 * 24 * 90,
       },
@@ -148,6 +150,14 @@ export const runtimeCaching = [
     // addressSearchLoader. The service worker must not replay stale manifest,
     // bundle, or query responses from the generic API cache.
     urlPattern: /\/api\/[^/]+\/address-search(?:[/?#]|$)/,
+    handler: "NetworkOnly" as const,
+  },
+  {
+    // Service alerts live in memory only and carry their own freshness
+    // (`stale`, `fetchedAt`). Under the /api/ catch-all a failed refresh fell
+    // back to an answer up to an hour old that the client then showed as
+    // just checked; it must see the failure instead.
+    urlPattern: /\/api\/[^/]+\/alerts(?:[/?#]|$)/,
     handler: "NetworkOnly" as const,
   },
   {

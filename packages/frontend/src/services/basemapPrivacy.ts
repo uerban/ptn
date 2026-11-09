@@ -106,9 +106,16 @@ export function guardMapRequest(
   isAllowed: (providerId: string) => boolean = isExternalBasemapAllowed,
 ): string | undefined {
   if (url.startsWith("data:") || url.startsWith("blob:")) return undefined;
-  if (url.startsWith(`${origin}/`) || url.startsWith("/")) return undefined;
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) return undefined;
-  const provider = basemapProviderForUrl(url);
+  let resolved: URL;
+  try {
+    resolved = new URL(url, origin);
+  } catch {
+    return emptyResource(url, resourceType);
+  }
+  // Relative and protocol-relative URLs are judged by where they resolve,
+  // so "//elsewhere.example/x" is cross-origin like any absolute URL.
+  if (resolved.origin === origin) return undefined;
+  const provider = basemapProviderForUrl(resolved.href);
   if (provider && isAllowed(provider.id)) return undefined;
   return emptyResource(url, resourceType);
 }

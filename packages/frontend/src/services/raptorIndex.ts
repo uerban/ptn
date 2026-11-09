@@ -14,6 +14,10 @@ export interface RaptorIndexRoute {
   mode: TransportMode;
   color?: string;
   textColor?: string;
+  /** GTFS `agency_id` and `route_type`, when the source carried them
+   * (matching service alerts); never consulted by the RAPTOR scan. */
+  agencyId?: string;
+  routeType?: number;
   stopIds: string[];
   trips: {
     tripId: string;
@@ -286,6 +290,8 @@ interface Raw {
     mode: TransportMode;
     color?: string;
     textColor?: string;
+    agencyId?: string;
+    routeType?: number;
     stopIds: string[];
     directionPatterns?: RouteDirectionPattern[];
     /**
@@ -631,6 +637,8 @@ export function hydrate(
     mode: r.mode,
     color: r.color,
     textColor: r.textColor,
+    ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
+    ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
     stopIds: r.stopIds,
     trips: (r.trips ?? [])
       .slice()
@@ -812,6 +820,8 @@ export function rawFromBundle(
     mode: r.mode as TransportMode,
     color: r.color,
     textColor: r.textColor,
+    ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
+    ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
     stopIds: r.stopIds,
     directionPatterns: r.directionPatterns,
     // Inline trips for THIS record only (per-pattern safe — no id regroup).

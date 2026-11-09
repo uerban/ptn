@@ -32,11 +32,14 @@ vi.mock("../../src/utils/buildLinePatterns.ts", () => ({
 }));
 
 // Don't actually initialize the GTFS store (no fetch in tests).
-vi.mock("../../src/stores/gtfsDataStore.ts", () => ({
-  useGtfsDataStore: {
-    getState: () => ({ init: vi.fn() }),
-  },
-}));
+vi.mock("../../src/stores/gtfsDataStore.ts", () => {
+  const state = { init: vi.fn(), raptorIndex: null };
+  const useGtfsDataStore = Object.assign(
+    (selector: (s: typeof state) => unknown) => selector(state),
+    { getState: () => state },
+  );
+  return { useGtfsDataStore };
+});
 
 import { LinePreviewPage } from "../../src/pages/LinePreview.tsx";
 import { useRtStore } from "../../src/stores/rtStore.ts";

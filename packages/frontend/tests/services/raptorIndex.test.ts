@@ -345,6 +345,21 @@ describe("buildRaptorIndex — gtfsBundle blob path", () => {
   });
 });
 
+describe("hydrate — route metadata", () => {
+  it.each([PatternMode.Off, PatternMode.Unbounded])(
+    "keeps each route's agency and GTFS route type in %s mode",
+    (mode) => {
+      const ptb = loadPtb(readFileSync(FREQUENCIES_FIXTURE));
+      const index = hydrate(rawFromBundle(ptbBundleToWire(ptb, mode), mode), undefined, mode);
+      for (const route of index.routes) {
+        const source = ptb.routes.find((r) => r.routeId === route.id)!;
+        expect(route.routeType).toBe(source.routeType);
+        expect(route.agencyId).toBe(source.agencyId || undefined);
+      }
+    },
+  );
+});
+
 describe("hydrate — frequency windows", () => {
   it("keeps PTB global ordinals distinct from route-local sorted trip positions", () => {
     const wire: RaptorBundleWire = {

@@ -50,6 +50,7 @@ const PTN_RUNTIME_CACHE_NAMES = new Set([
   "api-general-cache",
   "carto-style",
   "carto-tiles",
+  "map-assets",
 ]);
 
 /** Versioned runtime caches (see `src/sw/runtimeCaching.ts`). Matching the

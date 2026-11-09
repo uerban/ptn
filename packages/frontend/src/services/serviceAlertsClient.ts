@@ -20,6 +20,7 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 import {
+  ALERT_SEVERITIES,
   SERVICE_ALERTS_SCHEMA_VERSION,
   type Alert,
   type ServiceAlertsResponse,
@@ -50,15 +51,12 @@ export type ServiceAlertsStatus =
   /** The last request failed; `response` may still hold an older answer. */
   | "failed";
 
-export type ServiceAlertsError = "network" | "http" | "invalid" | "not-ready";
-
 export interface ServiceAlertsSnapshot {
   readonly city: string;
   readonly status: ServiceAlertsStatus;
   readonly response?: ServiceAlertsResponse;
   /** Epoch ms of the last successful check (200 or 304). */
   readonly checkedAt?: number;
-  readonly error?: ServiceAlertsError;
 }
 
 export interface ServiceAlertsClientOptions {
@@ -97,6 +95,8 @@ function isTextList(value: unknown): boolean {
   );
 }
 
+const SEVERITIES: ReadonlySet<string> = new Set(ALERT_SEVERITIES);
+
 function isAlert(value: unknown): value is Alert {
   if (!value || typeof value !== "object") return false;
   const alert = value as Record<string, unknown>;
@@ -130,7 +130,12 @@ export function parseServiceAlertsResponse(
     city,
     fetchedAt: raw.fetchedAt,
     stale: raw.stale,
-    alerts: raw.alerts.filter(isAlert),
+    // A severity this client does not know reads as unknown.
+    alerts: raw.alerts
+      .filter(isAlert)
+      .map((alert) =>
+        SEVERITIES.has(alert.severity) ? alert : { ...alert, severity: "UNKNOWN" as const },
+      ),
   };
 }
 
@@ -257,38 +262,7 @@ class CityAlertsFeed {
     if (!this.canRequest()) return;
     const controller = new AbortController();
     this.controller = controller;
-    const headers = new Headers();
-    if (this.etag) headers.set("If-None-Match", this.etag);
-    let outcome: {
-      error?: ServiceAlertsError;
-      response?: ServiceAlertsResponse;
-      notModified?: boolean;
-      etag?: string;
-    };
-    try {
-      const res = await options.fetch(alertsUrl(this.city), {
-        headers,
-        signal: controller.signal,
-        // The page URL can name a stop, line or place (`/line/<id>`,
-        // `/search?…`); the request must name only the city.
-        referrerPolicy: "no-referrer",
-        credentials: "omit",
-      });
-      if (res.status === 304 && this.snapshot.response) {
-        outcome = { notModified: true };
-      } else if (res.status === 503) {
-        outcome = { error: "not-ready" };
-      } else if (!res.ok) {
-        outcome = { error: "http" };
-      } else {
-        const response = parseServiceAlertsResponse(await res.json(), this.city);
-        outcome = response
-          ? { response, etag: res.headers.get("ETag") ?? undefined }
-          : { error: "invalid" };
-      }
-    } catch {
-      outcome = { error: "network" };
-    }
+    const outcome = await this.fetchAlerts(controller.signal);
     // Apply only if nothing revoked or replaced this request meanwhile.
     if (!this.stillWanted(controller)) {
       if (this.controller === controller) this.controller = undefined;
@@ -297,8 +271,8 @@ class CityAlertsFeed {
     this.controller = undefined;
     const now = options.now();
     this.lastAttemptAt = now;
-    if (outcome.error) {
-      this.set({ ...this.snapshot, status: "failed", error: outcome.error });
+    if (outcome.failed) {
+      this.set({ ...this.snapshot, status: "failed" });
     } else if (outcome.notModified) {
       this.set({
         city: this.city,
@@ -320,6 +294,44 @@ class CityAlertsFeed {
     }
   }
 
+  private async fetchAlerts(signal: AbortSignal): Promise<{
+    failed?: true;
+    response?: ServiceAlertsResponse;
+    notModified?: true;
+    etag?: string;
+  }> {
+    try {
+      let res = await this.send(signal);
+      if (res.status === 304 && !this.snapshot.response) {
+        // Nothing held to keep (dropped after a revocation in the meantime):
+        // ask once more for the full answer.
+        this.etag = undefined;
+        res = await this.send(signal);
+      }
+      if (res.status === 304 && this.snapshot.response) return { notModified: true };
+      if (!res.ok) return { failed: true };
+      const response = parseServiceAlertsResponse(await res.json(), this.city);
+      return response
+        ? { response, etag: res.headers.get("ETag") ?? undefined }
+        : { failed: true };
+    } catch {
+      return { failed: true };
+    }
+  }
+
+  private send(signal: AbortSignal): Promise<Response> {
+    const headers = new Headers();
+    if (this.etag) headers.set("If-None-Match", this.etag);
+    return options.fetch(alertsUrl(this.city), {
+      headers,
+      signal,
+      // The page URL can name a stop, line or place (`/line/<id>`,
+      // `/search?…`); the request must name only the city.
+      referrerPolicy: "no-referrer",
+      credentials: "omit",
+    });
+  }
+
   private abort(): void {
     this.controller?.abort();
     this.controller = undefined;
@@ -335,8 +347,7 @@ class CityAlertsFeed {
     if (
       prev.status === next.status &&
       prev.response === next.response &&
-      prev.checkedAt === next.checkedAt &&
-      prev.error === next.error
+      prev.checkedAt === next.checkedAt
     ) {
       return;
     }

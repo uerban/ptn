@@ -124,6 +124,19 @@ describe("health probes are never served from cache", () => {
   });
 });
 
+describe("service alerts are never served from cache", () => {
+  it("routes /api/<city>/alerts to a NetworkOnly rule before the /api/ catch-all", () => {
+    const rule = firstMatch("/api/tricity/alerts");
+    expect(rule?.handler).toBe("NetworkOnly");
+    expect(rule?.urlPattern.source).toContain("alerts");
+    expect(firstMatch("https://example.org/api/tricity/alerts?x=1")?.handler).toBe("NetworkOnly");
+  });
+
+  it("does not steal sibling API routes", () => {
+    expect(firstMatch("/api/tricity/alerts-archive")?.urlPattern.source).not.toContain("alerts");
+  });
+});
+
 describe("address-search NetworkOnly rule", () => {
   it("matches /api/<city>/address-search query requests", () => {
     expect(firstMatch("/api/vilnius/address-search?q=Kudirkos")).toBe(

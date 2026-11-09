@@ -6,7 +6,7 @@ import { PinnedSavesSection, type ResolvedSave } from "./PinnedSavesSection.tsx"
 import { restoreSave, saveRoutePair, type SavePayload } from "../../services/saves.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
-import { rawTableText, resetPersonalStorage } from "../../test-helpers/personalStorage.ts";
+import { findLeaks, rawTableText, resetPersonalStorage } from "../../test-helpers/personalStorage.ts";
 
 type SeedSave = Omit<SavePayload, "alias" | "savedAt"> & { id: string; alias: string; savedAt: number };
 
@@ -96,9 +96,7 @@ describe("PinnedSavesSection", () => {
       { now: () => 9_000, id: "pair-1" },
     );
     const raw = await rawTableText("savedLocations");
-    expect(raw).not.toContain("Daily");
-    expect(raw).not.toContain("Długa");
-    expect(raw).not.toContain("Central");
+    expect(findLeaks(raw, ["Daily", "Długa", "Central"])).toEqual([]);
 
     const onSelect = vi.fn();
     render(<PinnedSavesSection onSelect={onSelect} />);

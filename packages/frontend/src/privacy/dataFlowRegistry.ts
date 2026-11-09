@@ -464,6 +464,11 @@ const DATA_FLOW_BY_ID = new Map(
   DATA_FLOW_REGISTRY.map((flow) => [flow.id, flow] as const),
 );
 
+/** The registered description of a flow, if it has one. */
+export function findDataFlow(id: string): Readonly<PrivacyDataFlowDescriptor> | undefined {
+  return DATA_FLOW_BY_ID.get(id as PrivacyDataFlowId);
+}
+
 export function getDataFlow(
   id: PrivacyDataFlowId,
 ): Readonly<PrivacyDataFlowDescriptor> {

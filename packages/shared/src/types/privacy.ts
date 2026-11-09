@@ -28,6 +28,15 @@ export const PRIVACY_LEVELS: readonly PrivacyLevel[] = [
   "paranoid",
 ] as const;
 
+export function isPrivacyLevel(value: unknown): value is PrivacyLevel {
+  return typeof value === "string" && (PRIVACY_LEVELS as readonly string[]).includes(value);
+}
+
+/** Negative when `a` is less strict than `b`, zero when equal, else positive. */
+export function compareLevels(a: PrivacyLevel, b: PrivacyLevel): number {
+  return PRIVACY_LEVELS.indexOf(a) - PRIVACY_LEVELS.indexOf(b);
+}
+
 export interface PrivacyPolicy {
   /** Personal records are always encrypted when persisted; levels only
    * choose retention or keeping them for the session alone. */
@@ -449,6 +458,28 @@ export const PROTECTION_AXES: readonly ProtectionAxis[] = Object.freeze(
 
 export function isProtectionAxis(axis: string): axis is ProtectionAxis {
   return (PROTECTION_AXES as readonly string[]).includes(axis);
+}
+
+/** True when `value` is a valid value for `axis`. */
+export function isValidAxisValue<K extends keyof PrivacyPolicy>(
+  axis: K,
+  value: unknown,
+): value is PrivacyPolicy[K] {
+  const order = AXIS_STRICTNESS_ORDER[axis];
+  if (order.kind === "numeric") {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0;
+  }
+  return (order.values as readonly unknown[]).includes(value);
+}
+
+/** Keep only protection overrides whose value is valid for the axis. */
+export function sanitizeProtectionOverrides(raw: unknown): Partial<ProtectionPolicy> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: Record<string, unknown> = {};
+  for (const [axis, value] of Object.entries(raw)) {
+    if (isProtectionAxis(axis) && isValidAxisValue(axis, value)) result[axis] = value;
+  }
+  return result as Partial<ProtectionPolicy>;
 }
 
 /** Protection policy of a level after the override ratchet. Overrides on

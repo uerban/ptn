@@ -84,7 +84,8 @@ describe("LiveTimesNotice", () => {
     const disclosure = screen.getByTestId("flow-disclosure");
     expect(disclosure.textContent).toContain("This app's server");
     expect(disclosure.textContent).toContain("The stop you are viewing");
-    expect(document.activeElement?.textContent).toBe("Show live times");
+    // Focus lands on the prompt, not on Allow: a stray Enter grants nothing.
+    expect(document.activeElement).toBe(disclosure);
 
     fireEvent.click(screen.getByRole("button", { name: "Show live times" }));
     expect(canUse("operator.realtime")).toBe(true);
@@ -109,7 +110,9 @@ describe("LiveTimesNotice", () => {
   it("Escape answers Not now", () => {
     renderNotice();
     fireEvent.click(screen.getByRole("button", { name: "Show live times" }));
-    fireEvent.keyDown(document, { key: "Escape" });
+    // The prompt takes focus in place of the button that opened it.
+    expect(document.activeElement).toBe(screen.getByTestId("flow-disclosure"));
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByTestId("flow-disclosure")).toBeNull();
     expect(useNetworkDecisionsStore.getState().decisions).toEqual({});
   });

@@ -5,9 +5,9 @@ import type { Itinerary } from "@pt/shared";
 
 vi.mock("./ScheduleHome.tsx", () => ({
   ScheduleHome: ({ onShowMap }: { onShowMap: () => void }) => (
-    <main aria-label="Text mode">
+    <section aria-label="Text mode">
       <button type="button" data-return-focus="show-map" onClick={onShowMap}>Show map</button>
-    </main>
+    </section>
   ),
 }));
 vi.mock("../components/Guidance/TextGuidance.tsx", () => ({
@@ -54,7 +54,7 @@ beforeEach(() => {
 describe("TextHome", () => {
   it("shows the text home screen while no trip is on", () => {
     renderHome();
-    expect(screen.getByRole("main", { name: "Text mode" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Text mode" })).toBeTruthy();
     expect(screen.queryByTestId("text-guidance")).toBeNull();
   });
 
@@ -64,7 +64,7 @@ describe("TextHome", () => {
       useGuidanceStore.getState().startNavigation({ legs: [] } as unknown as Itinerary);
     });
     expect(screen.getByTestId("text-guidance")).toBeTruthy();
-    expect(screen.queryByRole("main", { name: "Text mode" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Text mode" })).toBeNull();
   });
 
   it("discloses the map download before Show map opens anything", async () => {

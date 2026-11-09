@@ -20,7 +20,7 @@ beforeEach(async () => {
     "ptn-privacy",
     JSON.stringify({ state: { level: "strict", overrides: {} }, version: 0 }),
   );
-  classifyInstallation(localStorage, 1);
+  classifyInstallation(localStorage);
   await usePrivacyStore.persist.rehydrate();
   await applyPendingOnboardingJournal();
 });

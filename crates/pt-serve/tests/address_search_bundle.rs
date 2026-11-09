@@ -9,7 +9,7 @@
 mod common;
 
 use common::publisher::{self, SidecarArtifacts};
-use pt_serve::app::address_search::bundle;
+use pt_serve::app::address_search::{bundle, manifest};
 use pt_serve::app::response::{ByteBody, Resp};
 use pt_serve::Generation;
 use std::io::Read as _;
@@ -173,6 +173,26 @@ fn if_none_match_304s_in_both_branches() {
                 Resp::NotModified { .. }
             ),
             "If-None-Match must 304 with accept_gzip={accept_gzip}",
+        );
+    }
+}
+
+#[test]
+fn weak_or_proxy_suffixed_if_none_match_304s() {
+    let (_tmp, gen) = gen_with_corpus(Some(corpus_bytes()));
+    let etag = match bundle(&gen, None, false) {
+        Resp::CachedBytes { etag, .. } => etag.expect("etag"),
+        _ => panic!("expected CachedBytes"),
+    };
+    let opaque = etag.trim_matches('"');
+    for header in [format!("W/{etag}"), format!("\"{opaque}-gzip\"")] {
+        assert!(
+            matches!(bundle(&gen, Some(&header), true), Resp::NotModified { .. }),
+            "{header} must 304",
+        );
+        assert!(
+            matches!(manifest(&gen, Some(&header)), Resp::NotModified { .. }),
+            "manifest: {header} must 304",
         );
     }
 }

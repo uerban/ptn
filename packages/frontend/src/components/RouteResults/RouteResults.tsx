@@ -20,6 +20,7 @@ import { RouteResultsAccessible } from "./RouteResultsAccessible.tsx";
 import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
 import { legTargets } from "../../hooks/useServiceAlertSelection.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 
 /** How often the result cards re-read the time. */
 const RESULTS_CLOCK_MS = 10_000;
@@ -122,9 +123,10 @@ export function RouteResults({
   const [savedDurably, setSavedDurably] = useState(true);
   const cityId = useCityStore((s) => s.activeCity.id);
   const cityName = useCityStore((s) => s.activeCity.name);
+  const timetable = useGtfsDataStore((s) => s.raptorIndex);
   const alertTargets = useMemo(
-    () => itineraries.flatMap((it) => it.legs.flatMap(legTargets)),
-    [itineraries],
+    () => itineraries.flatMap((it) => it.legs.flatMap((leg) => legTargets(leg, timetable))),
+    [itineraries, timetable],
   );
 
   const canSavePair = Boolean(origin && destination) && itineraries.length > 0;

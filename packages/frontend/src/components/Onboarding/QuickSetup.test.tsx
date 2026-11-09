@@ -70,4 +70,14 @@ describe("QuickSetup", () => {
     expect(screen.getByText(/reveal the city and timetable area/)).toBeTruthy();
     expect(screen.getByText("You can lower this later in Settings.")).toBeTruthy();
   });
+
+  it("says what starting downloads and what that request reveals, when the data is not here yet", () => {
+    renderQuick({ downloadsCity: true });
+    expect(screen.getByText(/downloads the timetables, stops and lines of Vilnius/).textContent).toMatch(
+      /reveals the city you chose/,
+    );
+    cleanup();
+    renderQuick({ downloadsCity: false });
+    expect(screen.queryByText(/downloads the timetables/)).toBeNull();
+  });
 });

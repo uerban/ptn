@@ -1,15 +1,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createTolerantJSONStorage } from "../services/tolerantLocalStorage.ts";
+import {
+  isOptionalStorageChoice,
+  OPTIONAL_STORAGE_CATEGORIES,
+  type OptionalStorageCategory,
+  type OptionalStorageChoice,
+} from "../services/preferenceValues.ts";
 
-export const OPTIONAL_STORAGE_CATEGORIES = [
-  "recents",
-  "viewport",
-  "personalization",
-] as const;
-
-export type OptionalStorageCategory =
-  (typeof OPTIONAL_STORAGE_CATEGORIES)[number];
-export type OptionalStorageChoice = "unset" | "enabled" | "disabled";
+export {
+  OPTIONAL_STORAGE_CATEGORIES,
+  type OptionalStorageCategory,
+  type OptionalStorageChoice,
+};
 
 export interface OptionalStorageChoices {
   recents: OptionalStorageChoice;
@@ -35,10 +38,6 @@ interface PrivacyChoicesState {
 
 function freshDefaults(): OptionalStorageChoices {
   return { ...DEFAULT_OPTIONAL_STORAGE_CHOICES };
-}
-
-function isOptionalStorageChoice(value: unknown): value is OptionalStorageChoice {
-  return value === "unset" || value === "enabled" || value === "disabled";
 }
 
 function sanitizeChoices(value: unknown): OptionalStorageChoices {
@@ -73,6 +72,7 @@ export const usePrivacyChoicesStore = create<PrivacyChoicesState>()(
     }),
     {
       name: "ptn-privacy-choices",
+      storage: createTolerantJSONStorage(),
       version: 1,
       partialize: (state) => ({ choices: state.choices }),
       // No optional category is accepted unless it contains a current

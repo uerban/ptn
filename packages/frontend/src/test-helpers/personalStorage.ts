@@ -9,8 +9,12 @@ import {
   PERSONAL_STORAGE_MARKER_KEY,
   PERSONAL_STORAGE_VERSION,
   __resetPersonalStorageForTests,
+  __settlePersonalStorageMigrationForTests,
 } from "../services/personalStorage.ts";
-import { __resetSealedLocalStorageForTests } from "../services/sealedLocalStorage.ts";
+import {
+  __resetSealedLocalStorageForTests,
+  isSealedValue,
+} from "../services/sealedLocalStorage.ts";
 import {
   PRIVACY_DATA_MIGRATION_KEY,
   PRIVACY_DATA_MIGRATION_VERSION,
@@ -25,6 +29,7 @@ export interface ResetPersonalStorageOptions {
 export async function resetPersonalStorage(
   opts: ResetPersonalStorageOptions = {},
 ): Promise<void> {
+  await __settlePersonalStorageMigrationForTests();
   if (!db.isOpen()) await db.open();
   await Promise.all([
     db.installKey.clear(),
@@ -47,19 +52,50 @@ export async function resetPersonalStorage(
   }
 }
 
+type Binary = ArrayBuffer | ArrayBufferView;
+
+// Rows read back from IndexedDB hold buffers from another realm, which fail
+// `instanceof ArrayBuffer`; the brand check works across realms.
+function isArrayBuffer(v: unknown): v is ArrayBuffer {
+  return Object.prototype.toString.call(v) === "[object ArrayBuffer]";
+}
+
+function isBinary(v: unknown): v is Binary {
+  return isArrayBuffer(v) || ArrayBuffer.isView(v);
+}
+
+function bytesOf(v: Binary): Uint8Array {
+  return isArrayBuffer(v)
+    ? new Uint8Array(v)
+    : new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+}
+
+/**
+ * Ciphertext buffers (the `iv` and `ct` of an encrypted record) are rendered
+ * as `<sealed:BASE64>` so `findLeaks` can skip them: random bytes can spell a
+ * short needle by chance.
+ */
+const SEALED_BYTES_PATTERN = /<sealed:[A-Za-z0-9+/]*={0,2}>/g;
+
+function isCiphertextHolder(holder: unknown): boolean {
+  if (!holder || typeof holder !== "object") return false;
+  const rec = holder as { iv?: unknown; ct?: unknown };
+  return isBinary(rec.iv) && isBinary(rec.ct);
+}
+
 /** Every raw row of a table, serialised the way a forensic reader would see it. */
 export async function rawTableText(table: string): Promise<string> {
   const rows = await db.table(table).toArray();
-  return JSON.stringify(rows, (_k, v: unknown) => {
-    if (v instanceof ArrayBuffer || ArrayBuffer.isView(v)) {
-      const bytes =
-        v instanceof ArrayBuffer
-          ? new Uint8Array(v)
-          : new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-      // Decode as text so a plaintext label inside a buffer would still show.
-      return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  return JSON.stringify(rows, function (this: unknown, k: string, v: unknown) {
+    if (!isBinary(v)) return v;
+    const bytes = bytesOf(v);
+    if ((k === "iv" || k === "ct") && isCiphertextHolder(this)) {
+      let binary = "";
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return `<sealed:${btoa(binary)}>`;
     }
-    return v;
+    // Decode other buffers as text so a plaintext label inside one would still show.
+    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   });
 }
 
@@ -73,7 +109,31 @@ export function rawLocalStorageText(): string {
   return out.join("\n");
 }
 
-/** Asserts that none of `needles` appears in `haystack`. */
+/** A sealed localStorage envelope as `sealString` writes it. */
+const SEALED_ENVELOPE_PATTERN = /\{"format":"ptn-sealed","v":(\d+),"iv":"[^"]*","ct":"[^"]*"\}/g;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+function blankEnvelope(match: string, v: string): string {
+  if (!isSealedValue(match)) return match;
+  const { iv, ct } = JSON.parse(match) as { iv: string; ct: string };
+  // Only a real base64 payload is ciphertext; anything else stays searchable.
+  if (!BASE64.test(iv) || !BASE64.test(ct)) return match;
+  return `{"format":"ptn-sealed","v":${v},"iv":"","ct":""}`;
+}
+
+/** Removes ciphertext payloads, leaving every other character searchable. */
+export function withoutCiphertext(haystack: string): string {
+  return haystack
+    .replace(SEALED_ENVELOPE_PATTERN, blankEnvelope)
+    .replace(SEALED_BYTES_PATTERN, "<sealed>");
+}
+
+/**
+ * The needles found in `haystack` outside ciphertext payloads (sealed
+ * localStorage envelopes and the encrypted-record buffers `rawTableText`
+ * renders). Expect an empty result.
+ */
 export function findLeaks(haystack: string, needles: readonly string[]): string[] {
-  return needles.filter((n) => haystack.includes(n));
+  const text = withoutCiphertext(haystack);
+  return needles.filter((n) => text.includes(n));
 }

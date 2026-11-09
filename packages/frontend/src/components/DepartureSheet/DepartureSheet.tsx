@@ -4,6 +4,7 @@ import { useDepartures } from "../../hooks/useDepartures.ts";
 import { useFavoritesStore } from "../../stores/favoritesStore.ts";
 import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
 import { LiveTimesNotice } from "./LiveTimesNotice.tsx";
@@ -81,7 +82,11 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, []);
 
   const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
-  const alertTargets = useMemo(() => stopTargets(stop.id, departures), [stop.id, departures]);
+  const timetable = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => stopTargets(stop.id, departures, timetable),
+    [stop.id, departures, timetable],
+  );
 
   const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);
@@ -152,14 +157,15 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
       {/* Drag handle */}
-      <div
+      <button
+        type="button"
         data-testid="sheet-handle"
-        className="flex justify-center pt-2 pb-1 cursor-pointer"
+        className="flex w-full justify-center pt-2 pb-1 min-h-6 cursor-pointer"
         onClick={cycleHeight}
         aria-label={height === "peek" ? "Expand sheet" : height === "half" ? "Expand sheet" : "Collapse sheet"}
       >
-        <div className="w-10 h-1 rounded-full bg-sheet-handle" />
-      </div>
+        <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-sheet-handle" />
+      </button>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-divider">

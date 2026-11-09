@@ -9,6 +9,7 @@ import { Icon } from "../Icon.tsx";
 import { useRegisterMapObstacle } from "../../hooks/useRegisterMapObstacle.ts";
 import { labelFontstack } from "../../map/styleBuilder.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import {
   ServiceAlertsPanel,
   routeTargets,
@@ -91,7 +92,11 @@ export function LineRouteOverlay({ map }: LineRouteOverlayProps) {
   const activeRouteId = useLineViewStore((s) => s.activeRouteId);
   const cityId = useCityStore((s) => s.activeCity.id);
   const cityName = useCityStore((s) => s.activeCity.name);
-  const alertTargets = useMemo(() => routeTargets(activeRouteId), [activeRouteId]);
+  const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => routeTargets(activeRouteId, raptorIndex),
+    [activeRouteId, raptorIndex],
+  );
   const layersAddedRef = useRef(false);
 
   const pattern = patterns[activeDirection] ?? patterns[0] ?? null;

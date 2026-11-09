@@ -75,6 +75,44 @@ describe("withMigrationLock", () => {
     await expect(
       withMigrationLock("m", fn, { locks: null, now: () => 200 }),
     ).resolves.toBe("ran");
+    expect(localStorage.getItem("ptn-lock:m")).toBeNull();
+  });
+
+  it("a holder that outlives its lease never removes the next holder's lease", async () => {
+    let clock = 0;
+    const now = () => clock;
+    let finishFirst!: () => void;
+    const first = withMigrationLock(
+      "m",
+      () => new Promise<void>((resolve) => (finishFirst = resolve)),
+      { locks: null, now, leaseMs: 100 },
+    );
+    await Promise.resolve();
+    expect(JSON.parse(localStorage.getItem("ptn-lock:m")!).expires).toBe(100);
+
+    // The first holder stalls past its lease; a second tab takes over.
+    clock = 150;
+    let secondRunning = false;
+    let finishSecond!: () => void;
+    const second = withMigrationLock(
+      "m",
+      () =>
+        new Promise<void>((resolve) => {
+          secondRunning = true;
+          finishSecond = resolve;
+        }),
+      { locks: null, now, leaseMs: 100, sleep: async () => {} },
+    );
+    await vi.waitFor(() => expect(secondRunning).toBe(true));
+    const secondLease = localStorage.getItem("ptn-lock:m");
+
+    finishFirst();
+    await first;
+    expect(localStorage.getItem("ptn-lock:m")).toBe(secondLease);
+
+    finishSecond();
+    await second;
+    expect(localStorage.getItem("ptn-lock:m")).toBeNull();
   });
 
   it("runs without coordination when storage is unavailable", async () => {

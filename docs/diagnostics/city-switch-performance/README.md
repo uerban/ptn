@@ -249,7 +249,9 @@ Costs introduced by the feature that do warrant separate attention:
   download, or falling back after an online error.
 - `listDeviceCities()` uses `offlineCities.toArray()`, cloning **all package
   contents** merely to list names/metadata. `chooseInitialCity` calls it before
-  its online saved-city early return, and the Settings download section calls it
+  its online saved-city early return (start-up now goes through
+  `setup/startupGate.ts`, which still calls it while deciding whether first-run
+  setup is needed), and the Settings download section calls it
   when mounted/refreshed. This can make startup/Settings scale poorly with
   retained city count, but it is not called on each ordinary map pan/city switch.
 - Transfers are now retained and verified through `offlineTransfers`, adding a

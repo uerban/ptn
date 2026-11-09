@@ -40,29 +40,24 @@ import {
   type PersonalStorageFailure,
   type PersonalTable,
 } from "./personalStorage.ts";
-import { LEGACY_FAVORITES_KEY } from "./favoritesMigration.ts";
-import {
-  DELAY_REPORTS_STORAGE_KEY,
-  MAP_VIEWPORT_STORAGE_KEY,
-} from "./privacyStorageKeys.ts";
+import { SEALED_LOCAL_STORAGE_KEYS } from "./privacyStorageKeys.ts";
 import { runPrivacyDataMigration } from "./privacyDataMigration.ts";
 import { isPrivacyDataMigrationComplete } from "./privacyDataMigrationState.ts";
 import type { RecentPayload } from "./recents.ts";
 import type { SavePayload } from "./saves.ts";
 import { isSealedValue, openSealedString, sealString } from "./sealedLocalStorage.ts";
-import { canonicalCityId } from "../utils/cityId.ts";
+import { canonicalCityId, readStoredCityId } from "../utils/cityId.ts";
 
-/** A legacy row's city, moved inside the sealed payload. */
-function legacyCity(cityId: unknown): { cityId?: string } {
-  return typeof cityId === "string" && cityId ? { cityId: canonicalCityId(cityId) } : {};
+/**
+ * A legacy row's city, moved inside the sealed payload. Rows written before
+ * records carried a city take the city selected when the migration runs, so
+ * they stay visible there; they stay untagged only when no city is known.
+ */
+function legacyCity(cityId: unknown, fallbackCityId: string | null): { cityId?: string } {
+  if (typeof cityId === "string" && cityId) return { cityId: canonicalCityId(cityId) };
+  return fallbackCityId ? { cityId: fallbackCityId } : {};
 }
 
-/** localStorage values holding personal state, sealed by this migration. */
-export const SEALED_LOCAL_STORAGE_KEYS: readonly string[] = [
-  LEGACY_FAVORITES_KEY,
-  DELAY_REPORTS_STORAGE_KEY,
-  MAP_VIEWPORT_STORAGE_KEY,
-];
 
 /** Response caches whose entries reveal stops, departures or map areas viewed. */
 export const ACTIVITY_CACHE_PREFIXES: readonly string[] = [
@@ -172,7 +167,11 @@ async function openLegacy<T>(
   return isEncryptedShape(value) ? ((await decrypt(value, key)) as T) : value;
 }
 
-async function convertRecents(key: CryptoKey, opts: PersonalStorageMigrationOptions) {
+async function convertRecents(
+  key: CryptoKey,
+  opts: PersonalStorageMigrationOptions,
+  currentCityId: string | null,
+) {
   const rows = (await db.recentLocations.toArray()) as unknown[];
   for (const raw of rows) {
     if (isSealedRow(raw)) continue;
@@ -183,7 +182,7 @@ async function convertRecents(key: CryptoKey, opts: PersonalStorageMigrationOpti
         endpoint: await openLegacy<BaseEndpoint>(legacy.endpoint, key),
         usedAt: typeof legacy.usedAt === "number" ? legacy.usedAt : 0,
         usedAsOrigin: legacy.usedAsOrigin === true,
-        ...legacyCity(legacy.cityId),
+        ...legacyCity(legacy.cityId, currentCityId),
       };
     } catch {
       value = { unreadableLegacy: true, row: toSealable(legacy) };
@@ -199,7 +198,11 @@ async function convertRecents(key: CryptoKey, opts: PersonalStorageMigrationOpti
   }
 }
 
-async function convertSaves(key: CryptoKey, opts: PersonalStorageMigrationOptions) {
+async function convertSaves(
+  key: CryptoKey,
+  opts: PersonalStorageMigrationOptions,
+  currentCityId: string | null,
+) {
   const rows = (await db.savedLocations.toArray()) as unknown[];
   for (const raw of rows) {
     if (isSealedRow(raw)) continue;
@@ -221,7 +224,7 @@ async function convertSaves(key: CryptoKey, opts: PersonalStorageMigrationOption
         alias,
         savedAt: typeof legacy.savedAt === "number" ? legacy.savedAt : 0,
         ...(legacy.pinColor !== undefined ? { pinColor: legacy.pinColor } : {}),
-        ...legacyCity(legacy.cityId),
+        ...legacyCity(legacy.cityId, currentCityId),
       };
     } catch {
       value = { unreadableLegacy: true, row: toSealable(legacy) };
@@ -234,7 +237,11 @@ async function convertSaves(key: CryptoKey, opts: PersonalStorageMigrationOption
   }
 }
 
-async function convertUsage(key: CryptoKey, opts: PersonalStorageMigrationOptions) {
+async function convertUsage(
+  key: CryptoKey,
+  opts: PersonalStorageMigrationOptions,
+  currentCityId: string | null,
+) {
   const rows = (await db.usageStats.toArray()) as UsageStatRecord[];
   for (const legacy of rows) {
     const sealed = await sealVerified(
@@ -259,7 +266,7 @@ async function convertUsage(key: CryptoKey, opts: PersonalStorageMigrationOption
       newPersonalId(),
       {
         stopId: legacy.stopId,
-        ...legacyCity(legacy.cityId),
+        ...legacyCity(legacy.cityId, currentCityId),
         tapCount: typeof legacy.tapCount === "number" ? legacy.tapCount : 0,
         lastTapped: typeof legacy.lastTapped === "number" ? legacy.lastTapped : 0,
       },
@@ -361,9 +368,10 @@ async function convertAll(
         "The install key cannot be stored on this device",
       );
     }
-    await convertRecents(key, opts);
-    await convertSaves(key, opts);
-    await convertUsage(key, opts);
+    const currentCityId = readStoredCityId(storage);
+    await convertRecents(key, opts, currentCityId);
+    await convertSaves(key, opts, currentCityId);
+    await convertUsage(key, opts, currentCityId);
     await convertLocalStorage(key, storage, opts);
     if (await hasLegacyData(storage)) {
       throw new PersonalStorageMigrationError("failed", "Plaintext records remain");
@@ -383,7 +391,17 @@ export function runPersonalStorageMigration(
   opts: PersonalStorageMigrationOptions = {},
 ): Promise<PersonalStorageMigrationResult> {
   if (running) return running;
-  const storage = opts.storage ?? globalThis.localStorage;
+  let storage: MigrationStorage;
+  try {
+    // Reading `localStorage` itself throws where site data is blocked.
+    storage = opts.storage ?? globalThis.localStorage;
+    if (!storage) throw new Error("localStorage is not available");
+  } catch {
+    // Nothing durable can be written: personal records stay session-only
+    // and no reader retries the conversion in this session.
+    setPersonalStorageMigrationState("failed", "key-unavailable");
+    return Promise.resolve("failed");
+  }
   if (isPersonalStorageMigrated(storage)) {
     setPersonalStorageMigrationState("complete");
     return Promise.resolve("already-complete");
@@ -419,4 +437,4 @@ export function runPersonalStorageMigration(
   return running;
 }
 
-registerPersonalStorageMigration(() => runPersonalStorageMigration());
+registerPersonalStorageMigration(runPersonalStorageMigration);

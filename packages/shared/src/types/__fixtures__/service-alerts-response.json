@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "city": "vilnius",
+  "fetchedAt": "2027-01-15T08:00:00.000Z",
+  "stale": false,
+  "alerts": [
+    {
+      "id": "a1",
+      "cause": "STRIKE",
+      "effect": "NO_SERVICE",
+      "severity": "SEVERE",
+      "header": [{ "language": "en", "text": "Strike" }],
+      "description": [],
+      "url": [],
+      "activePeriods": [{ "start": "2027-01-15T07:59:00Z", "end": "2027-01-15T09:00:00Z" }],
+      "informedEntities": [{ "routeId": "R1", "directionId": 1 }]
+    }
+  ]
+}

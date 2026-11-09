@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
-import { seedNetworkDecisions } from "../helpers/setup-complete";
+import { decideAfterSetup } from "../helpers/setup-complete";
 
 const ADAPTER_MODULE = "/src/services/geocoder/ThirdPartyGeocoderAdapter.ts";
 const EARTH_LAT_METERS_PER_DEG = 111_320;
@@ -56,10 +56,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
       await bootAtPrivacyLevel(page, "standard", {
         m10CoarsenGridDefaultMeters: gridMeters,
       });
-      await seedNetworkDecisions(page, {
-        "external.place-search@nominatim": "allowed",
-        "external.place-search@photon": "allowed",
-      });
       await mockApi(page);
 
       const intercepted: Array<{ url: string }> = [];
@@ -70,6 +66,10 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
 
       await page.goto("/");
       await page.waitForLoadState("networkidle");
+      await decideAfterSetup(page, {
+        "external.place-search@nominatim": "allowed",
+        "external.place-search@photon": "allowed",
+      });
 
       await page.evaluate(
         async ({ modulePath, hint, grid }) => {
@@ -111,10 +111,6 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
       await bootAtPrivacyLevel(page, "standard", {
         m10CoarsenGridDefaultMeters: gridMeters,
       });
-      await seedNetworkDecisions(page, {
-        "external.place-search@nominatim": "allowed",
-        "external.place-search@photon": "allowed",
-      });
       await mockApi(page);
 
       const intercepted: Array<{ url: string }> = [];
@@ -125,6 +121,10 @@ test.describe("M10 T-15: Coarsening enforced end-to-end @mock-api", () => {
 
       await page.goto("/");
       await page.waitForLoadState("networkidle");
+      await decideAfterSetup(page, {
+        "external.place-search@nominatim": "allowed",
+        "external.place-search@photon": "allowed",
+      });
 
       await page.evaluate(
         async ({ modulePath, coord, grid }) => {

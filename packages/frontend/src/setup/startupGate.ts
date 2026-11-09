@@ -6,8 +6,11 @@
  */
 import { installCityCatalog, type CityConfig } from "../config/cities.ts";
 import { readOnboardingRecord } from "../services/onboardingRecord.ts";
-import type { CatalogStatus } from "../components/Onboarding/CitySelection.tsx";
-import { planStartup } from "./startupPlan.ts";
+import { safeLocalStorage } from "../services/tolerantLocalStorage.ts";
+import { readStoredCityId } from "../utils/cityId.ts";
+import type { OfflineCityMetadata } from "../db/index.ts";
+import type { CatalogStatus } from "./cityList.ts";
+import { deviceTimeZone, planStartup } from "./startupPlan.ts";
 
 export interface StartupGateInput {
   /** The host's catalog; empty when discovery failed without a cached copy. */
@@ -15,12 +18,9 @@ export interface StartupGateInput {
   readonly catalogWasCached: boolean;
 }
 
-interface DeviceCityRecord {
-  readonly cityId: string;
-  /** Absent on downloads from before download details were listed separately. */
-  readonly city?: CityConfig;
-  readonly sizeBytes?: number;
-}
+/** `city` is absent on downloads from before download details were listed
+ * separately. */
+type DeviceCityRecord = Readonly<Pick<OfflineCityMetadata, "cityId" | "city" | "sizeBytes">>;
 
 interface DeviceCities {
   readonly records: readonly DeviceCityRecord[];
@@ -93,23 +93,10 @@ async function deviceCityConfigs(records: readonly DeviceCityRecord[]): Promise<
 /** The stored city choice, when it names a catalog city. */
 export function restoredCityId(
   cities: readonly CityConfig[],
-  storage: Pick<Storage, "getItem"> | undefined = (() => {
-    try {
-      return globalThis.localStorage;
-    } catch {
-      return undefined;
-    }
-  })(),
+  storage: Pick<Storage, "getItem"> | undefined = safeLocalStorage(),
 ): string | null {
-  try {
-    const saved = JSON.parse(storage?.getItem("ptn-city") ?? "null");
-    // Current stores keep only the id; older ones kept the whole city.
-    const rawId: unknown = saved?.state?.currentCityId ?? saved?.state?.activeCity?.id;
-    const id = rawId === "gdansk" ? "tricity" : rawId;
-    return typeof id === "string" && cities.some((city) => city.id === id) ? id : null;
-  } catch {
-    return null;
-  }
+  const id = readStoredCityId(storage);
+  return id !== null && cities.some((city) => city.id === id) ? id : null;
 }
 
 /** A deep link the user opened, or `null` for the home screen. */
@@ -162,6 +149,7 @@ export async function runStartupGate(input: StartupGateInput): Promise<void> {
     savedCityId: restoredCityId(cities),
     installedCityIds: device.installed,
     offline,
+    timeZone: deviceTimeZone(),
   });
 
   if (plan.kind === "enter") return enterCity(cities, plan.cityId);
@@ -171,6 +159,7 @@ export async function runStartupGate(input: StartupGateInput): Promise<void> {
     mode: plan.mode,
     initialStep: plan.initialStep,
     preselectedCityId: plan.preselectedCityId,
+    suggestedCityId: plan.suggestedCityId ?? null,
     cities,
     downloadedSizes: new Map(
       device.records.flatMap((r) => (r.sizeBytes === undefined ? [] : [[r.cityId, r.sizeBytes] as const])),

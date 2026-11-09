@@ -9,6 +9,12 @@ import {
 import { db } from "../../db/index.ts";
 import { usePersonalStorageStatus } from "../../services/personalStorage.ts";
 import { resetPersonalStorage } from "../../test-helpers/personalStorage.ts";
+import { retryPersonalStorage } from "../../services/personalStorageRecovery.ts";
+
+vi.mock("../../services/personalStorageRecovery.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../services/personalStorageRecovery.ts")>();
+  return { ...actual, retryPersonalStorage: vi.fn(actual.retryPersonalStorage) };
+});
 
 const FORBIDDEN = /\b(secure|safe|vault|locked)\b/i;
 
@@ -87,13 +93,28 @@ describe("PersonalStorageNotice", () => {
     });
   });
 
-  test("delete does nothing when the rider cancels", () => {
+  test("delete does nothing when the rider cancels", async () => {
+    await db.savedLocations.put({ id: "kept", endpoint: { kind: "stop" }, alias: "x", savedAt: 1 } as never);
     usePersonalStorageStatus.setState({ keyMode: "key-unreadable" });
     const confirmFn = vi.fn(() => false);
     render(<PersonalStorageNotice confirmFn={confirmFn} />);
     fireEvent.click(screen.getByRole("button", { name: "Delete saved places and history" }));
     expect(confirmFn).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await db.savedLocations.count()).toBe(1);
     expect(usePersonalStorageStatus.getState().keyMode).toBe("key-unreadable");
+    expect(screen.getByTestId("personal-storage-notice")).toBeDefined();
+  });
+
+  test("Try again retries the key read and the conversion", async () => {
+    usePersonalStorageStatus.setState({ keyMode: "read-failed" });
+    render(<PersonalStorageNotice />);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => {
+      expect(retryPersonalStorage).toHaveBeenCalledTimes(1);
+    });
+    // Let the retry finish before the next test resets storage.
+    await vi.mocked(retryPersonalStorage).mock.results[0].value;
   });
 
   test("unreadable records can be deleted on their own", () => {

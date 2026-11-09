@@ -80,6 +80,14 @@ describe("host-defined runtime cities", () => {
     delete globalThis.__PTN_DEPLOYMENT__;
     expect(deploymentCityConfigs([])?.[0]).toEqual({...runtimeCity, available: true});
   });
+  it("keeps an optional country code and ignores a missing or malformed one", () => {
+    const parse = (extra: Record<string, unknown>) =>
+      runtimeCityConfigs({schemaVersion: 2, cities: [{...runtimeCity, ...extra}]}, [])![0];
+    expect(parse({countryCode: "lv"}).countryCode).toBe("LV");
+    expect(parse({})).not.toHaveProperty("countryCode");
+    expect(parse({countryCode: "Latvia"})).not.toHaveProperty("countryCode");
+    expect(parse({countryCode: 371})).not.toHaveProperty("countryCode");
+  });
   it("rejects invalid metadata instead of silently serving an unrelated default city", () => {
     const bad = [
       {...runtimeCity, tz: "not/a-zone"}, {...runtimeCity, id: "../bad"},

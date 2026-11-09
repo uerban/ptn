@@ -1,10 +1,22 @@
 import { useId, useState } from "react";
-import type { GuidedNetworkChoice, OnboardingPresetId } from "@pt/shared/privacy";
+import {
+  presetDecisions,
+  type GuidedNetworkChoice,
+  type OnboardingPresetId,
+} from "@pt/shared/privacy";
 import type { RealtimeKind } from "@pt/shared/schedule-tile";
 import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
-import { describePreset } from "../../services/onboardingPresets.ts";
+import { findDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import type { StartMode } from "../../services/onboardingRecord.ts";
 import type { SetupStringKey, SetupText } from "../../setup/setupStrings.ts";
+
+/** The flows Recommended turns on, with their shared descriptions. */
+const RECOMMENDED_FLOWS = Object.entries(
+  presetDecisions("recommended"),
+).flatMap(([flowId, value]) => {
+  const flow = value === "allowed" ? findDataFlow(flowId) : undefined;
+  return flow ? [flow] : [];
+});
 
 export interface QuickSetupChoice {
   readonly presetId: OnboardingPresetId;
@@ -20,12 +32,17 @@ export interface QuickSetupProps {
   readonly onChoose: (choice: QuickSetupChoice) => void;
   /** Absent when the city cannot be changed from here. */
   readonly onChangeCity?: () => void;
+  /** The city's transit data is not on this device yet, so starting downloads it. */
+  readonly downloadsCity?: boolean;
   readonly busy: boolean;
   readonly error: string | null;
   readonly text: SetupText;
 }
 
-/** Recommended copy for what the city publishes (D8). */
+/**
+ * Recommended-setup copy for the live data the city publishes: both,
+ * departures only, alerts only, none, or not yet known.
+ */
 export function recommendedSummaryKey(
   kinds: readonly RealtimeKind[] | undefined,
 ): SetupStringKey {
@@ -59,7 +76,6 @@ export function QuickSetup(props: QuickSetupProps) {
   };
   const [customizing, setCustomizing] = useState(false);
   const [guided, setGuided] = useState<GuidedNetworkChoice | null>(null);
-  const recommendedFlows = describePreset("recommended").allowedFlows;
 
   return (
     <section aria-labelledby={ids.heading} className="flex flex-col gap-4">
@@ -75,9 +91,18 @@ export function QuickSetup(props: QuickSetupProps) {
             {text("setup.quick.changeCity")}
           </button>
         )}
+        {props.downloadsCity && (
+          <p className="basis-full text-sm text-fg-secondary">
+            {text("setup.quick.download", { city: cityName })}
+          </p>
+        )}
       </div>
 
-      <h1 tabIndex={-1} id={ids.heading} className="text-2xl font-semibold text-fg">
+      <h1
+        tabIndex={-1}
+        id={ids.heading}
+        className="text-2xl font-semibold text-fg"
+      >
         {text("setup.quick.heading")}
       </h1>
 
@@ -99,7 +124,11 @@ export function QuickSetup(props: QuickSetupProps) {
             />
             <span className="flex flex-col">
               <span className="text-base font-medium text-fg">
-                {text(mode === "text" ? "setup.presentation.text" : "setup.presentation.map")}
+                {text(
+                  mode === "text"
+                    ? "setup.presentation.text"
+                    : "setup.presentation.map",
+                )}
               </span>
               <span id={ids[mode]} className="text-sm text-fg-secondary">
                 {text(
@@ -125,7 +154,9 @@ export function QuickSetup(props: QuickSetupProps) {
         </button>
         <div id={ids.recommended} className="text-sm text-fg-secondary">
           <p>
-            {text(recommendedSummaryKey(props.realtimeKinds), { city: cityName })}{" "}
+            {text(recommendedSummaryKey(props.realtimeKinds), {
+              city: cityName,
+            })}{" "}
             {text("setup.recommended.nearby")}
             {startMode === "map" && <> {text("setup.recommended.mapNote")}</>}
           </p>
@@ -137,15 +168,13 @@ export function QuickSetup(props: QuickSetupProps) {
           <p>{text("setup.recommended.detailsIntro")}</p>
           {privacyReady && (
             <ul className="mt-1 list-disc pl-5">
-              {recommendedFlows.map((flow) =>
-                flow.dataFlow ? (
-                  <li key={flow.flowId}>
-                    <span className="font-medium text-fg">{t(flow.dataFlow.nameKey)}</span>
-                    {": "}
-                    {t(flow.dataFlow.purposeKey)}
-                  </li>
-                ) : null,
-              )}
+              {RECOMMENDED_FLOWS.map((flow) => (
+                <li key={flow.id}>
+                  <span className="font-medium text-fg">{t(flow.nameKey)}</span>
+                  {": "}
+                  {t(flow.purposeKey)}
+                </li>
+              ))}
             </ul>
           )}
         </details>
@@ -200,13 +229,26 @@ export function QuickSetup(props: QuickSetupProps) {
               )}
             </p>
             <fieldset className="flex flex-col gap-2">
-              <legend id={ids.question} className="text-base font-medium text-fg">
+              <legend
+                id={ids.question}
+                className="text-base font-medium text-fg"
+              >
                 {text("setup.customize.question")}
               </legend>
               {(
                 [
-                  ["live-information", "live", "setup.customize.live", "setup.customize.liveDescription"],
-                  ["ask-first", "ask", "setup.customize.ask", "setup.customize.askDescription"],
+                  [
+                    "live-information",
+                    "live",
+                    "setup.customize.live",
+                    "setup.customize.liveDescription",
+                  ],
+                  [
+                    "ask-first",
+                    "ask",
+                    "setup.customize.ask",
+                    "setup.customize.askDescription",
+                  ],
                 ] as const
               ).map(([value, idKey, label, description]) => (
                 <label key={value} className="flex min-h-11 items-start gap-3">
@@ -233,7 +275,8 @@ export function QuickSetup(props: QuickSetupProps) {
               className={secondaryButton}
               disabled={props.busy || guided === null}
               onClick={() =>
-                guided && props.onChoose({ presetId: "customize", guidedChoice: guided })
+                guided &&
+                props.onChoose({ presetId: "customize", guidedChoice: guided })
               }
             >
               {text("setup.customize.continue")}

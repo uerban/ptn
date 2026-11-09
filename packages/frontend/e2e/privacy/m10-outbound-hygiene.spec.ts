@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
-import { seedNetworkDecisions } from "../helpers/setup-complete";
+import { decideAfterSetup } from "../helpers/setup-complete";
 
 const ADAPTER_MODULE = "/src/services/geocoder/ThirdPartyGeocoderAdapter.ts";
 
@@ -19,7 +19,6 @@ test.describe("M10 T-4: Outbound hygiene @mock-api", () => {
     page,
   }) => {
     await bootAtPrivacyLevel(page, "standard");
-    await seedNetworkDecisions(page, { "external.place-search@nominatim": "allowed" });
     await mockApi(page);
 
     const intercepted: Array<{
@@ -38,6 +37,7 @@ test.describe("M10 T-4: Outbound hygiene @mock-api", () => {
 
     await page.goto("/");
     await page.waitForLoadState("networkidle");
+    await decideAfterSetup(page, { "external.place-search@nominatim": "allowed" });
 
     await page.evaluate(async (modulePath) => {
       const mod = (await import(/* @vite-ignore */ modulePath)) as {

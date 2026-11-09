@@ -17,24 +17,19 @@ export interface WhatsNewEntry {
   readonly topic: "service-alerts";
 }
 
+/** Listed oldest first; a new entry is appended with the next id. */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = Object.freeze([
   Object.freeze({ id: 1, topic: "service-alerts" as const }),
 ]);
 
 /** Highest entry id in this build; first-run setup marks it seen. */
-export const LATEST_WHATS_NEW_ID = WHATS_NEW_ENTRIES.reduce(
-  (max, entry) => Math.max(max, entry.id),
-  0,
-);
+export const LATEST_WHATS_NEW_ID = WHATS_NEW_ENTRIES.at(-1)?.id ?? 0;
 
 /** Entries the user has not seen yet, oldest first. A missing record has
  * nothing to show: a fresh install goes through setup instead. */
 export function unseenWhatsNewEntries(
   record: Pick<OnboardingRecord, "seenWhatsNew"> | null | undefined,
-  entries: readonly WhatsNewEntry[] = WHATS_NEW_ENTRIES,
 ): readonly WhatsNewEntry[] {
   if (!record) return [];
-  return entries
-    .filter((entry) => entry.id > record.seenWhatsNew)
-    .sort((a, b) => a.id - b.id);
+  return WHATS_NEW_ENTRIES.filter((entry) => entry.id > record.seenWhatsNew);
 }

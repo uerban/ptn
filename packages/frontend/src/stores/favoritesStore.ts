@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { createSealedJSONStorage } from "../services/sealedLocalStorage.ts";
 import type { FavoritePlace } from "@pt/shared";
 import { useCityStore } from "./cityStore.ts";
+import { canonicalCityId } from "../utils/cityId.ts";
 
 interface FavoritesState {
   favorites: FavoritePlace[];
@@ -12,7 +13,8 @@ interface FavoritesState {
   assignFavoriteCity: (id: string, cityId: string) => void;
 }
 
-const scope = (cityId: string | undefined) => cityId === "gdansk" ? "tricity" : cityId;
+const scope = (cityId: string | undefined) =>
+  cityId === undefined ? undefined : canonicalCityId(cityId);
 
 export const useFavoritesStore = create<FavoritesState>()(
   persist(
@@ -82,7 +84,7 @@ export const useFavoritesStore = create<FavoritesState>()(
         return {
           ...current,
           favorites: stored.favorites.map((f) =>
-            f.cityId === "gdansk" ? { ...f, cityId: "tricity" } : f
+            f.cityId === undefined ? f : { ...f, cityId: canonicalCityId(f.cityId) }
           ),
         };
       },

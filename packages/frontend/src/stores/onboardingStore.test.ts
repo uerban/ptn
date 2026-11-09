@@ -69,7 +69,7 @@ describe("setup commit: preset × presentation", () => {
   for (const [presetId, guided] of PRESETS) {
     for (const startMode of MODES) {
       it(`${presetId}${guided ? ` (${guided})` : ""} in ${startMode} mode`, async () => {
-        classifyInstallation(localStorage, 1);
+        classifyInstallation(localStorage);
         useOnboardingStore.getState().load();
         await useOnboardingStore.getState().commitSetup({
           presetId,
@@ -113,14 +113,40 @@ describe("setup commit: preset × presentation", () => {
   }
 
   it("a new Strict installation does not run the decoy timer", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
     const { level, overrides } = usePrivacyStore.getState();
     expect(effectivePolicy(level, overrides).m11TileDefense).toBe("prefetch-padding");
   });
 
+  it("setup never lowers a stricter level an unreadable record left behind", async () => {
+    seed("ptn-privacy", { level: "hardened", overrides: {} });
+    localStorage.setItem(ONBOARDING_RECORD_KEY, "{not json");
+    await usePrivacyStore.persist.rehydrate();
+    expect(classifyInstallation(localStorage)?.install.kind).toBe("new");
+    await useOnboardingStore.getState().commitSetup({ presetId: "recommended" });
+    expect(getCurrentLevel()).toBe("hardened");
+    await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+    expect(getCurrentLevel()).toBe("strict");
+  });
+
+  it("a preset commit replaces grants left from earlier decisions", async () => {
+    classifyInstallation(localStorage);
+    useNetworkDecisionsStore.getState().setDecision("operator.realtime", "allowed", "settings");
+    useNetworkDecisionsStore
+      .getState()
+      .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
+    await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+    expect(canUse("operator.realtime")).toBe(false);
+    expect(canUse("external.detailed-basemap", "carto")).toBe(false);
+
+    useNetworkDecisionsStore.getState().setDecision("operator.realtime", "allowed", "settings");
+    await useOnboardingStore.getState().commitSetup({ presetId: "customize" });
+    expect(canUse("operator.realtime")).toBe(false);
+  });
+
   it("a later level change leaves decisions untouched, and a decision leaves the level", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({ presetId: "recommended" });
     const before = useNetworkDecisionsStore.getState().decisions;
     await usePrivacyStore.getState().setLevel("paranoid");
@@ -133,7 +159,7 @@ describe("setup commit: preset × presentation", () => {
   });
 
   it("the draft never activates anything before commit", () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     useOnboardingStore.getState().load();
     useOnboardingStore.getState().setDraftPreset("recommended");
     useOnboardingStore.getState().setDraftPresentation({ startMode: "text" });
@@ -143,7 +169,7 @@ describe("setup commit: preset × presentation", () => {
   });
 
   it("stores the What's new id shown at setup", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({
       presetId: "strict",
       seenWhatsNew: 3,
@@ -152,7 +178,7 @@ describe("setup commit: preset × presentation", () => {
   });
 
   it("applies storage choices from the journal", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({
       presetId: "recommended",
       storageChoices: { recents: "disabled" },
@@ -162,7 +188,7 @@ describe("setup commit: preset × presentation", () => {
   });
 
   it("keeps working on session state when storage refuses writes", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     useOnboardingStore.getState().load();
     const original = localStorage.setItem;
     localStorage.setItem = () => {
@@ -172,7 +198,8 @@ describe("setup commit: preset × presentation", () => {
       const applied = await useOnboardingStore
         .getState()
         .commitSetup({ presetId: "recommended" });
-      expect(applied.applied).toBe(true);
+      // Nothing was persisted: the journal is not acknowledged.
+      expect(applied.applied).toBe(false);
       expect(useOnboardingStore.getState().storageAvailable).toBe(false);
       expect(canUse("operator.realtime")).toBe(true);
     } finally {
@@ -183,7 +210,7 @@ describe("setup commit: preset × presentation", () => {
 
 describe("journal recovery", () => {
   it("re-applies a committed journal interrupted before it reached the stores", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     const pending: OnboardingRecord = {
       ...record(),
       decisions: {
@@ -211,8 +238,54 @@ describe("journal recovery", () => {
     expect(canUse("operator.realtime")).toBe(false);
   });
 
+  it("keeps the journal pending when a preference write is refused after the journal was stored", async () => {
+    classifyInstallation(localStorage);
+    const original = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = (key: string, value: string) => {
+      if (key === "ptn-privacy") throw new Error("quota");
+      original(key, value);
+    };
+    try {
+      await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+    } finally {
+      localStorage.setItem = original;
+    }
+    expect(record().applied).toBe(false);
+
+    // Reload: the level comes back from storage, which never got Strict.
+    expect(localStorage.getItem("ptn-privacy") ?? "").not.toContain("strict");
+    usePrivacyStore.setState({ level: "standard" });
+    await reload();
+    await applyPendingOnboardingJournal();
+    expect(getCurrentLevel()).toBe("strict");
+    expect(record().applied).toBe(true);
+  });
+
+  it("stores a level that is already in memory when the journal is replayed in the same session", async () => {
+    classifyInstallation(localStorage);
+    const original = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = (key: string, value: string) => {
+      if (key === "ptn-privacy") throw new Error("quota");
+      original(key, value);
+    };
+    try {
+      await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+      expect(getCurrentLevel()).toBe("strict");
+      // Boot replay right after setup: Strict is in memory, storage still refuses it.
+      await applyPendingOnboardingJournal();
+      expect(record().applied).toBe(false);
+    } finally {
+      localStorage.setItem = original;
+    }
+    expect(localStorage.getItem("ptn-privacy") ?? "").not.toContain("strict");
+
+    await applyPendingOnboardingJournal();
+    expect(record().applied).toBe(true);
+    expect(localStorage.getItem("ptn-privacy") ?? "").toContain("strict");
+  });
+
   it("survives a reload after commit: preference stores stay authoritative", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({
       presetId: "recommended",
       presentation: { startMode: "text" },
@@ -229,7 +302,7 @@ describe("journal recovery", () => {
 describe("legacy installations", () => {
   async function bootLegacy(state: Record<string, unknown>): Promise<void> {
     seed("ptn-privacy", state);
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     await reload();
     await applyPendingOnboardingJournal();
   }
@@ -261,7 +334,7 @@ describe("legacy installations", () => {
     expect(record().legacyOverrides).toEqual({});
 
     // Next boot: classification and journal are done; nothing comes back.
-    classifyInstallation(localStorage, 2);
+    classifyInstallation(localStorage);
     await reload();
     await applyPendingOnboardingJournal();
     expect(usePrivacyStore.getState().overrides.m11TileDefense).toBeUndefined();
@@ -278,7 +351,7 @@ describe("legacy installations", () => {
     useOnboardingStore.getState().removeCarriedOverOverride("m11TileDefense");
     expect(usePrivacyStore.getState().overrides.m11TileDefense).toBeUndefined();
 
-    classifyInstallation(localStorage, 2);
+    classifyInstallation(localStorage);
     await reload();
     await applyPendingOnboardingJournal();
     expect(usePrivacyStore.getState().overrides.m11TileDefense).toBeUndefined();
@@ -288,7 +361,7 @@ describe("legacy installations", () => {
   it("the migration runs once even when the journal is applied repeatedly", async () => {
     await bootLegacy({ level: "standard", overrides: {} });
     useNetworkDecisionsStore.getState().setDecision("operator.realtime", "denied", "settings");
-    classifyInstallation(localStorage, 3);
+    classifyInstallation(localStorage);
     await reload();
     await applyPendingOnboardingJournal();
     expect(canUse("operator.realtime")).toBe(false);
@@ -303,7 +376,7 @@ describe("legacy installations", () => {
 
 describe("cross-tab journal sync", () => {
   it("re-reads the record when another tab changes it", async () => {
-    classifyInstallation(localStorage, 1);
+    classifyInstallation(localStorage);
     useOnboardingStore.getState().load();
     const stop = installPrivacyStateSync();
     try {
@@ -311,8 +384,19 @@ describe("cross-tab journal sync", () => {
       localStorage.setItem(ONBOARDING_RECORD_KEY, JSON.stringify(other));
       window.dispatchEvent(new StorageEvent("storage", { key: ONBOARDING_RECORD_KEY }));
       expect(useOnboardingStore.getState().record?.seenWhatsNew).toBe(4);
+
+      // Another tab deleted all data: the copy in memory goes too.
+      localStorage.removeItem(ONBOARDING_RECORD_KEY);
+      window.dispatchEvent(new StorageEvent("storage", { key: ONBOARDING_RECORD_KEY }));
+      expect(useOnboardingStore.getState().record).toBeNull();
     } finally {
       stop();
     }
+  });
+
+  it("counts a Not now even when no record is stored or held", () => {
+    useOnboardingStore.setState({ record: null });
+    useOnboardingStore.getState().recordAlertsNotNow();
+    expect(record().alertsNotNow).toBe(1);
   });
 });

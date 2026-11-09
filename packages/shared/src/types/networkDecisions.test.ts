@@ -14,6 +14,7 @@ import {
   ONBOARDING_PRESETS,
   presetDecisions,
   resolveNetworkDecision,
+  sanitizeDecisionClears,
   sanitizeNetworkDecisions,
   type NetworkDecisionMap,
 } from "./networkDecisions.js";
@@ -116,6 +117,21 @@ describe("network decisions", () => {
     });
     expect(sanitizeNetworkDecisions("nope")).toEqual({});
     expect(sanitizeNetworkDecisions([1])).toEqual({});
+  });
+
+  it("sanitizes untrusted return-to-ask-first times", () => {
+    expect(
+      sanitizeDecisionClears({
+        "operator.realtime": 7,
+        "external.detailed-basemap@carto": 9,
+        "external.detailed-basemap": 3,
+        "made.up": 1,
+        "operator.service-alerts": "soon",
+        "operator.place-search": Number.NaN,
+      }),
+    ).toEqual({ "operator.realtime": 7, "external.detailed-basemap@carto": 9 });
+    expect(sanitizeDecisionClears(null)).toEqual({});
+    expect(sanitizeDecisionClears([1])).toEqual({});
   });
 
   it("resolves unknown flows and missing decisions as unset", () => {

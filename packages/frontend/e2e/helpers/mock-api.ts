@@ -157,8 +157,8 @@ interface MockApiOptions {
   setup?: "complete" | "fresh";
   /**
    * `X-PT-Realtime` value on manifest responses: the realtime kinds the city
-   * offers (`"departures, alerts"`). Absent sends no header, which the client
-   * records as "no realtime kinds".
+   * offers (`"departures, alerts"`). Absent sends an empty header, as the
+   * server does for a city without realtime kinds.
    */
   realtime?: string;
 }
@@ -313,7 +313,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
         headers: {
           "X-PT-Bundle-Hash": FIXTURE_BUNDLE_HASH,
           etag: `"${FIXTURE_BUNDLE_HASH}"`,
-          ...(options.realtime !== undefined ? { "X-PT-Realtime": options.realtime } : {}),
+          "X-PT-Realtime": options.realtime ?? "",
         },
         body: JSON.stringify(buildFixtureManifest()),
       })

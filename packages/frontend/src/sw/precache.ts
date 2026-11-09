@@ -37,6 +37,8 @@ export type LazyLocaleCode = (typeof LAZY_LOCALE_CODES)[number];
  */
 export const MAP_ONLY_PRECACHE_IGNORES: string[] = [
   "assets/vendor-map-*.js",
+  // The small module that loads MapLibre and registers its worker.
+  "assets/maplibre-*.js",
   "assets/maplibre-gl-worker-*.js",
   "glyphs/*/*.pbf",
 ];

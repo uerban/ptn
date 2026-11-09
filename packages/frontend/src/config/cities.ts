@@ -28,6 +28,9 @@ export interface CityConfig {
   readonly center: { readonly lat: number; readonly lon: number };
   readonly bbox: { readonly minLat: number; readonly minLon: number; readonly maxLat: number; readonly maxLon: number };
   readonly available: boolean;
+  /** ISO 3166-1 alpha-2 country, shown as context in city lists. Optional:
+   * hosts that leave it out still work, and the city is shown without one. */
+  readonly countryCode?: string;
   /** Schedule-source credits shown in Settings for the active city. */
   readonly transitSources?: readonly { readonly name: string; readonly url: string }[];
   /**

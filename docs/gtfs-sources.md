@@ -111,7 +111,8 @@ codes, coordinates, times, repeated stop occurrences and sequence values remain
 unchanged. The namespace rewrite rejects unreviewed tables or ID columns.
 `pt-producer republish` accepts repeated `--from-cache` arguments and publishes
 all components together. Source-aware realtime ID conversion is separate;
-`host.py` rejects an unscoped `tripUpdatesURL` for namespaced multi-feed inputs.
+`host.py` rejects an unscoped `tripUpdatesURL` or `serviceAlertsURL` for
+namespaced multi-feed inputs.
 
 Warsaw runs normalization, lossless compaction, and its independent full-date
 schedule/alias verifier. Its recipe requires `--derive-inseat off`. Alias and

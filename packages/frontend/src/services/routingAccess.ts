@@ -11,7 +11,7 @@
  * preference: it never rewrites a decision.
  */
 import { canUse, useCanUse } from "../privacy/canUse.ts";
-import { grantFlow, isFlowAvailable, type GrantSource } from "../privacy/flowGrants.ts";
+import { grantFlow, type GrantSource } from "../privacy/flowGrants.ts";
 import {
   useSettingsStore,
   type RemoteRoutingProvider,
@@ -39,11 +39,6 @@ export function canUseRemoteRouting(provider: RemoteRoutingProvider): boolean {
 /** React binding of `canUseRemoteRouting`; re-renders on decision changes. */
 export function useCanUseRemoteRouting(provider: RemoteRoutingProvider): boolean {
   return useCanUse(...routingFlow(provider));
-}
-
-/** Whether remote routing through `provider` can be offered at all. */
-export function isRemoteRoutingAvailable(provider: RemoteRoutingProvider): boolean {
-  return isFlowAvailable(...routingFlow(provider));
 }
 
 /** Grant remote routing through `provider` after a deliberate action. */

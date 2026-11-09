@@ -10,9 +10,10 @@
  * them, changes to that state are kept for the session only.
  */
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
-import { decrypt, encrypt, RECORD_VERSION } from "./cryptoBox.ts";
+import { decrypt, encrypt } from "./cryptoBox.ts";
 import { durablePersonalKey, reportUnreadable } from "./personalStorage.ts";
 import { MAP_VIEWPORT_STORAGE_KEY } from "./privacyStorageKeys.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 
 const SEALED_FORMAT = "ptn-sealed";
 
@@ -24,14 +25,6 @@ interface SealedEnvelope {
 }
 
 type ItemStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-
-function defaultStorage(): ItemStorage | undefined {
-  try {
-    return globalThis.localStorage ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function toBase64(buf: ArrayBuffer): string {
   let binary = "";
@@ -85,7 +78,7 @@ export async function openSealedString(raw: string, key: CryptoKey): Promise<str
   const envelope = parseEnvelope(raw);
   if (!envelope) throw new Error("not a sealed value");
   const value = await decrypt(
-    { v: envelope.v ?? RECORD_VERSION, iv: fromBase64(envelope.iv), ct: fromBase64(envelope.ct) },
+    { v: envelope.v, iv: fromBase64(envelope.iv), ct: fromBase64(envelope.ct) },
     key,
   );
   if (typeof value !== "string") throw new Error("sealed value is not a string");
@@ -94,7 +87,10 @@ export async function openSealedString(raw: string, key: CryptoKey): Promise<str
 
 /** Names whose stored value may be replaced this session. */
 const writable = new Set<string>();
-/** Bumped on removal so an in-flight write cannot resurrect a removed value. */
+/**
+ * Bumped by every write and removal, so a write that finishes after a newer
+ * write or a removal cannot store an older value.
+ */
 const generations = new Map<string, number>();
 
 /**
@@ -103,7 +99,7 @@ const generations = new Map<string, number>();
  */
 export async function readSealedItem(
   name: string,
-  storage: ItemStorage | undefined = defaultStorage(),
+  storage: ItemStorage | undefined = safeLocalStorage(),
 ): Promise<string | null> {
   const key = await durablePersonalKey();
   if (!key || !storage) return null;
@@ -135,10 +131,11 @@ export async function readSealedItem(
 export async function writeSealedItem(
   name: string,
   value: string,
-  storage: ItemStorage | undefined = defaultStorage(),
+  storage: ItemStorage | undefined = safeLocalStorage(),
 ): Promise<boolean> {
   if (!storage || !writable.has(name)) return false;
-  const generation = generations.get(name) ?? 0;
+  const generation = (generations.get(name) ?? 0) + 1;
+  generations.set(name, generation);
   const key = await durablePersonalKey();
   if (!key) return false;
   const sealed = await sealString(value, key);
@@ -156,7 +153,7 @@ export async function writeSealedItem(
 /** Removes a value, readable or not. Later writes may store a new one. */
 export function removeSealedItem(
   name: string,
-  storage: Pick<Storage, "removeItem"> | undefined = defaultStorage(),
+  storage: Pick<Storage, "removeItem"> | undefined = safeLocalStorage(),
 ): void {
   generations.set(name, (generations.get(name) ?? 0) + 1);
   try {
@@ -182,36 +179,24 @@ export function createSealedJSONStorage<S>() {
 }
 
 /**
- * A sealed value with a synchronous in-memory view, for code that reads it
- * synchronously (map start-up). `load()` runs once before first use.
+ * The last viewed map area (see utils/mapViewport.ts), with a synchronous
+ * in-memory view for the map's start-up. `load()` runs once before first use.
  */
-export interface SealedSyncItem {
-  load(): Promise<void>;
-  get(): string | null;
-  set(value: string): void;
-  remove(storage?: Pick<Storage, "removeItem">): void;
-}
-
-export function createSealedSyncItem(name: string): SealedSyncItem {
-  let value: string | null = null;
-  return {
-    async load() {
-      value = await readSealedItem(name);
-    },
-    get: () => value,
-    set(next) {
-      value = next;
-      void writeSealedItem(name, next).catch(() => {});
-    },
-    remove(storage) {
-      value = null;
-      removeSealedItem(name, storage ?? defaultStorage());
-    },
-  };
-}
-
-/** The last viewed map area (see utils/mapViewport.ts). */
-export const mapViewportItem = createSealedSyncItem(MAP_VIEWPORT_STORAGE_KEY);
+let mapViewportValue: string | null = null;
+export const mapViewportItem = {
+  async load(): Promise<void> {
+    mapViewportValue = await readSealedItem(MAP_VIEWPORT_STORAGE_KEY);
+  },
+  get: (): string | null => mapViewportValue,
+  set(next: string): void {
+    mapViewportValue = next;
+    void writeSealedItem(MAP_VIEWPORT_STORAGE_KEY, next).catch(() => {});
+  },
+  remove(storage: Pick<Storage, "removeItem"> | undefined = safeLocalStorage()): void {
+    mapViewportValue = null;
+    removeSealedItem(MAP_VIEWPORT_STORAGE_KEY, storage);
+  },
+};
 
 /** Test-only: forgets which values may be replaced. */
 export function __resetSealedLocalStorageForTests(): void {

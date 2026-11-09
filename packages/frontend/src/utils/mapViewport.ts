@@ -2,6 +2,7 @@ import type { PrivacyPolicy, StopWithLines } from "@pt/shared";
 import { isOptionalStorageEnabledNow } from "../services/privacyChoices.ts";
 import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
 import { mapViewportItem } from "../services/sealedLocalStorage.ts";
+import { canonicalCityId } from "./cityId.ts";
 import { haversineDistance } from "./geo.ts";
 
 export { MAP_VIEWPORT_STORAGE_KEY } from "../services/privacyStorageKeys.ts";
@@ -77,7 +78,7 @@ function parseStoredViewport(raw: string): PersistedViewport | null {
     const pitch = Number.isFinite(v.pitch) ? (v.pitch as number) : 0;
     const bearing = Number.isFinite(v.bearing) ? (v.bearing as number) : 0;
     return {
-      cityId: v.cityId === "gdansk" ? "tricity" : v.cityId,
+      cityId: canonicalCityId(v.cityId),
       lat: v.lat,
       lon: v.lon,
       zoom: v.zoom,
@@ -154,7 +155,7 @@ export function loadViewport(cityId?: string): SavedViewport | null {
   if (!isOptionalStorageEnabledNow("viewport") || getPolicy().viewportPersistence === "off") return null;
   try {
     const collection = readViewports();
-    const id = cityId === "gdansk" ? "tricity" : cityId ?? collection.lastCityId;
+    const id = cityId === undefined ? collection.lastCityId : canonicalCityId(cityId);
     const v = id ? collection.viewports.get(id) : undefined;
     if (!v) return null;
     return {cityId: v.cityId, lat: v.lat, lon: v.lon, zoom: v.zoom, bearing: v.bearing, pitch: v.pitch};

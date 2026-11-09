@@ -12,12 +12,15 @@
  */
 import { create } from "zustand";
 import {
+  compareLevels,
   ONBOARDING_PRESETS,
   presetDecisions,
   type GuidedNetworkChoice,
   type NetworkDecision,
   type OnboardingPresetId,
+  type PrivacyLevel,
   type ProtectionAxis,
+  type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import {
   hasPendingJournal,
@@ -32,14 +35,15 @@ import {
 } from "../services/onboardingRecord.ts";
 import {
   onStorageKeyChange,
-  syncStoreAcrossTabs,
   withMigrationLock,
 } from "../services/crossTab.ts";
+import { refusedWriteCount } from "../services/tolerantLocalStorage.ts";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
+  absorbStoredDecisions,
   useNetworkDecisionsStore,
 } from "./networkDecisionsStore.ts";
-import { usePrivacyStore } from "./privacyStore.ts";
+import { getCurrentLevel, usePrivacyStore } from "./privacyStore.ts";
 import { usePrivacyChoicesStore } from "./privacyChoicesStore.ts";
 import { useSettingsStore } from "./settingsStore.ts";
 
@@ -86,8 +90,9 @@ function initialDraft(): SetupDraft {
 }
 
 /**
- * Apply a journal to the preference stores and return the record marked
- * applied. Safe to run any number of times for the same journal.
+ * Apply a journal to the preference stores and return the record, marked
+ * applied only when every store change was persisted. Safe to run any number
+ * of times for the same journal.
  */
 export async function applyJournalToStores(
   record: OnboardingRecord,
@@ -95,16 +100,33 @@ export async function applyJournalToStores(
   if (!record.decisions) return record;
   const { flows, level, storageChoices } = record.decisions;
 
-  // Persisting a store can throw (quota, blocked storage) after its
-  // in-memory state changed. Keep going so this session still gets every
-  // part of the journal; the record stays authoritative for the next boot.
-  await safely(() => useNetworkDecisionsStore.getState().applyDecisions(flows));
-  if (level) await safely(() => usePrivacyStore.getState().setLevel(level));
+  // Persisting a store can fail (quota, blocked storage) after its in-memory
+  // state changed; the persisted stores swallow the error. Keep going so this
+  // session still gets every part of the journal, and leave the journal
+  // pending so the next boot applies it again.
+  const refusedBefore = refusedWriteCount();
+  let failed = false;
+  const safely = async (step: () => unknown): Promise<void> => {
+    try {
+      await step();
+    } catch {
+      failed = true;
+    }
+  };
 
-  for (const [axis, value] of Object.entries(record.legacyOverrides)) {
-    await safely(() =>
-      usePrivacyStore.getState().setOverride(axis as ProtectionAxis, value as never),
-    );
+  await safely(() => useNetworkDecisionsStore.getState().replaceDecisions(flows));
+  if (level) {
+    await safely(async () => {
+      const privacy = usePrivacyStore.getState();
+      // Already in memory (this session applied it, but storage may have
+      // refused it): store it again so a refusal is noticed.
+      if (privacy.level === level) usePrivacyStore.setState({ level });
+      else await privacy.setLevel(level);
+    });
+  }
+
+  for (const axis of Object.keys(record.legacyOverrides) as ProtectionAxis[]) {
+    await safely(() => restoreOverride(axis, record.legacyOverrides));
   }
 
   if (record.presentation) {
@@ -127,15 +149,16 @@ export async function applyJournalToStores(
     }
   }
 
-  return { ...record, applied: true };
+  const durable = !failed && refusedWriteCount() === refusedBefore;
+  return { ...record, applied: durable };
 }
 
-async function safely(step: () => unknown): Promise<void> {
-  try {
-    await step();
-  } catch {
-    // See applyJournalToStores.
-  }
+function restoreOverride<K extends ProtectionAxis>(
+  axis: K,
+  overrides: Partial<ProtectionPolicy>,
+): void {
+  const value = overrides[axis];
+  if (value !== undefined) usePrivacyStore.getState().setOverride(axis, value);
 }
 
 /**
@@ -149,7 +172,7 @@ export async function applyPendingOnboardingJournal(): Promise<void> {
       const read = readOnboardingRecord();
       if (read.status !== "ok" || !hasPendingJournal(read.record)) return;
       const applied = await applyJournalToStores(read.record);
-      writeOnboardingRecord(applied);
+      if (applied.applied) writeOnboardingRecord(applied);
     });
   } catch {
     // Stores keep their previous values; the journal stays pending and is
@@ -170,7 +193,9 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
     } else if (read.status === "unavailable") {
       set({ storageAvailable: false });
     } else {
-      set({ storageAvailable: true });
+      // Gone (another tab deleted all data) or unreadable: an older copy in
+      // memory no longer describes this device.
+      set({ record: null, storageAvailable: true });
     }
   },
 
@@ -182,14 +207,7 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
 
   commitSetup: async (input) => {
     const now = Date.now();
-    const base =
-      get().record ??
-      (() => {
-        const read = readOnboardingRecord();
-        return read.status === "ok"
-          ? read.record
-          : newInstallRecord({ kind: "new", classifiedAt: now });
-      })();
+    const base = currentRecord(get);
     const flows: Record<string, NetworkDecision> = {};
     for (const [flowId, value] of Object.entries(
       presetDecisions(input.presetId, input.guidedChoice),
@@ -200,7 +218,7 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
       ...base,
       decisions: {
         preset: input.presetId,
-        level: ONBOARDING_PRESETS[input.presetId].level,
+        level: stricterLevel(ONBOARDING_PRESETS[input.presetId].level, getCurrentLevel()),
         flows,
         ...(input.storageChoices ? { storageChoices: input.storageChoices } : {}),
       },
@@ -216,14 +234,13 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
   },
 
   removeCarriedOverOverride: (axis) => {
-    const record = get().record;
-    if (!record || !(axis in record.legacyOverrides)) return;
+    if (!(axis in currentRecord(get).legacyOverrides)) return;
     usePrivacyStore.getState().clearOverride(axis);
-    const legacyOverrides = { ...record.legacyOverrides };
-    delete legacyOverrides[axis];
-    const next = { ...record, legacyOverrides };
-    writeOnboardingRecord(next);
-    set({ record: next });
+    updateRecord(get, set, (record) => {
+      const legacyOverrides = { ...record.legacyOverrides };
+      delete legacyOverrides[axis];
+      return { ...record, legacyOverrides };
+    });
   },
 
   recordAlertsNotNow: () => {
@@ -243,19 +260,33 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
 }));
 
 /**
- * Apply `change` to the freshest record: the stored one (another tab may have
- * written since this tab last read it), else the one in memory. When storage
- * refuses the write, the change still holds for this session.
+ * Setup never lowers a stricter level already stored on this device (a
+ * record that could not be read sends an existing installation through setup
+ * again); the level can still be lowered in Settings.
+ */
+function stricterLevel(a: PrivacyLevel, b: PrivacyLevel): PrivacyLevel {
+  return compareLevels(a, b) >= 0 ? a : b;
+}
+
+/**
+ * The freshest record: the stored one (another tab may have written since
+ * this tab last read it), else the one in memory, else a fresh one.
+ */
+function currentRecord(get: () => OnboardingState): OnboardingRecord {
+  const read = readOnboardingRecord();
+  return read.status === "ok" ? read.record : (get().record ?? newInstallRecord({ kind: "new" }));
+}
+
+/**
+ * Apply `change` to the freshest record. When storage refuses the write, the
+ * change still holds for this session.
  */
 function updateRecord(
   get: () => OnboardingState,
   set: (partial: Partial<OnboardingState>) => void,
   change: (record: OnboardingRecord) => OnboardingRecord,
 ): void {
-  const read = readOnboardingRecord();
-  const current = read.status === "ok" ? read.record : get().record;
-  if (!current) return;
-  const next = change(current);
+  const next = change(currentRecord(get));
   if (!writeOnboardingRecord(next)) set({ record: next });
 }
 
@@ -265,13 +296,12 @@ onOnboardingRecordWrite((record) => {
 
 /**
  * Propagate decision and journal changes made in other tabs: the decision
- * store rehydrates and the record is re-read. Call once at boot.
+ * store merges the other tab's change and the record is re-read. Call once at boot.
  */
 export function installPrivacyStateSync(): () => void {
-  const stopDecisions = syncStoreAcrossTabs(
-    NETWORK_DECISIONS_STORAGE_KEY,
-    useNetworkDecisionsStore,
-  );
+  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, (newValue) => {
+    absorbStoredDecisions(newValue);
+  });
   const stopRecord = onStorageKeyChange(ONBOARDING_RECORD_KEY, () => {
     useOnboardingStore.getState().load();
   });

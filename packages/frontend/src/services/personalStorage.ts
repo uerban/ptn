@@ -17,6 +17,11 @@ import { create } from "zustand";
 import { db, type SealedPersonalRow } from "../db/index.ts";
 import { decrypt, encrypt, type EncryptedRecord } from "./cryptoBox.ts";
 import { getOrCreateInstallKey, isInstallKeyDurable } from "./installKey.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
+import type {
+  PersonalStorageMigrationOptions,
+  PersonalStorageMigrationResult,
+} from "./personalStorageMigration.ts";
 import {
   getDegradedMode,
   subscribeDegradedMode,
@@ -87,23 +92,45 @@ let migrationRun: Promise<unknown> | null = null;
 
 // The migration module imports stores that hydrate through this module, so it
 // cannot be imported statically. It registers itself once fully evaluated.
-let migrationStarter: (() => Promise<unknown>) | null = null;
-let resolveStarter: () => void = () => {};
-const starterReady = new Promise<void>((resolve) => {
+type MigrationStarter = (
+  opts?: PersonalStorageMigrationOptions,
+) => Promise<PersonalStorageMigrationResult>;
+let migrationStarter: MigrationStarter | null = null;
+let resolveStarter: (start: MigrationStarter) => void = () => {};
+const starterReady = new Promise<MigrationStarter>((resolve) => {
   resolveStarter = resolve;
 });
 
-export function registerPersonalStorageMigration(start: () => Promise<unknown>): void {
+export function registerPersonalStorageMigration(start: MigrationStarter): void {
   migrationStarter = start;
-  resolveStarter();
+  resolveStarter(start);
+}
+
+/** Settles with whether the migration module could be imported. */
+let migrationLoad: Promise<boolean> | null = null;
+
+function loadedMigration(): Promise<MigrationStarter> {
+  if (migrationStarter) return Promise.resolve(migrationStarter);
+  migrationLoad ??= import("./personalStorageMigration.ts").then(
+    () => true,
+    () => false,
+  );
+  return starterReady;
+}
+
+/**
+ * Runs the storage migration once its module has been fully evaluated. Code
+ * that the stores' import graph can reach calls this instead of importing the
+ * migration, which could hand it the module before its exports exist.
+ */
+export async function runRegisteredPersonalStorageMigration(
+  opts?: PersonalStorageMigrationOptions,
+): Promise<PersonalStorageMigrationResult> {
+  return (await loadedMigration())(opts);
 }
 
 async function startMigration(): Promise<void> {
-  if (!migrationStarter) {
-    void import("./personalStorageMigration.ts").catch(() => {});
-    await starterReady;
-  }
-  await migrationStarter?.();
+  await runRegisteredPersonalStorageMigration();
 }
 
 /** Records the outcome of the storage migration for readers and the UI. */
@@ -363,13 +390,67 @@ export async function resolvePersonalRows<T>(
 export interface PutPersonalOptions {
   /** Keep this record in memory only, whatever storage allows. */
   sessionOnly?: boolean;
+  /**
+   * Checked right before the record is written, after the key was acquired
+   * and the record sealed. Returning false drops the write (for example,
+   * consent was withdrawn meanwhile).
+   */
+  commitIf?: () => boolean;
 }
 
-export type PersonalWriteResult = "stored" | "session";
+/** `discarded`: the table was cleared, or `commitIf` refused, while the
+ * record was being prepared; nothing was written. */
+export type PersonalWriteResult = "stored" | "session" | "discarded";
+
+/** Bumped by every clear of a table in this tab. */
+const clearGenerations = new Map<PersonalTable, number>();
+
+/**
+ * localStorage key of a table's clear mark: a fresh random value replaced by
+ * every clear of that table in any tab. A tab's own counter cannot see a clear
+ * made in another tab, so a write prepared there before the clear also checks
+ * this mark. One key per table, so clears of different tables never overwrite
+ * each other's marks. Holds no personal data.
+ */
+export function personalClearMarkKey(table: PersonalTable): string {
+  return `ptn-personal-clear:${table}`;
+}
+
+function storedClearMark(table: PersonalTable): string {
+  try {
+    return safeLocalStorage()?.getItem(personalClearMarkKey(table)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function markCleared(table: PersonalTable): void {
+  try {
+    safeLocalStorage()?.setItem(personalClearMarkKey(table), newPersonalId());
+  } catch {
+    // Not stored: other tabs only learn of this clear through their reads.
+  }
+}
+
+/** Changes whenever the table is cleared, in this tab or in another one. */
+function clearGeneration(table: PersonalTable): string {
+  return `${clearGenerations.get(table) ?? 0}:${storedClearMark(table)}`;
+}
+
+/**
+ * Identifies the table's latest clear, in this tab or another. A caller that
+ * reads before writing captures it first and passes `commitIf`, so a clear
+ * during the read also drops the write.
+ */
+export function personalClearGeneration(table: PersonalTable): string {
+  return clearGeneration(table);
+}
 
 /**
  * Writes one record. It is sealed and stored when durable encrypted storage is
- * available; otherwise it is kept for this session only.
+ * available; otherwise it is kept for this session only. A clear of the table
+ * while the record is being prepared discards it, so a deletion is never
+ * undone by a write that was already in flight.
  */
 export async function putPersonal<T>(
   table: PersonalTable,
@@ -377,13 +458,18 @@ export async function putPersonal<T>(
   value: T,
   opts: PutPersonalOptions = {},
 ): Promise<PersonalWriteResult> {
+  const generation = clearGeneration(table);
+  const mayCommit = () =>
+    clearGeneration(table) === generation && (opts.commitIf?.() ?? true);
   const key = opts.sessionOnly ? null : await durablePersonalKey();
   if (!key) {
+    if (!mayCommit()) return "discarded";
     sessionTable(table).set(id, value);
     notifySession();
     return "session";
   }
   const row = await sealRow(id, value, key);
+  if (!mayCommit()) return "discarded";
   invalidateDurableCache();
   await db.table(table).put(row);
   invalidateDurableCache();
@@ -434,6 +520,8 @@ export async function deletePersonal(
 
 /** Removes every record of a table, durable, legacy and session-only. */
 export async function clearPersonal(table: PersonalTable): Promise<void> {
+  clearGenerations.set(table, (clearGenerations.get(table) ?? 0) + 1);
+  markCleared(table);
   if (sessionTable(table).size > 0) {
     sessionTable(table).clear();
     notifySession();
@@ -472,10 +560,21 @@ export async function moveSessionToDurable(table: PersonalTable): Promise<void> 
   }
 }
 
+/**
+ * Test-only: waits for a migration that a reader requested before the
+ * migration module had loaded. It starts once the module registers, which
+ * can otherwise happen in the middle of a later test.
+ */
+export async function __settlePersonalStorageMigrationForTests(): Promise<void> {
+  if (migrationLoad && (await migrationLoad)) await starterReady;
+  while (migrationRun) await migrationRun.catch(() => {});
+}
+
 /** Test-only: drops session records, caches and status. */
 export function __resetPersonalStorageForTests(): void {
   session.clear();
   sessionListeners.clear();
+  clearGenerations.clear();
   durableCache.clear();
   unreadableBySource.clear();
   migrationRun = null;

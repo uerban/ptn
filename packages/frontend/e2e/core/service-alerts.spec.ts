@@ -73,11 +73,10 @@ async function seedProfile(
         "ptn-onboarding",
         JSON.stringify({
           version: 1,
-          install: { kind: install, classifiedAt: 1 },
+          install: { kind: install },
           decisions: { preset: "recommended", level: null, flows: {} },
           presentation: null,
           applied: true,
-          legacyMigrated: install === "existing",
           legacyOverrides: {},
           seenWhatsNew,
           alertsNotNow: 0,

@@ -17,6 +17,7 @@ import {
   type RealtimeKind,
 } from "@pt/shared/schedule-tile";
 import { onStorageKeyChange } from "./crossTab.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 
 export const REALTIME_AVAILABILITY_STORAGE_KEY = "ptn-realtime-availability";
 
@@ -33,14 +34,6 @@ interface StoredCityAvailability {
 type StoredAvailability = Record<string, StoredCityAvailability>;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
-
-function defaultStorage(): StorageLike | undefined {
-  try {
-    return globalThis.localStorage ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function sanitize(raw: unknown): StoredAvailability {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -85,9 +78,11 @@ function notify(): void {
 }
 
 /**
- * Record the `X-PT-Realtime` value of a manifest response for `cityId`. A
- * missing header records "no realtime kinds": a server that does not send it
- * offers neither. Writes only when the value changed.
+ * Record the `X-PT-Realtime` value of a manifest response for `cityId`. The
+ * server always sends the header, empty when the city offers no realtime
+ * kinds. A missing header (an older server, or a proxy that strips it) says
+ * nothing and leaves what is stored as it was. Writes only when the value
+ * changed.
  */
 export function recordRealtimeHeader(
   cityId: string,
@@ -95,7 +90,8 @@ export function recordRealtimeHeader(
   options: { storage?: StorageLike; now?: number } = {},
 ): void {
   if (!CITY_ID_PATTERN.test(cityId)) return;
-  const storage = options.storage ?? defaultStorage();
+  if (headerValue === null || headerValue === undefined) return;
+  const storage = options.storage ?? safeLocalStorage();
   if (!storage) return;
   const kinds = parseRealtimeHeader(headerValue);
   const stored = read(storage);
@@ -122,7 +118,7 @@ export function recordRealtimeHeader(
  */
 export function getRealtimeAvailability(
   cityId: string,
-  storage: StorageLike | undefined = defaultStorage(),
+  storage: StorageLike | undefined = safeLocalStorage(),
 ): readonly RealtimeKind[] | undefined {
   return read(storage)[cityId]?.kinds;
 }

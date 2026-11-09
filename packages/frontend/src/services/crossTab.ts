@@ -9,6 +9,8 @@
  *   an expiry so a crashed tab cannot hold it forever.
  */
 
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
+
 type StorageEventTarget = Pick<Window, "addEventListener" | "removeEventListener">;
 
 function defaultTarget(): StorageEventTarget | undefined {
@@ -16,13 +18,14 @@ function defaultTarget(): StorageEventTarget | undefined {
 }
 
 /**
- * Call `onChange` whenever another tab changes (or clears) `key`. The event
- * only fires for writes made by other documents, so a tab never reacts to
- * its own writes. Returns an unsubscriber.
+ * Call `onChange` whenever another tab changes (or clears) `key`, with the
+ * value that tab stored (null when it removed the key). The event only fires
+ * for writes made by other documents, so a tab never reacts to its own
+ * writes. Returns an unsubscriber.
  */
 export function onStorageKeyChange(
   key: string,
-  onChange: () => void,
+  onChange: (newValue: string | null) => void,
   target: StorageEventTarget | undefined = defaultTarget(),
 ): () => void {
   if (!target) return () => {};
@@ -31,7 +34,7 @@ export function onStorageKeyChange(
     // `key === null` means another tab called localStorage.clear().
     if (storageEvent.key !== null && storageEvent.key !== key) return;
     try {
-      onChange();
+      onChange(storageEvent.key === null ? null : storageEvent.newValue);
     } catch {
       // A failed refresh must not break other listeners; the next change or
       // reload re-reads the store anyway.
@@ -39,26 +42,6 @@ export function onStorageKeyChange(
   };
   target.addEventListener("storage", listener);
   return () => target.removeEventListener("storage", listener);
-}
-
-/** Minimal shape of a zustand persist store. */
-export interface RehydratableStore {
-  persist: { rehydrate: () => unknown };
-}
-
-/** Keep a persisted store in step with writes from other tabs. */
-export function syncStoreAcrossTabs(
-  key: string,
-  store: RehydratableStore,
-  target?: StorageEventTarget,
-): () => void {
-  return onStorageKeyChange(
-    key,
-    () => {
-      void store.persist.rehydrate();
-    },
-    target ?? defaultTarget(),
-  );
 }
 
 // --- Migration lock ---------------------------------------------------------
@@ -93,11 +76,7 @@ function defaultLocks(): LockManagerLike | null {
 }
 
 function defaultLeaseStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
+  return safeLocalStorage() ?? null;
 }
 
 function randomOwner(): string {

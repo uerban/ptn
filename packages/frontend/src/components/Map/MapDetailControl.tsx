@@ -156,7 +156,7 @@ export function MapDetailControl() {
                 onClick={dismissHint}
                 aria-label={text("mapDetail.hintDismiss")}
                 data-testid="map-detail-hint-dismiss"
-                className="px-1 text-fg-muted"
+                className="inline-flex min-h-6 min-w-6 items-center justify-center text-fg-muted"
               >
                 ×
               </button>
@@ -175,7 +175,7 @@ export function MapDetailControl() {
             <button
               type="button"
               onClick={() => void loadMicromap(cityId)}
-              className="mt-0.5 block text-accent font-medium"
+              className="mt-0.5 block min-h-6 text-accent font-medium"
             >
               {text("mapStatus.retry")}
             </button>

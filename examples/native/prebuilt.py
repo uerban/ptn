@@ -98,4 +98,6 @@ def run(command, config, state, binary_dir):
         args.append("--without-geometry")
     if config.get("tripUpdatesURL"):
         args.append(f"--rt-trip-updates-urls={config['tripUpdatesURL']}")
+    if config.get("serviceAlertsURL"):
+        args.append(f"--rt-service-alerts-urls={config['serviceAlertsURL']}")
     os.execve(args[0], args, dict(os.environ))

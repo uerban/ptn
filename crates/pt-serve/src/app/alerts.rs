@@ -7,13 +7,14 @@
 //!
 //! - 200 with a strong `ETag` and `Cache-Control: no-cache` (revalidate every
 //!   time; the ETag makes that cheap).
-//! - 304 when `If-None-Match` matches.
+//! - 304 when `If-None-Match` matches: any listed tag, `*`, weak (`W/`)
+//!   tags, and tags a compressing proxy suffixed (`"<tag>-gzip"`) all count.
 //! - 404 `ALERTS_NOT_CONFIGURED` when this process has no alerts feed.
 //! - 503 `ALERTS_UNAVAILABLE` until a feed has been fetched successfully.
 //!
 //! There is no Node counterpart: pt-serve is the only implementation.
 
-use crate::app::response::{ByteBody, Resp};
+use crate::app::response::{if_none_match_hits, ByteBody, Resp};
 use crate::ops::ServerCtx;
 use std::sync::Arc;
 
@@ -39,7 +40,7 @@ pub fn service_alerts(ctx: &ServerCtx, if_none_match: Option<&str>) -> Resp {
     let Some(reply) = snap.reply.as_ref() else {
         return json(503, UNAVAILABLE_BODY);
     };
-    if if_none_match == Some(reply.etag.as_str()) {
+    if if_none_match_hits(if_none_match, &reply.etag) {
         return Resp::CachedBytes {
             status: 304,
             body: ByteBody::Raw(Arc::from(&[][..])),

@@ -16,12 +16,16 @@ import {
   legacyEffectiveNetworkPolicy,
   type LegacyNetworkPolicy,
   type NetworkDecision,
+  isPrivacyLevel,
+  LEGACY_NETWORK_FLOORS_V1,
+  LEVEL_FLOORS,
   type PrivacyLevel,
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
 import { PRIVACY_DATA_MIGRATION_KEY } from "./privacyDataMigrationState.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
+import { readStoredCityId } from "../utils/cityId.ts";
 import {
-  isPrivacyLevel,
   newInstallRecord,
   readOnboardingRecord,
   writeOnboardingRecord,
@@ -74,16 +78,6 @@ function hasKey(storage: StorageReader, key: string): boolean {
   } catch {
     return false;
   }
-}
-
-function storedCityId(storage: StorageReader): string | undefined {
-  const state = readPersistedState(storage, "ptn-city");
-  // Current stores keep only the id; older ones kept the whole city.
-  const city = state?.activeCity;
-  const id = typeof state?.currentCityId === "string"
-    ? state.currentCityId
-    : city && typeof city === "object" ? (city as { id?: unknown }).id : undefined;
-  return typeof id === "string" && id ? id : undefined;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -198,46 +192,71 @@ export function mapLegacyNetworkDecisions(
   }
 
   // The operator geocoder ran whenever its host configured one and the axis
-  // permitted it.
+  // permitted it. The same flow also carries server-side place search, which a
+  // local-only residency forbade: keeping the flow allowed there would start
+  // sending place searches the installation never sent, so it is denied.
   put(
-    network.m9SelfHosted === "disabled" ? "denied" : "allowed",
+    network.m9SelfHosted === "disabled" || network.poiResidency === "local-only"
+      ? "denied"
+      : "allowed",
     "operator.place-search",
   );
 
   return decisions;
 }
 
+/** Smallest coarsening floor that makes the operator geocoder coarsen every
+ * location hint, whatever the deployment. */
+export const ALWAYS_COARSEN_FLOOR_METERS = 50;
+
+function storedNumber(overrides: unknown, axis: string): number | undefined {
+  if (!overrides || typeof overrides !== "object") return undefined;
+  const value = (overrides as Record<string, unknown>)[axis];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 /** Overrides that keep an existing installation's protections intact. */
-export function carriedOverOverrides(level: PrivacyLevel): Partial<ProtectionPolicy> {
+export function carriedOverOverrides(
+  level: PrivacyLevel,
+  network: LegacyNetworkPolicy = LEGACY_NETWORK_FLOORS_V1[level],
+  rawOverrides: unknown = undefined,
+): Partial<ProtectionPolicy> {
+  const carried: Partial<ProtectionPolicy> = {};
   // The decoy timer left the `strict` floor; existing strict installations
   // keep it until they remove it or lower their level.
-  return level === "strict" ? { m11TileDefense: "prefetch-padding-decoy" } : {};
+  if (level === "strict") carried.m11TileDefense = "prefetch-padding-decoy";
+  // "Always coarsen" for the operator geocoder is no longer a setting of its
+  // own: the coarsening floor decides it. Raise the floor where the level's
+  // own floor (or a stored override) would leave location hints unrounded.
+  if (network.m9SelfHosted === "always-coarsen") {
+    const floor = Math.max(
+      LEVEL_FLOORS[level].m10CoarsenGridFloorMeters,
+      storedNumber(rawOverrides, "m10CoarsenGridFloorMeters") ?? 0,
+    );
+    if (floor < ALWAYS_COARSEN_FLOOR_METERS) {
+      carried.m10CoarsenGridFloorMeters = ALWAYS_COARSEN_FLOOR_METERS;
+    }
+  }
+  return carried;
 }
 
 function isExistingInstall(storage: StorageReader): boolean {
   return EXISTING_INSTALL_KEYS.some((key) => hasKey(storage, key));
 }
 
-export type ClassificationResult =
-  | { readonly status: "classified"; readonly record: OnboardingRecord }
-  | { readonly status: "already-classified"; readonly record: OnboardingRecord }
-  | { readonly status: "unavailable" }
-  | { readonly status: "write-failed"; readonly record: OnboardingRecord };
-
 /** Build the record for an installation that has no onboarding record. */
 export function buildClassification(
   storage: StorageReader,
-  now: number,
   previousRecordCorrupt = false,
 ): OnboardingRecord {
-  const preselectedCityId = storedCityId(storage);
+  const preselectedCityId = readStoredCityId(storage);
   // A corrupt record cannot tell a finished legacy migration from a setup in
   // progress (which may already have written ptn-settings). Run setup again
-  // rather than guess: it never grants anything on its own.
+  // rather than guess: it never grants anything on its own, and it never
+  // lowers a stricter stored level.
   if (previousRecordCorrupt || !isExistingInstall(storage)) {
     return newInstallRecord({
       kind: "new",
-      classifiedAt: now,
       ...(preselectedCityId ? { preselectedCityId } : {}),
     });
   }
@@ -246,41 +265,26 @@ export function buildClassification(
   const network = legacyEffectiveNetworkPolicy(level, overrides);
   const flows = mapLegacyNetworkDecisions(network, readLegacySettings(storage));
   return {
-    ...newInstallRecord({
-      kind: "existing",
-      classifiedAt: now,
-      legacy: { level, network },
-    }),
+    ...newInstallRecord({ kind: "existing" }),
     decisions: { preset: null, level: null, flows },
     applied: false,
-    legacyMigrated: true,
-    legacyOverrides: carriedOverOverrides(level),
+    legacyOverrides: carriedOverOverrides(level, network, overrides),
   };
 }
 
 /**
  * Classify this installation once. Idempotent: an existing valid record is
  * returned untouched, so a removed carried-over override is never re-added.
+ * Returns the record (kept for this session when storage refuses the write),
+ * or null when storage cannot be read at all.
  */
 export function classifyInstallation(
-  storage: Pick<Storage, "getItem" | "setItem"> | undefined = (() => {
-    try {
-      return globalThis.localStorage;
-    } catch {
-      return undefined;
-    }
-  })(),
-  now: number = Date.now(),
-): ClassificationResult {
+  storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeLocalStorage(),
+): OnboardingRecord | null {
   const existing = readOnboardingRecord(storage);
-  if (existing.status === "ok") {
-    return { status: "already-classified", record: existing.record };
-  }
-  if (existing.status === "unavailable" || !storage) {
-    return { status: "unavailable" };
-  }
-  const record = buildClassification(storage, now, existing.status === "corrupt");
-  return writeOnboardingRecord(record, storage)
-    ? { status: "classified", record }
-    : { status: "write-failed", record };
+  if (existing.status === "ok") return existing.record;
+  if (existing.status === "unavailable" || !storage) return null;
+  const record = buildClassification(storage, existing.status === "corrupt");
+  writeOnboardingRecord(record, storage);
+  return record;
 }

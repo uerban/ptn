@@ -120,6 +120,26 @@ export function patternDirKeys(index: Pick<RaptorIndex, "patterns">): PatternDir
   return keys;
 }
 
+/**
+ * GTFS `direction_id` of `tripId`, or `undefined` when the index does not say
+ * (unknown trip, a feed without direction_id). The trip's pattern decides when
+ * the index has patterns: a trip folded into a longer pattern
+ * (`PatternMode.CoveringMerge`) lost its own direction_id but rides its
+ * pattern's. Otherwise the canonical route's trip.
+ */
+export function tripDirectionId(
+  index: Pick<RaptorIndex, "patterns" | "routes" | "routeIdToIdx">,
+  routeId: string,
+  tripId: string,
+): 0 | 1 | undefined {
+  const key = patternDirKeys(index).byTrip.get(tripId);
+  if (key === "d0") return 0;
+  if (key === "d1") return 1;
+  const routeIdx = index.routeIdToIdx.get(routeId);
+  if (routeIdx === undefined) return undefined;
+  return index.routes[routeIdx]?.trips.find((t) => t.tripId === tripId)?.directionId;
+}
+
 const isHeadsignKey = (key: DirKey): boolean => key.startsWith("h:");
 
 /**

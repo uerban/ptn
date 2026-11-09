@@ -32,6 +32,11 @@ import "../styles/searchPicker.css";
 import { PinnedSavesSection, type ResolvedSave } from "../components/Search/PinnedSavesSection.tsx";
 import { OptionalStorageChoice } from "../components/Privacy/OptionalStorageChoice.tsx";
 import {
+  PLACE_SEARCH_FLOW,
+  ServerPlaceSearchOffer,
+} from "../components/Search/ServerPlaceSearchOffer.tsx";
+import { useCanUse } from "../privacy/canUse.ts";
+import {
   searchSuggestions,
   searchSuggestionsStream,
   SUGGESTION_PAGE_SIZE,
@@ -43,7 +48,7 @@ import { buildSearchPrefetchDriver } from "../services/poiSearchDriver.ts";
 import { getCityPoiTiling } from "../services/poiManifest.ts";
 import { PREFETCH_EST_TILE_BYTES } from "@pt/shared/poi";
 import { getPolicy } from "../stores/privacyStore.ts";
-import { grantRemoteRouting, isRemoteRoutingAvailable, useCanUseRemoteRouting } from "../services/routingAccess.ts";
+import { grantRemoteRouting, useCanUseRemoteRouting } from "../services/routingAccess.ts";
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { isDeviceOnline } from "../hooks/useConnectivity.ts";
 import { getActiveTileLoader } from "../services/poiSync.ts";
@@ -889,21 +894,18 @@ export function SearchPage() {
 }, [fromEndpoint, toEndpoint, preferredAdapter, raptorReady, ptRouterReady, gtfsSyncing, cityId, paginationTime, excludedModes, excludedRouteGroupsByCity, ranking, feedTz, hasRouteRestrictions, routingMode, routingProvider, remoteAllowed, transitousAllowed, transitousQueryKey, failedTransitousPrimaryKey, handleSearchOnServer, handleRemotePrimarySearch, endpointLabels]);
 
   // The RECOVERY affordance (engine-failure "Search on the server") is the no-wasm user's only
-  // route — gate on the privacy ceiling ONLY, never on the availability probe. If the source is
-  // truly down, the real plan() rejection drives the signalled fallback; a wrong/transient probe
-  // must never strand the user with no action.
-  // The explicit "Search on the server" click is the action that allows it.
-  const remoteOffered = isRemoteRoutingAvailable("operator");
+  // route — never gated on the availability probe. If the source is truly down, the real plan()
+  // rejection drives the signalled fallback; a wrong/transient probe must never strand the user
+  // with no action. The explicit "Search on the server" click is the action that allows it.
   const handleSearchOnServerRequest = useCallback(() => {
     if (grantRemoteRouting("operator", "contextual")) handleSearchOnServer();
   }, [handleSearchOnServer]);
-  const remoteSearch = remoteOffered && routingProvider === "operator"
+  const remoteSearch = routingProvider === "operator"
     ? { onSearchOnServer: handleSearchOnServerRequest }
     : undefined;
   // The empty-state nicety (on-device ran and found nothing) — cheap to suppress
   // on a hint, so it DOES gate on availability (don't offer a dead button).
   const emptyRemoteSearch =
-    remoteOffered &&
     routingProvider === "operator" &&
     remoteRoutingAvailable
     ? { onSearchOnServer: handleSearchOnServerRequest }
@@ -973,6 +975,9 @@ export function SearchPage() {
       toInputRef.current.focus();
     }
   }, []);
+
+  // Granting or revoking the operator's address search reruns the suggestions.
+  const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
 
   // One request identity per field/query/provider. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
@@ -1045,7 +1050,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, userLocation?.lat, userLocation?.lon]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, userLocation?.lat, userLocation?.lon]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
@@ -1672,6 +1677,7 @@ export function SearchPage() {
                 {t("search.show_more", "Show more")}
               </button>
             )}
+            <ServerPlaceSearchOffer cityId={cityId} query={activeQuery} />
             <PinnedSavesSection onSelect={selectSave} query={activeQuery} compact={compactRows} />
             {!activeQuery.trim() && <>
             <OptionalStorageChoice

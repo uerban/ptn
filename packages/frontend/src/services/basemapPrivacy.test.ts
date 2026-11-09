@@ -88,6 +88,15 @@ describe("map request guard", () => {
     expect(guardMapRequest("data:application/json,{}", "SpriteJSON", origin)).toBeUndefined();
   });
 
+  it("judges protocol-relative and look-alike URLs by where they resolve", () => {
+    expect(guardMapRequest("//tracker.example/x.pbf", "Tile", origin)).toMatch(/^data:/);
+    expect(guardMapRequest(`${origin}.tracker.example/x.pbf`, "Tile", origin)).toMatch(/^data:/);
+    expect(guardMapRequest("tiles/1/2/3.pbf", "Tile", origin)).toBeUndefined();
+    expect(
+      guardMapRequest("//tiles.basemaps.cartocdn.com/fonts/a/0-255.pbf", "Glyphs", origin),
+    ).toMatch(/^data:/);
+  });
+
   it("answers provider tiles, glyphs and sprites locally until the provider is allowed", () => {
     const tile = "https://tiles.basemaps.cartocdn.com/vector/carto.streets/v1/1/2/3.mvt";
     expect(guardMapRequest(tile, "Tile", origin)).toMatch(/^data:application\/x-protobuf/);
