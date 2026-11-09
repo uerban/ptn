@@ -1,9 +1,8 @@
 name: CI
 run-name: CI ${{ github.head_ref || github.ref_name }}
+# Pushes to main are built once by release.yml; this workflow is PR feedback only.
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -41,7 +40,7 @@ jobs:
           sudo apt-get install -y pkg-config osmium-tool
       - uses: ./.github/actions/setup-build
         with:
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
+          cache-profile: release-native
       - name: Build the browser engine
         working-directory: crates/pt-wasm
         env:
@@ -75,6 +74,8 @@ jobs:
             target: x86_64-unknown-linux-musl
             runner: ubuntu-24.04
             emulator: ""
+            # release.yml builds this target inside its native build job.
+            cache-profile: release-native
           - platform: linux-armv6-rpi1
             target: arm-unknown-linux-musleabihf
             runner: ubuntu-24.04
@@ -107,8 +108,7 @@ jobs:
         with:
           node: 'false'
           wasm-pack: 'false'
-          cache-profile: release-${{ matrix.target }}
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
+          cache-profile: ${{ matrix.cache-profile || format('release-{0}', matrix.target) }}
       - name: Build all host tools
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
