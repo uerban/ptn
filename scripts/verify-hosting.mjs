@@ -5,6 +5,7 @@ import {createHash} from "node:crypto";
 import {readFile, mkdir, writeFile} from "node:fs/promises";
 import {createRequire} from "node:module";
 import {resolve} from "node:path";
+import {installBrowserProbe} from "./hosting-browser-probe.mjs";
 import {navigate} from "./hosting-navigation.mjs";
 const require = createRequire(new URL("../packages/frontend/package.json", import.meta.url));
 const {chromium} = require("@playwright/test");
@@ -24,32 +25,7 @@ await context.route("**/*", route => {
   const url = new URL(route.request().url());
   return url.origin === new URL(baseURL).origin || ["blob:", "data:"].includes(url.protocol) ? route.continue() : route.abort();
 });
-await page.addInitScript(({at}) => {
-  globalThis.__PTN_HOST_CHECK__ = {transitResults: 0};
-  const NativeWorker = Worker;
-  globalThis.Worker = class extends NativeWorker {
-    constructor(url, options) {
-      super(url, options);
-      if (/ptRouter\.worker/.test(String(url))) {
-        this.addEventListener("message", ({data}) => {
-          if (data?.ok && Array.isArray(data.value)) {
-            globalThis.__PTN_HOST_CHECK__.transitResults += data.value.filter(itinerary =>
-              itinerary.legs?.some(leg => typeof leg.tripId === "string" && leg.tripId.length > 0)).length;
-          }
-        });
-      }
-    }
-  };
-  const NativeDate = Date;
-  function FixedDate(...args) {
-    if (!new.target) return new NativeDate(at).toString();
-    return Reflect.construct(NativeDate, args.length ? args : [at], new.target);
-  }
-  Object.setPrototypeOf(FixedDate, NativeDate);
-  FixedDate.prototype = NativeDate.prototype;
-  FixedDate.now = () => at;
-  globalThis.Date = FixedDate;
-}, {at: Date.parse(probe.at)});
+await page.addInitScript(installBrowserProbe, {at: Date.parse(probe.at), fromStopId: probe.fromStopId, toStopId: probe.toStopId});
 try {
   const ready = await context.request.get(`${baseURL}/api/vilnius/ready`);
   assert.equal(ready.status(), 200);
@@ -93,26 +69,16 @@ try {
   await page.waitForFunction(() => globalThis.__PTN_HOST_CHECK__.transitResults > 0);
   assert(page.workers().some(worker => /ptRouter\.worker/.test(worker.url())), "no on-device router worker");
   assert.deepEqual(serverPlans, [], "browser sent a route query to the server");
-  const storedStops = await page.evaluate(async () => {
-    const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("ptn");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = database.transaction("gtfsStops").objectStore("gtfsStops").count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {database.close();}
-  });
-  assert(storedStops > 0, "browser did not synchronize stops");
+  // City activation keeps decoded stops in memory; the legacy gtfsStops
+  // projection is intentionally empty on a fresh installation.
+  const {catalogStops, journeyStopsPresent} = await page.evaluate(() => globalThis.__PTN_HOST_CHECK__);
+  assert(catalogStops > 0, "browser did not decode the city catalog");
+  assert(journeyStopsPresent, "decoded catalog is missing the journey stops");
   assert.deepEqual(errors, [], "uncaught browser errors");
   await page.screenshot({path: resolve(output, "route.png"), fullPage: true});
   const transitResults = await page.evaluate(() => globalThis.__PTN_HOST_CHECK__.transitResults);
-  await writeFile(resolve(output, "result.json"), JSON.stringify({baseURL, generation: provenance.servingGenerationId, storedStops, routerWorker: true, transitResults, serverPlanRequests: serverPlans.length}, null, 2) + "\n");
-  console.log(`PASS: ${storedStops} stops, on-device route, zero server plan requests`);
+  await writeFile(resolve(output, "result.json"), JSON.stringify({baseURL, generation: provenance.servingGenerationId, catalogStops, journeyStopsPresent, routerWorker: true, transitResults, serverPlanRequests: serverPlans.length}, null, 2) + "\n");
+  console.log(`PASS: ${catalogStops} catalog stops, on-device route, zero server plan requests`);
 } catch (error) {
   await page.screenshot({path: resolve(output, "failure.png"), fullPage: true});
   await writeFile(resolve(output, "failure.html"), await page.content());
