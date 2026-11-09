@@ -351,6 +351,30 @@ describe("all data deleted in another tab", () => {
     expect(storedState().generation).toBe("fresh");
   });
 
+  it("does not merge a setup it stored into a newer setup written right after it", () => {
+    // Another tab deletes all data and stores a Strict setup immediately
+    // after this tab's write lands.
+    localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
+    const fresh = JSON.stringify({
+      state: { decisions: {}, cleared: {}, generation: "fresh" },
+      version: 1,
+    });
+    const write = localStorage.setItem.bind(localStorage);
+    vi.spyOn(localStorage, "setItem").mockImplementationOnce((key, value) => {
+      write(key, value);
+      write(key, fresh);
+    });
+    const store = useNetworkDecisionsStore.getState();
+    store.replaceDecisions({ [CARTO]: { value: "allowed", source: "setup" } });
+    expect(storedState().generation).toBe("fresh");
+
+    store.setDecision("operator.service-alerts", "denied", "settings");
+
+    expect(storedDecisions()[CARTO]).toBeUndefined();
+    expect(useNetworkDecisionsStore.getState().decisions[CARTO]).toBeUndefined();
+    expect(storedState().generation).toBe("fresh");
+  });
+
   it("still merges decisions it could never store into the stored ones", () => {
     // Nothing is stored yet and this tab's writes are all refused, so its
     // copy was never stored; another tab then stores the first decisions.

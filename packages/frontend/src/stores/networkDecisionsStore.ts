@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import {
   createTolerantJSONStorage,
+  refusedWriteCount,
   tolerantLocalStorage,
 } from "../services/tolerantLocalStorage.ts";
 import {
@@ -87,12 +88,6 @@ function parseSnapshot(raw: string | null | undefined): DecisionSnapshot | null 
 
 function storedRaw(): string | null {
   return tolerantLocalStorage.getItem(NETWORK_DECISIONS_STORAGE_KEY) as string | null;
-}
-
-/** The decisions as last stored by any tab, or null when nothing readable is
- * stored. */
-function storedSnapshot(): DecisionSnapshot | null {
-  return parseSnapshot(storedRaw());
 }
 
 function snapshotOf(state: DecisionSnapshot): DecisionSnapshot {
@@ -226,13 +221,6 @@ function current(
   return copies.length > 0 ? mergeSnapshots(...copies) : EMPTY;
 }
 
-/** Remember the generation storage holds now. Called after every write, so
- * a tab always knows which generation it stored last. */
-function noteStored(): void {
-  const stored = storedSnapshot();
-  if (stored) seenGeneration = stored.generation;
-}
-
 /**
  * Apply this tab's changes on top of the current decisions (see `current`).
  */
@@ -267,14 +255,17 @@ let writesHeld = false;
 /**
  * Writes go through unless the store is updated in memory only. Every write
  * the store makes passes here, so this is the one place that records the
- * generation it left in storage.
+ * generation it stored: the one in the value it wrote, once the write was
+ * accepted. Storage is not read back, since another tab may already have
+ * replaced the value.
  */
 const decisionsStorage: PersistStorage<PersistedDecisions> | undefined = tolerantStorage && {
   getItem: (name) => tolerantStorage.getItem(name),
   setItem: (name, value) => {
     if (writesHeld) return;
+    const refusedBefore = refusedWriteCount();
     void tolerantStorage.setItem(name, value);
-    noteStored();
+    if (refusedWriteCount() === refusedBefore) seenGeneration = value.state.generation;
   },
   removeItem: (name) => tolerantStorage.removeItem(name),
 };
