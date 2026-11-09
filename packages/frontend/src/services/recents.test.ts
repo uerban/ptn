@@ -23,7 +23,7 @@ import {
 import { __resetInstallKeyCacheForTests } from "./installKey.ts";
 import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
 import { __resetPersonalStorageForTests, putPersonal } from "./personalStorage.ts";
-import { usePrivacyStore } from "../stores/privacyStore.ts";
+import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
 import { usePrivacyChoicesStore } from "../stores/privacyChoicesStore.ts";
 import {
   findLeaks,
@@ -259,6 +259,33 @@ describe("clearRecents", () => {
     expect(pending).toHaveLength(1);
     expect(await db.recentLocations.count()).toBe(0);
     expect(await listRecents()).toEqual([]);
+  });
+
+  it("a recent recorded while history is cleared during the read of existing recents is not stored", async () => {
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    const pending: Promise<unknown>[] = [];
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      pending.push(clearRecents());
+      return decrypt(...args);
+    });
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed when the level moves recents to this session is not stored", async () => {
+    const pending = whileSealing(() => usePrivacyStore.getState().setLevel("paranoid"));
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(getPolicy().recentsEncryption).toBe("ram-only");
+    expect(await db.recentLocations.count()).toBe(0);
   });
 });
 

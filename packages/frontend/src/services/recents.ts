@@ -8,6 +8,7 @@ import {
   moveDurableToSession,
   moveSessionToDurable,
   newPersonalId,
+  personalClearGeneration,
   putPersonal,
   type PersonalEntry,
 } from "./personalStorage.ts";
@@ -147,13 +148,22 @@ export async function recordRecent(
   // Capture ownership before decryption yields to a possible city switch.
   const cityId = activeCityId();
   const fingerprint = endpointFingerprint(endpoint);
+  // Captured before the first read: a clear, a consent withdrawal or a move
+  // to another storage tier at any point before the write drops the record.
+  const generation = personalClearGeneration(TABLE);
+  const stillValid = (): boolean => {
+    if (personalClearGeneration(TABLE) !== generation) return false;
+    if (!isOptionalStorageEnabledNow("recents")) return false;
+    if (opts.tier !== undefined) return true;
+    const currentAxis = getPolicy().recentsEncryption;
+    return currentAxis !== "off" && tierForRecentsAxis(currentAxis) === tier;
+  };
 
   // Identical endpoints collapse per city; the LRU cap is per city too.
   const entries = (await listRecentEntries()).filter((e) =>
     recentInCity(e.value, cityId),
   );
-  // Recheck consent after waiting for storage.
-  if (!isOptionalStorageEnabledNow("recents")) return;
+  if (!stillValid()) return;
   const existing = entries.find(
     (e) => endpointFingerprint(e.value.endpoint) === fingerprint,
   );
@@ -167,9 +177,9 @@ export async function recordRecent(
   invalidateRecentsCache();
   const written = await putPersonal(TABLE, id, payload, {
     sessionOnly: tier === "ram-only",
-    // Consent can be withdrawn (and recents cleared) while the record is
+    // Consent, the storage tier or the table can change while the record is
     // being sealed.
-    commitIf: () => isOptionalStorageEnabledNow("recents"),
+    commitIf: stillValid,
   });
   if (written === "discarded") {
     invalidateRecentsCache();

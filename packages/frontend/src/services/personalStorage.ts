@@ -383,6 +383,15 @@ function clearGeneration(table: PersonalTable): number {
 }
 
 /**
+ * How many times a table has been cleared. A caller that reads before writing
+ * captures it first and passes `commitIf`, so a clear during the read also
+ * drops the write.
+ */
+export function personalClearGeneration(table: PersonalTable): number {
+  return clearGeneration(table);
+}
+
+/**
  * Writes one record. It is sealed and stored when durable encrypted storage is
  * available; otherwise it is kept for this session only. A clear of the table
  * while the record is being prepared discards it, so a deletion is never
