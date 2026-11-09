@@ -135,32 +135,6 @@ test.describe("accessibility @mock-api", () => {
     await expect(stop).toBeFocused();
   });
 
-  test("the map detail offer neither takes focus nor speaks through a live region", async ({
-    page,
-    context,
-  }) => {
-    await context.grantPermissions(["geolocation"]);
-    await mockApi(page, { realtime: "departures, alerts" });
-    await page.goto("/");
-    const control = page.getByTestId("more-map-detail");
-    await expect(control).toBeVisible({ timeout: 20_000 });
-    await page.waitForTimeout(500);
-    const focusedInside = await page.evaluate(
-      () =>
-        !!document.activeElement?.closest("[data-testid='map-detail-control']"),
-    );
-    expect(focusedInside).toBe(false);
-    const live = await page
-      .getByTestId("map-detail-control")
-      .evaluate(
-        (el) =>
-          !!el.closest("[aria-live], [role='status'], [role='alert']") ||
-          !!el.querySelector("[aria-live], [role='status'], [role='alert']"),
-      );
-    expect(live).toBe(false);
-    expect(await axeViolations(page)).toEqual([]);
-  });
-
   test("privacy settings pass axe and label every choice", async ({ page }) => {
     await mockApi(page, { realtime: "departures, alerts" });
     await page.goto("/settings");

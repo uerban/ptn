@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import type * as maplibregl from "maplibre-gl";
 import { TransitMap } from "../components/Map/TransitMap.tsx";
 import { FavoritesBar } from "../components/Favorites/FavoritesBar.tsx";
-import { Icon } from "../components/Icon.tsx";
 import { StopPopup } from "../components/Map/StopPopup.tsx";
 import { MapTapActionSheet } from "../components/Map/MapTapActionSheet.tsx";
 import { LineRouteOverlay } from "../components/Map/LineRouteOverlay.tsx";
@@ -16,7 +15,6 @@ import { useVisibleStops } from "../hooks/useVisibleStops.ts";
 import { useViewportBadgeActivity } from "../hooks/useViewportBadgeActivity.ts";
 import { useDepartures } from "../hooks/useDepartures.ts";
 import { useNearbyDirections } from "../hooks/useNearbyDirections.ts";
-import { useTranslation } from "../i18n/index.ts";
 import { ModeToggle } from "../components/Map/ModeToggle.tsx";
 import { BikeShareToggle } from "../components/Map/BikeShareToggle.tsx";
 import { BikeShareLayer } from "../components/Map/BikeShareLayer.tsx";
@@ -72,7 +70,6 @@ export interface HomePageProps {
 
 export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
   const navigate = useNavigate();
-  const { t } = useTranslation();
 
   // The same foreground position feeds the map, nearby stops, and guidance.
   const watchPos = useWatchPosition(true);
@@ -395,33 +392,31 @@ export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
 
   return (
     <div className="relative h-full flex flex-col" data-sheet={sheetStop || tripTarget ? "" : undefined}>
-      {/* Floating search bar */}
+      {/* One top row: city name on the left; bikes (and any other
+          experimental chip), urban mode and schedule mode on the right.
+          Search lives in the bottom nav. */}
       <MapObstacle
-        id="search-bar"
+        id="top-controls"
         className="absolute top-3 left-3 right-3 z-10 flex items-center gap-2"
       >
-        <button
-          onClick={() => navigate("/search")}
-          className="flex-1 min-w-0 flex items-center gap-2 px-4 py-3 bg-surface-raised
-            rounded-xl shadow-2
-            text-fg-muted text-left"
+        <span
+          className="min-w-0 flex-1 truncate self-center"
+          data-testid="city-name"
         >
-          <Icon name="search" className="shrink-0" />
-          <span className="truncate">{t("search.where_to", "Where are you going?")}</span>
-        </button>
-        <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 shrink-0">
-          <span className="px-2 py-0.5 sm:py-1.5 text-xs text-fg-muted font-medium whitespace-nowrap" data-testid="city-name">
+          <span className="inline-block max-w-full truncate px-3 py-1.5 bg-surface-raised rounded-full shadow-1 text-xs text-fg-muted font-medium">
             {activeCity.name}
           </span>
-          <ModeToggle />
+        </span>
+        <div className="flex items-center gap-2 shrink-0">
           <BikeShareToggle />
+          <ModeToggle />
           <TextModeButton onBackToText={onBackToText} />
         </div>
       </MapObstacle>
 
-      {/* Favorites bar, then the map-detail control and the local map's
-          status below it. The column itself lets map gestures through. */}
-      <div className="absolute top-[4.5rem] left-0 right-0 z-10 pointer-events-none">
+      {/* Favorites bar, then the local map's status below it. The column
+          itself lets map gestures through. */}
+      <div className="absolute top-[3.75rem] left-0 right-0 z-10 pointer-events-none">
         <MapObstacle id="favorites-bar" className="pointer-events-auto">
           <FavoritesBar onFavoriteClick={handleFavoriteClick} />
         </MapObstacle>

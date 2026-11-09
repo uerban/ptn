@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { I18nContext } from "../../i18n/index.ts";
-import { MAP_DETAIL_HINT_KEY, MapDetailControl } from "./MapDetailControl.tsx";
+import { MAP_DETAIL_ASKED_KEY, MapDetailControl } from "./MapDetailControl.tsx";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useNetworkDecisionsStore } from "../../stores/networkDecisionsStore.ts";
 import { canUse } from "../../privacy/canUse.ts";
@@ -38,13 +38,12 @@ function renderControl() {
   return render(<MapDetailControl />, { wrapper: Wrapper });
 }
 
-const moreDetail = () => screen.getByTestId("more-map-detail");
-const hint = () => screen.queryByTestId("map-detail-hint");
+const disclosure = () => screen.queryByTestId("flow-disclosure");
 
 beforeEach(() => {
-  localStorage.removeItem(MAP_DETAIL_HINT_KEY);
+  localStorage.removeItem(MAP_DETAIL_ASKED_KEY);
   useNetworkDecisionsStore.getState().reset();
-  useSettingsStore.getState().setMapDetailMode("detailed");
+  useSettingsStore.getState().setMapDetailMode("micromap");
   __resetContextualPromptsForTests();
   reportDetailedBasemapStatus("off");
   micromap.state = undefined;
@@ -54,33 +53,17 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("MapDetailControl", () => {
-  it("offers More map detail at once, with a quiet tip that takes no focus", () => {
+  it("has no standing toggle", () => {
     renderControl();
-    expect(moreDetail().getAttribute("aria-pressed")).toBe("false");
-    expect(hint()).not.toBeNull();
-    expect(hint()?.getAttribute("role")).toBeNull();
-    expect(hint()?.getAttribute("aria-live")).toBeNull();
-    expect(document.activeElement).toBe(document.body);
+    expect(screen.queryByTestId("more-map-detail")).toBeNull();
+    expect(screen.queryByText("More map detail")).toBeNull();
   });
 
-  it("remembers a dismissed tip across reloads and keeps the control", () => {
-    const view = renderControl();
-    fireEvent.click(screen.getByTestId("map-detail-hint-dismiss"));
-    expect(hint()).toBeNull();
-    view.unmount();
-
+  it("asks once, naming the provider, and Use detailed maps grants that provider only", () => {
     renderControl();
-    expect(hint()).toBeNull();
-    expect(moreDetail()).toBeDefined();
-  });
-
-  it("asks first, naming the provider, and Use detailed maps grants that provider only", () => {
-    renderControl();
-    fireEvent.click(moreDetail());
-    const disclosure = screen.getByTestId("flow-disclosure");
-    expect(disclosure.getAttribute("role")).toBe("dialog");
-    expect(disclosure.textContent).toContain("CARTO");
-    expect(disclosure.textContent).toContain("The map area on screen");
+    const dialog = screen.getByTestId("flow-disclosure");
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.textContent).toContain("CARTO");
     expect(canUse("external.detailed-basemap", "carto")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Use detailed maps" }));
@@ -89,74 +72,42 @@ describe("MapDetailControl", () => {
       "external.detailed-basemap@carto",
     ]);
     expect(useSettingsStore.getState().mapDetailMode).toBe("detailed");
-    expect(moreDetail().getAttribute("aria-pressed")).toBe("true");
-    expect(document.activeElement).toBe(moreDetail());
+    expect(disclosure()).toBeNull();
+    expect(localStorage.getItem(MAP_DETAIL_ASKED_KEY)).toBe("1");
   });
 
-  it("Not now keeps the local map and hides the tip for the session", () => {
+  it("Not now keeps the local map and is never asked again, even after a reload", () => {
     const view = renderControl();
-    fireEvent.click(moreDetail());
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
     expect(useNetworkDecisionsStore.getState().decisions).toEqual({});
+    expect(disclosure()).toBeNull();
     view.unmount();
 
-    // Same session, tip not dismissed in storage: still not offered again.
-    localStorage.removeItem(MAP_DETAIL_HINT_KEY);
+    __resetContextualPromptsForTests();
     renderControl();
-    expect(hint()).toBeNull();
-    // The deliberate action still opens the disclosure.
-    fireEvent.click(moreDetail());
-    expect(screen.getByTestId("flow-disclosure")).toBeDefined();
+    expect(disclosure()).toBeNull();
+    expect(useSettingsStore.getState().mapDetailMode).toBe("micromap");
   });
 
-  it("Don't ask again silences the tip, but the control still opens the disclosure with Allow", () => {
+  it("Don't ask again records a denial and stays silent", () => {
     const view = renderControl();
-    fireEvent.click(moreDetail());
     fireEvent.click(screen.getByRole("button", { name: "Don't ask again" }));
     expect(
       useNetworkDecisionsStore.getState().decisions["external.detailed-basemap@carto"]?.value,
     ).toBe("denied");
     view.unmount();
-    localStorage.removeItem(MAP_DETAIL_HINT_KEY);
+
     __resetContextualPromptsForTests();
-
     renderControl();
-    expect(hint()).toBeNull();
-    fireEvent.click(moreDetail());
-    expect(screen.queryByRole("button", { name: "Don't ask again" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Use detailed maps" }));
-    expect(canUse("external.detailed-basemap", "carto")).toBe(true);
+    expect(disclosure()).toBeNull();
   });
 
-  it("switches directly when detailed maps are already allowed, and back without revoking", () => {
-    useNetworkDecisionsStore
-      .getState()
-      .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
-    useSettingsStore.getState().setMapDetailMode("micromap");
-    renderControl();
-    expect(hint()).toBeNull();
-
-    fireEvent.click(moreDetail());
-    expect(screen.queryByTestId("flow-disclosure")).toBeNull();
-    expect(useSettingsStore.getState().mapDetailMode).toBe("detailed");
-
-    fireEvent.click(moreDetail());
-    expect(useSettingsStore.getState().mapDetailMode).toBe("micromap");
-    expect(canUse("external.detailed-basemap", "carto")).toBe(true);
-  });
-
-  it("follows a revocation made elsewhere", () => {
+  it("does not ask when detailed maps are already allowed or decided", () => {
     useNetworkDecisionsStore
       .getState()
       .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
     renderControl();
-    expect(moreDetail().getAttribute("aria-pressed")).toBe("true");
-    act(() => {
-      useNetworkDecisionsStore
-        .getState()
-        .setDecision("external.detailed-basemap", "denied", "settings", "carto");
-    });
-    expect(moreDetail().getAttribute("aria-pressed")).toBe("false");
+    expect(disclosure()).toBeNull();
   });
 
   it.each([
@@ -189,6 +140,7 @@ describe("MapDetailControl", () => {
     useNetworkDecisionsStore
       .getState()
       .setDecision("external.detailed-basemap", "allowed", "settings", "carto");
+    useSettingsStore.getState().setMapDetailMode("detailed");
     renderControl();
     act(() => reportDetailedBasemapStatus("loading"));
     expect(screen.getByTestId("map-status").textContent).toContain("Loading detailed map");

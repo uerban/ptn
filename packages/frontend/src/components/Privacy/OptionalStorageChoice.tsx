@@ -149,7 +149,13 @@ export function OptionalStorageChoice({
       }
       aria-label={title}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className={
+          presentation === "contextual"
+            ? "flex flex-col items-stretch gap-2"
+            : "flex items-start justify-between gap-3"
+        }
+      >
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-fg">{title}</h3>
           <p className="text-xs text-fg-muted">{description}</p>
@@ -159,7 +165,13 @@ export function OptionalStorageChoice({
             </p>
           )}
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+        <div
+          className={
+            presentation === "contextual"
+              ? "flex flex-wrap justify-start gap-2"
+              : "flex shrink-0 flex-wrap justify-end gap-2"
+          }
+        >
           {choice === "enabled" ? (
             <button
               type="button"

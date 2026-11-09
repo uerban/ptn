@@ -20,6 +20,21 @@ const MODE_COLORS: Record<string, string> = {
   WALK: "#6b7280",
 };
 
+/** Walk legs are drawn dashed in grey; the light-theme grey vanishes on the
+ * dark basemap, so dark theme uses a light slate that stays clearly visible. */
+const WALK_COLOR_LIGHT = "#6b7280";
+const WALK_COLOR_DARK = "#e2e8f0";
+
+function legColor(leg: Leg): string {
+  if (leg.routeColor) return `#${leg.routeColor}`;
+  if (leg.mode === "WALK") {
+    return document.documentElement.dataset.theme === "dark"
+      ? WALK_COLOR_DARK
+      : WALK_COLOR_LIGHT;
+  }
+  return MODE_COLORS[leg.mode];
+}
+
 type Pending = {
   leg: Leg;
   geom: LegGeometryResult;
@@ -106,10 +121,8 @@ function apply(map: maplibregl.Map, index: number, p: Pending): void {
         source: sourceId,
         layout: { "line-join": "round", "line-cap": "round" },
         paint: {
-          "line-color": p.leg.routeColor
-            ? `#${p.leg.routeColor}`
-            : MODE_COLORS[p.leg.mode],
-          "line-width": p.leg.mode === "WALK" ? 3 : 5,
+          "line-color": legColor(p.leg),
+          "line-width": p.leg.mode === "WALK" ? 4 : 5,
           "line-opacity": opacity,
           ...(p.leg.mode === "WALK" ? { "line-dasharray": [2, 2] } : {}),
         },
@@ -120,6 +133,8 @@ function apply(map: maplibregl.Map, index: number, p: Pending): void {
     (src as maplibregl.GeoJSONSource).setData(geojson);
     if (map.getLayer(layerId)) {
       map.setPaintProperty(layerId, "line-opacity", opacity);
+      // Follows a theme switch while guidance is running.
+      if (p.leg.mode === "WALK") map.setPaintProperty(layerId, "line-color", legColor(p.leg));
       // If the stops layer mounted after this leg's first enqueue, the
       // initial `addLayer` ran with `beforeId=undefined` (so the leg now
       // sits above stops). Re-position so the first user-tap after stops
