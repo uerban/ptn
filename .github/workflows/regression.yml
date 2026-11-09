@@ -7,11 +7,10 @@ on:
         description: Exact 40-character source commit (defaults to workflow commit)
         required: false
         type: string
-  # PR pushes reach this through ci.yml (a skipped job inside the CI run, not
-  # a separate skipped run). Only adding the label starts a run directly.
+  # Labelled PRs run this inside their CI run (ci.yml); a PR trigger here would
+  # add a skipped run per push and duplicate CI's call. Release drafting uses
+  # manual dispatches on main.
   workflow_call:
-  pull_request:
-    types: [labeled]
 permissions:
   contents: read
 concurrency:
@@ -19,10 +18,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regressions:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'ci:regression') ||
-      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'ci:regression'))
     name: Performance, memory and binding parity
     runs-on: ubuntu-24.04
     timeout-minutes: 75
@@ -78,26 +73,33 @@ jobs:
         id: parity
         run: |
           set -o pipefail
-          cargo test --locked -p pt-core --test raptor_behavior
+          cargo test --locked -p pt-core --test raptor_behavior 2>&1 | tee evidence/routing-goldens.log
           node crates/pt-wasm/tests/plan_golden.mjs | tee evidence/wasm-goldens.log
           node crates/pt-wasm/tests/three_way.mjs | tee evidence/binding-parity.log
           grep -E 'pt-wasm-three-way: [1-9][0-9]* tuples compared, 0 mismatch' evidence/binding-parity.log
-          pnpm --filter @pt/backend exec tsx ../shared/scripts/assert-ptb-cross-parity.ts ../../crates/pt-core/tests/tiny.projection.json ../../crates/pt-core/tests/canary.projection.json ../../crates/pt-core/tests/tiny-service-pool.projection.json ../../crates/pt-core/tests/tiny-v1.projection.json ../../crates/pt-core/tests/overnight-i32.projection.json
+          pnpm --filter @pt/backend exec tsx ../shared/scripts/assert-ptb-cross-parity.ts ../../crates/pt-core/tests/tiny.projection.json ../../crates/pt-core/tests/canary.projection.json ../../crates/pt-core/tests/tiny-service-pool.projection.json ../../crates/pt-core/tests/tiny-v1.projection.json ../../crates/pt-core/tests/overnight-i32.projection.json 2>&1 | tee evidence/ptb-parity.log
       - name: Native RSS admission safeguards
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: rss
-        run: cargo test --locked -p pt-serve --test rss_guard --test rss_guard_process --test generation_load_phases
+        run: |
+          set -o pipefail
+          cargo test --locked -p pt-serve --test rss_guard --test rss_guard_process --test generation_load_phases 2>&1 | tee evidence/rss.log
       - name: Index-build p99 budget
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: index
         run: |
           pnpm --filter @pt/frontend bench:check
           cd packages/frontend
-          node "$GATE_TOOLS/packages/frontend/scripts/check-bench-budgets.mjs"
+          cp tests/benchmarks/.results.json ../../evidence/index-bench-raw.json
+          PTN_BENCH_EVIDENCE=../../evidence/index-bench.json node "$GATE_TOOLS/packages/frontend/scripts/check-bench-budgets.mjs"
       - name: Browser bundle-size budgets
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: bundle
-        run: pnpm --filter @pt/frontend size:check
+        run: |
+          set -o pipefail
+          # Sizes are recorded even when a budget fails; size:check is the gate.
+          pnpm --filter @pt/frontend --silent exec size-limit --json > evidence/bundle.json || true
+          pnpm --filter @pt/frontend size:check 2>&1 | tee evidence/bundle.log
       - name: Install Chromium
         id: browser
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -181,6 +183,8 @@ jobs:
           name: regression-evidence
           retention-days: 30
           if-no-files-found: error
+          # Benchmark output is a dot-file; upload-artifact skips those by default.
+          include-hidden-files: true
           path: |
             source/evidence/
             source/packages/frontend/tests/benchmarks/.results.json

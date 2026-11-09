@@ -10,7 +10,7 @@
 //   (c) if vitest's JSON shape drifts and no benchmarks are found, fail loud
 //   (d) double-matches (two benchmarks both matching one budget key) must fail
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
 const RESULTS_PATH = "tests/benchmarks/.results.json";
@@ -88,6 +88,13 @@ for (const key of Object.keys(BUDGETS_MS)) {
 const missing = Object.keys(BUDGETS_MS).filter((k) => !matchedKeys.has(k));
 if (missing.length) {
   failures.push(`No benchmark found for budget key(s): ${missing.join(", ")} — bench name may have drifted or the JSON shape changed`);
+}
+
+// Optional machine-readable record of each budgeted value (regression evidence).
+if (process.env.PTN_BENCH_EVIDENCE) {
+  await writeFile(process.env.PTN_BENCH_EVIDENCE, JSON.stringify(
+    checked.map(({ key, metricName, metric, budget }) => ({ name: key, metric: metricName, valueMs: metric, budgetMs: budget })),
+    null, 2) + "\n");
 }
 
 for (const { key, metricName, metric, budget } of checked) {

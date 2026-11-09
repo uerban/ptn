@@ -45,6 +45,10 @@ during stable promotion.
 
 Each run publishes a human-readable job summary with the exact source revision,
 overall result and every gate/prerequisite outcome, including failures and skips.
+The summary and `regression.json` also list each measured value with its budget
+(WASM and bundle sizes, index p99, JS heap, cold-start p95 stages, city-switch
+and pan timings). Routing parity and native RSS checks are pass/fail; their
+logs are kept in `regression-evidence`.
 The same report is saved as `regression.md` in `regression-evidence`; machine-readable
 `regression.json` is also uploaded as `regression-proof`, including on failure.
 Both artifacts are retained for 30 days.
@@ -55,9 +59,12 @@ After the workflows land on main:
 gh workflow run regression.yml --ref main -f revision=FULL_40_CHARACTER_COMMIT
 ```
 
-For pre-merge diagnostics, add `ci:regression` to a PR. Adding the label starts
-a run; subsequent commits rerun the gate inside the PR's CI run while the label
-remains. Unlabelled PRs show only a skipped job in CI, not a separate workflow run. These runs use hosted Ubuntu runners, read-only
+For pre-merge diagnostics, add `ci:regression` to a PR. While the label remains,
+each source push runs the gates as a job inside the PR's CI run (results and
+artifacts are on that CI run). The label takes effect on the next push; to run
+immediately, dispatch `regression.yml` on the PR branch with the head commit.
+`regression.yml` has no PR trigger, so unlabelled PRs create no extra runs, and
+its run list holds only dispatched runs such as release evidence. These runs use hosted Ubuntu runners, read-only
 repository permissions and committed synthetic/public fixtures; they need no
 private feeds, credentials or homelab access. PR diagnostics do not substitute for
 the trusted main-workflow run required by release preparation.
