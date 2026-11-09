@@ -240,4 +240,28 @@ describe("mapLegacyNetworkDecisions", () => {
       "allowed",
     );
   });
+
+  it("place search on the server stays off where residency was local-only", () => {
+    expect(
+      mapLegacyNetworkDecisions(LEGACY_NETWORK_FLOORS_V1.hardened, {})["operator.place-search"]
+        ?.value,
+    ).toBe("denied");
+    expect(
+      mapLegacyNetworkDecisions({ ...standard, poiResidency: "local-only" }, {})[
+        "operator.place-search"
+      ]?.value,
+    ).toBe("denied");
+  });
+});
+
+describe("legacy place search protections", () => {
+  it("denies place search for a standard install whose residency override was local-only", () => {
+    seed("ptn-privacy", { level: "standard", overrides: { poiResidency: "local-only" } });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
+
+  it("denies place search for a hardened install", () => {
+    seed("ptn-privacy", { level: "hardened", overrides: {} });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
 });

@@ -190,9 +190,13 @@ export function mapLegacyNetworkDecisions(
   }
 
   // The operator geocoder ran whenever its host configured one and the axis
-  // permitted it.
+  // permitted it. The same flow also carries server-side place search, which a
+  // local-only residency forbade: keeping the flow allowed there would start
+  // sending place searches the installation never sent, so it is denied.
   put(
-    network.m9SelfHosted === "disabled" ? "denied" : "allowed",
+    network.m9SelfHosted === "disabled" || network.poiResidency === "local-only"
+      ? "denied"
+      : "allowed",
     "operator.place-search",
   );
 
