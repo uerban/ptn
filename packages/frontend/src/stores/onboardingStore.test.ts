@@ -261,6 +261,29 @@ describe("journal recovery", () => {
     expect(record().applied).toBe(true);
   });
 
+  it("stores a level that is already in memory when the journal is replayed in the same session", async () => {
+    classifyInstallation(localStorage);
+    const original = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = (key: string, value: string) => {
+      if (key === "ptn-privacy") throw new Error("quota");
+      original(key, value);
+    };
+    try {
+      await useOnboardingStore.getState().commitSetup({ presetId: "strict" });
+      expect(getCurrentLevel()).toBe("strict");
+      // Boot replay right after setup: Strict is in memory, storage still refuses it.
+      await applyPendingOnboardingJournal();
+      expect(record().applied).toBe(false);
+    } finally {
+      localStorage.setItem = original;
+    }
+    expect(localStorage.getItem("ptn-privacy") ?? "").not.toContain("strict");
+
+    await applyPendingOnboardingJournal();
+    expect(record().applied).toBe(true);
+    expect(localStorage.getItem("ptn-privacy") ?? "").toContain("strict");
+  });
+
   it("survives a reload after commit: preference stores stay authoritative", async () => {
     classifyInstallation(localStorage);
     await useOnboardingStore.getState().commitSetup({

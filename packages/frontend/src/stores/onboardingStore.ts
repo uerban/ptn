@@ -114,7 +114,15 @@ export async function applyJournalToStores(
   };
 
   await safely(() => useNetworkDecisionsStore.getState().replaceDecisions(flows));
-  if (level) await safely(() => usePrivacyStore.getState().setLevel(level));
+  if (level) {
+    await safely(async () => {
+      const privacy = usePrivacyStore.getState();
+      // Already in memory (this session applied it, but storage may have
+      // refused it): store it again so a refusal is noticed.
+      if (privacy.level === level) usePrivacyStore.setState({ level });
+      else await privacy.setLevel(level);
+    });
+  }
 
   for (const axis of Object.keys(record.legacyOverrides) as ProtectionAxis[]) {
     await safely(() => restoreOverride(axis, record.legacyOverrides));
