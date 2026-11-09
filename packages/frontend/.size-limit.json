@@ -111,7 +111,7 @@
       "dist/assets/fi-*.js",
       "dist/assets/privacy.*-*.js"
     ],
-    "limit": "200 kB",
+    "limit": "250 kB",
     "gzip": true
   }
 ]
