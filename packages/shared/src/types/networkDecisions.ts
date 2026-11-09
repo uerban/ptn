@@ -140,6 +140,21 @@ export function sanitizeNetworkDecisions(raw: unknown): NetworkDecisionMap {
   return result;
 }
 
+/**
+ * When each flow last went back to "ask first", keyed like the decisions.
+ * Kept so a later merge of two copies of the decisions can tell a recent
+ * return to "ask first" from an older decision. Untrusted input.
+ */
+export function sanitizeDecisionClears(raw: unknown): Readonly<Record<string, number>> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: Record<string, number> = {};
+  for (const [key, at] of Object.entries(raw as Record<string, unknown>)) {
+    if (!parseDecisionKey(key)) continue;
+    if (typeof at === "number" && Number.isFinite(at)) result[key] = at;
+  }
+  return result;
+}
+
 /** Decision for a flow (and provider). Unknown flows are `unset`. */
 export function resolveNetworkDecision(
   decisions: NetworkDecisionMap,

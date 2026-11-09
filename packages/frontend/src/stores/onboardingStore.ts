@@ -40,6 +40,7 @@ import {
 import { refusedWriteCount } from "../services/tolerantLocalStorage.ts";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
+  absorbStoredDecisions,
   useNetworkDecisionsStore,
 } from "./networkDecisionsStore.ts";
 import { getCurrentLevel, usePrivacyStore } from "./privacyStore.ts";
@@ -295,11 +296,11 @@ onOnboardingRecordWrite((record) => {
 
 /**
  * Propagate decision and journal changes made in other tabs: the decision
- * store rehydrates and the record is re-read. Call once at boot.
+ * store merges the other tab's change and the record is re-read. Call once at boot.
  */
 export function installPrivacyStateSync(): () => void {
-  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, () => {
-    void useNetworkDecisionsStore.persist.rehydrate();
+  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, (newValue) => {
+    absorbStoredDecisions(newValue);
   });
   const stopRecord = onStorageKeyChange(ONBOARDING_RECORD_KEY, () => {
     useOnboardingStore.getState().load();
