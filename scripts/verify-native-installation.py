@@ -47,8 +47,13 @@ def main():
     processes = []
 
     def run(command, name, **kwargs):
-        with (evidence / f"{name}.log").open("w") as log:
-            subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True, **kwargs)
+        log_path = evidence / f"{name}.log"
+        try:
+            with log_path.open("w") as log:
+                subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True, **kwargs)
+        except subprocess.CalledProcessError:
+            print(log_path.read_text(), file=sys.stderr, flush=True)
+            raise
 
     def start(command, name, **kwargs):
         with (evidence / f"{name}.log").open("w") as log:
