@@ -3,8 +3,9 @@ import { listSaves, restoreSaves, type SavePayload } from "./saves.ts";
 import { canonicalCityId } from "../utils/cityId.ts";
 import { readSealedItem, removeSealedItem } from "./sealedLocalStorage.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
+import { LEGACY_FAVORITES_KEY } from "./privacyStorageKeys.ts";
 
-export const LEGACY_FAVORITES_KEY = "ptn-favorites";
+export { LEGACY_FAVORITES_KEY };
 
 /**
  * Zustand-persist envelope for the legacy favoritesStore. Shape:

@@ -9,6 +9,7 @@ import {
   PERSONAL_STORAGE_MARKER_KEY,
   PERSONAL_STORAGE_VERSION,
   __resetPersonalStorageForTests,
+  __settlePersonalStorageMigrationForTests,
 } from "../services/personalStorage.ts";
 import {
   __resetSealedLocalStorageForTests,
@@ -28,6 +29,7 @@ export interface ResetPersonalStorageOptions {
 export async function resetPersonalStorage(
   opts: ResetPersonalStorageOptions = {},
 ): Promise<void> {
+  await __settlePersonalStorageMigrationForTests();
   if (!db.isOpen()) await db.open();
   await Promise.all([
     db.installKey.clear(),

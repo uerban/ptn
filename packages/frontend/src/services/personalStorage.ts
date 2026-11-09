@@ -18,6 +18,10 @@ import { db, type SealedPersonalRow } from "../db/index.ts";
 import { decrypt, encrypt, type EncryptedRecord } from "./cryptoBox.ts";
 import { getOrCreateInstallKey, isInstallKeyDurable } from "./installKey.ts";
 import { safeLocalStorage } from "./tolerantLocalStorage.ts";
+import type {
+  PersonalStorageMigrationOptions,
+  PersonalStorageMigrationResult,
+} from "./personalStorageMigration.ts";
 import {
   getDegradedMode,
   subscribeDegradedMode,
@@ -88,23 +92,45 @@ let migrationRun: Promise<unknown> | null = null;
 
 // The migration module imports stores that hydrate through this module, so it
 // cannot be imported statically. It registers itself once fully evaluated.
-let migrationStarter: (() => Promise<unknown>) | null = null;
-let resolveStarter: () => void = () => {};
-const starterReady = new Promise<void>((resolve) => {
+type MigrationStarter = (
+  opts?: PersonalStorageMigrationOptions,
+) => Promise<PersonalStorageMigrationResult>;
+let migrationStarter: MigrationStarter | null = null;
+let resolveStarter: (start: MigrationStarter) => void = () => {};
+const starterReady = new Promise<MigrationStarter>((resolve) => {
   resolveStarter = resolve;
 });
 
-export function registerPersonalStorageMigration(start: () => Promise<unknown>): void {
+export function registerPersonalStorageMigration(start: MigrationStarter): void {
   migrationStarter = start;
-  resolveStarter();
+  resolveStarter(start);
+}
+
+/** Settles with whether the migration module could be imported. */
+let migrationLoad: Promise<boolean> | null = null;
+
+function loadedMigration(): Promise<MigrationStarter> {
+  if (migrationStarter) return Promise.resolve(migrationStarter);
+  migrationLoad ??= import("./personalStorageMigration.ts").then(
+    () => true,
+    () => false,
+  );
+  return starterReady;
+}
+
+/**
+ * Runs the storage migration once its module has been fully evaluated. Code
+ * that the stores' import graph can reach calls this instead of importing the
+ * migration, which could hand it the module before its exports exist.
+ */
+export async function runRegisteredPersonalStorageMigration(
+  opts?: PersonalStorageMigrationOptions,
+): Promise<PersonalStorageMigrationResult> {
+  return (await loadedMigration())(opts);
 }
 
 async function startMigration(): Promise<void> {
-  if (!migrationStarter) {
-    void import("./personalStorageMigration.ts").catch(() => {});
-    await starterReady;
-  }
-  await migrationStarter?.();
+  await runRegisteredPersonalStorageMigration();
 }
 
 /** Records the outcome of the storage migration for readers and the UI. */
@@ -532,6 +558,16 @@ export async function moveSessionToDurable(table: PersonalTable): Promise<void> 
   for (const [id, value] of [...entries.entries()]) {
     await putPersonal(table, id, value);
   }
+}
+
+/**
+ * Test-only: waits for a migration that a reader requested before the
+ * migration module had loaded. It starts once the module registers, which
+ * can otherwise happen in the middle of a later test.
+ */
+export async function __settlePersonalStorageMigrationForTests(): Promise<void> {
+  if (migrationLoad && (await migrationLoad)) await starterReady;
+  while (migrationRun) await migrationRun.catch(() => {});
 }
 
 /** Test-only: drops session records, caches and status. */
