@@ -125,5 +125,8 @@
   "update.updating": "Uuendatakse…",
   "update.notNow": "Mitte praegu",
   "serviceAlerts.offerCityFallback": "see linn",
-  "serviceAlerts.lines": "Liin {lines}"
+  "serviceAlerts.lines": "Liin {lines}",
+  "placeSearch.show": "Aadresside otsimine serverist",
+  "placeSearch.heading": "Kas otsida aadresse serverist?",
+  "placeSearch.details": "Kui sisestate asukoha, saadab rakendus teie sisestatud teksti ja otsitava piirkonna andmed rakenduse serverisse, mis otsib sobivaid aadresse. Selles seadmes asuvaid peatusi ja kohti otsitakse endiselt siit."
 }

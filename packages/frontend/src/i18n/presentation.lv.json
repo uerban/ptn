@@ -125,5 +125,8 @@
   "update.updating": "Atjaunina…",
   "update.notNow": "Ne tagad",
   "serviceAlerts.offerCityFallback": "šī pilsēta",
-  "serviceAlerts.lines": "Līnija {lines}"
+  "serviceAlerts.lines": "Līnija {lines}",
+  "placeSearch.show": "Adrešu meklēšana serverī",
+  "placeSearch.heading": "Adrešu meklēšana serverī?",
+  "placeSearch.details": "Kamēr jūs ievadāt vietas nosaukumu, lietotne nosūta jūsu ievadīto tekstu un meklējamo apgabalu uz šīs lietotnes serveri, kurš meklē atbilstošas adreses. Pieturas un vietas šajā ierīcē joprojām tiek meklētas šeit."
 }

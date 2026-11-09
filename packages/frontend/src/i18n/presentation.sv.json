@@ -125,5 +125,8 @@
   "update.updating": "Uppdaterar…",
   "update.notNow": "Inte nu",
   "serviceAlerts.offerCityFallback": "denna stad",
-  "serviceAlerts.lines": "Linje {lines}"
+  "serviceAlerts.lines": "Linje {lines}",
+  "placeSearch.show": "Sök adresser på servern",
+  "placeSearch.heading": "Söka efter adresser på servern?",
+  "placeSearch.details": "När du skriver in en plats skickar appen det du skriver och det område du söker i till appens server, som söker efter matchande adresser. Hållplatser och platser på den här enheten söks fortfarande här."
 }

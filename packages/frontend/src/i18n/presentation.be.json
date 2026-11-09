@@ -125,5 +125,8 @@
   "update.updating": "Абнаўленне…",
   "update.notNow": "Не зараз",
   "serviceAlerts.offerCityFallback": "гэты горад",
-  "serviceAlerts.lines": "Радок {lines}"
+  "serviceAlerts.lines": "Радок {lines}",
+  "placeSearch.show": "Пошук адрасоў на серверы",
+  "placeSearch.heading": "Пошук адрасоў на серверы?",
+  "placeSearch.details": "Пакуль вы ўводзіце месца, дадатак адпраўляе на сервер дадатка тое, што вы ўводзіце, і раён, які вы шукаеце, а сервер шукае адпаведныя адрасы. Прыпынкі і месцы на гэтым прыстасаванні ўсё роўна шукаюцца тут."
 }

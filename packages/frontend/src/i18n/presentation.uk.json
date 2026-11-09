@@ -125,5 +125,8 @@
   "update.updating": "Оновлення…",
   "update.notNow": "Не зараз",
   "serviceAlerts.offerCityFallback": "це місто",
-  "serviceAlerts.lines": "Лінія {lines}"
+  "serviceAlerts.lines": "Лінія {lines}",
+  "placeSearch.show": "Пошук адрес на сервері",
+  "placeSearch.heading": "Пошук адрес на сервері?",
+  "placeSearch.details": "Під час введення назви місця додаток надсилає введену інформацію та район, у якому ви здійснюєте пошук, на сервер цього додатка, який шукає відповідні адреси. Зупинки та місця на цьому пристрої все одно шукаються тут."
 }
