@@ -48,7 +48,7 @@ async function openMap(page: Page) {
 test.describe("Detailed maps, asked once @mock-api", () => {
   test("asks before contacting the provider; Use detailed maps loads it", async ({ page }) => {
     const carto = await interceptCarto(page);
-    await mockApi(page);
+    await mockApi(page, { mapDetailAsked: false });
     await openMap(page);
 
     const disclosure = page.getByTestId("flow-disclosure");
@@ -67,7 +67,7 @@ test.describe("Detailed maps, asked once @mock-api", () => {
     page,
   }) => {
     const carto = await interceptCarto(page);
-    await mockApi(page);
+    await mockApi(page, { mapDetailAsked: false });
     await openMap(page);
 
     await page.getByRole("button", { name: "Not now" }).click();
@@ -82,14 +82,14 @@ test.describe("Detailed maps, asked once @mock-api", () => {
 
   test("a revocation in another tab stops the detailed map here", async ({ page, context }) => {
     const carto = await interceptCarto(page);
-    await mockApi(page);
+    await mockApi(page, { mapDetailAsked: false });
     await openMap(page);
     await page.getByRole("button", { name: "Use detailed maps" }).click();
     await expect.poll(() => carto.length).toBeGreaterThan(0);
 
     const other = await context.newPage();
     await interceptCarto(other);
-    await mockApi(other);
+    await mockApi(other, { mapDetailAsked: false });
     await other.goto("/settings");
     await other.evaluate(() => {
       const key = "ptn-network-decisions";

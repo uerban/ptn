@@ -155,6 +155,8 @@ interface MockApiOptions {
    * for specs that drive setup themselves.
    */
   setup?: "complete" | "fresh";
+  /** Seed the one-time detailed-maps question as answered (default `true`). */
+  mapDetailAsked?: boolean;
   /**
    * `X-PT-Realtime` value on manifest responses: the realtime kinds the city
    * offers (`"departures, alerts"`). Absent sends an empty header, as the
@@ -224,7 +226,7 @@ function makeDepartures(now: Date = new Date()) {
 
 /** Set up API route interception before navigation. Call this before page.goto(). */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
-  if (options.setup !== "fresh") await seedCompletedSetup(page);
+  if (options.setup !== "fresh") await seedCompletedSetup(page, { mapDetailAsked: options.mapDetailAsked });
   // These specs start inside a selected city. Model discovery and the saved
   // selection explicitly; production no longer chooses a default city.
   await page.route("**/api/cities", route => route.fulfill({json: {

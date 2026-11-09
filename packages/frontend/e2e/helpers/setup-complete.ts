@@ -27,6 +27,9 @@ export interface CompletedSetupOptions {
   readonly decisions?: Record<string, "allowed" | "denied">;
   /** Also select this city when no city is stored yet. */
   readonly cityId?: string;
+  /** Mark the one-time detailed-maps question as answered (default), so its
+   * dialog does not cover the map. Pass `false` to see the question. */
+  readonly mapDetailAsked?: boolean;
 }
 
 export const RECOMMENDED_DECISIONS: Readonly<Record<string, "allowed">> = {
@@ -55,8 +58,9 @@ export async function seedCompletedSetup(
     ]),
   );
   const cityId = options.cityId ?? null;
+  const mapDetailAsked = options.mapDetailAsked ?? true;
   await page.addInitScript(
-    ({ record, decisions, cityId }) => {
+    ({ record, decisions, cityId, mapDetailAsked }) => {
       if (cityId && !localStorage.getItem("ptn-city")) {
         localStorage.setItem(
           "ptn-city",
@@ -64,6 +68,11 @@ export async function seedCompletedSetup(
         );
       }
       const seed = () => {
+        // Independent of the setup record: an installation a spec models as
+        // existing still must not open the question over the map.
+        if (mapDetailAsked && !localStorage.getItem("ptn-map-detail-asked")) {
+          localStorage.setItem("ptn-map-detail-asked", "1");
+        }
         if (localStorage.getItem("ptn-onboarding")) return;
         const existing = [
           "ptn-settings",
@@ -87,7 +96,7 @@ export async function seedCompletedSetup(
         seed();
       }
     },
-    { record, decisions, cityId },
+    { record, decisions, cityId, mapDetailAsked },
   );
 }
 
