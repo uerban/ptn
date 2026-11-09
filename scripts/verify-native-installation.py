@@ -105,10 +105,13 @@ def main():
         # timetable records and the selected journey remain unchanged.
         changed = evidence / "changed.zip"
         change_stop_label(state / "vilnius.zip", changed)
+        producer_environment = {**os.environ, "PT_COLOR_BUILD": "rust", "PT_TILE_BUILD": "rust"}
+        if "dataRootId" in config:
+            producer_environment["PT_DATA_ROOT_ID"] = config["dataRootId"]
         run([str(bundle / "bin/pt-producer"), "republish", "--data-root", str(state / "transit"),
              "--city", "vilnius", "--city-tz-iana", "Europe/Vilnius", "--from-cache", str(changed),
              "--osm-artifact-root", str(state / "artifacts"), "--osm-lease-root", str(state / "leases")],
-            "republish", env={**os.environ, "PT_COLOR_BUILD": "rust", "PT_TILE_BUILD": "rust"})
+            "republish", env=producer_environment)
         new_generation = json.loads((state / "transit/current.json").read_text())["generationId"]
         assert new_generation != generation
         ready(http, new_generation)
