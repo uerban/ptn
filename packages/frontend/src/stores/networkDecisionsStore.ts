@@ -226,7 +226,8 @@ function current(
   return copies.length > 0 ? mergeSnapshots(...copies) : EMPTY;
 }
 
-/** Remember the generation storage holds now. */
+/** Remember the generation storage holds now. Called after every write, so
+ * a tab always knows which generation it stored last. */
 function noteStored(): void {
   const stored = storedSnapshot();
   if (stored) seenGeneration = stored.generation;
@@ -263,11 +264,17 @@ type PersistedDecisions = DecisionSnapshot;
 const tolerantStorage = createTolerantJSONStorage<PersistedDecisions>();
 let writesHeld = false;
 
-/** Writes go through unless the store is updated in memory only. */
+/**
+ * Writes go through unless the store is updated in memory only. Every write
+ * the store makes passes here, so this is the one place that records the
+ * generation it left in storage.
+ */
 const decisionsStorage: PersistStorage<PersistedDecisions> | undefined = tolerantStorage && {
   getItem: (name) => tolerantStorage.getItem(name),
   setItem: (name, value) => {
-    if (!writesHeld) return tolerantStorage.setItem(name, value);
+    if (writesHeld) return;
+    void tolerantStorage.setItem(name, value);
+    noteStored();
   },
   removeItem: (name) => tolerantStorage.removeItem(name),
 };
@@ -291,7 +298,6 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
         set((state) =>
           decide(state, { [key]: value === "unset" ? null : { value, source } }),
         );
-        noteStored();
         return true;
       },
       replaceDecisions: (decisions) =>
@@ -306,10 +312,7 @@ export const useNetworkDecisionsStore = create<NetworkDecisionsState>()(
           return decide(state, changes);
         }),
       // A new generation: copies other tabs hold from before are outdated.
-      reset: () => {
-        set({ decisions: {}, cleared: {}, generation: newGeneration() });
-        noteStored();
-      },
+      reset: () => set({ decisions: {}, cleared: {}, generation: newGeneration() }),
     }),
     {
       name: NETWORK_DECISIONS_STORAGE_KEY,
@@ -370,5 +373,4 @@ export function absorbStoredDecisions(newValue: string | null): void {
     return;
   }
   useNetworkDecisionsStore.setState(next);
-  noteStored();
 }

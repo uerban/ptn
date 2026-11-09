@@ -328,6 +328,29 @@ describe("all data deleted in another tab", () => {
     expect(storedState().generation).toBe("fresh");
   });
 
+  it("does not merge a setup it stored as a new generation into a newer setup", () => {
+    // Nothing is stored, so committing a preset starts a new generation.
+    localStorage.removeItem(NETWORK_DECISIONS_STORAGE_KEY);
+    const store = useNetworkDecisionsStore.getState();
+    store.replaceDecisions({ [CARTO]: { value: "allowed", source: "setup" } });
+    const recommended = storedState().generation;
+    expect(storedDecisions()[CARTO]?.value).toBe("allowed");
+
+    // Another tab deletes all data and stores a Strict setup before this tab
+    // has heard of the removal.
+    localStorage.setItem(
+      NETWORK_DECISIONS_STORAGE_KEY,
+      JSON.stringify({ state: { decisions: {}, cleared: {}, generation: "fresh" }, version: 1 }),
+    );
+    expect(recommended).not.toBe("fresh");
+
+    store.setDecision("operator.service-alerts", "denied", "settings");
+
+    expect(storedDecisions()[CARTO]).toBeUndefined();
+    expect(useNetworkDecisionsStore.getState().decisions[CARTO]).toBeUndefined();
+    expect(storedState().generation).toBe("fresh");
+  });
+
   it("still merges decisions it could never store into the stored ones", () => {
     // Nothing is stored yet and this tab's writes are all refused, so its
     // copy was never stored; another tab then stores the first decisions.
