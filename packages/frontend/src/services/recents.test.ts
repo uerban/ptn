@@ -23,7 +23,8 @@ import {
 import { __resetInstallKeyCacheForTests } from "./installKey.ts";
 import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
 import {
-  PERSONAL_CLEARS_STORAGE_KEY,
+  clearPersonal,
+  personalClearMarkKey,
   __resetPersonalStorageForTests,
   putPersonal,
 } from "./personalStorage.ts";
@@ -290,14 +291,37 @@ describe("clearRecents", () => {
       spy.mockRestore();
       // What another tab's clear leaves behind: a new clear mark and an
       // emptied table. This tab's own state does not change.
-      localStorage.setItem(
-        PERSONAL_CLEARS_STORAGE_KEY,
-        JSON.stringify({ recentLocations: "other-tab-clear" }),
-      );
+      localStorage.setItem(personalClearMarkKey("recentLocations"), "other-tab-clear");
       pending.push(db.recentLocations.clear());
       return decrypt(...args);
     });
     await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed is not stored when another tab clears history while a clear of saved places overlaps it", async () => {
+    const pending = whileSealing(async () => {
+      const before = new Map<string, string>();
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)!;
+        before.set(key, localStorage.getItem(key)!);
+      }
+      // Another tab clears history: a new clear mark, then an emptied table.
+      localStorage.setItem(personalClearMarkKey("recentLocations"), crypto.randomUUID());
+      // Meanwhile saved places are cleared from a read of localStorage taken
+      // before that mark landed.
+      const read = vi
+        .spyOn(localStorage, "getItem")
+        .mockImplementation((key) => before.get(key) ?? null);
+      const cleared = clearPersonal("savedLocations");
+      read.mockRestore();
+      await Promise.all([cleared, db.recentLocations.clear()]);
+    });
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
     await Promise.all(pending);
 
     expect(pending).toHaveLength(1);

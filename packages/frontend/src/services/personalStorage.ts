@@ -380,32 +380,27 @@ export type PersonalWriteResult = "stored" | "session" | "discarded";
 const clearGenerations = new Map<PersonalTable, number>();
 
 /**
- * localStorage: a fresh random mark per table, replaced by every clear in any
- * tab. A tab's own counter cannot see a clear made in another tab, so a write
- * prepared there before the clear also checks this mark. Holds no personal
- * data.
+ * localStorage key of a table's clear mark: a fresh random value replaced by
+ * every clear of that table in any tab. A tab's own counter cannot see a clear
+ * made in another tab, so a write prepared there before the clear also checks
+ * this mark. One key per table, so clears of different tables never overwrite
+ * each other's marks. Holds no personal data.
  */
-export const PERSONAL_CLEARS_STORAGE_KEY = "ptn-personal-clears";
+export function personalClearMarkKey(table: PersonalTable): string {
+  return `ptn-personal-clear:${table}`;
+}
 
-function storedClearMarks(): Record<string, unknown> {
+function storedClearMark(table: PersonalTable): string {
   try {
-    const parsed: unknown = JSON.parse(
-      safeLocalStorage()?.getItem(PERSONAL_CLEARS_STORAGE_KEY) ?? "null",
-    );
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
+    return safeLocalStorage()?.getItem(personalClearMarkKey(table)) ?? "";
   } catch {
-    return {};
+    return "";
   }
 }
 
 function markCleared(table: PersonalTable): void {
   try {
-    safeLocalStorage()?.setItem(
-      PERSONAL_CLEARS_STORAGE_KEY,
-      JSON.stringify({ ...storedClearMarks(), [table]: newPersonalId() }),
-    );
+    safeLocalStorage()?.setItem(personalClearMarkKey(table), newPersonalId());
   } catch {
     // Not stored: other tabs only learn of this clear through their reads.
   }
@@ -413,8 +408,7 @@ function markCleared(table: PersonalTable): void {
 
 /** Changes whenever the table is cleared, in this tab or in another one. */
 function clearGeneration(table: PersonalTable): string {
-  const mark = storedClearMarks()[table];
-  return `${clearGenerations.get(table) ?? 0}:${typeof mark === "string" ? mark : ""}`;
+  return `${clearGenerations.get(table) ?? 0}:${storedClearMark(table)}`;
 }
 
 /**
