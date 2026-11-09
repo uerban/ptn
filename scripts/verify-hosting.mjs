@@ -83,7 +83,7 @@ try {
   await navigate(page, `${baseURL}/search?${params}`);
   // A fresh install opens onboarding: either a city picker, or (when the
   // city is preselected) the plan-mode/privacy step. Accept both.
-  const chooseCity = page.getByRole("button", {name: "Vilnius", exact: true}).first();
+  const chooseCity = page.getByRole("button", {name: /^Vilnius/}).first();
   const recommended = page.getByRole("button", {name: "Start with recommended settings"});
   await chooseCity.or(recommended).first().waitFor({timeout: 30_000});
   if (await chooseCity.isVisible()) await chooseCity.click();
