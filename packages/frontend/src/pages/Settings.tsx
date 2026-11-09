@@ -445,7 +445,7 @@ export function SettingsPage() {
             {t("settings.display", "Display")}
           </h2>
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
-            <div className="flex items-center justify-between py-3 border-b border-divider">
+            <div className="flex items-center justify-between gap-3 py-3 border-b border-divider">
               <div>
                 <span id="settings-schedule-mode-label" className="text-sm text-fg">{presentationText("presentation.settingsLabel")}</span>
                 <p id="settings-schedule-mode-desc" className="text-xs text-fg-muted">
@@ -458,12 +458,12 @@ export function SettingsPage() {
                 aria-labelledby="settings-schedule-mode-label"
                 aria-describedby="settings-schedule-mode-desc"
                 onClick={() => setScheduleMode(!scheduleMode)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${scheduleMode ? "bg-accent" : "bg-surface-overlay"}`}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${scheduleMode ? "bg-accent" : "bg-surface-overlay"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${scheduleMode ? "translate-x-5" : ""}`} />
               </button>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-divider">
+            <div className="flex items-center justify-between gap-3 py-3 border-b border-divider">
               <div>
                 <span id="settings-eta-cards-label" className="text-sm text-fg">{t("settings.eta_cards", "Nearby departures cards")}</span>
                 <p id="settings-eta-cards-desc" className="text-xs text-fg-muted">{t("settings.eta_cards_desc", "Show the next departures near you on the map, in both directions. Tap one to see its stops.")}</p>
@@ -474,7 +474,7 @@ export function SettingsPage() {
                 aria-labelledby="settings-eta-cards-label"
                 aria-describedby="settings-eta-cards-desc"
                 onClick={() => setEtaCardsEnabled(!etaCardsEnabled)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${etaCardsEnabled ? "bg-accent" : "bg-surface-overlay"}`}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${etaCardsEnabled ? "bg-accent" : "bg-surface-overlay"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${etaCardsEnabled ? "translate-x-5" : ""}`} />
               </button>
@@ -483,7 +483,7 @@ export function SettingsPage() {
               <div
                 role="radiogroup"
                 aria-labelledby="eta-layout-label"
-                className="flex items-center justify-between py-3 border-b border-divider"
+                className="flex items-center justify-between gap-3 py-3 border-b border-divider"
               >
                 <span id="eta-layout-label" className="text-sm text-fg">
                   {t("settings.eta_layout", "Cards layout")}
@@ -510,7 +510,7 @@ export function SettingsPage() {
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-between py-3">
+            <div className="flex items-center justify-between gap-3 py-3">
               <div>
                 <span id="settings-startup-locate-label" className="text-sm text-fg">{t("settings.startup_locate", "Center on my location at startup")}</span>
                 <p id="settings-startup-locate-desc" className="text-xs text-fg-muted">{t("settings.startup_locate_desc", "Fly to your GPS location when the app opens. Off keeps the map where you left it.")}</p>
@@ -521,7 +521,7 @@ export function SettingsPage() {
                 aria-labelledby="settings-startup-locate-label"
                 aria-describedby="settings-startup-locate-desc"
                 onClick={() => setStartupLocate(!startupLocate)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${startupLocate ? "bg-accent" : "bg-surface-overlay"}`}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${startupLocate ? "bg-accent" : "bg-surface-overlay"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${startupLocate ? "translate-x-5" : ""}`} />
               </button>
@@ -630,7 +630,7 @@ export function SettingsPage() {
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
             <div className="py-3">
               <span id="settings-mobility-profile-label" className="text-sm text-fg">{t("settings.mobility_profile", "Mobility profile")}</span>
-              <div role="group" aria-labelledby="settings-mobility-profile-label" className="flex gap-2 mt-2">
+              <div role="group" aria-labelledby="settings-mobility-profile-label" className="flex flex-wrap gap-2 mt-2">
                 {(["default", "wheelchair", "vision_impaired", "bicycle"] as const).map((profile) => (
                   <button key={profile} data-testid={`mobility-${profile}`} onClick={() => setMobilityProfile(profile)}
                     aria-pressed={mobilityProfile === profile}
@@ -705,14 +705,14 @@ export function SettingsPage() {
                 onChange={(e) => setMaxWalkSecs(parseInt(e.target.value))} className="w-full mt-1 accent-accent" />
             </div>
             {mobilityProfile === "default" && (
-            <div className="flex items-center justify-between border-t border-divider py-3">
+            <div className="flex items-center justify-between gap-3 border-t border-divider py-3">
               <div>
                 <span id="settings-run-to-catch-label" className="text-sm text-fg">{t("settings.run_to_catch", "Run to catch")}</span>
                 <p id="settings-run-to-catch-desc" className="text-xs text-fg-muted">{t("settings.run_to_catch_desc", "Reach stops at a running pace to catch departing vehicles")}</p>
               </div>
               <button role="switch" aria-checked={runToCatch} onClick={() => setRunToCatch(!runToCatch)}
                 aria-labelledby="settings-run-to-catch-label" aria-describedby="settings-run-to-catch-desc"
-                className={`relative w-11 h-6 rounded-full transition-colors ${runToCatch ? "bg-accent" : "bg-surface-overlay"}`}>
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${runToCatch ? "bg-accent" : "bg-surface-overlay"}`}>
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${runToCatch ? "translate-x-5" : ""}`} />
               </button>
             </div>
@@ -761,7 +761,7 @@ export function SettingsPage() {
                         : null,
                     )
                   }
-                  className={`relative w-11 h-6 rounded-full transition-colors ${
+                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
                     leaveBufferOverrideSeconds === null
                       ? "bg-accent"
                       : "bg-surface-overlay"
@@ -817,7 +817,7 @@ export function SettingsPage() {
             {t("settings.navigation", "Navigation")}
           </h2>
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
-            <div className="flex items-center justify-between py-3 border-b border-divider">
+            <div className="flex items-center justify-between gap-3 py-3 border-b border-divider">
               <div>
                 <span id="settings-get-off-alarm-label" className="text-sm text-fg">{t("settings.get_off_alarm", "Get-off alarm")}</span>
                 <p id="settings-get-off-alarm-desc" className="text-xs text-fg-muted">{t("settings.get_off_alarm_desc", "Vibrate and show a banner when approaching your destination stop")}</p>
@@ -828,12 +828,12 @@ export function SettingsPage() {
                 aria-labelledby="settings-get-off-alarm-label"
                 aria-describedby="settings-get-off-alarm-desc"
                 onClick={() => setGetOffAlarmEnabled(!getOffAlarmEnabled)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${getOffAlarmEnabled ? "bg-accent" : "bg-surface-overlay"}`}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${getOffAlarmEnabled ? "bg-accent" : "bg-surface-overlay"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${getOffAlarmEnabled ? "translate-x-5" : ""}`} />
               </button>
             </div>
-            <div className="flex items-center justify-between py-3">
+            <div className="flex items-center justify-between gap-3 py-3">
               <div>
                 <span id="settings-trip-notifications-label" className="text-sm text-fg">{t("settings.trip_notifications", "Trip notifications")}</span>
                 <p id="settings-trip-notifications-desc" className="text-xs text-fg-muted">{t("settings.trip_notifications_desc", "Show browser notifications for trip events when the app is in the background")}</p>
@@ -849,7 +849,7 @@ export function SettingsPage() {
                   }
                   setTripNotificationsEnabled(!tripNotificationsEnabled);
                 }}
-                className={`relative w-11 h-6 rounded-full transition-colors ${tripNotificationsEnabled ? "bg-accent" : "bg-surface-overlay"}`}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${tripNotificationsEnabled ? "bg-accent" : "bg-surface-overlay"}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${tripNotificationsEnabled ? "translate-x-5" : ""}`} />
               </button>
