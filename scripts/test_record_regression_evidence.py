@@ -142,7 +142,12 @@ class BaselineTests(unittest.TestCase):
                 {'mode': 'all', 'level': 'cards', 'zoom': 16, 'dots': 40, 'settleMs': 31.5, 'frameIntervalMs': {'p95': 9}, 'longTaskMs': {'samples': 2},
                  'longTaskTotalMs': 120, 'labels': 0, 'cards': 18}]}))
             steps = {name: {'outcome': 'success'} for name in regression.LABELS}
-            with patch.dict(os.environ, {'STEP_RESULTS': json.dumps(steps)}), \
+            # CI exports GITHUB_STEP_SUMMARY to every process, including tests.
+            # Keep this fixture's fake revisions out of the real run summary.
+            with patch.dict(os.environ, {
+                    'STEP_RESULTS': json.dumps(steps),
+                    'GITHUB_STEP_SUMMARY': str(Path(self.directory.name) / 'summary.md'),
+            }), \
                  patch.object(regression.subprocess, 'check_output', return_value='a' * 40), \
                  patch.object(regression.subprocess, 'run') as run:
                 run.return_value.returncode = 0
