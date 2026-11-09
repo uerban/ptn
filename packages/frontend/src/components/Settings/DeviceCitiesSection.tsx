@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {getAvailableCities} from "../../config/cities.ts";
 import {useCityStore} from "../../stores/cityStore.ts";
 import {useRtStore} from "../../stores/rtStore.ts";
@@ -12,8 +12,14 @@ export function DeviceCitiesSection() {
   const [downloads, setDownloads] = useState<OfflineCityMetadata[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const refresh = () => listDeviceCities().then(setDownloads);
-  useEffect(() => { void refresh(); }, []);
+  // The device list reads IndexedDB; drop answers that arrive after unmount.
+  const mounted = useRef(true);
+  const refresh = () => listDeviceCities().then(list => { if (mounted.current) setDownloads(list); });
+  useEffect(() => {
+    mounted.current = true;
+    void refresh();
+    return () => { mounted.current = false; };
+  }, []);
   async function download() {
     setBusy(true);
     setMessage("Downloading timetable and walking transfers…");
