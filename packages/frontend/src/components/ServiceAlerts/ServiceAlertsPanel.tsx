@@ -1,16 +1,26 @@
 import { useId } from "react";
 import { useTranslation } from "../../i18n/index.ts";
 import { usePresentationText } from "../../i18n/presentationStrings.ts";
-import { useServiceAlertSelection } from "../../hooks/useServiceAlertSelection.ts";
+import {
+  serviceTarget,
+  useServiceAlertSelection,
+  type AlertTargetIndex,
+} from "../../hooks/useServiceAlertSelection.ts";
 import { useRealtimeKindStatus } from "../../services/realtimeAvailability.ts";
 import type { AlertTarget } from "../../services/serviceAlertSelection.ts";
 import { useInlineAlertsOffer } from "../../services/serviceAlertsOffer.ts";
 import { ServiceAlertItem } from "./ServiceAlertItem.tsx";
 import { ServiceAlertsOffer } from "./ServiceAlertsOffer.tsx";
 
-/** Alert targets for a line view: the route, in any direction or stop. */
-export function routeTargets(routeId: string | null | undefined): AlertTarget[] {
-  return routeId ? [{ routeId }] : [];
+/**
+ * Alert targets for a line view: the route, in any direction or stop, with
+ * its agency and route type from the timetable when it is loaded.
+ */
+export function routeTargets(
+  routeId: string | null | undefined,
+  index?: AlertTargetIndex | null,
+): AlertTarget[] {
+  return routeId ? [serviceTarget(index, { routeId })] : [];
 }
 
 export interface ServiceAlertsPanelProps {

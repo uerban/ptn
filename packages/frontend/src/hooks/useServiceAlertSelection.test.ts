@@ -8,6 +8,7 @@ import {
 } from "./useServiceAlertSelection.ts";
 import { selectAlerts } from "../services/serviceAlertSelection.ts";
 import { itineraryAlerts } from "../components/ServiceAlerts/ServiceAlertTripNotes.tsx";
+import { routeTargets } from "../components/ServiceAlerts/ServiceAlertsPanel.tsx";
 
 function alert(overrides: Partial<Alert> = {}): Alert {
   return {
@@ -150,5 +151,33 @@ describe("itineraryAlerts", () => {
     const entries = itineraryAlerts([alert()], { legs: [RIDE, WALK, second] });
     expect(entries).toHaveLength(1);
     expect(entries[0].lines).toEqual(["4G", "7"]);
+  });
+  it("lists agency, route-type and direction alerts on the result card", () => {
+    const agency = alert({ id: "agency", informedEntities: [{ agencyId: "A" }] });
+    const buses = alert({ id: "buses", informedEntities: [{ routeType: 3 }] });
+    const direction = alert({ id: "dir", informedEntities: [{ routeId: "R1", directionId: 1 }] });
+    const entries = itineraryAlerts([agency, buses, direction], TRIP, TIMETABLE);
+    expect(entries.map((e) => e.alert.id)).toEqual(["agency", "buses", "dir"]);
+    expect(entries[0].lines).toEqual(["4G"]);
+  });
+});
+
+describe("routeTargets", () => {
+  it("shows agency-wide and route-type alerts on the line view, and direction alerts as partial", () => {
+    const agency = alert({ id: "agency", informedEntities: [{ agencyId: "A" }] });
+    const buses = alert({ id: "buses", informedEntities: [{ routeType: 3 }] });
+    const direction = alert({ id: "dir", informedEntities: [{ routeId: "R1", directionId: 1 }] });
+    const trams = alert({ id: "trams", informedEntities: [{ routeType: 0 }] });
+    const all = [agency, buses, direction, trams];
+
+    const targets = routeTargets("R1", TIMETABLE);
+    expect(targets).toEqual([{ routeId: "R1", agencyId: "A", routeType: 3 }]);
+    expect(selectAlerts(all, targets).map((a) => a.id)).toEqual(["agency", "buses"]);
+    expect(selectAlerts(all, targets, { includePartial: true }).map((a) => a.id)).toEqual([
+      "agency",
+      "buses",
+      "dir",
+    ]);
+    expect(routeTargets(null, TIMETABLE)).toEqual([]);
   });
 });
