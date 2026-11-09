@@ -55,8 +55,9 @@ After the workflows land on main:
 gh workflow run regression.yml --ref main -f revision=FULL_40_CHARACTER_COMMIT
 ```
 
-For pre-merge diagnostics, add `ci:regression` to a PR. Subsequent commits rerun
-the gate while that label remains. These runs use hosted Ubuntu runners, read-only
+For pre-merge diagnostics, add `ci:regression` to a PR. Adding the label starts
+a run; subsequent commits rerun the gate inside the PR's CI run while the label
+remains. Unlabelled PRs show only a skipped job in CI, not a separate workflow run. These runs use hosted Ubuntu runners, read-only
 repository permissions and committed synthetic/public fixtures; they need no
 private feeds, credentials or homelab access. PR diagnostics do not substitute for
 the trusted main-workflow run required by release preparation.

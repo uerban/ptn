@@ -7,8 +7,11 @@ on:
         description: Exact 40-character source commit (defaults to workflow commit)
         required: false
         type: string
+  # PR pushes reach this through ci.yml (a skipped job inside the CI run, not
+  # a separate skipped run). Only adding the label starts a run directly.
+  workflow_call:
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
+    types: [labeled]
 permissions:
   contents: read
 concurrency:
@@ -16,7 +19,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regressions:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ci:regression')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ci:regression') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'ci:regression'))
     name: Performance, memory and binding parity
     runs-on: ubuntu-24.04
     timeout-minutes: 75
