@@ -17,6 +17,7 @@ import { create } from "zustand";
 import { db, type SealedPersonalRow } from "../db/index.ts";
 import { decrypt, encrypt, type EncryptedRecord } from "./cryptoBox.ts";
 import { getOrCreateInstallKey, isInstallKeyDurable } from "./installKey.ts";
+import { safeLocalStorage } from "./tolerantLocalStorage.ts";
 import {
   getDegradedMode,
   subscribeDegradedMode,
@@ -375,19 +376,53 @@ export interface PutPersonalOptions {
  * record was being prepared; nothing was written. */
 export type PersonalWriteResult = "stored" | "session" | "discarded";
 
-/** Bumped by every clear of a table: writes prepared before it are dropped. */
+/** Bumped by every clear of a table in this tab. */
 const clearGenerations = new Map<PersonalTable, number>();
 
-function clearGeneration(table: PersonalTable): number {
-  return clearGenerations.get(table) ?? 0;
+/**
+ * localStorage: a fresh random mark per table, replaced by every clear in any
+ * tab. A tab's own counter cannot see a clear made in another tab, so a write
+ * prepared there before the clear also checks this mark. Holds no personal
+ * data.
+ */
+export const PERSONAL_CLEARS_STORAGE_KEY = "ptn-personal-clears";
+
+function storedClearMarks(): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(
+      safeLocalStorage()?.getItem(PERSONAL_CLEARS_STORAGE_KEY) ?? "null",
+    );
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function markCleared(table: PersonalTable): void {
+  try {
+    safeLocalStorage()?.setItem(
+      PERSONAL_CLEARS_STORAGE_KEY,
+      JSON.stringify({ ...storedClearMarks(), [table]: newPersonalId() }),
+    );
+  } catch {
+    // Not stored: other tabs only learn of this clear through their reads.
+  }
+}
+
+/** Changes whenever the table is cleared, in this tab or in another one. */
+function clearGeneration(table: PersonalTable): string {
+  const mark = storedClearMarks()[table];
+  return `${clearGenerations.get(table) ?? 0}:${typeof mark === "string" ? mark : ""}`;
 }
 
 /**
- * How many times a table has been cleared. A caller that reads before writing
- * captures it first and passes `commitIf`, so a clear during the read also
- * drops the write.
+ * Identifies the table's latest clear, in this tab or another. A caller that
+ * reads before writing captures it first and passes `commitIf`, so a clear
+ * during the read also drops the write.
  */
-export function personalClearGeneration(table: PersonalTable): number {
+export function personalClearGeneration(table: PersonalTable): string {
   return clearGeneration(table);
 }
 
@@ -465,7 +500,8 @@ export async function deletePersonal(
 
 /** Removes every record of a table, durable, legacy and session-only. */
 export async function clearPersonal(table: PersonalTable): Promise<void> {
-  clearGenerations.set(table, clearGeneration(table) + 1);
+  clearGenerations.set(table, (clearGenerations.get(table) ?? 0) + 1);
+  markCleared(table);
   if (sessionTable(table).size > 0) {
     sessionTable(table).clear();
     notifySession();

@@ -22,7 +22,11 @@ import {
 } from "./recents.ts";
 import { __resetInstallKeyCacheForTests } from "./installKey.ts";
 import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
-import { __resetPersonalStorageForTests, putPersonal } from "./personalStorage.ts";
+import {
+  PERSONAL_CLEARS_STORAGE_KEY,
+  __resetPersonalStorageForTests,
+  putPersonal,
+} from "./personalStorage.ts";
 import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
 import { usePrivacyChoicesStore } from "../stores/privacyChoicesStore.ts";
 import {
@@ -268,6 +272,29 @@ describe("clearRecents", () => {
     const spy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation((...args) => {
       spy.mockRestore();
       pending.push(clearRecents());
+      return decrypt(...args);
+    });
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent recorded while another tab clears history during the read of existing recents is not stored", async () => {
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    const pending: Promise<unknown>[] = [];
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      // What another tab's clear leaves behind: a new clear mark and an
+      // emptied table. This tab's own state does not change.
+      localStorage.setItem(
+        PERSONAL_CLEARS_STORAGE_KEY,
+        JSON.stringify({ recentLocations: "other-tab-clear" }),
+      );
+      pending.push(db.recentLocations.clear());
       return decrypt(...args);
     });
     await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
