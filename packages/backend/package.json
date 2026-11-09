@@ -26,7 +26,7 @@
   "dependencies": {
     "@fastify/cors": "^11.0.0",
     "@fastify/rate-limit": "^10",
-    "@fastify/static": "^10.1.2",
+    "@fastify/static": "^10.1.10",
     "@pt/shared": "workspace:*",
     "csv-parse": "^7.0.2",
     "culori": "^4.0.2",
