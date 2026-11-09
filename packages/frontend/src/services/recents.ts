@@ -165,9 +165,16 @@ export async function recordRecent(
     cityId,
   };
   invalidateRecentsCache();
-  await putPersonal(TABLE, id, payload, {
+  const written = await putPersonal(TABLE, id, payload, {
     sessionOnly: tier === "ram-only",
+    // Consent can be withdrawn (and recents cleared) while the record is
+    // being sealed.
+    commitIf: () => isOptionalStorageEnabledNow("recents"),
   });
+  if (written === "discarded") {
+    invalidateRecentsCache();
+    return;
+  }
 
   const after = existing
     ? entries.map((e) => (e.id === id ? { ...e, value: payload } : e))

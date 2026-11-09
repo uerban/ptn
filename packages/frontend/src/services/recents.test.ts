@@ -224,6 +224,42 @@ describe("clearRecents", () => {
     expect(await db.recentLocations.count()).toBe(0);
     expect(await listRecents()).toEqual([]);
   });
+
+  /** Runs `during` once, while the next record is being sealed. */
+  function whileSealing(during: () => Promise<unknown>): Promise<unknown>[] {
+    const pending: Promise<unknown>[] = [];
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "encrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      pending.push(during());
+      return encrypt(...args);
+    });
+    return pending;
+  }
+
+  it("a recent being sealed when recents are switched off and cleared is not stored", async () => {
+    const pending = whileSealing(async () => {
+      usePrivacyChoicesStore.getState().setChoice("recents", "disabled");
+      await clearRecents();
+    });
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    usePrivacyChoicesStore.getState().setChoice("recents", "enabled");
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed when history is cleared is not stored", async () => {
+    const pending = whileSealing(() => clearRecents());
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await listRecents()).toEqual([]);
+  });
 });
 
 describe("migrateRecentsForLevelChange", () => {

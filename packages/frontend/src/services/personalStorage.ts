@@ -363,13 +363,30 @@ export async function resolvePersonalRows<T>(
 export interface PutPersonalOptions {
   /** Keep this record in memory only, whatever storage allows. */
   sessionOnly?: boolean;
+  /**
+   * Checked right before the record is written, after the key was acquired
+   * and the record sealed. Returning false drops the write (for example,
+   * consent was withdrawn meanwhile).
+   */
+  commitIf?: () => boolean;
 }
 
-export type PersonalWriteResult = "stored" | "session";
+/** `discarded`: the table was cleared, or `commitIf` refused, while the
+ * record was being prepared; nothing was written. */
+export type PersonalWriteResult = "stored" | "session" | "discarded";
+
+/** Bumped by every clear of a table: writes prepared before it are dropped. */
+const clearGenerations = new Map<PersonalTable, number>();
+
+function clearGeneration(table: PersonalTable): number {
+  return clearGenerations.get(table) ?? 0;
+}
 
 /**
  * Writes one record. It is sealed and stored when durable encrypted storage is
- * available; otherwise it is kept for this session only.
+ * available; otherwise it is kept for this session only. A clear of the table
+ * while the record is being prepared discards it, so a deletion is never
+ * undone by a write that was already in flight.
  */
 export async function putPersonal<T>(
   table: PersonalTable,
@@ -377,13 +394,18 @@ export async function putPersonal<T>(
   value: T,
   opts: PutPersonalOptions = {},
 ): Promise<PersonalWriteResult> {
+  const generation = clearGeneration(table);
+  const mayCommit = () =>
+    clearGeneration(table) === generation && (opts.commitIf?.() ?? true);
   const key = opts.sessionOnly ? null : await durablePersonalKey();
   if (!key) {
+    if (!mayCommit()) return "discarded";
     sessionTable(table).set(id, value);
     notifySession();
     return "session";
   }
   const row = await sealRow(id, value, key);
+  if (!mayCommit()) return "discarded";
   invalidateDurableCache();
   await db.table(table).put(row);
   invalidateDurableCache();
@@ -434,6 +456,7 @@ export async function deletePersonal(
 
 /** Removes every record of a table, durable, legacy and session-only. */
 export async function clearPersonal(table: PersonalTable): Promise<void> {
+  clearGenerations.set(table, clearGeneration(table) + 1);
   if (sessionTable(table).size > 0) {
     sessionTable(table).clear();
     notifySession();
@@ -476,6 +499,7 @@ export async function moveSessionToDurable(table: PersonalTable): Promise<void> 
 export function __resetPersonalStorageForTests(): void {
   session.clear();
   sessionListeners.clear();
+  clearGenerations.clear();
   durableCache.clear();
   unreadableBySource.clear();
   migrationRun = null;
