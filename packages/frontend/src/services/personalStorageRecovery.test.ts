@@ -57,6 +57,16 @@ describe("deleteUnreadablePersonalData", () => {
     expect(localStorage.getItem(MAP_VIEWPORT_STORAGE_KEY)).toBeNull();
     expect(await getOrCreateInstallKey()).not.toBe(keyBefore);
   });
+
+  it("deletes legacy stop use so the restarted migration converts nothing", async () => {
+    await db.cityUsageStats.put({ id: "tricity:s1", cityId: "tricity", stopId: "s1", tapCount: 3, lastTapped: 1 });
+    usePersonalStorageStatus.setState({ keyMode: "key-unreadable" });
+
+    await deleteUnreadablePersonalData();
+
+    expect(await db.cityUsageStats.count()).toBe(0);
+    expect(await db.personalUsage.count()).toBe(0);
+  });
 });
 
 describe("retryPersonalStorage", () => {

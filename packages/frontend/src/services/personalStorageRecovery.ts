@@ -75,7 +75,9 @@ export async function deleteAllPersonalData(
   storage: Storage_ = globalThis.localStorage,
 ): Promise<void> {
   for (const table of PERSONAL_TABLES) await clearPersonal(table);
-  await db.usageStats.clear();
+  // Stop use from before it was sealed: left in place, the migration below
+  // would convert it into fresh personal records.
+  await Promise.all([db.usageStats.clear(), db.cityUsageStats.clear()]);
   await db.geocoderDedup.clear();
   for (const name of SEALED_LOCAL_STORAGE_KEYS) removeSealedItem(name, storage);
   useFavoritesStore.setState({ favorites: [] });
