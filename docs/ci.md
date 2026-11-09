@@ -4,9 +4,9 @@ Routine checks and release preparation have different costs and purposes.
 
 | Workflow | Trigger | Required work |
 | --- | --- | --- |
-| **CI** | Pull requests, pushes to main, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
+| **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
-| **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Build all installable platforms, validate native/Docker fresh-host lifecycle and retain archives |
+| **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Sole main build: build/test source, build all installable platforms, validate native/Docker fresh-host lifecycle, security scans and retain archives |
 | **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
 | **Promote immutable RC to stable draft** | Manual on main | Copy the published RC assets and proof unchanged; no builds |
 
@@ -128,10 +128,12 @@ these small fixtures must not be represented as production capacity evidence.
 
 ## Release evidence
 
-Every push to main automatically runs `release.yml`, which uploads the validated
-archives for all five platforms with 30-day retention. Tagging that exact commit
-reuses those archives; if validation is still running, RC preparation waits for it.
-The ordinary source CI job continues to provide fast feedback independently.
+Every push to main runs only `release.yml` (build once): it builds and tests the
+source, packages all five platforms, scans for secrets/vulnerable dependencies and
+uploads the validated archives with 30-day retention. `ci.yml` does not run on
+main, so the same commit is never compiled by two workflows. Tagging that exact
+commit reuses those archives; if validation is still running, RC preparation waits
+for it.
 Release validation is also manually dispatchable for commits without retained builds.
 
 RC preparation selects an eligible run of each workflow for the tag's exact
@@ -171,8 +173,10 @@ that other keys and paths still fail.
 
 Node, pnpm, Rust dependencies, wasm-pack and cargo-audit use pinned tools and
 caches separated by OS, architecture, lockfile/toolchain and build profile.
-Only trusted main source runs save caches; PRs and alternate source revisions
-restore without saving. Host validation runners restore the pnpm store only:
+Only trusted main release-validation runs save caches; PRs and alternate source
+revisions restore without saving. PR CI restores the profiles saved by
+`release.yml` (`release-native` for source and Linux x86_64, `release-<target>`
+for the other platforms). Host validation runners restore the pnpm store only:
 they receive no Rust build outputs or initialized runtime state.
 
 After packaging, release validation prepares a signed reference OSM catalog

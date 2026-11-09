@@ -1,4 +1,5 @@
 name: Release candidate validation
+# Sole build for pushes to main ("build once"); ci.yml covers pull requests.
 
 run-name: Release validation ${{ inputs.revision || github.sha }}
 
@@ -395,6 +396,14 @@ jobs:
             ${{ runner.temp }}/ptn-evidence/**/result.json
             ${{ runner.temp }}/ptn-evidence/**/*.png
           if-no-files-found: warn
+
+  security:
+    name: Security scans
+    # PRs are scanned by CI; this covers direct pushes to main.
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/security.yml
+    with:
+      audit-dependencies: true
 
   validated-archive:
     name: Retain archive after both hosting validations
