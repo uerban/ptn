@@ -17,6 +17,8 @@ import {
   type LegacyNetworkPolicy,
   type NetworkDecision,
   isPrivacyLevel,
+  LEGACY_NETWORK_FLOORS_V1,
+  LEVEL_FLOORS,
   type PrivacyLevel,
   type ProtectionPolicy,
 } from "@pt/shared/privacy";
@@ -190,20 +192,52 @@ export function mapLegacyNetworkDecisions(
   }
 
   // The operator geocoder ran whenever its host configured one and the axis
-  // permitted it.
+  // permitted it. The same flow also carries server-side place search, which a
+  // local-only residency forbade: keeping the flow allowed there would start
+  // sending place searches the installation never sent, so it is denied.
   put(
-    network.m9SelfHosted === "disabled" ? "denied" : "allowed",
+    network.m9SelfHosted === "disabled" || network.poiResidency === "local-only"
+      ? "denied"
+      : "allowed",
     "operator.place-search",
   );
 
   return decisions;
 }
 
+/** Smallest coarsening floor that makes the operator geocoder coarsen every
+ * location hint, whatever the deployment. */
+export const ALWAYS_COARSEN_FLOOR_METERS = 50;
+
+function storedNumber(overrides: unknown, axis: string): number | undefined {
+  if (!overrides || typeof overrides !== "object") return undefined;
+  const value = (overrides as Record<string, unknown>)[axis];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 /** Overrides that keep an existing installation's protections intact. */
-export function carriedOverOverrides(level: PrivacyLevel): Partial<ProtectionPolicy> {
+export function carriedOverOverrides(
+  level: PrivacyLevel,
+  network: LegacyNetworkPolicy = LEGACY_NETWORK_FLOORS_V1[level],
+  rawOverrides: unknown = undefined,
+): Partial<ProtectionPolicy> {
+  const carried: Partial<ProtectionPolicy> = {};
   // The decoy timer left the `strict` floor; existing strict installations
   // keep it until they remove it or lower their level.
-  return level === "strict" ? { m11TileDefense: "prefetch-padding-decoy" } : {};
+  if (level === "strict") carried.m11TileDefense = "prefetch-padding-decoy";
+  // "Always coarsen" for the operator geocoder is no longer a setting of its
+  // own: the coarsening floor decides it. Raise the floor where the level's
+  // own floor (or a stored override) would leave location hints unrounded.
+  if (network.m9SelfHosted === "always-coarsen") {
+    const floor = Math.max(
+      LEVEL_FLOORS[level].m10CoarsenGridFloorMeters,
+      storedNumber(rawOverrides, "m10CoarsenGridFloorMeters") ?? 0,
+    );
+    if (floor < ALWAYS_COARSEN_FLOOR_METERS) {
+      carried.m10CoarsenGridFloorMeters = ALWAYS_COARSEN_FLOOR_METERS;
+    }
+  }
+  return carried;
 }
 
 function isExistingInstall(storage: StorageReader): boolean {
@@ -234,7 +268,7 @@ export function buildClassification(
     ...newInstallRecord({ kind: "existing" }),
     decisions: { preset: null, level: null, flows },
     applied: false,
-    legacyOverrides: carriedOverOverrides(level),
+    legacyOverrides: carriedOverOverrides(level, network, overrides),
   };
 }
 

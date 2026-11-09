@@ -197,3 +197,12 @@ usePrivacyStore.subscribe((state, previous) => {
 registerLevelChangeListener(async () => {
   await policySweep;
 });
+
+/** Resolves once every sweep queued by a retention change has finished. */
+export async function whenStopUsageSweepsSettled(): Promise<void> {
+  let sweep: Promise<unknown>;
+  do {
+    sweep = policySweep;
+    await sweep.catch(() => {});
+  } while (sweep !== policySweep);
+}

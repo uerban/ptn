@@ -337,7 +337,7 @@ describe("serviceAlertsClient revocation", () => {
       JSON.stringify({
         state: {
           decisions: {
-            "operator.service-alerts": { value: "denied", source: "settings" },
+            "operator.service-alerts": { value: "denied", source: "settings", decidedAt: Date.now() + 1 },
           },
         },
         version: 1,

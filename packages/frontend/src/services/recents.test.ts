@@ -22,8 +22,13 @@ import {
 } from "./recents.ts";
 import { __resetInstallKeyCacheForTests } from "./installKey.ts";
 import { __resetDegradedModeForTests } from "./installKeyDegrade.ts";
-import { __resetPersonalStorageForTests, putPersonal } from "./personalStorage.ts";
-import { usePrivacyStore } from "../stores/privacyStore.ts";
+import {
+  clearPersonal,
+  personalClearMarkKey,
+  __resetPersonalStorageForTests,
+  putPersonal,
+} from "./personalStorage.ts";
+import { getPolicy, usePrivacyStore } from "../stores/privacyStore.ts";
 import { usePrivacyChoicesStore } from "../stores/privacyChoicesStore.ts";
 import {
   findLeaks,
@@ -223,6 +228,115 @@ describe("clearRecents", () => {
     await clearRecents();
     expect(await db.recentLocations.count()).toBe(0);
     expect(await listRecents()).toEqual([]);
+  });
+
+  /** Runs `during` once, while the next record is being sealed. */
+  function whileSealing(during: () => Promise<unknown>): Promise<unknown>[] {
+    const pending: Promise<unknown>[] = [];
+    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "encrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      pending.push(during());
+      return encrypt(...args);
+    });
+    return pending;
+  }
+
+  it("a recent being sealed when recents are switched off and cleared is not stored", async () => {
+    const pending = whileSealing(async () => {
+      usePrivacyChoicesStore.getState().setChoice("recents", "disabled");
+      await clearRecents();
+    });
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    usePrivacyChoicesStore.getState().setChoice("recents", "enabled");
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed when history is cleared is not stored", async () => {
+    const pending = whileSealing(() => clearRecents());
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await listRecents()).toEqual([]);
+  });
+
+  it("a recent recorded while history is cleared during the read of existing recents is not stored", async () => {
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    const pending: Promise<unknown>[] = [];
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      pending.push(clearRecents());
+      return decrypt(...args);
+    });
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent recorded while another tab clears history during the read of existing recents is not stored", async () => {
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    const pending: Promise<unknown>[] = [];
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const spy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation((...args) => {
+      spy.mockRestore();
+      // What another tab's clear leaves behind: a new clear mark and an
+      // emptied table. This tab's own state does not change.
+      localStorage.setItem(personalClearMarkKey("recentLocations"), "other-tab-clear");
+      pending.push(db.recentLocations.clear());
+      return decrypt(...args);
+    });
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed is not stored when another tab clears history while a clear of saved places overlaps it", async () => {
+    const pending = whileSealing(async () => {
+      const before = new Map<string, string>();
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)!;
+        before.set(key, localStorage.getItem(key)!);
+      }
+      // Another tab clears history: a new clear mark, then an emptied table.
+      localStorage.setItem(personalClearMarkKey("recentLocations"), crypto.randomUUID());
+      // Meanwhile saved places are cleared from a read of localStorage taken
+      // before that mark landed.
+      const read = vi
+        .spyOn(localStorage, "getItem")
+        .mockImplementation((key) => before.get(key) ?? null);
+      const cleared = clearPersonal("savedLocations");
+      read.mockRestore();
+      await Promise.all([cleared, db.recentLocations.clear()]);
+    });
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(await db.recentLocations.count()).toBe(0);
+    expect(await countRecents()).toBe(0);
+  });
+
+  it("a recent being sealed when the level moves recents to this session is not stored", async () => {
+    const pending = whileSealing(() => usePrivacyStore.getState().setLevel("paranoid"));
+    await recordRecent(stopEndpoint, { usedAsOrigin: true });
+    await Promise.all(pending);
+
+    expect(pending).toHaveLength(1);
+    expect(getPolicy().recentsEncryption).toBe("ram-only");
+    expect(await db.recentLocations.count()).toBe(0);
   });
 });
 

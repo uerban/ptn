@@ -51,7 +51,15 @@ function NearbyDepartures({ showStop }: { showStop: (stop: Stop) => void }) {
  * trip guidance once a trip starts, with no map module loaded. **Show map**
  * opens a temporary map (`temporaryMap`); coming back restores focus.
  */
-export function TextHome({ temporaryMap }: { temporaryMap: TemporaryMap }) {
+export interface TextHomeProps {
+  temporaryMap: TemporaryMap;
+  /** The stop whose departures are shown; kept by the caller so it survives
+   * a trip to the temporary map. */
+  selectedStop?: Stop | null;
+  onSelectStop?: (stop: Stop | null) => void;
+}
+
+export function TextHome({ temporaryMap, selectedStop, onSelectStop }: TextHomeProps) {
   const phase = useGuidanceStore((s) => s.phase);
   const showMap = useShowMapAction(temporaryMap);
   const { request } = showMap;
@@ -76,7 +84,12 @@ export function TextHome({ temporaryMap }: { temporaryMap: TemporaryMap }) {
   return (
     <>
       {phase === "idle" ? (
-        <ScheduleHome onShowMap={showStopsMap} renderNearbyDepartures={renderNearby} />
+        <ScheduleHome
+          onShowMap={showStopsMap}
+          renderNearbyDepartures={renderNearby}
+          selectedStop={selectedStop}
+          onSelectStop={onSelectStop}
+        />
       ) : (
         <TextGuidance onShowMap={showTripMap} />
       )}

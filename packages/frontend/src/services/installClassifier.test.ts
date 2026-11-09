@@ -240,4 +240,54 @@ describe("mapLegacyNetworkDecisions", () => {
       "allowed",
     );
   });
+
+  it("place search on the server stays off where residency was local-only", () => {
+    expect(
+      mapLegacyNetworkDecisions(LEGACY_NETWORK_FLOORS_V1.hardened, {})["operator.place-search"]
+        ?.value,
+    ).toBe("denied");
+    expect(
+      mapLegacyNetworkDecisions({ ...standard, poiResidency: "local-only" }, {})[
+        "operator.place-search"
+      ]?.value,
+    ).toBe("denied");
+  });
+});
+
+describe("legacy place search protections", () => {
+  it("denies place search for a standard install whose residency override was local-only", () => {
+    seed("ptn-privacy", { level: "standard", overrides: { poiResidency: "local-only" } });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
+
+  it("denies place search for a hardened install", () => {
+    seed("ptn-privacy", { level: "hardened", overrides: {} });
+    expect(flows(classified())["operator.place-search"]).toBe("denied");
+  });
+
+  it("keeps geocoder hints coarsened where an always-coarsen override was stored", () => {
+    for (const level of ["baseline", "standard"]) {
+      localStorage.clear();
+      seed("ptn-privacy", { level, overrides: { m9SelfHosted: "always-coarsen" } });
+      const record = classified();
+      expect(record.legacyOverrides).toEqual({ m10CoarsenGridFloorMeters: 50 });
+      expect(flows(record)["operator.place-search"]).toBe("allowed");
+    }
+  });
+
+  it("adds no coarsening floor where the level or a stored floor already coarsens", () => {
+    seed("ptn-privacy", { level: "hardened", overrides: { m9SelfHosted: "always-coarsen" } });
+    expect(classified().legacyOverrides).toEqual({});
+    localStorage.clear();
+    seed("ptn-privacy", {
+      level: "standard",
+      overrides: { m9SelfHosted: "always-coarsen", m10CoarsenGridFloorMeters: 100 },
+    });
+    expect(classified().legacyOverrides).toEqual({});
+  });
+
+  it("adds no coarsening floor without an always-coarsen override", () => {
+    seed("ptn-privacy", { level: "standard", overrides: {} });
+    expect(classified().legacyOverrides).toEqual({});
+  });
 });

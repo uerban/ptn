@@ -37,8 +37,10 @@ import {
   onStorageKeyChange,
   withMigrationLock,
 } from "../services/crossTab.ts";
+import { refusedWriteCount } from "../services/tolerantLocalStorage.ts";
 import {
   NETWORK_DECISIONS_STORAGE_KEY,
+  absorbStoredDecisions,
   useNetworkDecisionsStore,
 } from "./networkDecisionsStore.ts";
 import { getCurrentLevel, usePrivacyStore } from "./privacyStore.ts";
@@ -88,8 +90,9 @@ function initialDraft(): SetupDraft {
 }
 
 /**
- * Apply a journal to the preference stores and return the record marked
- * applied. Safe to run any number of times for the same journal.
+ * Apply a journal to the preference stores and return the record, marked
+ * applied only when every store change was persisted. Safe to run any number
+ * of times for the same journal.
  */
 export async function applyJournalToStores(
   record: OnboardingRecord,
@@ -97,11 +100,30 @@ export async function applyJournalToStores(
   if (!record.decisions) return record;
   const { flows, level, storageChoices } = record.decisions;
 
-  // Persisting a store can throw (quota, blocked storage) after its
-  // in-memory state changed. Keep going so this session still gets every
-  // part of the journal; the record stays authoritative for the next boot.
+  // Persisting a store can fail (quota, blocked storage) after its in-memory
+  // state changed; the persisted stores swallow the error. Keep going so this
+  // session still gets every part of the journal, and leave the journal
+  // pending so the next boot applies it again.
+  const refusedBefore = refusedWriteCount();
+  let failed = false;
+  const safely = async (step: () => unknown): Promise<void> => {
+    try {
+      await step();
+    } catch {
+      failed = true;
+    }
+  };
+
   await safely(() => useNetworkDecisionsStore.getState().replaceDecisions(flows));
-  if (level) await safely(() => usePrivacyStore.getState().setLevel(level));
+  if (level) {
+    await safely(async () => {
+      const privacy = usePrivacyStore.getState();
+      // Already in memory (this session applied it, but storage may have
+      // refused it): store it again so a refusal is noticed.
+      if (privacy.level === level) usePrivacyStore.setState({ level });
+      else await privacy.setLevel(level);
+    });
+  }
 
   for (const axis of Object.keys(record.legacyOverrides) as ProtectionAxis[]) {
     await safely(() => restoreOverride(axis, record.legacyOverrides));
@@ -127,7 +149,8 @@ export async function applyJournalToStores(
     }
   }
 
-  return { ...record, applied: true };
+  const durable = !failed && refusedWriteCount() === refusedBefore;
+  return { ...record, applied: durable };
 }
 
 function restoreOverride<K extends ProtectionAxis>(
@@ -136,14 +159,6 @@ function restoreOverride<K extends ProtectionAxis>(
 ): void {
   const value = overrides[axis];
   if (value !== undefined) usePrivacyStore.getState().setOverride(axis, value);
-}
-
-async function safely(step: () => unknown): Promise<void> {
-  try {
-    await step();
-  } catch {
-    // See applyJournalToStores.
-  }
 }
 
 /**
@@ -157,7 +172,7 @@ export async function applyPendingOnboardingJournal(): Promise<void> {
       const read = readOnboardingRecord();
       if (read.status !== "ok" || !hasPendingJournal(read.record)) return;
       const applied = await applyJournalToStores(read.record);
-      writeOnboardingRecord(applied);
+      if (applied.applied) writeOnboardingRecord(applied);
     });
   } catch {
     // Stores keep their previous values; the journal stays pending and is
@@ -281,11 +296,11 @@ onOnboardingRecordWrite((record) => {
 
 /**
  * Propagate decision and journal changes made in other tabs: the decision
- * store rehydrates and the record is re-read. Call once at boot.
+ * store merges the other tab's change and the record is re-read. Call once at boot.
  */
 export function installPrivacyStateSync(): () => void {
-  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, () => {
-    void useNetworkDecisionsStore.persist.rehydrate();
+  const stopDecisions = onStorageKeyChange(NETWORK_DECISIONS_STORAGE_KEY, (newValue) => {
+    absorbStoredDecisions(newValue);
   });
   const stopRecord = onStorageKeyChange(ONBOARDING_RECORD_KEY, () => {
     useOnboardingStore.getState().load();

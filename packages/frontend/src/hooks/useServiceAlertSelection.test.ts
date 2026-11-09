@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Alert, Itinerary, Leg } from "@pt/shared";
-import { alertsByLeg, legTargets, stopTargets } from "./useServiceAlertSelection.ts";
+import {
+  alertsByLeg,
+  legTargets,
+  stopTargets,
+  type AlertTargetIndex,
+} from "./useServiceAlertSelection.ts";
+import { selectAlerts } from "../services/serviceAlertSelection.ts";
 import { itineraryAlerts } from "../components/ServiceAlerts/ServiceAlertTripNotes.tsx";
+import { routeTargets } from "../components/ServiceAlerts/ServiceAlertsPanel.tsx";
 
 function alert(overrides: Partial<Alert> = {}): Alert {
   return {
@@ -65,6 +72,50 @@ describe("targets", () => {
   });
 });
 
+/** Timetable metadata: R1 is agency A's bus (route_type 3), T1 runs direction 1. */
+const TIMETABLE = {
+  routes: [
+    {
+      id: "R1",
+      shortName: "4G",
+      mode: "BUS",
+      agencyId: "A",
+      routeType: 3,
+      stopIds: ["SA", "SB"],
+      trips: [{ tripId: "T1", serviceId: "x", headsign: "B", directionId: 1, departureSecs: [0, 60] }],
+    },
+  ],
+  routeIdToIdx: new Map([["R1", 0]]),
+} as unknown as AlertTargetIndex;
+
+describe("targets with timetable metadata", () => {
+  it("carries agency, route type and direction on departures and rides", () => {
+    expect(stopTargets("S1", [{ routeId: "R1", tripId: "T1" }], TIMETABLE)[1]).toEqual({
+      stopId: "S1",
+      routeId: "R1",
+      tripId: "T1",
+      agencyId: "A",
+      routeType: 3,
+      directionId: 1,
+    });
+    expect(legTargets(RIDE, TIMETABLE)[0]).toMatchObject({ agencyId: "A", routeType: 3, directionId: 1 });
+  });
+
+  it("shows agency-wide, route-type and direction alerts on the stop sheet and the ride", () => {
+    const agency = alert({ id: "agency", informedEntities: [{ agencyId: "A" }] });
+    const buses = alert({ id: "buses", informedEntities: [{ routeType: 3 }] });
+    const direction = alert({ id: "dir", informedEntities: [{ routeId: "R1", directionId: 1 }] });
+    const otherAgency = alert({ id: "other-agency", informedEntities: [{ agencyId: "B" }] });
+    const trams = alert({ id: "trams", informedEntities: [{ routeType: 0 }] });
+    const otherDirection = alert({ id: "dir0", informedEntities: [{ routeId: "R1", directionId: 0 }] });
+    const all = [agency, buses, direction, otherAgency, trams, otherDirection];
+
+    const targets = stopTargets("S1", [{ routeId: "R1", tripId: "T1" }], TIMETABLE);
+    expect(selectAlerts(all, targets).map((a) => a.id)).toEqual(["agency", "buses", "dir"]);
+    expect(alertsByLeg(all, TRIP, TIMETABLE)[1].map((a) => a.id)).toEqual(["agency", "buses", "dir"]);
+  });
+});
+
 describe("alertsByLeg", () => {
   it("assigns route, trip and stop alerts to the ride only", () => {
     const route = alert({ id: "route" });
@@ -100,5 +151,33 @@ describe("itineraryAlerts", () => {
     const entries = itineraryAlerts([alert()], { legs: [RIDE, WALK, second] });
     expect(entries).toHaveLength(1);
     expect(entries[0].lines).toEqual(["4G", "7"]);
+  });
+  it("lists agency, route-type and direction alerts on the result card", () => {
+    const agency = alert({ id: "agency", informedEntities: [{ agencyId: "A" }] });
+    const buses = alert({ id: "buses", informedEntities: [{ routeType: 3 }] });
+    const direction = alert({ id: "dir", informedEntities: [{ routeId: "R1", directionId: 1 }] });
+    const entries = itineraryAlerts([agency, buses, direction], TRIP, TIMETABLE);
+    expect(entries.map((e) => e.alert.id)).toEqual(["agency", "buses", "dir"]);
+    expect(entries[0].lines).toEqual(["4G"]);
+  });
+});
+
+describe("routeTargets", () => {
+  it("shows agency-wide and route-type alerts on the line view, and direction alerts as partial", () => {
+    const agency = alert({ id: "agency", informedEntities: [{ agencyId: "A" }] });
+    const buses = alert({ id: "buses", informedEntities: [{ routeType: 3 }] });
+    const direction = alert({ id: "dir", informedEntities: [{ routeId: "R1", directionId: 1 }] });
+    const trams = alert({ id: "trams", informedEntities: [{ routeType: 0 }] });
+    const all = [agency, buses, direction, trams];
+
+    const targets = routeTargets("R1", TIMETABLE);
+    expect(targets).toEqual([{ routeId: "R1", agencyId: "A", routeType: 3 }]);
+    expect(selectAlerts(all, targets).map((a) => a.id)).toEqual(["agency", "buses"]);
+    expect(selectAlerts(all, targets, { includePartial: true }).map((a) => a.id)).toEqual([
+      "agency",
+      "buses",
+      "dir",
+    ]);
+    expect(routeTargets(null, TIMETABLE)).toEqual([]);
   });
 });

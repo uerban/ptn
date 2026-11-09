@@ -5,14 +5,16 @@
  */
 
 /**
- * What the map canvas draws underneath the transit overlays. One choice, three
- * rungs of decreasing external dependence:
- *   - detailed : external street basemap (only when the privacy policy allows)
- *   - micromap : the on-device city micromap artifact (water, major roads,
- *                green areas, district labels) — no network at all
+ * What the map canvas draws underneath the transit overlays, a display
+ * preference with three rungs of decreasing external dependence:
+ *   - detailed : external street basemap, drawn only while its provider's
+ *                network decision allows it
+ *   - micromap : the city micromap (water, major roads, green areas, district
+ *                labels), downloaded once from this app's server and then
+ *                drawn on the device with no further requests
  *   - gtfs-only: nothing but GTFS-derived transit corridors
- * `src/map/mapMode.ts` owns the mapping between this setting and the
- * `basemapMode` privacy axis; the two used to be separate controls.
+ * `src/map/mapMode.ts` resolves what is actually drawn from this preference
+ * and the detailed map's network decision.
  */
 export const MAP_DETAIL_MODES = ["detailed", "micromap", "gtfs-only"] as const;
 export type MapDetailMode = (typeof MAP_DETAIL_MODES)[number];

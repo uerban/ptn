@@ -4,6 +4,7 @@ import { useDepartures } from "../../hooks/useDepartures.ts";
 import { useFavoritesStore } from "../../stores/favoritesStore.ts";
 import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { LineGroup } from "./LineGroup.tsx";
 import { LiveTimesNotice } from "./LiveTimesNotice.tsx";
@@ -81,7 +82,11 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   }, []);
 
   const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
-  const alertTargets = useMemo(() => stopTargets(stop.id, departures), [stop.id, departures]);
+  const timetable = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => stopTargets(stop.id, departures, timetable),
+    [stop.id, departures, timetable],
+  );
 
   const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);

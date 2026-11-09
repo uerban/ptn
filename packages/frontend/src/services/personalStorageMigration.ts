@@ -40,11 +40,7 @@ import {
   type PersonalStorageFailure,
   type PersonalTable,
 } from "./personalStorage.ts";
-import { LEGACY_FAVORITES_KEY } from "./favoritesMigration.ts";
-import {
-  DELAY_REPORTS_STORAGE_KEY,
-  MAP_VIEWPORT_STORAGE_KEY,
-} from "./privacyStorageKeys.ts";
+import { SEALED_LOCAL_STORAGE_KEYS } from "./privacyStorageKeys.ts";
 import { runPrivacyDataMigration } from "./privacyDataMigration.ts";
 import { isPrivacyDataMigrationComplete } from "./privacyDataMigrationState.ts";
 import type { RecentPayload } from "./recents.ts";
@@ -62,12 +58,6 @@ function legacyCity(cityId: unknown, fallbackCityId: string | null): { cityId?: 
   return fallbackCityId ? { cityId: fallbackCityId } : {};
 }
 
-/** localStorage values holding personal state, sealed by this migration. */
-export const SEALED_LOCAL_STORAGE_KEYS: readonly string[] = [
-  LEGACY_FAVORITES_KEY,
-  DELAY_REPORTS_STORAGE_KEY,
-  MAP_VIEWPORT_STORAGE_KEY,
-];
 
 /** Response caches whose entries reveal stops, departures or map areas viewed. */
 export const ACTIVITY_CACHE_PREFIXES: readonly string[] = [
@@ -447,4 +437,4 @@ export function runPersonalStorageMigration(
   return running;
 }
 
-registerPersonalStorageMigration(() => runPersonalStorageMigration());
+registerPersonalStorageMigration(runPersonalStorageMigration);

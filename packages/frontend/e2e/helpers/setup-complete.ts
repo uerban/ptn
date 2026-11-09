@@ -93,9 +93,13 @@ export async function seedCompletedSetup(
 
 /**
  * Record network decisions as if the user had made them in Settings, merged
- * over whatever the profile already stores. Works for new and existing
- * installations alike (an existing one keeps the decisions its classifier
- * derives for other flows).
+ * over whatever the profile already stores.
+ *
+ * Only for a profile whose setup is already applied (a new installation, or
+ * one seeded by `seedCompletedSetup`). An existing installation that the app
+ * still has to classify (a spec that seeds `ptn-privacy`, `ptn-settings`, …,
+ * such as `bootAtPrivacyLevel`) applies its setup journal at boot, and the
+ * journal replaces every decision: use `decideAfterSetup` there.
  *
  * MUST be called before `page.goto(...)`.
  */
@@ -120,4 +124,55 @@ export async function seedNetworkDecisions(
       JSON.stringify({ state: { decisions: merged }, version: stored.version ?? 1 }),
     );
   }, decisions);
+}
+
+const NETWORK_DECISIONS_MODULE = "/src/stores/networkDecisionsStore.ts";
+
+/**
+ * Record network decisions in the running app, as the user would in
+ * Settings, once the setup journal has been applied (so the journal cannot
+ * replace them). Works for every profile, including an existing installation
+ * the app classified at boot. Needs the dev server, which serves the store
+ * module by its source path.
+ *
+ * MUST be called after `page.goto(...)`.
+ */
+export async function decideAfterSetup(
+  page: Page,
+  decisions: Record<string, "allowed" | "denied">,
+): Promise<void> {
+  await page.waitForFunction(() => {
+    try {
+      const record = JSON.parse(localStorage.getItem("ptn-onboarding") ?? "null") as {
+        applied?: unknown;
+      } | null;
+      return record?.applied === true;
+    } catch {
+      return false;
+    }
+  });
+  await page.evaluate(
+    async ({ decisions, modulePath }) => {
+      const mod = (await import(/* @vite-ignore */ modulePath)) as {
+        useNetworkDecisionsStore: {
+          getState: () => {
+            setDecision: (
+              flowId: string,
+              value: string,
+              source: string,
+              providerId?: string,
+            ) => boolean;
+          };
+        };
+      };
+      for (const [key, value] of Object.entries(decisions)) {
+        const [flowId, providerId] = key.split("@");
+        const stored = mod.useNetworkDecisionsStore
+          .getState()
+          .setDecision(flowId!, value, "settings", providerId);
+        if (!stored) throw new Error(`Cannot record a decision for ${key}`);
+      }
+    },
+    { decisions, modulePath: NETWORK_DECISIONS_MODULE },
+  );
 }

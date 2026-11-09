@@ -45,7 +45,11 @@ export function LinePreviewPage() {
   const badgeSize = getBadgeSize(variant);
   const cityId = useCityStore((s) => s.activeCity.id);
   const cityName = useCityStore((s) => s.activeCity.name);
-  const alertTargets = useMemo(() => routeTargets(routeId), [routeId]);
+  const raptorIndex = useGtfsDataStore((s) => s.raptorIndex);
+  const alertTargets = useMemo(
+    () => routeTargets(routeId, raptorIndex),
+    [routeId, raptorIndex],
+  );
 
   // Make sure GTFS data is loaded for the active city.
   useEffect(() => {

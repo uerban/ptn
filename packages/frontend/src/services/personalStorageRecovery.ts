@@ -11,13 +11,11 @@ import {
   PERSONAL_TABLES,
   clearPersonal,
   deleteUnreadablePersonal,
+  runRegisteredPersonalStorageMigration,
   usePersonalStorageStatus,
 } from "./personalStorage.ts";
-import {
-  SEALED_LOCAL_STORAGE_KEYS,
-  runPersonalStorageMigration,
-  type PersonalStorageMigrationResult,
-} from "./personalStorageMigration.ts";
+import type { PersonalStorageMigrationResult } from "./personalStorageMigration.ts";
+import { SEALED_LOCAL_STORAGE_KEYS } from "./privacyStorageKeys.ts";
 import {
   mapViewportItem,
   readSealedItem,
@@ -38,7 +36,7 @@ export async function rehydrateSealedStores(): Promise<void> {
 /** Retries a failed key read and the storage migration, then reloads. */
 export async function retryPersonalStorage(): Promise<PersonalStorageMigrationResult> {
   retryInstallKeyReadNow();
-  const result = await runPersonalStorageMigration();
+  const result = await runRegisteredPersonalStorageMigration();
   if (result !== "failed") await rehydrateSealedStores();
   return result;
 }
@@ -75,12 +73,14 @@ export async function deleteAllPersonalData(
   storage: Storage_ = globalThis.localStorage,
 ): Promise<void> {
   for (const table of PERSONAL_TABLES) await clearPersonal(table);
-  await db.usageStats.clear();
+  // Stop use from before it was sealed: left in place, the migration below
+  // would convert it into fresh personal records.
+  await Promise.all([db.usageStats.clear(), db.cityUsageStats.clear()]);
   await db.geocoderDedup.clear();
   for (const name of SEALED_LOCAL_STORAGE_KEYS) removeSealedItem(name, storage);
   useFavoritesStore.setState({ favorites: [] });
   useDelayReportStore.setState({ reports: [] });
   await resetInstallKeys();
-  await runPersonalStorageMigration({ storage });
+  await runRegisteredPersonalStorageMigration({ storage });
   await rehydrateSealedStores();
 }
