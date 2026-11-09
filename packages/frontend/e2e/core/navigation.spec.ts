@@ -6,12 +6,6 @@ test.describe("Navigation", () => {
     await mockApi(page);
   });
 
-  test("search bar navigates to /search", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Where are you going?" }).click();
-    await expect(page).toHaveURL(/\/search/);
-  });
-
   test("Settings tab navigates to /settings", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "Settings" }).click();

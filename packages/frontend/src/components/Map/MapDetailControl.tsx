@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { resolveNetworkDecision } from "@pt/shared/privacy";
 import { usePresentationText } from "../../i18n/presentationStrings.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
@@ -27,35 +27,31 @@ import { onStorageKeyChange } from "../../services/crossTab.ts";
 
 /** Asking surface, for the session's **Not now** memory. */
 export const MAP_DETAIL_SURFACE = "map-detail";
-/** Set once the tip is dismissed; survives reloads. Public UI state. */
-export const MAP_DETAIL_HINT_KEY = "ptn-map-detail-hint";
+/** Set once the one-time question has been answered; survives reloads. Public UI state. */
+export const MAP_DETAIL_ASKED_KEY = "ptn-map-detail-asked";
 
-function readHintDismissed(): boolean {
+function readAsked(): boolean {
   try {
-    return globalThis.localStorage?.getItem(MAP_DETAIL_HINT_KEY) === "dismissed";
+    return globalThis.localStorage?.getItem(MAP_DETAIL_ASKED_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-function subscribeHint(listener: () => void): () => void {
-  return onStorageKeyChange(MAP_DETAIL_HINT_KEY, listener);
+function subscribeAsked(listener: () => void): () => void {
+  return onStorageKeyChange(MAP_DETAIL_ASKED_KEY, listener);
 }
 
 /**
- * **More map detail**, available at once in map mode, plus a short line on
- * the state of the local map.
+ * One-time **detailed maps** decision plus a short line on the state of the
+ * local map.
  *
- * Pressing it is the deliberate action: with detailed maps already allowed
- * it switches to them, otherwise it opens the disclosure naming the provider
- * (**Use detailed maps** / **Not now** / **Don't ask again**). Nothing is
- * requested from the provider before **Use detailed maps**. Pressed again,
- * it returns to the minimal map without revoking the decision.
- *
- * A one-time tip may sit next to it while the decision is unset. It never
- * takes focus and is not announced; dismissing it is remembered across
- * reloads, and **Not now** hides it for the session. City changes and
- * journeys never bring either back.
+ * There is no standing toggle. Once setup is done and the decision is still
+ * unset, the disclosure naming the provider opens once (**Use detailed maps**
+ * / **Not now** / **Don't ask again**). Any answer is remembered across
+ * reloads (`MAP_DETAIL_ASKED_KEY`), so it is never asked again; the choice
+ * stays changeable in Settings. Nothing is requested from the provider before
+ * **Use detailed maps**.
  */
 export function MapDetailControl() {
   const text = usePresentationText();
@@ -70,44 +66,18 @@ export function MapDetailControl() {
   );
   const micromap = useMicromapState(cityId);
   const detailed = useDetailedBasemapStatus();
-  const storedDismissal = useSyncExternalStore(subscribeHint, readHintDismissed, readHintDismissed);
-  const [hintClosed, setHintClosed] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const storedAsked = useSyncExternalStore(subscribeAsked, readAsked, readAsked);
+  const [answeredNow, setAnsweredNow] = useState(false);
 
   const locked = isDetailedMapLocked();
-  const pressed = effectiveMode === "detailed";
   const providerName =
     getBasemapProvider(DEFAULT_BASEMAP_PROVIDER)?.name ?? DEFAULT_BASEMAP_PROVIDER;
 
-  const dismissHint = () => {
-    setHintClosed(true);
-    try {
-      globalThis.localStorage?.setItem(MAP_DETAIL_HINT_KEY, "dismissed");
-    } catch {
-      // Storage unavailable: the tip stays closed for this page only.
-    }
-  };
-
-  const onPress = () => {
-    if (pressed) {
-      setMapDetailMode("micromap");
-      return;
-    }
-    if (allowed) {
-      setMapDetailMode("detailed");
-      return;
-    }
-    dismissHint();
-    setAsking(true);
-  };
-
-  const showHint =
+  const asking =
     !locked &&
-    !pressed &&
-    !asking &&
-    !hintClosed &&
-    !storedDismissal &&
+    !answeredNow &&
+    !storedAsked &&
+    !allowed &&
     decision === "unset" &&
     mayOfferUnprompted(DETAILED_BASEMAP_FLOW, MAP_DETAIL_SURFACE, DEFAULT_BASEMAP_PROVIDER);
 
@@ -132,38 +102,6 @@ export function MapDetailControl() {
       data-micromap-state={micromap ?? "idle"}
       data-detailed-state={detailed}
     >
-      {!locked && (
-        <div className="flex items-center gap-1.5">
-          <button
-            ref={buttonRef}
-            type="button"
-            onClick={onPress}
-            aria-pressed={pressed}
-            data-testid="more-map-detail"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-raised rounded-full shadow-1
-              text-xs font-medium shrink-0"
-          >
-            <span className={pressed ? "text-fg" : "text-fg-muted"}>{text("mapDetail.more")}</span>
-          </button>
-          {showHint && (
-            <span
-              data-testid="map-detail-hint"
-              className="flex items-center gap-1 rounded-lg bg-surface-raised/95 shadow-1 px-2 py-1 text-xs text-fg-secondary"
-            >
-              <span>{text("mapDetail.hint")}</span>
-              <button
-                type="button"
-                onClick={dismissHint}
-                aria-label={text("mapDetail.hintDismiss")}
-                data-testid="map-detail-hint-dismiss"
-                className="inline-flex min-h-6 min-w-6 items-center justify-center text-fg-muted"
-              >
-                ×
-              </button>
-            </span>
-          )}
-        </div>
-      )}
       {status && (
         <div
           data-testid="map-status"
@@ -192,7 +130,12 @@ export function MapDetailControl() {
           recipientName={providerName}
           details={<p>{text("mapDetail.details", { provider: providerName })}</p>}
           onClose={(answer) => {
-            setAsking(false);
+            setAnsweredNow(true);
+            try {
+              globalThis.localStorage?.setItem(MAP_DETAIL_ASKED_KEY, "1");
+            } catch {
+              // Storage unavailable: not asked again for this page only.
+            }
             if (answer === "allowed") {
               applyMapMode("detailed", {
                 setMapDetailMode,
@@ -200,7 +143,6 @@ export function MapDetailControl() {
                   grantFlow(DETAILED_BASEMAP_FLOW, "contextual", providerId),
               });
             }
-            buttonRef.current?.focus();
           }}
         />
       )}

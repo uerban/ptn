@@ -43,70 +43,47 @@ async function interceptCarto(page: Page) {
 async function openMap(page: Page) {
   await page.goto("/");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  await expect(page.getByTestId("more-map-detail")).toBeVisible();
 }
 
-test.describe("More map detail @mock-api", () => {
+test.describe("Detailed maps, asked once @mock-api", () => {
   test("asks before contacting the provider; Use detailed maps loads it", async ({ page }) => {
     const carto = await interceptCarto(page);
     await mockApi(page);
     await openMap(page);
 
-    const control = page.getByTestId("more-map-detail");
-    await expect(control).toHaveAttribute("aria-pressed", "false");
-    await expect(page.getByTestId("map-detail-hint")).toBeVisible();
-    await page.waitForTimeout(500);
-    expect(carto).toEqual([]);
-
-    await control.click();
     const disclosure = page.getByTestId("flow-disclosure");
     await expect(disclosure).toBeVisible();
     await expect(disclosure).toContainText("CARTO");
+    await page.waitForTimeout(500);
     expect(carto).toEqual([]);
+    await expect(page.getByTestId("more-map-detail")).toHaveCount(0);
 
     await disclosure.getByRole("button", { name: "Use detailed maps" }).click();
     await expect(disclosure).toBeHidden();
-    await expect(control).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => carto.filter((url) => url.endsWith(".png")).length).toBeGreaterThan(0);
-    await expect(control).toBeFocused();
   });
 
-  test("Don't ask again keeps the provider silent across a reload, without the tip", async ({
+  test("Not now keeps the provider silent and is not asked again after a reload", async ({
     page,
   }) => {
     const carto = await interceptCarto(page);
     await mockApi(page);
     await openMap(page);
 
-    await page.getByTestId("more-map-detail").click();
-    await page.getByRole("button", { name: "Don't ask again" }).click();
+    await page.getByRole("button", { name: "Not now" }).click();
     await expect(page.getByTestId("flow-disclosure")).toBeHidden();
 
     await page.reload();
     await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-    await expect(page.getByTestId("more-map-detail")).toBeVisible();
-    await expect(page.getByTestId("map-detail-hint")).toBeHidden();
     await page.waitForTimeout(500);
+    await expect(page.getByTestId("flow-disclosure")).toHaveCount(0);
     expect(carto).toEqual([]);
-  });
-
-  test("a dismissed tip stays dismissed after a reload", async ({ page }) => {
-    await interceptCarto(page);
-    await mockApi(page);
-    await openMap(page);
-
-    await page.getByTestId("map-detail-hint-dismiss").click();
-    await expect(page.getByTestId("map-detail-hint")).toBeHidden();
-    await page.reload();
-    await expect(page.getByTestId("more-map-detail")).toBeVisible();
-    await expect(page.getByTestId("map-detail-hint")).toBeHidden();
   });
 
   test("a revocation in another tab stops the detailed map here", async ({ page, context }) => {
     const carto = await interceptCarto(page);
     await mockApi(page);
     await openMap(page);
-    await page.getByTestId("more-map-detail").click();
     await page.getByRole("button", { name: "Use detailed maps" }).click();
     await expect.poll(() => carto.length).toBeGreaterThan(0);
 
@@ -125,8 +102,6 @@ test.describe("More map detail @mock-api", () => {
       localStorage.setItem(key, JSON.stringify(stored));
     });
 
-    const control = page.getByTestId("more-map-detail");
-    await expect(control).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByTestId("map-detail-control")).toHaveAttribute(
       "data-detailed-state",
       "off",

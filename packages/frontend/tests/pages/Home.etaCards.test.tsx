@@ -61,6 +61,11 @@ const cityState = vi.hoisted(() => ({ activeCity: VILNIUS_CITY }));
 
 // ─── Module mocks (same thin set as Home.scheduleMode.test.tsx) ─────────────
 
+// The one-time detailed-maps question is covered by MapDetailControl.test.tsx.
+vi.mock("../../src/components/Map/MapDetailControl.tsx", () => ({
+  MapDetailControl: () => null,
+}));
+
 vi.mock("../../src/hooks/useNearbyDirections.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/hooks/useNearbyDirections.ts")>();
   return {

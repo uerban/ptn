@@ -1,3 +1,8 @@
+// The one-time detailed-maps question is covered by MapDetailControl.test.tsx.
+vi.mock("../../src/components/Map/MapDetailControl.tsx", () => ({
+  MapDetailControl: () => null,
+}));
+
 vi.mock("../../src/services/liveLocation.ts", () => ({ liveLocation: { request: vi.fn() } }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
