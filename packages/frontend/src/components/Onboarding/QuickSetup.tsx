@@ -56,9 +56,9 @@ export function recommendedSummaryKey(
 }
 
 const primaryButton =
-  "min-h-11 w-full rounded-lg bg-accent px-4 py-2 text-left text-base font-medium text-white disabled:opacity-60";
+  "min-h-11 w-full rounded-lg bg-accent px-4 py-2 text-left text-base [overflow-wrap:anywhere] font-medium text-white disabled:opacity-60";
 const secondaryButton =
-  "min-h-11 w-full rounded-lg border border-divider bg-surface-raised px-4 py-2 text-left text-base font-medium text-fg disabled:opacity-60";
+  "min-h-11 w-full rounded-lg border border-divider bg-surface-raised px-4 py-2 text-left text-base [overflow-wrap:anywhere] font-medium text-fg disabled:opacity-60";
 
 export function QuickSetup(props: QuickSetupProps) {
   const { text, cityName, startMode } = props;
@@ -120,9 +120,9 @@ export function QuickSetup(props: QuickSetupProps) {
               checked={startMode === mode}
               onChange={() => props.onStartModeChange(mode)}
               aria-describedby={ids[mode]}
-              className="mt-1 accent-accent"
+              className="mt-1 shrink-0 accent-accent"
             />
-            <span className="flex flex-col">
+            <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
               <span className="text-base font-medium text-fg">
                 {text(
                   mode === "text"
@@ -167,7 +167,7 @@ export function QuickSetup(props: QuickSetupProps) {
           </summary>
           <p>{text("setup.recommended.detailsIntro")}</p>
           {privacyReady && (
-            <ul className="mt-1 list-disc pl-5">
+            <ul className="mt-1 list-disc pl-5 [overflow-wrap:anywhere]">
               {RECOMMENDED_FLOWS.map((flow) => (
                 <li key={flow.id}>
                   <span className="font-medium text-fg">{t(flow.nameKey)}</span>
@@ -197,7 +197,7 @@ export function QuickSetup(props: QuickSetupProps) {
           <summary className="min-h-11 cursor-pointer py-2 text-fg">
             {text("setup.strict.detailsSummary")}
           </summary>
-          <ul className="list-disc pl-5">
+          <ul className="list-disc pl-5 [overflow-wrap:anywhere]">
             <li>{text("setup.strict.history")}</li>
             <li>{text("setup.strict.personalization")}</li>
             <li>{text("setup.strict.export")}</li>
@@ -259,9 +259,9 @@ export function QuickSetup(props: QuickSetupProps) {
                     checked={guided === value}
                     onChange={() => setGuided(value)}
                     aria-describedby={ids[idKey]}
-                    className="mt-1 accent-accent"
+                    className="mt-1 shrink-0 accent-accent"
                   />
-                  <span className="flex flex-col">
+                  <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
                     <span className="text-base text-fg">{text(label)}</span>
                     <span id={ids[idKey]} className="text-sm text-fg-secondary">
                       {text(description)}
