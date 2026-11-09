@@ -174,6 +174,22 @@
     "cityswitch/pan urban z16 long-task total": {
       "value": 0,
       "unit": "ms"
+    },
+    "cityswitch/pan all z14 stop cards": {
+      "value": 0,
+      "unit": "cards"
+    },
+    "cityswitch/pan all z16 stop cards": {
+      "value": 18,
+      "unit": "cards"
+    },
+    "cityswitch/pan urban z14 stop cards": {
+      "value": 0,
+      "unit": "cards"
+    },
+    "cityswitch/pan urban z16 stop cards": {
+      "value": 15,
+      "unit": "cards"
     }
   }
 }

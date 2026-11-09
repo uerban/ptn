@@ -90,8 +90,8 @@ The initial suite recovers these useful checks from the archive:
   browser reaches them through the same API paths as a native host. Twelve
   alternating arrivals at zoom 16 must each complete index activation, resolve
   every in-view badge and settle nonempty stop cards for 500 ms. Four one-second
-  pans per zoom (14, 16) in all-stops and urban modes must render frames and
-  show cards. Neither workload may run the legacy timetable projection write or
+  pans per zoom (14, 16) in all-stops and urban modes must render frames, show
+  stop-name labels in the label band (zoom 14) and stop cards from zoom 15. Neither workload may run the legacy timetable projection write or
   write its tables after the first city is ready, and page errors fail the gate.
   Switch, badge, card-settlement, frame and long-task timings are recorded in
   `city-switch.json` and `viewport-pan.json` but do not fail yet: the

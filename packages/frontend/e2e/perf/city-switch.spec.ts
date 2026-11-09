@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { ZOOM_CARDS_MIN, ZOOM_LABELS_MIN } from "@pt/shared";
 import { seedCompletedSetup } from "../helpers/setup-complete";
 
 // City switching and viewport panning against two synthetic cities served by
@@ -222,7 +223,8 @@ test.describe("@perf city switch and viewport pan", () => {
       await expect(toggle).toHaveAttribute("aria-label", all ? "All" : /^(?!All$)/);
       for (const zoom of zooms) {
         const run = await page.evaluate(async ({ zoom, timeoutMs }) => {
-          type Map = { jumpTo: (o: object) => void; once: (type: string, fn: () => void) => void; panBy: (o: number[], options: object) => void };
+          type Map = { jumpTo: (o: object) => void; once: (type: string, fn: () => void) => void; panBy: (o: number[], options: object) => void;
+            getLayer: (id: string) => unknown; queryRenderedFeatures: (options: object) => unknown[] };
           const map = (window as unknown as { __ptnMap: Map }).__ptnMap;
           map.jumpTo({ zoom });
           await new Promise(done => setTimeout(done, 1000));
@@ -248,10 +250,12 @@ test.describe("@perf city switch and viewport pan", () => {
           const end = performance.now();
           const longTasks = (window as unknown as { __gateLongTasks: { startTime: number; duration: number }[] }).__gateLongTasks
             .filter(task => task.startTime >= start && task.startTime <= end).map(task => task.duration);
-          return { zoom, frames, longTasks, cards: document.querySelectorAll("[data-stop-id]").length, durationMs: end - start };
+          // Stop names are map symbols below the card zoom and DOM cards from it.
+          const labels = map.getLayer("stops-label") ? map.queryRenderedFeatures({ layers: ["stops-label"] }).length : 0;
+          return { zoom, frames, longTasks, labels, cards: document.querySelectorAll("[data-stop-id]").length, durationMs: end - start };
         }, { zoom, timeoutMs: STEP_TIMEOUT_MS });
         results.push({ mode, zoom, frameIntervalMs: distribution(run.frames), longTaskMs: distribution(run.longTasks),
-          longTaskTotalMs: run.longTasks.reduce((sum, value) => sum + value, 0), cards: run.cards, durationMs: run.durationMs });
+          longTaskTotalMs: run.longTasks.reduce((sum, value) => sum + value, 0), labels: run.labels, cards: run.cards, durationMs: run.durationMs });
       }
     }
     const writes = await projectionWrites(page);
@@ -263,7 +267,10 @@ test.describe("@perf city switch and viewport pan", () => {
     console.log(JSON.stringify(results));
 
     for (const run of results) expect(run.frameIntervalMs.samples, `${run.mode} zoom ${run.zoom} rendered frames`).toBeGreaterThan(0);
-    expect(results.find(run => run.mode === "all" && run.zoom === 16)?.cards, "stop cards at zoom 16").toBeGreaterThan(0);
+    for (const run of results) {
+      if (run.zoom >= ZOOM_CARDS_MIN) expect(run.cards, `${run.mode} zoom ${run.zoom} stop cards`).toBeGreaterThan(0);
+      else if (run.zoom >= ZOOM_LABELS_MIN) expect(run.labels, `${run.mode} zoom ${run.zoom} stop labels`).toBeGreaterThan(0);
+    }
     expect(writes).toEqual({ stages: [], tableWrites: [] });
     expect(errors).toEqual([]);
   });

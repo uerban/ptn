@@ -65,6 +65,8 @@ def collect_measurements():
         add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} frame p95", (run.get('frameIntervalMs') or {}).get('p95'), 'ms')
         add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task count", (run.get('longTaskMs') or {}).get('samples'), 'tasks')
         add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} long-task total", run.get('longTaskTotalMs'), 'ms')
+        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} stop labels", run.get('labels'), 'labels')
+        add('cityswitch', f"pan {run.get('mode')} z{run.get('zoom')} stop cards", run.get('cards'), 'cards')
     return rows
 
 
@@ -135,9 +137,12 @@ def write_summary(report, steps):
             output.write(summary)
 
 
-def main():
-    if sys.argv[1:2] == ['--update-baseline'] and len(sys.argv) == 3:
-        update_baseline(sys.argv[2])
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv:
+        if len(argv) != 2 or argv[0] != '--update-baseline':
+            raise SystemExit('usage: record-regression-evidence.py [--update-baseline REGRESSION_JSON]')
+        update_baseline(argv[1])
         return
     baseline = load_baseline()
     steps = json.loads(os.environ['STEP_RESULTS'])
