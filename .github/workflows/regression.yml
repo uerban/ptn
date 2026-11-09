@@ -7,8 +7,10 @@ on:
         description: Exact 40-character source commit (defaults to workflow commit)
         required: false
         type: string
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
+  # Labelled PRs run this inside their CI run (ci.yml); a PR trigger here would
+  # add a skipped run per push and duplicate CI's call. Release drafting uses
+  # manual dispatches on main.
+  workflow_call:
 permissions:
   contents: read
 concurrency:
@@ -16,10 +18,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   regressions:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ci:regression')
     name: Performance, memory and binding parity
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     defaults:
       run:
         working-directory: source
@@ -60,7 +61,7 @@ jobs:
           wasm-pack build --release --target nodejs --out-dir pkg-node
           cd ../..
           pnpm install --frozen-lockfile
-          cargo build --release --locked -p pt-core-emit
+          cargo build --release --locked -p pt-core-emit -p pt-producer -p pt-serve
           pnpm --filter @pt/shared build
           pnpm --filter @pt/frontend build
       - name: WASM import and compressed-size budgets
@@ -72,26 +73,33 @@ jobs:
         id: parity
         run: |
           set -o pipefail
-          cargo test --locked -p pt-core --test raptor_behavior
+          cargo test --locked -p pt-core --test raptor_behavior 2>&1 | tee evidence/routing-goldens.log
           node crates/pt-wasm/tests/plan_golden.mjs | tee evidence/wasm-goldens.log
           node crates/pt-wasm/tests/three_way.mjs | tee evidence/binding-parity.log
           grep -E 'pt-wasm-three-way: [1-9][0-9]* tuples compared, 0 mismatch' evidence/binding-parity.log
-          pnpm --filter @pt/backend exec tsx ../shared/scripts/assert-ptb-cross-parity.ts ../../crates/pt-core/tests/tiny.projection.json ../../crates/pt-core/tests/canary.projection.json ../../crates/pt-core/tests/tiny-service-pool.projection.json ../../crates/pt-core/tests/tiny-v1.projection.json ../../crates/pt-core/tests/overnight-i32.projection.json
+          pnpm --filter @pt/backend exec tsx ../shared/scripts/assert-ptb-cross-parity.ts ../../crates/pt-core/tests/tiny.projection.json ../../crates/pt-core/tests/canary.projection.json ../../crates/pt-core/tests/tiny-service-pool.projection.json ../../crates/pt-core/tests/tiny-v1.projection.json ../../crates/pt-core/tests/overnight-i32.projection.json 2>&1 | tee evidence/ptb-parity.log
       - name: Native RSS admission safeguards
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: rss
-        run: cargo test --locked -p pt-serve --test rss_guard --test rss_guard_process --test generation_load_phases
+        run: |
+          set -o pipefail
+          cargo test --locked -p pt-serve --test rss_guard --test rss_guard_process --test generation_load_phases 2>&1 | tee evidence/rss.log
       - name: Index-build p99 budget
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: index
         run: |
           pnpm --filter @pt/frontend bench:check
           cd packages/frontend
-          node "$GATE_TOOLS/packages/frontend/scripts/check-bench-budgets.mjs"
+          cp tests/benchmarks/.results.json ../../evidence/index-bench-raw.json
+          PTN_BENCH_EVIDENCE=../../evidence/index-bench.json node "$GATE_TOOLS/packages/frontend/scripts/check-bench-budgets.mjs"
       - name: Browser bundle-size budgets
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         id: bundle
-        run: pnpm --filter @pt/frontend size:check
+        run: |
+          set -o pipefail
+          # Sizes are recorded even when a budget fails; size:check is the gate.
+          pnpm --filter @pt/frontend --silent exec size-limit --json > evidence/bundle.json || true
+          pnpm --filter @pt/frontend size:check 2>&1 | tee evidence/bundle.log
       - name: Install Chromium
         id: browser
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -122,6 +130,41 @@ jobs:
         run: |
           pnpm --filter @pt/frontend exec playwright test --project=pr-chromium --project=pr-chromium-throttled e2e/core/wasm-engine-coldstart.spec.ts --retries=0 --reporter=json > evidence/browser-coldstart.json
           node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-coldstart.json 'fast profile' 'real CDP CPU throttle'
+      - name: Serve two synthetic cities through producer and pt-serve
+        id: cities
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          nohup python3 "$GATE_TOOLS/scripts/regression/synthetic_cities.py" --bin-dir target/release \
+            --work "$RUNNER_TEMP/synthetic-cities" --catalog "$RUNNER_TEMP/synthetic-cities.json" \
+            > "$RUNNER_TEMP/synthetic-cities.log" 2>&1 &
+          for _ in $(seq 1 600); do
+            if [ -f "$RUNNER_TEMP/synthetic-cities.json" ]; then break; fi
+            if ! kill -0 $! 2>/dev/null; then break; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/synthetic-cities.log"
+          test -f "$RUNNER_TEMP/synthetic-cities.json"
+          cp "$RUNNER_TEMP/synthetic-cities.json" evidence/synthetic-cities.json
+      - name: City switch and viewport pan workloads
+        if: ${{ !cancelled() && steps.cities.outcome == 'success' && steps.browser.outcome == 'success' && steps.measurement.outcome == 'success' }}
+        id: cityswitch
+        env:
+          E2E_PREVIEW: "1"
+          CI: "true"
+          PTN_SYNTHETIC_CITIES: ${{ runner.temp }}/synthetic-cities.json
+        run: |
+          pnpm --filter @pt/frontend exec playwright test --project=perf e2e/perf/city-switch.spec.ts --retries=0 --reporter=json > evidence/browser-city-switch.json
+          node "$GATE_TOOLS/scripts/check-browser-regressions.mjs" evidence/browser-city-switch.json 'alternating city switches' 'viewport pans'
+          cp packages/frontend/test-results/perf-metrics/city-switch.json packages/frontend/test-results/perf-metrics/viewport-pan.json evidence/
+      - name: Retain synthetic city server logs
+        if: ${{ always() && steps.cities.outcome != 'skipped' }}
+        run: |
+          mkdir -p evidence/synthetic-cities
+          cp "$RUNNER_TEMP/synthetic-cities.log" evidence/synthetic-cities/ 2>/dev/null || true
+          for log in "$RUNNER_TEMP"/synthetic-cities/*/*.log; do
+            [ -f "$log" ] && cp "$log" "evidence/synthetic-cities/$(basename "$(dirname "$log")")-$(basename "$log")"
+          done
+          true
       - name: Record exact revision and gate outcomes
         if: always()
         env:
@@ -140,7 +183,8 @@ jobs:
           name: regression-evidence
           retention-days: 30
           if-no-files-found: error
+          # Gate metrics are copied into evidence/; test-results keeps failure traces.
           path: |
             source/evidence/
-            source/packages/frontend/tests/benchmarks/.results.json
             source/packages/frontend/test-results/
+            !source/packages/frontend/test-results/perf-metrics/

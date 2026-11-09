@@ -31,7 +31,7 @@ def artifact_state(artifacts, required=REQUIRED):
     return 'expired' if any(by_name[n]['expired'] for n in required) else 'ready'
 
 
-REGRESSION_CHECKS = {'identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart'}
+REGRESSION_CHECKS = {'identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch'}
 
 
 def validate_regression_proof(proof, revision, run_id):

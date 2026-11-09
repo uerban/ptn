@@ -148,6 +148,15 @@ jobs:
     uses: ./.github/workflows/security.yml
     with:
       audit-dependencies: ${{ needs.changes.outputs.dependencies == 'true' }}
+  regression:
+    name: Regression gates
+    # Optional diagnostics for labelled PRs; not part of the required result.
+    # The label takes effect on the next push (or dispatch regression.yml).
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' && needs.changes.outputs.source == 'true' &&
+      contains(github.event.pull_request.labels.*.name, 'ci:regression')
+    uses: ./.github/workflows/regression.yml
   result:
     name: CI
     needs: [changes, source, platforms, security]

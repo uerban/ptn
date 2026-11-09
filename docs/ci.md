@@ -45,6 +45,10 @@ during stable promotion.
 
 Each run publishes a human-readable job summary with the exact source revision,
 overall result and every gate/prerequisite outcome, including failures and skips.
+The summary and `regression.json` also list each measured value with its budget
+(WASM and bundle sizes, index p99, JS heap, cold-start p95 stages, city-switch
+and pan timings). Routing parity and native RSS checks are pass/fail; their
+logs are kept in `regression-evidence`.
 The same report is saved as `regression.md` in `regression-evidence`; machine-readable
 `regression.json` is also uploaded as `regression-proof`, including on failure.
 Both artifacts are retained for 30 days.
@@ -55,8 +59,12 @@ After the workflows land on main:
 gh workflow run regression.yml --ref main -f revision=FULL_40_CHARACTER_COMMIT
 ```
 
-For pre-merge diagnostics, add `ci:regression` to a PR. Subsequent commits rerun
-the gate while that label remains. These runs use hosted Ubuntu runners, read-only
+For pre-merge diagnostics, add `ci:regression` to a PR. While the label remains,
+each source push runs the gates as a job inside the PR's CI run (results and
+artifacts are on that CI run). The label takes effect on the next push; to run
+immediately, dispatch `regression.yml` on the PR branch with the head commit.
+`regression.yml` has no PR trigger, so unlabelled PRs create no extra runs, and
+its run list holds only dispatched runs such as release evidence. These runs use hosted Ubuntu runners, read-only
 repository permissions and committed synthetic/public fixtures; they need no
 private feeds, credentials or homelab access. PR diagnostics do not substitute for
 the trusted main-workflow run required by release preparation.
@@ -74,6 +82,31 @@ The initial suite recovers these useful checks from the archive:
 - Native and WASM routing goldens, nonempty native/WASM binding comparisons and
   Rust/TypeScript PTB decoding parity.
 - Native RSS admission and rejection-before-bind process checks.
+- City switching and viewport panning (`e2e/perf/city-switch.spec.ts`), ported
+  from the [city-switch investigation](diagnostics/city-switch-performance/README.md).
+  `scripts/regression/synthetic_cities.py` generates two fixed-seed synthetic
+  GTFS cities (about 1,000 and 2,300 stops, round-the-clock service), publishes
+  them with `pt-producer republish` and serves each with its own `pt-serve`; the
+  browser reaches them through the same API paths as a native host. Twelve
+  alternating arrivals at zoom 16 must each complete index activation, resolve
+  every in-view badge and settle nonempty stop cards for 500 ms. In all-stops
+  and urban modes, four one-second pans run at each stop rendering level (plain
+  dots at zoom 12, dots with name labels at 14, stop cards at 16), then a
+  zoom-in sweep 12 → 14 → 16 and a zoom-out sweep 16 → 14 → 12. Each run must
+  render frames and show the content of the level it ends on; the time from the
+  last move until that content shows is recorded as settle time, alongside
+  frame p95, long tasks and dot, label and card counts. Neither workload may run the legacy timetable projection write or
+  write its tables after the first city is ready, and page errors fail the gate.
+  Switch, badge, card-settlement, frame and long-task timings are recorded in
+  `city-switch.json` and `viewport-pan.json` but do not fail yet: the
+  investigation's 1 s budget came from a desktop GPU, and CI budgets will be set
+  once hosted-runner baselines exist.
+
+Every run compares its measurements with `scripts/regression/baseline.json` and
+shows the baseline and relative change next to each value in `regression.md`,
+`regression.json` and the run summary. Changes are informational; only budgets
+fail. To move the baseline, download `regression-proof` from a passing run and
+run `scripts/record-regression-evidence.py --update-baseline regression.json`.
 
 The browser heap workload uses a separate preview build with `VITE_E2E=1` to
 expose the existing map inspection handle. Production size budgets run before that
