@@ -107,7 +107,9 @@ describe("cross-tab decision sync", () => {
         NETWORK_DECISIONS_STORAGE_KEY,
         JSON.stringify({
           state: {
-            decisions: { "operator.realtime": { value: "denied", source: "settings" } },
+            decisions: {
+              "operator.realtime": { value: "denied", source: "settings", decidedAt: Date.now() + 1 },
+            },
           },
           version: 1,
         }),
