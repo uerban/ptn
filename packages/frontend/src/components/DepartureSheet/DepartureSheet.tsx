@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Stop, TransportMode } from "@pt/shared";
 import { useDepartures } from "../../hooks/useDepartures.ts";
-import { useFavoritesStore } from "../../stores/favoritesStore.ts";
-import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
+import { StopFavoriteButton } from "../Favorites/StopFavoriteButton.tsx";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -17,6 +16,7 @@ import {
   useFocusTrap,
   useReturnFocus,
 } from "../../hooks/useFocusManagement.ts";
+import { useSheetResize } from "../../hooks/useSheetResize.ts";
 import { groupDeparturesByLine } from "../../utils/groupDeparturesByLine.ts";
 
 interface DepartureSheetProps {
@@ -24,24 +24,20 @@ interface DepartureSheetProps {
   onClose: () => void;
 }
 
-type SheetHeight = "peek" | "half" | "full";
+const SHEET_PRESETS = { peek: 120, half: 0.5, full: 0.9 };
 
 export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
-  const [height, setHeight] = useState<SheetHeight>("half");
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const { height, grabProps, sheetProps } = useSheetResize(sheetRef, SHEET_PRESETS, "half");
   const { departures, loading, error, unavailable, updatedAt } = useDepartures(
     stop.id,
     true,
     24,
     { hedge: true },
   );
-  const { favorites, addFavorite, removeFavorite } = useFavoritesStore();
-  // Favorites are sealed and load asynchronously; editing before they load
-  // would replace the stored list.
-  const favoritesLoaded = usePersistHydrated(useFavoritesStore.persist);
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const activeCityName = useCityStore((s) => s.activeCity.name);
   const { t } = useTranslation();
-  const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -88,7 +84,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     [stop.id, departures, timetable],
   );
 
-  const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);
   const { openLine: handleLineClick } = useLineClick();
 
@@ -116,36 +111,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  function toggleFavorite() {
-    if (!favoritesLoaded) return;
-    if (isFavorite) {
-      const fav = favorites.find((f) => f.stopId === stop.id && f.cityId === activeCityId);
-      if (fav) removeFavorite(fav.id);
-    } else {
-      addFavorite({
-        name: stop.name,
-        type: "stop",
-        location: stop.location,
-        stopId: stop.id,
-        cityId: activeCityId,
-      });
-    }
-  }
-
-  function cycleHeight() {
-    setHeight((h) => {
-      if (h === "half") return "full";
-      if (h === "full") return "peek";
-      return "half"; // peek → half
-    });
-  }
-
-  const heightClass = {
-    peek: "max-h-[120px]",
-    half: "max-h-[50vh]",
-    full: "max-h-[90vh]",
-  }[height];
-
   return (
     <div
       ref={sheetRef}
@@ -154,14 +119,16 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       aria-modal={height === "full" ? true : undefined}
       aria-label={stop.name}
       data-sheet-height={height}
-      className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
+      {...sheetProps}
+      className={`bg-surface-raised rounded-t-2xl shadow-2 overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
-      {/* Drag handle */}
+      {/* Grab area: swipe up/down or tap the handle and header to resize */}
+      <div {...grabProps} data-testid="sheet-grab-area" className="cursor-pointer select-none">
       <button
         type="button"
         data-testid="sheet-handle"
-        className="flex w-full justify-center pt-2 pb-1 min-h-6 cursor-pointer"
-        onClick={cycleHeight}
+        data-sheet-handle
+        className="flex w-full justify-center pt-3 pb-2 min-h-8 cursor-pointer"
         aria-label={height === "peek" ? "Expand sheet" : height === "half" ? "Expand sheet" : "Collapse sheet"}
       >
         <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-sheet-handle" />
@@ -182,18 +149,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
           )}
         </div>
         <div className="flex items-center gap-1 ml-2">
-          <button
-            onClick={toggleFavorite}
-            disabled={!favoritesLoaded}
-            aria-busy={!favoritesLoaded}
-            className="p-2 rounded-full hover:bg-surface-overlay disabled:opacity-50"
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            <Icon
-              name={isFavorite ? "star-filled" : "star-outline"}
-              className={isFavorite ? "text-favorite" : "text-fg-muted"}
-            />
-          </button>
+          <StopFavoriteButton stop={stop} />
           <button
             ref={closeBtnRef}
             data-testid="sheet-close"
@@ -205,6 +161,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             <Icon name="close" className="text-fg-muted" />
           </button>
         </div>
+      </div>
       </div>
 
       {/* Scheduled vs live, and the way to live times */}

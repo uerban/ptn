@@ -128,22 +128,22 @@ describe("DepartureSheet", () => {
     const handle = screen.getByTestId("sheet-handle");
 
     // Initial state: half — body visible
-    expect(sheet.className).toContain("max-h-[50vh]");
+    expect(sheet.style.maxHeight).toBe("50vh");
     expect(screen.getByText("Centre")).toBeDefined();
 
     // half → full
     fireEvent.click(handle);
-    expect(sheet.className).toContain("max-h-[90vh]");
+    expect(sheet.style.maxHeight).toBe("90vh");
     expect(screen.getByText("Centre")).toBeDefined();
 
     // full → peek — body hidden
     fireEvent.click(handle);
-    expect(sheet.className).toContain("max-h-[120px]");
+    expect(sheet.style.maxHeight).toBe("120px");
     expect(screen.queryByText("Centre")).toBeNull();
 
     // peek → half — body visible again
     fireEvent.click(handle);
-    expect(sheet.className).toContain("max-h-[50vh]");
+    expect(sheet.style.maxHeight).toBe("50vh");
     expect(screen.getByText("Centre")).toBeDefined();
   });
 
