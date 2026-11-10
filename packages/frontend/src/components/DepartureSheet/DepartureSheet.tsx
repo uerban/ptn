@@ -24,8 +24,11 @@ interface DepartureSheetProps {
   onClose: () => void;
 }
 
+const SHEET_PRESETS = { peek: 120, half: 0.5, full: 0.9 };
+
 export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
-  const { height, grabProps } = useSheetResize("half");
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const { height, grabProps, sheetProps } = useSheetResize(sheetRef, SHEET_PRESETS, "half");
   const { departures, loading, error, unavailable, updatedAt } = useDepartures(
     stop.id,
     true,
@@ -35,7 +38,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const activeCityName = useCityStore((s) => s.activeCity.name);
   const { t } = useTranslation();
-  const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -109,12 +111,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const heightClass = {
-    peek: "max-h-[120px]",
-    half: "max-h-[50vh]",
-    full: "max-h-[90vh]",
-  }[height];
-
   return (
     <div
       ref={sheetRef}
@@ -123,7 +119,8 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       aria-modal={height === "full" ? true : undefined}
       aria-label={stop.name}
       data-sheet-height={height}
-      className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
+      {...sheetProps}
+      className={`bg-surface-raised rounded-t-2xl shadow-2 overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
       {/* Grab area: swipe up/down or tap the handle and header to resize */}
       <div {...grabProps} data-testid="sheet-grab-area" className="cursor-pointer select-none">

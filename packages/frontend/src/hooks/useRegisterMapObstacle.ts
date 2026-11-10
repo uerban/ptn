@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useMapObstaclesStore } from "../stores/mapObstaclesStore.ts";
+import { OBSTACLES_REFRESH_EVENT, SHEET_DRAGGING_ATTR } from "./useSheetResize.ts";
 
 /**
  * Register a DOM element as a "map obstacle" — a UI overlay rectangle that
@@ -19,6 +20,8 @@ export function useRegisterMapObstacle<T extends HTMLElement>(
   const update = useCallback(() => {
     const el = elRef.current;
     if (!el) return;
+    // A sheet being dragged resizes every frame; measure once when it settles.
+    if (document.documentElement.hasAttribute(SHEET_DRAGGING_ATTR)) return;
     const r = el.getBoundingClientRect();
     useMapObstaclesStore.getState().setObstacle(id, {
       left: r.left,
@@ -51,6 +54,7 @@ export function useRegisterMapObstacle<T extends HTMLElement>(
     // Position changes (mounting in different bottom anchor, viewport resize)
     // aren't picked up by ResizeObserver directly — fall back to window events.
     window.addEventListener("resize", update);
+    window.addEventListener(OBSTACLES_REFRESH_EVENT, update);
 
     // Some transitions move position without resizing (e.g. translate). Listen
     // to transitionend on the element to refresh.
@@ -59,6 +63,7 @@ export function useRegisterMapObstacle<T extends HTMLElement>(
     return () => {
       ro?.disconnect();
       window.removeEventListener("resize", update);
+      window.removeEventListener(OBSTACLES_REFRESH_EVENT, update);
       el.removeEventListener("transitionend", update);
       useMapObstaclesStore.getState().clearObstacle(id);
     };

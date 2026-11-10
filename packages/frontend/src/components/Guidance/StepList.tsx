@@ -3,7 +3,7 @@ import { useGuidanceStore } from "../../stores/guidanceStore.ts";
 import { useRtStore } from "../../stores/rtStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useAutoFocus } from "../../hooks/useFocusManagement.ts";
-import { useSheetResize, type SheetHeight } from "../../hooks/useSheetResize.ts";
+import { useSheetResize } from "../../hooks/useSheetResize.ts";
 import { LegRow } from "./LegRow.tsx";
 import { computeConnectionStatus, type ConnectionStatus } from "./connectionStatus.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -24,13 +24,16 @@ interface StepListProps {
 }
 
 
+const SHEET_PRESETS = { peek: 0.15, half: 0.45, full: 0.85 };
+
 export function StepList({ onLegTap, onClose }: StepListProps) {
   const { t, formattingLocale } = useTranslation();
   // The guidance itinerary's leg/arrival ISO times are feed-tz-anchored true
   // instants (produced by convertRaptorResults), so render them in the feed tz.
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const cityId = useCityStore((s) => s.activeCity.id);
-  const { height, grabProps } = useSheetResize("half");
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const { height, grabProps, sheetProps } = useSheetResize(sheetRef, SHEET_PRESETS, "half");
   const legListRef = useRef<HTMLDivElement>(null);
   const activeLegRef = useRef<HTMLElement | null>(null);
 
@@ -154,19 +157,16 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
       ...(feedTz ? { timeZone: feedTz } : {}),
     });
 
-  const heightClass: Record<SheetHeight, string> = {
-    peek: "max-h-[15vh]",
-    half: "max-h-[45vh]",
-    full: "max-h-[85vh]",
-  };
-
   return (
     <div
+      ref={sheetRef}
       data-testid="guidance-step-list"
+      data-sheet-height={height}
+      {...sheetProps}
       role="region"
       aria-live="polite"
       aria-label={t("guidance.navigation_steps", "Navigation steps")}
-      className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass[height]} overflow-hidden flex flex-col transition-[max-height] duration-300`}
+      className={`bg-surface-raised rounded-t-2xl shadow-2 overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
       {/* Grab area: swipe up/down or tap the handle and header to resize */}
       <div {...grabProps} data-testid="sheet-grab-area" className="cursor-pointer select-none">
