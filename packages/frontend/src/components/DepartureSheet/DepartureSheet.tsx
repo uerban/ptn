@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Stop, TransportMode } from "@pt/shared";
 import { useDepartures } from "../../hooks/useDepartures.ts";
-import { useFavoritesStore } from "../../stores/favoritesStore.ts";
-import { usePersistHydrated } from "../../hooks/usePersistHydrated.ts";
+import { StopFavoriteButton } from "../Favorites/StopFavoriteButton.tsx";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -34,10 +33,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     24,
     { hedge: true },
   );
-  const { favorites, addFavorite, removeFavorite } = useFavoritesStore();
-  // Favorites are sealed and load asynchronously; editing before they load
-  // would replace the stored list.
-  const favoritesLoaded = usePersistHydrated(useFavoritesStore.persist);
   const activeCityId = useCityStore((s) => s.activeCity.id);
   const activeCityName = useCityStore((s) => s.activeCity.name);
   const { t } = useTranslation();
@@ -88,7 +83,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     [stop.id, departures, timetable],
   );
 
-  const isFavorite = favorites.some((f) => f.stopId === stop.id && f.cityId === activeCityId);
   const groups = groupDeparturesByLine(departures);
   const { openLine: handleLineClick } = useLineClick();
 
@@ -115,22 +109,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
-
-  function toggleFavorite() {
-    if (!favoritesLoaded) return;
-    if (isFavorite) {
-      const fav = favorites.find((f) => f.stopId === stop.id && f.cityId === activeCityId);
-      if (fav) removeFavorite(fav.id);
-    } else {
-      addFavorite({
-        name: stop.name,
-        type: "stop",
-        location: stop.location,
-        stopId: stop.id,
-        cityId: activeCityId,
-      });
-    }
-  }
 
   function cycleHeight() {
     setHeight((h) => {
@@ -182,18 +160,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
           )}
         </div>
         <div className="flex items-center gap-1 ml-2">
-          <button
-            onClick={toggleFavorite}
-            disabled={!favoritesLoaded}
-            aria-busy={!favoritesLoaded}
-            className="p-2 rounded-full hover:bg-surface-overlay disabled:opacity-50"
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            <Icon
-              name={isFavorite ? "star-filled" : "star-outline"}
-              className={isFavorite ? "text-favorite" : "text-fg-muted"}
-            />
-          </button>
+          <StopFavoriteButton stop={stop} />
           <button
             ref={closeBtnRef}
             data-testid="sheet-close"

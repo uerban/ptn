@@ -543,6 +543,7 @@ export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
         >
           <StopPopup
             stopName={popupStop.name}
+            stop={popupStop}
             departures={popupDepartures}
             loading={popupLoading}
             isSheetOpen={sheetStop?.id === popupStop.id}

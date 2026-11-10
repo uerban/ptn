@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Departure, TransportMode } from "@pt/shared";
+import type { Departure, Stop, TransportMode } from "@pt/shared";
 import { POPUP_DEPARTED_CUTOFF_MINUTES } from "@pt/shared/constants";
 import { useCountdown } from "../../hooks/useCountdown.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -9,6 +9,7 @@ import { resolveRouteStyle } from "../../utils/routeColor.ts";
 import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { ModeFilterPills } from "../ModeFilterPills.tsx";
 import { Icon } from "../Icon.tsx";
+import { StopFavoriteButton } from "../Favorites/StopFavoriteButton.tsx";
 import { groupDeparturesByLine } from "../../utils/groupDeparturesByLine.ts";
 
 const EMPTY_OVERRIDES: Partial<Record<TransportMode, string>> = {};
@@ -17,6 +18,8 @@ const MAX_UPCOMING_PER_GROUP = 10;
 
 interface StopPopupProps {
   stopName: string;
+  /** When set, the header offers a favorite star for this stop. */
+  stop?: Pick<Stop, "id" | "name" | "location">;
   departures: Departure[];
   loading?: boolean;
   isSheetOpen?: boolean;
@@ -79,6 +82,7 @@ function splitMinutes(groups: RouteGroup[], allMinutes: number[]): number[][] {
 
 export function StopPopup({
   stopName,
+  stop,
   departures,
   loading = false,
   isSheetOpen = false,
@@ -161,6 +165,7 @@ export function StopPopup({
             </span>
           )}
         </div>
+        {stop && <StopFavoriteButton stop={stop} />}
         {onClose && (
           <button
             onClick={onClose}
