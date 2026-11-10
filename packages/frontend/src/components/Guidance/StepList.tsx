@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useMemo, useRef, useCallback, useEffect } from "react";
 import { useGuidanceStore } from "../../stores/guidanceStore.ts";
 import { useRtStore } from "../../stores/rtStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useAutoFocus } from "../../hooks/useFocusManagement.ts";
+import { useSheetResize, type SheetHeight } from "../../hooks/useSheetResize.ts";
 import { LegRow } from "./LegRow.tsx";
 import { computeConnectionStatus, type ConnectionStatus } from "./connectionStatus.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -22,7 +23,6 @@ interface StepListProps {
   onClose: () => void;
 }
 
-type SheetHeight = "peek" | "half" | "full";
 
 export function StepList({ onLegTap, onClose }: StepListProps) {
   const { t, formattingLocale } = useTranslation();
@@ -30,7 +30,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
   // instants (produced by convertRaptorResults), so render them in the feed tz.
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const cityId = useCityStore((s) => s.activeCity.id);
-  const [height, setHeight] = useState<SheetHeight>("half");
+  const { height, grabProps } = useSheetResize("half");
   const legListRef = useRef<HTMLDivElement>(null);
   const activeLegRef = useRef<HTMLElement | null>(null);
 
@@ -160,14 +160,6 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
     full: "max-h-[85vh]",
   };
 
-  function cycleHeight() {
-    setHeight((h) => {
-      if (h === "peek") return "half";
-      if (h === "half") return "full";
-      return "peek";
-    });
-  }
-
   return (
     <div
       data-testid="guidance-step-list"
@@ -176,11 +168,9 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
       aria-label={t("guidance.navigation_steps", "Navigation steps")}
       className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass[height]} overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
-      {/* Drag handle */}
-      <div
-        className="flex justify-center pt-2 pb-1 cursor-pointer"
-        onClick={cycleHeight}
-      >
+      {/* Grab area: swipe up/down or tap the handle and header to resize */}
+      <div {...grabProps} data-testid="sheet-grab-area" className="cursor-pointer select-none">
+      <div className="flex justify-center pt-3 pb-2">
         <div className="w-10 h-1 rounded-full bg-sheet-handle" />
       </div>
 
@@ -203,6 +193,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
         >
           <Icon name="close" className="text-fg-muted" />
         </button>
+      </div>
       </div>
 
       {/* Timebar */}

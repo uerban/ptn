@@ -16,6 +16,7 @@ import {
   useFocusTrap,
   useReturnFocus,
 } from "../../hooks/useFocusManagement.ts";
+import { useSheetResize } from "../../hooks/useSheetResize.ts";
 import { groupDeparturesByLine } from "../../utils/groupDeparturesByLine.ts";
 
 interface DepartureSheetProps {
@@ -23,10 +24,8 @@ interface DepartureSheetProps {
   onClose: () => void;
 }
 
-type SheetHeight = "peek" | "half" | "full";
-
 export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
-  const [height, setHeight] = useState<SheetHeight>("half");
+  const { height, grabProps } = useSheetResize("half");
   const { departures, loading, error, unavailable, updatedAt } = useDepartures(
     stop.id,
     true,
@@ -110,14 +109,6 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  function cycleHeight() {
-    setHeight((h) => {
-      if (h === "half") return "full";
-      if (h === "full") return "peek";
-      return "half"; // peek → half
-    });
-  }
-
   const heightClass = {
     peek: "max-h-[120px]",
     half: "max-h-[50vh]",
@@ -134,12 +125,13 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       data-sheet-height={height}
       className={`bg-surface-raised rounded-t-2xl shadow-2 ${heightClass} overflow-hidden flex flex-col transition-[max-height] duration-300`}
     >
-      {/* Drag handle */}
+      {/* Grab area: swipe up/down or tap the handle and header to resize */}
+      <div {...grabProps} data-testid="sheet-grab-area" className="cursor-pointer select-none">
       <button
         type="button"
         data-testid="sheet-handle"
-        className="flex w-full justify-center pt-2 pb-1 min-h-6 cursor-pointer"
-        onClick={cycleHeight}
+        data-sheet-handle
+        className="flex w-full justify-center pt-3 pb-2 min-h-8 cursor-pointer"
         aria-label={height === "peek" ? "Expand sheet" : height === "half" ? "Expand sheet" : "Collapse sheet"}
       >
         <span aria-hidden="true" className="block w-10 h-1 rounded-full bg-sheet-handle" />
@@ -172,6 +164,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             <Icon name="close" className="text-fg-muted" />
           </button>
         </div>
+      </div>
       </div>
 
       {/* Scheduled vs live, and the way to live times */}
