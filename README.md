@@ -81,7 +81,7 @@ Native binaries:
 cargo build --release --locked --workspace   # target/release/{pt-serve,pt-producer,pt-artifacts,...}
 ```
 
-The ordinary PWA build does not need the opt-in arrive-by package.
+The release build also builds the arrive-by package: `node scripts/build-pt-wasm-arrive-by.mjs`, then `PTN_ARRIVE_BY_EXPERIMENT=1 pnpm build`.
 
 ## Installable archive
 

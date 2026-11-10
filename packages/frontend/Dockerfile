@@ -63,7 +63,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=shared \
     wasm-pack build --release --target web --out-dir pkg-web
 
 # Optional staging arrive-by package; ordinary builds keep it empty.
-ARG PTN_ARRIVE_BY_EXPERIMENT=0
+ARG PTN_ARRIVE_BY_EXPERIMENT=1
 ARG GIT_SHA=
 COPY scripts/build-pt-wasm-arrive-by.mjs /src/scripts/build-pt-wasm-arrive-by.mjs
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=shared \
@@ -114,7 +114,7 @@ COPY scripts/ ./scripts/
 ARG GIT_SHA=
 ENV GIT_SHA=${GIT_SHA}
 COPY --from=rust-wasm /src/crates/pt-wasm/pkg-web-arrive-by ./crates/pt-wasm/pkg-web-arrive-by
-ARG PTN_ARRIVE_BY_EXPERIMENT=0
+ARG PTN_ARRIVE_BY_EXPERIMENT=1
 ENV PTN_ARRIVE_BY_EXPERIMENT=${PTN_ARRIVE_BY_EXPERIMENT}
 ARG VITE_PT_TBILISI_ENABLED=0
 ENV VITE_PT_TBILISI_ENABLED=${VITE_PT_TBILISI_ENABLED}

@@ -60,7 +60,14 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: "true"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
         run: wasm-pack build --release --target web --out-dir pkg-web
+      - name: Build the arrive-by browser engine
+        run: |
+          bindgen="$(awk '/^name = "wasm-bindgen"$/{getline; gsub(/[^0-9.]/,""); print; exit}' Cargo.lock)"
+          cargo install wasm-bindgen-cli --locked --version "$bindgen"
+          node scripts/build-pt-wasm-arrive-by.mjs
       - name: Build and test source
+        env:
+          PTN_ARRIVE_BY_EXPERIMENT: "1"
         run: |
           pnpm install --frozen-lockfile
           node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
