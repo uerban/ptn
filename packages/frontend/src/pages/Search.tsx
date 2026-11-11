@@ -1488,6 +1488,7 @@ export function SearchPage() {
             destination={toEndpoint}
             recommended={itineraries}
             recommendedInitial={paginationTime === null}
+            onDepartAt={setPaginationTime}
           />
         )}
 

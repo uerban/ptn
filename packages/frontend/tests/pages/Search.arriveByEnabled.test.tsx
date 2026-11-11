@@ -11,14 +11,14 @@ vi.mock("../../src/components/ArriveBy/arriveByEntry.ts", async () =>
   await import("../../src/components/ArriveBy/arriveByEntry.arriveBy.ts"));
 
 describe("Search with the arrive-by experiment", () => {
-  it("shows Leave now and Arrive by, Leave now chosen", () => {
+  it("shows Leave (chosen) and Arrive by", () => {
     render(
       <MemoryRouter initialEntries={["/search?toLat=54.7&toLon=25.3&toName=Somewhere"]}>
         <SearchPage />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("arrive-by-toolbar")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Leave now" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Leave" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Arrive by" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByTestId("arrive-by-results")).not.toBeInTheDocument();
   });
