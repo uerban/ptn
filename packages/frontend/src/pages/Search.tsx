@@ -55,7 +55,7 @@ import { getActiveTileLoader } from "../services/poiSync.ts";
 import { poiCityIds } from "../services/poiLoader.ts";
 import { scheduleIdle } from "../utils/idle.ts";
 import { recordRecent } from "../services/recents.ts";
-import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByExperiment.ts";
+import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByEntry.ts";
 import { resolveTransitLegDisplay } from "../services/legEnrichment.ts";
 
 const SearchMapPicker = lazy(() => import("../components/Search/SearchMapPicker.tsx").then(module => ({ default: module.SearchMapPicker })));
@@ -1481,7 +1481,7 @@ export function SearchPage() {
           </div>
         </div>
 
-        {/* Opt-in Arrive-by choice; null in the default build. */}
+        {/* Arrive-by choice; null when the build has no arrive-by package. */}
         {!activeField && ArriveByToolbar && (
           <ArriveByToolbar
             origin={fromEndpoint}

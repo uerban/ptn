@@ -8,6 +8,6 @@ pkg-web/*
 !pkg-web/package.json
 pkg-node/
 target/
-# Opt-in arrive-by experiment package (scripts/build-pt-wasm-arrive-by.mjs).
-# Only a PTN_ARRIVE_BY_EXPERIMENT=1 frontend build reads it.
+# Arrive-by package (scripts/build-pt-wasm-arrive-by.mjs).
+# Read by the frontend build unless PTN_ARRIVE_BY_EXPERIMENT=0.
 pkg-web-arrive-by/

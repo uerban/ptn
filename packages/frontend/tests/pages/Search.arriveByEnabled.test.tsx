@@ -7,8 +7,8 @@ import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
 import { SearchPage } from "../../src/pages/Search.tsx";
 
-vi.mock("../../src/components/ArriveBy/arriveByExperiment.ts", async () =>
-  await import("../../src/components/ArriveBy/arriveByExperiment.arriveBy.ts"));
+vi.mock("../../src/components/ArriveBy/arriveByEntry.ts", async () =>
+  await import("../../src/components/ArriveBy/arriveByEntry.arriveBy.ts"));
 
 describe("Search with the arrive-by experiment", () => {
   it("shows Leave now and Arrive by, Leave now chosen", () => {
