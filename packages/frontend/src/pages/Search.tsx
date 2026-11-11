@@ -1235,18 +1235,32 @@ export function SearchPage() {
     setActiveField(null);
   }
 
+  // The list is ranked, not time-ordered, so the first and last rows are not
+  // the earliest and latest departures: take the real extremes.
+  function departureBounds(): { earliest: number; latest: number } | null {
+    if (itineraries.length === 0) return null;
+    const times = itineraries.map((i) => new Date(i.departureTime).getTime()).filter(Number.isFinite);
+    return times.length === 0 ? null : { earliest: Math.min(...times), latest: Math.max(...times) };
+  }
+
+  // Earlier and Later are symmetric: they move the planning time by one step.
+  // Back at (or before) now, Earlier returns to plain "now". Next is different:
+  // it continues after the latest departure already shown.
+  const TIME_STEP_MS = 30 * 60_000;
+
   function handleEarlier() {
-    if (itineraries.length === 0) return;
-    const earliest = new Date(itineraries[0].departureTime);
-    earliest.setMinutes(earliest.getMinutes() - 30);
-    setPaginationTime(earliest);
+    const moved = (paginationTime ?? new Date()).getTime() - TIME_STEP_MS;
+    setPaginationTime(moved <= Date.now() ? null : new Date(moved));
   }
 
   function handleLater() {
-    if (itineraries.length === 0) return;
-    const latest = new Date(itineraries[itineraries.length - 1].departureTime);
-    latest.setMinutes(latest.getMinutes() + 1);
-    setPaginationTime(latest);
+    setPaginationTime(new Date((paginationTime ?? new Date()).getTime() + TIME_STEP_MS));
+  }
+
+  function handleNext() {
+    const bounds = departureBounds();
+    if (!bounds) return;
+    setPaginationTime(new Date(bounds.latest + 60_000));
   }
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1354,8 +1368,9 @@ export function SearchPage() {
         remoteSearch={remoteSearch}
         emptyRemoteSearch={emptyRemoteSearch}
         serverEmpty={serverEmpty}
-        onEarlier={handleEarlier}
+        onEarlier={paginationTime !== null ? handleEarlier : undefined}
         onLater={handleLater}
+        onNext={handleNext}
         origin={fromEndpoint}
         destination={toEndpoint}
         feedTz={feedTz}
@@ -1488,6 +1503,7 @@ export function SearchPage() {
             destination={toEndpoint}
             recommended={itineraries}
             recommendedInitial={paginationTime === null}
+            departAt={paginationTime}
             onDepartAt={setPaginationTime}
           />
         )}

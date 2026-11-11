@@ -58,6 +58,8 @@ interface RouteResultsProps {
   emptyRemoteSearch?: { onSearchOnServer: () => void };
   onEarlier?: () => void;
   onLater?: () => void;
+  /** The set after the latest departure shown (not a fixed time shift). */
+  onNext?: () => void;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */
@@ -92,6 +94,7 @@ export function RouteResults({
   emptyRemoteSearch,
   onEarlier,
   onLater,
+  onNext,
   origin,
   destination,
   feedTz,
@@ -345,7 +348,15 @@ export function RouteResults({
                 onClick={onLater}
                 className="flex-1 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10"
               >
-                {t("search.later", "Later")} ↓
+                {t("search.later", "Later")}
+              </button>
+            )}
+            {onNext && (
+              <button
+                onClick={onNext}
+                className="flex-1 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10"
+              >
+                {t("search.next", "Next")} ↓
               </button>
             )}
           </div>

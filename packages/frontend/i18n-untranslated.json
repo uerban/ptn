@@ -13,6 +13,7 @@
     "mode.glyph_tram",
     "route.bar_ride",
     "route.bar_ride_title",
+    "search.next",
     "search.poi_badge",
     "settings.mode_funicular",
     "settings.scheme_deuteranopia",
@@ -33,6 +34,7 @@
     "mode.glyph_metro",
     "route.bar_ride",
     "route.bar_ride_title",
+    "search.next",
     "search.poi_badge",
     "settings.mode_funicular",
     "settings.mode_metro",
@@ -54,6 +56,7 @@
     "mode.glyph_tram",
     "route.bar_ride",
     "route.bar_ride_title",
+    "search.next",
     "search.poi_badge",
     "settings.mode_metro",
     "time.min",
@@ -72,6 +75,7 @@
     "route.bar_ride",
     "route.bar_ride_title",
     "route.walk",
+    "search.next",
     "search.poi_badge",
     "settings.mode_funicular",
     "settings.mode_metro",
@@ -94,6 +98,7 @@
     "mode.glyph_trolleybus",
     "route.bar_ride",
     "route.bar_ride_title",
+    "search.next",
     "search.poi_badge",
     "settings.mode_funicular",
     "settings.mode_scooter",
@@ -123,6 +128,7 @@
     "mode.glyph_trolleybus",
     "route.bar_ride",
     "route.bar_ride_title",
+    "search.next",
     "search.poi_badge",
     "settings.mode_metro",
     "settings.scheme_deuteranopia",
@@ -140,6 +146,7 @@
     "arriveBy.leave_at",
     "arriveBy.now",
     "arriveBy.pick_time",
+    "search.next",
     "search.poi_badge",
     "walk.step.arrive"
   ],
@@ -161,6 +168,7 @@
     "route.bar_ride",
     "route.bar_ride_title",
     "route.destination",
+    "search.next",
     "search.poi_badge",
     "settings.mode_scooter",
     "theme.system",
@@ -175,6 +183,7 @@
     "arriveBy.leave_at",
     "arriveBy.now",
     "arriveBy.pick_time",
+    "search.next",
     "search.poi_badge"
   ],
   "be": [
@@ -184,6 +193,7 @@
     "arriveBy.leave",
     "arriveBy.leave_at",
     "arriveBy.now",
-    "arriveBy.pick_time"
+    "arriveBy.pick_time",
+    "search.next"
   ]
 }
