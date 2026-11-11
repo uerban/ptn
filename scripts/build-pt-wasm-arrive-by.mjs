@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Build the opt-in arrive-by WASM package, crates/pt-wasm/pkg-web-arrive-by.
+// Build the arrive-by WASM package, crates/pt-wasm/pkg-web-arrive-by.
 //
-// Only a `PTN_ARRIVE_BY_EXPERIMENT=1` frontend build reads this package; the
-// default build never does, so neither CI nor production needs it.
+// The frontend build reads this package unless `PTN_ARRIVE_BY_EXPERIMENT=0`;
+// without it (and without the flag) the frontend builds with arrive-by off.
 //
 // The profile is `speed-lto`, the one the user selected for the deadline chunk:
 // a

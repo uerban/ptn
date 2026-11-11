@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useArriveByUi } from "./arriveByUiStore.ts";
 
 const reset = () => useArriveByUi.setState({
-  cityId: null, mode: "leave-now", draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {},
+  cityId: null, mode: "leave", draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {},
 });
 
 describe("arrive-by UI state", () => {
@@ -15,7 +15,7 @@ describe("arrive-by UI state", () => {
     useArriveByUi.getState().apply();
     expect(useArriveByUi.getState().appliedMs).toBe(1000);
     useArriveByUi.getState().chooseLeaveNow();
-    expect(useArriveByUi.getState()).toMatchObject({ mode: "leave-now", appliedMs: null });
+    expect(useArriveByUi.getState()).toMatchObject({ mode: "leave", appliedMs: null });
   });
 
   it("keeps an edited deadline across a mode switch", () => {
@@ -53,6 +53,6 @@ describe("arrive-by UI state", () => {
     useArriveByUi.getState().syncCity("vilnius");
     expect(useArriveByUi.getState().appliedMs).toBe(1000);
     useArriveByUi.getState().syncCity("riga");
-    expect(useArriveByUi.getState()).toMatchObject({ cityId: "riga", mode: "leave-now", draftMs: null, appliedMs: null, defaults: {} });
+    expect(useArriveByUi.getState()).toMatchObject({ cityId: "riga", mode: "leave", draftMs: null, appliedMs: null, defaults: {} });
   });
 });

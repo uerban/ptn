@@ -1,6 +1,5 @@
-// Opt-in arrive-by owner worker (H74): only the experimental owner, beside the
-// default router worker. Only a PTN_ARRIVE_BY_EXPERIMENT=1 build reaches this
-// file (see `ptRouterWorkerEntry.arriveBy.ts`).
+// Arrive-by owner worker (H74): only the owner, beside the default router
+// worker. Only an arrive-by build reaches this file (see `ptRouterWorkerEntry.arriveBy.ts`).
 //
 // The arrive-by glue is bundled statically (an IIFE worker cannot code-split),
 // but its WASM is fetched only on the first enable.

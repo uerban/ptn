@@ -107,18 +107,24 @@ logger.error = (msg, opts) => {
 };
 
 /**
- * Opt-in arrive-by experiment, build-time only: `PTN_ARRIVE_BY_EXPERIMENT=1`
- * swaps the router worker entry for one that also hosts the experimental
- * arrive-by owner, resolves its WASM package (built by
+ * Arrive-by, build-time. On by default: swaps the router worker entry for one
+ * that also hosts the arrive-by owner, resolves its WASM package (built by
  * `scripts/build-pt-wasm-arrive-by.mjs`), and swaps Search's UI gate for the
- * Arrive-by toolbar and results. Without the flag nothing here applies, and
- * the default build never sees the experiment.
+ * Arrive-by toolbar and results. `PTN_ARRIVE_BY_EXPERIMENT=0` turns it off.
+ * When the package is not built and the flag is unset (a plain dev checkout),
+ * it is skipped with a warning; `PTN_ARRIVE_BY_EXPERIMENT=1` makes a missing
+ * package a hard error, as the release build needs.
  */
-function arriveByExperimentAliases() {
-  if (process.env.PTN_ARRIVE_BY_EXPERIMENT !== "1") return [];
+function arriveByAliases() {
+  const flag = process.env.PTN_ARRIVE_BY_EXPERIMENT;
+  if (flag === "0") return [];
   const glue = new URL("../../crates/pt-wasm/pkg-web-arrive-by/pt_arrive_by.js", import.meta.url).pathname;
   if (!existsSync(glue)) {
-    throw new Error(`PTN_ARRIVE_BY_EXPERIMENT=1 needs ${glue}; run: node scripts/build-pt-wasm-arrive-by.mjs`);
+    if (flag === "1") {
+      throw new Error(`PTN_ARRIVE_BY_EXPERIMENT=1 needs ${glue}; run: node scripts/build-pt-wasm-arrive-by.mjs`);
+    }
+    console.warn(`[vite] arrive-by disabled: ${glue} not built; run: node scripts/build-pt-wasm-arrive-by.mjs`);
+    return [];
   }
   return [
     {
@@ -127,8 +133,8 @@ function arriveByExperimentAliases() {
     },
     { find: /^@pt\/wasm-arrive-by$/, replacement: glue },
     {
-      find: /^\.\.\/components\/ArriveBy\/arriveByExperiment\.ts$/,
-      replacement: new URL("./src/components/ArriveBy/arriveByExperiment.arriveBy.ts", import.meta.url).pathname,
+      find: /^\.\.\/components\/ArriveBy\/arriveByEntry\.ts$/,
+      replacement: new URL("./src/components/ArriveBy/arriveByEntry.arriveBy.ts", import.meta.url).pathname,
     },
   ];
 }
@@ -143,7 +149,7 @@ export default defineConfig({
         find: /^@pt\/shared\/address-search$/,
         replacement: new URL("../shared/src/addressSearch/index.ts", import.meta.url).pathname,
       },
-      ...arriveByExperimentAliases(),
+      ...arriveByAliases(),
     ],
   },
   plugins: [
