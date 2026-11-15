@@ -288,3 +288,36 @@ fn number_without_street_mark_still_matches() {
     assert!(labels("europos 2").is_empty());
     assert_eq!(labels("europos 7"), vec!["Europos 7"]);
 }
+
+#[test]
+fn multi_word_names_match_by_any_word_part() {
+    let rows = vec![
+        row("V. Kudirkos g. 1", 54.69, 25.27),
+        row("V. Kudirkos g. 14", 54.69, 25.27),
+        row("Vinciūniškių g. 1", 54.68, 25.28),
+    ];
+    let keys = vec![
+        key("v kudirkos gatve 1", 0),
+        key("kudirkos gatve 1", 0),
+        key("v kudirkos gatve 14", 1),
+        key("kudirkos gatve 14", 1),
+        key("vinciuniskiu gatve 1", 2),
+    ];
+    let index = AddrIndex::build(&rows, &keys).expect("build should succeed");
+    let labels = |q: &str| -> Vec<String> {
+        index
+            .search_variants(&address_search_query_variants(q), 10)
+            .into_iter()
+            .map(|m| m.label)
+            .collect()
+    };
+    let both = vec!["V. Kudirkos g. 1", "V. Kudirkos g. 14"];
+    assert_eq!(labels("vinc kudirk"), both);
+    assert_eq!(labels("kudirkos vinco"), both);
+    assert_eq!(labels("винц кудирк"), both);
+    // Exact house number first.
+    assert_eq!(labels("vinc kudirk 14"), vec!["V. Kudirkos g. 14"]);
+    assert_eq!(labels("vinc kudirk 1"), both);
+    // Every word must match: Vinciūniškių has no Kudirkos.
+    assert!(!labels("vinc kudirk").contains(&"Vinciūniškių g. 1".to_string()));
+}

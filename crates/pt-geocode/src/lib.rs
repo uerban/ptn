@@ -194,28 +194,6 @@ fn is_canonical_address_term(token: &str) -> bool {
     matches!(token, "aikste" | "gatve" | "prospektas")
 }
 
-/// A token that names the kind of street rather than the street: a canonical
-/// term (`gatve`), or a short abbreviation (`g`, `a`, `pr`, `al`, `pl`, `skg`).
-fn is_street_mark(token: &str) -> bool {
-    is_canonical_address_term(token)
-        || (token.len() <= 3 && !token.starts_with(|c: char| c.is_ascii_digit()))
-}
-
-/// `key` tokens begin with `query` tokens, the last query token as a prefix
-/// (the user may still be typing it).
-fn tokens_start_with(key: &[&str], query: &[&str]) -> bool {
-    if query.len() > key.len() {
-        return false;
-    }
-    query.iter().enumerate().all(|(i, q)| {
-        if i + 1 == query.len() {
-            key[i].starts_with(q)
-        } else {
-            key[i] == *q
-        }
-    })
-}
-
 fn tokens_of(text: &str) -> impl Iterator<Item = &str> {
     text.split(' ').filter(|token| !token.is_empty())
 }
@@ -523,16 +501,22 @@ impl AddrIndex {
     }
 
     /// Searches the query variants, then fills any remaining slots with a
-    /// gap match: a query of the form `<name> <number>` also matches keys that
-    /// carry a street-type mark between the name and the number.
+    /// token match that a plain prefix scan cannot reach.
     ///
-    /// Labels keep the local abbreviation (`Europos a. 1`, `Gedimino pr. 9`,
-    /// `Vilniaus g. 3`), so the stored keys read `europos a 1`. People type
-    /// `europos 1`; a plain prefix search never reaches the key because the
-    /// mark sits in the middle. Storing a mark-less copy of every key would
-    /// grow the FST, so the gap is bridged at query time instead: scan the
-    /// keys under `<name> ` and accept one extra short or term token before
-    /// the number.
+    /// Address labels abbreviate (`V. Kudirkos a. 11`, `Gedimino pr. 9`), and
+    /// people type the parts they remember in any shape: `europos 1` (no
+    /// street mark), `sava 1` (unfinished), `vinc kudirk` (full first name
+    /// where the label has an initial). Storing every such form as a key would
+    /// multiply the FST, so the match is done at query time instead:
+    ///
+    /// * scan the keys that start with one query word (3+ letters) — keys
+    ///   already include every word-suffix of a label, so any word works;
+    /// * keep a row when every query word starts a word of its label, or is
+    ///   the full form of a one-letter initial there, in any order;
+    /// * keep it only when every number in the query starts a number in the
+    ///   label; an exact house number ranks first.
+    ///
+    /// Street marks (`g`, `a`, `pr`, `gatve`) in the query are optional.
     pub fn search_variants(&self, variants: &[String], limit: usize) -> Vec<AddrMatch> {
         let mut seen = HashSet::new();
         let mut out = Vec::new();
@@ -542,71 +526,55 @@ impl AddrIndex {
             }
             out.extend(self.prefix_search_inner(prefix, limit - out.len(), &mut seen));
         }
+        let mut extra = Vec::new();
         for variant in variants {
-            if out.len() >= limit {
-                break;
-            }
             let tokens: Vec<&str> = tokens_of(variant).collect();
-            let Some(first_number) = tokens
+            let (numbers, words): (Vec<&str>, Vec<&str>) = tokens
                 .iter()
-                .position(|t| t.starts_with(|c: char| c.is_ascii_digit()))
-            else {
-                continue;
-            };
-            if first_number == 0 {
-                continue;
-            }
-            let name = &tokens[..first_number];
-            let rest = &tokens[first_number..];
-            // The last name token may be unfinished (`sava 1` for
-            // `Savanorių pr. 1`); below 3 letters it would scan too widely.
-            if name.last().is_some_and(|t| t.len() < 3) {
+                .partition(|t| t.starts_with(|c: char| c.is_ascii_digit()));
+            let words: Vec<&str> = words
+                .into_iter()
+                .filter(|w| !is_canonical_address_term(w) && w.len() > 2)
+                .collect();
+            // A single word with no number is exactly what the prefix pass did.
+            if words.is_empty() || (words.len() == 1 && numbers.is_empty()) {
                 continue;
             }
-            out.extend(self.gap_scan(name, rest, limit - out.len(), &mut seen));
+            for anchor in &words {
+                self.token_scan(anchor, &words, &numbers, limit * 4, &mut seen, &mut extra);
+            }
         }
+        // Stable: FST order within each group.
+        extra.sort_by_key(|(exact, _)| !*exact);
+        out.extend(extra.into_iter().map(|(_, m)| m).take(limit - out.len()));
         out
     }
 
-    fn gap_scan(
+    fn token_scan(
         &self,
-        name: &[&str],
-        rest: &[&str],
-        limit: usize,
+        anchor: &str,
+        words: &[&str],
+        numbers: &[&str],
+        cap: usize,
         seen: &mut HashSet<usize>,
-    ) -> Vec<AddrMatch> {
-        // Bounded: keys sharing a name prefix sit together, so this covers
-        // every house on the streets a 3+ letter prefix names without letting
-        // a short prefix walk the whole corpus.
+        out: &mut Vec<(bool, AddrMatch)>,
+    ) {
+        // Bounded: keys sharing a 3+ letter prefix sit together, so this
+        // covers every house on the streets it names without letting a short
+        // prefix walk the whole corpus.
         const SCAN_CAP: usize = 16_384;
-        let prefix = name.join(" ");
-        let prefix = prefix.as_str();
-        let mut stream = self.map.range().ge(prefix).into_stream();
-        let mut out = Vec::new();
+        let mut stream = self.map.range().ge(anchor).into_stream();
         let mut scanned = 0;
         while let Some((encoded_key, value)) = stream.next() {
-            if !encoded_key.starts_with(prefix.as_bytes()) || out.len() >= limit {
+            if !encoded_key.starts_with(anchor.as_bytes()) || out.len() >= cap {
                 break;
             }
             scanned += 1;
             if scanned > SCAN_CAP {
                 break;
             }
-            let key = decode_lookup_key(encoded_key);
-            let tokens: Vec<&str> = tokens_of(&key).collect();
-            if !tokens_start_with(&tokens, name) {
-                continue;
-            }
-            let after = &tokens[name.len()..];
-            let direct = tokens_start_with(after, rest);
-            let over_mark = after
-                .split_first()
-                .is_some_and(|(mark, tail)| is_street_mark(mark) && tokens_start_with(tail, rest));
-            if !direct && !over_mark {
-                continue;
-            }
             let row_id = value as usize;
-            if !seen.insert(row_id) {
+            if seen.contains(&row_id) {
                 continue;
             }
             let (Some(label), Some((lat, lon))) =
@@ -614,15 +582,42 @@ impl AddrIndex {
             else {
                 continue;
             };
-            out.push(AddrMatch {
-                key,
-                row_id,
-                label: label.to_string(),
-                lat,
-                lon,
+            let normalized = replace_address_terms(&normalize_address_search_text(label));
+            let label_tokens: Vec<&str> = tokens_of(&normalized).collect();
+            let word_ok = words.iter().all(|q| {
+                label_tokens.iter().any(|l| {
+                    !l.starts_with(|c: char| c.is_ascii_digit())
+                        && (l.starts_with(q) || (l.len() == 1 && q.starts_with(l)))
+                })
             });
+            if !word_ok {
+                continue;
+            }
+            let label_numbers: Vec<&str> = label_tokens
+                .iter()
+                .copied()
+                .filter(|l| l.starts_with(|c: char| c.is_ascii_digit()))
+                .collect();
+            if !numbers
+                .iter()
+                .all(|q| label_numbers.iter().any(|l| l.starts_with(q)))
+            {
+                continue;
+            }
+            let exact =
+                !numbers.is_empty() && numbers.iter().all(|q| label_numbers.iter().any(|l| l == q));
+            seen.insert(row_id);
+            out.push((
+                exact,
+                AddrMatch {
+                    key: decode_lookup_key(encoded_key),
+                    row_id,
+                    label: label.to_string(),
+                    lat,
+                    lon,
+                },
+            ));
         }
-        out
     }
 
     fn prefix_search_inner(
