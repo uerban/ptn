@@ -167,12 +167,12 @@ const ConsumerCard = memo(function ConsumerCard({
       className="w-full text-left rounded-2xl bg-surface-raised border border-divider
         hover:border-accent transition-colors p-3.5 flex flex-col gap-2"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="text-sm font-semibold text-fg tabular-nums">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <div className="min-w-0 text-sm font-semibold text-fg tabular-nums">
           {formatTime(span.departureTime, formattingLocale, feedTz)} →{" "}
           {formatTime(span.arrivalTime, formattingLocale, feedTz)}
         </div>
-        <div className="text-right shrink-0">
+        <div className="ml-auto min-w-0 text-right">
           <div className="text-sm font-semibold text-fg tabular-nums">
             {duration} {t("time.min", "min")}
           </div>
@@ -252,7 +252,7 @@ const ConsumerCard = memo(function ConsumerCard({
         />
       )}
 
-      <div className="flex items-center gap-3 text-[0.6875rem] text-fg-muted tabular-nums">
+      <div className="flex flex-wrap items-center gap-x-3 text-[0.6875rem] text-fg-muted tabular-nums">
         <span>
           {it.transfers}{" "}
           {pluralize(
@@ -363,7 +363,7 @@ function LegChip({ leg }: { leg: Leg }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1">
       <LineBadge
         mode={leg.mode}
         label={leg.routeShortName}
@@ -372,7 +372,7 @@ function LegChip({ leg }: { leg: Leg }) {
       />
       {leg.headsign && (
         <span
-          className="text-xs text-fg-muted truncate max-w-[120px]"
+          className="min-w-0 text-xs text-fg-muted truncate max-w-[min(7.5rem,100%)]"
           title={leg.headsign}
         >
           › {leg.headsign}

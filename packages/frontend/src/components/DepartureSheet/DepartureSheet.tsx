@@ -135,9 +135,9 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
       </button>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-divider">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <h2 data-testid="sheet-stop-name" className="text-lg font-semibold text-fg truncate">
+      <div className="flex items-center justify-between px-[min(1rem,16px)] py-[min(0.5rem,8px)] border-b border-divider">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <h2 data-testid="sheet-stop-name" className="min-w-0 flex-[1_1_6rem] text-lg font-semibold text-fg line-clamp-2 break-words">
             {stop.name}
           </h2>
           {departures.some((d) => d.predictedTime) && (
@@ -148,7 +148,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1 ml-2">
+        <div className="flex items-center gap-[min(0.25rem,4px)] ml-[min(0.5rem,8px)]">
           <StopFavoriteButton stop={stop} />
           <button
             ref={closeBtnRef}
