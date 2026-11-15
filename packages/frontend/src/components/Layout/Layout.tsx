@@ -31,7 +31,7 @@ export function Layout() {
       </a>
       {!fitSearchPicker && <IOSInstallPrompt />}
       {!isOnline && (
-        <div className="bg-warning text-warning-fg text-center text-sm py-1 px-3">
+        <div className="bg-warning text-warning-fg text-center leading-snug py-1 px-3 text-[min(0.875rem,18px)]">
           {t("offline.banner", "Offline — showing cached data")}
         </div>
       )}
