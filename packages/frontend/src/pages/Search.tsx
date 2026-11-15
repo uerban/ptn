@@ -979,15 +979,15 @@ export function SearchPage() {
   // Granting or revoking the operator's address search reruns the suggestions.
   const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
 
-  // GPS fixes arrive every few seconds and jitter by metres. Rerunning the
-  // suggestions on each one refreshed the list while the text had not changed,
-  // so the search reruns only when the position moves by roughly 100 m. The
-  // request itself still reads the latest fix.
+  // Suggestions depend on the text, not on where the rider is: later GPS fixes
+  // never rerun the search (they arrive every few seconds and refreshed the list
+  // while the text had not changed). The location is only a small ranking hint
+  // (at most +0.1, fading out over 50 km), so movement cannot reorder results
+  // in practice. The one exception is the first fix: results ranked with no
+  // location at all are refreshed once when it arrives.
   const userLocationRef = useRef(userLocation);
   userLocationRef.current = userLocation;
-  const suggestionLocationKey = userLocation
-    ? `${userLocation.lat.toFixed(3)},${userLocation.lon.toFixed(3)}`
-    : "";
+  const hasUserLocation = userLocation != null;
 
   // A different field means different suggestions: clear them so the old
   // field's rows never show under the new one.
@@ -1074,7 +1074,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, suggestionLocationKey]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, hasUserLocation]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
