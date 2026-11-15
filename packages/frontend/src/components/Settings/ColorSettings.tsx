@@ -293,7 +293,7 @@ export function ColorSettings() {
           bg-surface-raised rounded-xl border border-divider text-left"
         data-testid="color-settings-collapsed"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-sm font-semibold text-fg">
             {t("settings.color_accessibility", "Color & Accessibility")}
           </span>

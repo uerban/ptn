@@ -153,10 +153,13 @@ export function OptionalStorageChoice({
         className={
           presentation === "contextual"
             ? "flex flex-col items-stretch gap-2"
-            : "flex items-start justify-between gap-3"
+            : "flex flex-wrap items-start justify-between gap-3"
         }
       >
-        <div className="min-w-0">
+        {/* In settings the buttons sit beside the text only while the text keeps
+            about 12rem. On a narrow screen or with large text they wrap below it,
+            instead of squeezing the text to a word per line. */}
+        <div className={presentation === "contextual" ? "min-w-0" : "min-w-0 flex-[1_1_12rem]"}>
           <h3 className="text-sm font-medium text-fg">{title}</h3>
           <p className="text-xs text-fg-muted">{description}</p>
           {presentation === "settings" && (
@@ -169,7 +172,7 @@ export function OptionalStorageChoice({
           className={
             presentation === "contextual"
               ? "flex flex-wrap justify-start gap-2"
-              : "flex shrink-0 flex-wrap justify-end gap-2"
+              : "flex max-w-full flex-wrap justify-end gap-2"
           }
         >
           {choice === "enabled" ? (

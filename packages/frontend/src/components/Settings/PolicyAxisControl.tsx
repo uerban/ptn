@@ -106,7 +106,7 @@ export function PolicyAxisControl<K extends ProtectionAxis>({
             key={formatOption(value)}
             className={`flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
           >
-            <span className="flex flex-col gap-0.5">
+            <span className="flex min-w-0 flex-col gap-0.5">
               <span className="text-sm text-fg">{optionLabel}</span>
               {lockCopy && (
                 <span className="text-xs text-fg-muted italic">{lockCopy}</span>

@@ -191,7 +191,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-surface">
+    <div className="settings-rows h-full overflow-y-auto bg-surface">
       <div className="max-w-lg mx-auto p-4 space-y-6">
         <h1 className="text-xl font-bold text-fg">
           {t("settings.title", "Settings")}
@@ -488,7 +488,7 @@ export function SettingsPage() {
                 <span id="eta-layout-label" className="text-sm text-fg">
                   {t("settings.eta_layout", "Cards layout")}
                 </span>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {(
                     [
                       { id: "rows", label: t("settings.eta_layout_rows", "Rows") },
