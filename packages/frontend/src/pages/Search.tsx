@@ -979,20 +979,42 @@ export function SearchPage() {
   // Granting or revoking the operator's address search reruns the suggestions.
   const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
 
+  // GPS fixes arrive every few seconds and jitter by metres. Rerunning the
+  // suggestions on each one refreshed the list while the text had not changed,
+  // so the search reruns only when the position moves by roughly 100 m. The
+  // request itself still reads the latest fix.
+  const userLocationRef = useRef(userLocation);
+  userLocationRef.current = userLocation;
+  const suggestionLocationKey = userLocation
+    ? `${userLocation.lat.toFixed(3)},${userLocation.lon.toFixed(3)}`
+    : "";
+
+  // A different field means different suggestions: clear them so the old
+  // field's rows never show under the new one.
+  useEffect(() => {
+    setSuggestions([]);
+  }, [activeField]);
+
   // One request identity per field/query/provider. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
+  // The rows on screen stay until the new results replace them, so the list
+  // does not blink empty on every keystroke.
   useEffect(() => {
     if (!activeField) return;
     const controller = new AbortController();
     searchAbortRef.current = controller;
-    setSuggestions([]);
     setSuggestionStatus(activeQuery.trim() ? "searching" : "idle");
     setVisibleSuggestionCount(SUGGESTION_PAGE_SIZE);
+    const location = userLocationRef.current ?? null;
+    let delivered = false;
     const accept = (rows: SearchSuggestion[]) => {
-      if (!controller.signal.aborted) {
-        setSuggestions(rows);
-        if (rows.length > 0) setSuggestionStatus("ready");
-      }
+      if (controller.signal.aborted) return;
+      // An empty interim batch from the stream would blank the list before
+      // the real rows arrive; the final empty answer is applied below.
+      if (rows.length === 0) return;
+      delivered = true;
+      setSuggestions(rows);
+      setSuggestionStatus("ready");
     };
     const timer = setTimeout(() => {
       const mode = resolvePoiFetchMode(cityId);
@@ -1029,7 +1051,7 @@ export function SearchPage() {
           }),
         }) : undefined;
         request = searchSuggestionsStream(
-          activeQuery, cityId, userLocation ?? null, controller.signal, searchProvider,
+          activeQuery, cityId, location, controller.signal, searchProvider,
           {
             onResults: accept,
             driver,
@@ -1038,10 +1060,12 @@ export function SearchPage() {
           },
         );
       } else {
-        request = searchSuggestions(activeQuery, cityId, userLocation ?? null, controller.signal, searchProvider).then(accept);
+        request = searchSuggestions(activeQuery, cityId, location, controller.signal, searchProvider).then(accept);
       }
       void request.then(() => {
-        if (!controller.signal.aborted) setSuggestionStatus("ready");
+        if (controller.signal.aborted) return;
+        if (!delivered) setSuggestions([]);
+        setSuggestionStatus("ready");
       }).catch((err) => {
         if (controller.signal.aborted) return;
         console.warn("Search suggestions failed:", err);
@@ -1050,7 +1074,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, userLocation?.lat, userLocation?.lon]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, suggestionLocationKey]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
@@ -1078,8 +1102,6 @@ export function SearchPage() {
     if (typedEndpoint) captureRecent(typedEndpoint, field);
     setItineraries([]);
     setLoading(false);
-
-    setSuggestions([]);
     setSuggestionStatus(query.trim() ? "searching" : "idle");
   }
 
@@ -1597,7 +1619,7 @@ export function SearchPage() {
             <div className="flex min-h-11 items-center justify-between gap-2 px-3">
               <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1 py-1 text-[11px] leading-4 text-fg-muted">
               {suggestionStatus === "error" ? t("search.suggestions_error", "Could not search for places. Try again.")
-                : suggestionStatus === "searching" ? t("search.searching", "Searching…")
+                : suggestionStatus === "searching" && suggestions.length === 0 ? t("search.searching", "Searching…")
                 : suggestions.length > 0 ? t("search.suggestion_count", "{n} place suggestions").replace("{n}", String(suggestions.length))
                 : activeQuery.trim() && suggestionStatus === "ready" ? t("search.no_place_suggestions", "No matching place suggestions")
                 : <span className="sr-only">{t("search.type_place", "Type a stop, address or place")}</span>}
