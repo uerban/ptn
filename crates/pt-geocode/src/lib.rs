@@ -558,23 +558,29 @@ impl AddrIndex {
             }
             let name = &tokens[..first_number];
             let rest = &tokens[first_number..];
-            let prefix = format!("{} ", name.join(" "));
-            out.extend(self.gap_scan(&prefix, rest, limit - out.len(), &mut seen));
+            // The last name token may be unfinished (`sava 1` for
+            // `Savanorių pr. 1`); below 3 letters it would scan too widely.
+            if name.last().is_some_and(|t| t.len() < 3) {
+                continue;
+            }
+            out.extend(self.gap_scan(name, rest, limit - out.len(), &mut seen));
         }
         out
     }
 
     fn gap_scan(
         &self,
-        prefix: &str,
+        name: &[&str],
         rest: &[&str],
         limit: usize,
         seen: &mut HashSet<usize>,
     ) -> Vec<AddrMatch> {
-        // Bounded: one street's keys sit together under its name, so a few
-        // thousand covers every house on the longest street without letting a
-        // one-letter name walk the whole corpus.
-        const SCAN_CAP: usize = 4096;
+        // Bounded: keys sharing a name prefix sit together, so this covers
+        // every house on the streets a 3+ letter prefix names without letting
+        // a short prefix walk the whole corpus.
+        const SCAN_CAP: usize = 16_384;
+        let prefix = name.join(" ");
+        let prefix = prefix.as_str();
         let mut stream = self.map.range().ge(prefix).into_stream();
         let mut out = Vec::new();
         let mut scanned = 0;
@@ -587,11 +593,16 @@ impl AddrIndex {
                 break;
             }
             let key = decode_lookup_key(encoded_key);
-            let tail: Vec<&str> = tokens_of(&key[prefix.len()..]).collect();
-            let Some((mark, after)) = tail.split_first() else {
+            let tokens: Vec<&str> = tokens_of(&key).collect();
+            if !tokens_start_with(&tokens, name) {
                 continue;
-            };
-            if !is_street_mark(mark) || !tokens_start_with(after, rest) {
+            }
+            let after = &tokens[name.len()..];
+            let direct = tokens_start_with(after, rest);
+            let over_mark = after
+                .split_first()
+                .is_some_and(|(mark, tail)| is_street_mark(mark) && tokens_start_with(tail, rest));
+            if !direct && !over_mark {
                 continue;
             }
             let row_id = value as usize;

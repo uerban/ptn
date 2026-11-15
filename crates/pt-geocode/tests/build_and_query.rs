@@ -279,6 +279,11 @@ fn number_without_street_mark_still_matches() {
     );
     assert_eq!(labels("vilniaus 3"), vec!["Vilniaus g. 3"]);
     assert_eq!(labels("gedimino 9"), vec!["Gedimino pr. 9"]);
+    // Unfinished name, in either script.
+    assert_eq!(labels("gedim 9"), vec!["Gedimino pr. 9"]);
+    assert_eq!(labels("гедим 9"), vec!["Gedimino pr. 9"]);
+    // Too short to scan for.
+    assert!(labels("ge 9").is_empty());
     // A real house number, not a mark, is not skipped over.
     assert!(labels("europos 2").is_empty());
     assert_eq!(labels("europos 7"), vec!["Europos 7"]);
