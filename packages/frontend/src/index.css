@@ -92,7 +92,8 @@ body {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   textarea,
   select {
-    font-size: 16px;
+    /* A floor, so larger text settings still enlarge typed text. */
+    font-size: max(16px, 1rem);
   }
 }
 

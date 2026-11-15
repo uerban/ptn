@@ -7,7 +7,9 @@
   margin-block: 0;
 }
 
-/* Avoid input auto-zoom on phone browsers while retaining desktop density. */
+/* Avoid input auto-zoom on phone browsers while retaining desktop density.
+   16px is a floor, not a fixed size: with larger text settings the typed text
+   grows with the rest of the page. */
 @media (max-width: 640px) {
-  .search-picker [role="searchbox"] { font-size: 16px; }
+  .search-picker [role="searchbox"] { font-size: max(16px, 1rem); }
 }

@@ -141,7 +141,7 @@ export function DepartureSheet({ stop, onClose }: DepartureSheetProps) {
             {stop.name}
           </h2>
           {departures.some((d) => d.predictedTime) && (
-            <span className="text-[9px] font-bold text-success bg-success/10
+            <span className="text-[0.5625rem] font-bold text-success bg-success/10
               px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
               <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse motion-reduce:animate-none" />
               {t("popup.live", "LIVE")}

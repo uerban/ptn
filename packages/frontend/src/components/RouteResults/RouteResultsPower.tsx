@@ -70,7 +70,7 @@ export function RouteResultsPower({
       {topDelay && (
         <div
           role="status"
-          className="flex items-center gap-2 px-3.5 py-2 text-[11px] bg-warning/10 text-warning border-b border-divider"
+          className="flex items-center gap-2 px-3.5 py-2 text-[0.6875rem] bg-warning/10 text-warning border-b border-divider"
         >
           <span aria-hidden>⚠</span>
           <span className="flex-1">
@@ -87,7 +87,7 @@ export function RouteResultsPower({
 
       {/* Column legend */}
       <div
-        className="grid items-center px-3.5 py-1.5 text-[9px] text-fg-muted tracking-widest border-b border-divider"
+        className="grid items-center px-3.5 py-1.5 text-[0.5625rem] text-fg-muted tracking-widest border-b border-divider"
         style={{ gridTemplateColumns: "70px 1fr 60px" }}
       >
         <span>
@@ -238,11 +238,11 @@ const PowerCard = memo(function PowerCard({
         <div className="text-sm font-bold tabular-nums -tracking-tight">
           {formatTime(span.departureTime, formattingLocale, feedTz)}
         </div>
-        <div className="text-[10px] text-fg-muted tabular-nums">
+        <div className="text-[0.625rem] text-fg-muted tabular-nums">
           → {formatTime(span.arrivalTime, formattingLocale, feedTz)}
         </div>
         {fastest && (
-          <div className="mt-1 text-[9px] tracking-widest text-accent font-bold">
+          <div className="mt-1 text-[0.5625rem] tracking-widest text-accent font-bold">
             ★ {t("route.fastest_label", "FASTEST")}
           </div>
         )}
@@ -256,7 +256,7 @@ const PowerCard = memo(function PowerCard({
       <div className="min-w-0 space-y-1.5">
         <BoardingLine
           segments={display.segments}
-          className="text-[10px] text-fg-muted"
+          className="text-[0.625rem] text-fg-muted"
         />
         <LegStrip
           segments={display.segments}
@@ -284,7 +284,7 @@ const PowerCard = memo(function PowerCard({
           // never hide the bar from AT when no replacement is in the tree.
           ariaHidden={!hideBufferChrome && display.bufferSeconds >= 60}
         />
-        <div className="flex items-center gap-2.5 flex-wrap text-[10px] text-fg-muted tabular-nums">
+        <div className="flex items-center gap-2.5 flex-wrap text-[0.625rem] text-fg-muted tabular-nums">
           {onBoard > 0 && (
             <span>
               {t("route.ride_short", "ride")}{" "}
@@ -324,7 +324,7 @@ const PowerCard = memo(function PowerCard({
         <div className="text-lg font-bold tabular-nums -tracking-tight leading-none">
           {duration}
         </div>
-        <div className="text-[9px] text-fg-muted tracking-widest uppercase">
+        <div className="text-[0.5625rem] text-fg-muted tracking-widest uppercase">
           {t("time.min", "min")}
         </div>
       </div>
@@ -356,7 +356,7 @@ function LegStrip({
         nodes.push(
           <span
             key={`lead-${i}`}
-            className="text-[10px] text-fg tabular-nums mr-1"
+            className="text-[0.625rem] text-fg tabular-nums mr-1"
             aria-label={t(
               "route.power_leading_wait_token_aria",
               "{n} minute leading wait, leave at {time}",
@@ -379,7 +379,7 @@ function LegStrip({
             routeColor={seg.leg.routeColor}
             size="sm"
           />
-          <span className="text-[10px] text-fg-muted tabular-nums">
+          <span className="text-[0.625rem] text-fg-muted tabular-nums">
             <span className="opacity-50" aria-hidden>
               ▸
             </span>
@@ -395,7 +395,7 @@ function LegStrip({
         nodes.push(
           <span
             key={i}
-            className="inline-flex items-center gap-1 px-1.5 py-px rounded border border-divider text-[10px] text-fg-muted tabular-nums"
+            className="inline-flex items-center gap-1 px-1.5 py-px rounded border border-divider text-[0.625rem] text-fg-muted tabular-nums"
             title={t("route.bar_transfer_walk_title", "Transfer walk · {n} min · {m} m")
               .replace("{n}", String(seg.minutes))
               .replace("{m}", String(seg.meters))}
@@ -410,7 +410,7 @@ function LegStrip({
         nodes.push(
           <span
             key={i}
-            className="inline-flex items-center gap-0.5 text-[10px] text-fg-muted tabular-nums"
+            className="inline-flex items-center gap-0.5 text-[0.625rem] text-fg-muted tabular-nums"
             title={t("route.walk", "walk")}
           >
             <span aria-hidden>🚶</span>
@@ -432,7 +432,7 @@ function LegStrip({
     nodes.push(
       <span
         key={i}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[10px] tabular-nums font-bold
+        className={`inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[0.625rem] tabular-nums font-bold
           ${seg.tight ? "text-danger border border-danger/60 bg-danger/10" : "text-fg-muted bg-surface-overlay"}`}
         aria-label={t(
           "route.power_transfer_wait_token_aria",

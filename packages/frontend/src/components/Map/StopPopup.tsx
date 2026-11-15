@@ -152,13 +152,13 @@ export function StopPopup({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <h3
             data-testid="popup-stop-name"
-            className="font-semibold text-fg text-[17px] leading-tight"
+            className="font-semibold text-fg text-[1.0625rem] leading-tight"
             style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}
           >
             {stopName}
           </h3>
           {departures.some((d) => d.predictedTime) && (
-            <span className="text-[9px] font-bold text-success bg-success/15
+            <span className="text-[0.5625rem] font-bold text-success bg-success/15
               px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
               <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
               {t("popup.live", "LIVE")}

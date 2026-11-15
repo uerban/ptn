@@ -116,7 +116,7 @@ export function VersionBlock({ onClick }: VersionBlockProps = {}) {
         <span className="font-mono text-right">
           v{buildInfo.version} ·{" "}
           <span className={commitClass(buildInfo.commit)}>{buildInfo.commit}</span>
-          <span className="block text-[11px] text-fg-muted">
+          <span className="block text-[0.6875rem] text-fg-muted">
             {formatBuiltAt(buildInfo.builtAt)}
           </span>
         </span>
@@ -128,7 +128,7 @@ export function VersionBlock({ onClick }: VersionBlockProps = {}) {
             <>
               v{backend.data.version} ·{" "}
               <span className={commitClass(backend.data.commit)}>{backend.data.commit}</span>
-              <span className="block text-[11px] text-fg-muted">
+              <span className="block text-[0.6875rem] text-fg-muted">
                 {formatBuiltAt(backend.data.builtAt)}
               </span>
             </>

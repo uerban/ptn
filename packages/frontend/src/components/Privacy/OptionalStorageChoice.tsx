@@ -184,7 +184,7 @@ export function OptionalStorageChoice({
               type="button"
               onClick={() => void withdraw()}
               disabled={busy}
-              className="rounded-lg border border-danger px-3 py-1.5 text-xs font-medium text-danger disabled:opacity-50"
+              className="max-w-full rounded-lg border border-danger px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-danger disabled:opacity-50"
             >
               {busy
                 ? t("privacy.optional.stopping", "Stopping…")
@@ -195,7 +195,7 @@ export function OptionalStorageChoice({
               type="button"
               onClick={remember}
               disabled={!permitted}
-              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-badge-text disabled:opacity-50"
+              className="max-w-full rounded-lg bg-accent px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-badge-text disabled:opacity-50"
             >
               {t("privacy.optional.remember", "Remember")}
             </button>
@@ -204,7 +204,7 @@ export function OptionalStorageChoice({
             <button
               type="button"
               onClick={decline}
-              className="rounded-lg border border-divider px-3 py-1.5 text-xs font-medium text-fg-secondary"
+              className="max-w-full rounded-lg border border-divider px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-fg-secondary"
             >
               {t("privacy.optional.no_thanks", "No thanks")}
             </button>

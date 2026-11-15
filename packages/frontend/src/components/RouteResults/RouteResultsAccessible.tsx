@@ -203,7 +203,7 @@ const AccessibleCard = memo(function AccessibleCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {fastest && (
-            <div className="text-[11px] font-bold tracking-widest text-accent mb-0.5">
+            <div className="text-[0.6875rem] font-bold tracking-widest text-accent mb-0.5">
               ★ {t("route.fastest_label", "FASTEST")}
               {stepFree
                 ? ` · ${t("route.step_free", "STEP-FREE")}`

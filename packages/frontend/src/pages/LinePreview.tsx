@@ -198,7 +198,7 @@ export function LinePreviewPage() {
           size={variant === "accessible" ? "lg" : "md"}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] tracking-widest text-fg-muted font-bold">
+          <div className="text-[0.625rem] tracking-widest text-fg-muted font-bold">
             {t("line.toward", "TOWARD")}
           </div>
           <div className="text-sm font-bold text-fg truncate">{headsign}</div>
@@ -281,7 +281,7 @@ function DirectionSwap({
         className={`px-3 py-2.5 text-left transition-colors ${minHeight}
           ${dirIdx === 0 ? "bg-accent/10 text-accent" : "text-fg-muted hover:bg-surface-overlay"}`}
       >
-        <div className="text-[10px] tracking-widest font-bold opacity-70">→</div>
+        <div className="text-[0.625rem] tracking-widest font-bold opacity-70">→</div>
         <div className="font-bold truncate mt-0.5">{d0.headsign}</div>
       </button>
       <button
@@ -310,7 +310,7 @@ function DirectionSwap({
         className={`px-3 py-2.5 text-right transition-colors ${minHeight}
           ${dirIdx === 1 ? "bg-accent/10 text-accent" : "text-fg-muted hover:bg-surface-overlay"}`}
       >
-        <div className="text-[10px] tracking-widest font-bold opacity-70">←</div>
+        <div className="text-[0.625rem] tracking-widest font-bold opacity-70">←</div>
         <div className="font-bold truncate mt-0.5">{d1.headsign}</div>
       </button>
     </div>
@@ -358,7 +358,7 @@ function StopList({
     variant === "accessible"
       ? "text-base"
       : variant === "power"
-        ? "text-[11px] font-mono"
+        ? "text-[0.6875rem] font-mono"
         : "text-sm";
 
   return (
@@ -405,7 +405,7 @@ function StopList({
               {s.name}
               {isCurrent && (
                 <span
-                  className="ml-2 text-[10px] tracking-widest font-extrabold"
+                  className="ml-2 text-[0.625rem] tracking-widest font-extrabold"
                   style={{ color: connectorColor }}
                 >
                   ← {t("line.vehicle_here", "HERE")}

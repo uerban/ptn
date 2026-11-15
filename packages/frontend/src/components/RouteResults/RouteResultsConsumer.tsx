@@ -177,7 +177,7 @@ const ConsumerCard = memo(function ConsumerCard({
             {duration} {t("time.min", "min")}
           </div>
           {onBoard > 0 && onBoard !== duration && (
-            <div className="text-[10px] text-fg-muted tabular-nums mt-0.5">
+            <div className="text-[0.625rem] text-fg-muted tabular-nums mt-0.5">
               {t("route.on_vehicle", "on vehicle")} {onBoard}{" "}
               {t("time.min", "min")}
             </div>
@@ -216,7 +216,7 @@ const ConsumerCard = memo(function ConsumerCard({
 
       {/* Live delay callout when a route is running late */}
       {liveDelay.minutes >= 2 && risk !== "miss" && (
-        <div className="flex items-center gap-2 rounded-lg bg-warning/10 text-warning px-2.5 py-1.5 text-[11px] leading-snug">
+        <div className="flex items-center gap-2 rounded-lg bg-warning/10 text-warning px-2.5 py-1.5 text-[0.6875rem] leading-snug">
           <span aria-hidden>⚠</span>
           <span>
             {t("route.live_update_line", "Live:")}{" "}
@@ -231,7 +231,7 @@ const ConsumerCard = memo(function ConsumerCard({
 
       {/* Miss-risk callout — stronger */}
       {risk === "miss" && (
-        <div className="flex items-start gap-2 rounded-lg bg-danger/10 text-danger px-2.5 py-1.5 text-[11px] leading-snug border border-danger/30">
+        <div className="flex items-start gap-2 rounded-lg bg-danger/10 text-danger px-2.5 py-1.5 text-[0.6875rem] leading-snug border border-danger/30">
           <span aria-hidden>⚠</span>
           <span>
             {t(
@@ -252,7 +252,7 @@ const ConsumerCard = memo(function ConsumerCard({
         />
       )}
 
-      <div className="flex items-center gap-3 text-[11px] text-fg-muted tabular-nums">
+      <div className="flex items-center gap-3 text-[0.6875rem] text-fg-muted tabular-nums">
         <span>
           {it.transfers}{" "}
           {pluralize(
@@ -282,7 +282,7 @@ const ConsumerCard = memo(function ConsumerCard({
       {eco.savingsPercent > 0 && (
         <div
           data-testid="eco-score"
-          className="flex items-center gap-1 text-[10px] text-success"
+          className="flex items-center gap-1 text-[0.625rem] text-success"
         >
           <span aria-hidden>{"🌿"}</span>
           <span>

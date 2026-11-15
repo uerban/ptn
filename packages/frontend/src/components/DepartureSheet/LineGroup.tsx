@@ -236,7 +236,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
           >
             <span data-countdown className={timeColor}>{mins}&thinsp;m</span>
             {delayShouldShow && (
-              <span data-countdown className={`text-[10px] font-bold ${delayColor}`}>
+              <span data-countdown className={`text-[0.625rem] font-bold ${delayColor}`}>
                 +{delayMinutes}
               </span>
             )}
