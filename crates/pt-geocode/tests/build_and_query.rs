@@ -318,6 +318,7 @@ fn multi_word_names_match_by_any_word_part() {
     // Exact house number first.
     assert_eq!(labels("vinc kudirk 14"), vec!["V. Kudirkos g. 14"]);
     assert_eq!(labels("vinc kudirk 1"), both);
+    assert_eq!(labels("kudirk 14"), vec!["V. Kudirkos g. 14"]);
     // Every word must match: Vinciūniškių has no Kudirkos.
     assert!(!labels("vinc kudirk").contains(&"Vinciūniškių g. 1".to_string()));
 }

@@ -528,7 +528,21 @@ impl AddrIndex {
         }
         let mut extra = Vec::new();
         for variant in variants {
-            let tokens: Vec<&str> = tokens_of(variant).collect();
+            // `11 a` is house 11A, not house 11 on an `a.` square.
+            let mut tokens: Vec<String> = Vec::new();
+            for t in tokens_of(variant) {
+                match tokens.last_mut() {
+                    Some(prev)
+                        if t.len() == 1
+                            && t.starts_with(|c: char| c.is_ascii_lowercase())
+                            && prev.chars().all(|c| c.is_ascii_digit()) =>
+                    {
+                        prev.push_str(t)
+                    }
+                    _ => tokens.push(t.to_string()),
+                }
+            }
+            let tokens: Vec<&str> = tokens.iter().map(String::as_str).collect();
             let (numbers, words): (Vec<&str>, Vec<&str>) = tokens
                 .iter()
                 .partition(|t| t.starts_with(|c: char| c.is_ascii_digit()));
