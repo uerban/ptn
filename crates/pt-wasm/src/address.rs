@@ -88,7 +88,7 @@ impl PtAddressIndex {
         }
         let hits: Vec<Hit> = self
             .index
-            .prefix_search_any(variants.iter().map(String::as_str), limit)
+            .search_variants(&variants, limit)
             .into_iter()
             .map(|m| Hit {
                 exact: variants.contains(&m.key),

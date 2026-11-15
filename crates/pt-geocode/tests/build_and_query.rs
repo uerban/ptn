@@ -246,3 +246,40 @@ fn query_rotation_places_term_before_the_house_number() {
         "{variants:?}"
     );
 }
+
+#[test]
+fn number_without_street_mark_still_matches() {
+    let rows = vec![
+        row("Europos a. 1", 54.69, 25.27),
+        row("Europos a. 12", 54.69, 25.27),
+        row("Vilniaus g. 3", 54.68, 25.28),
+        row("Gedimino pr. 9", 54.68, 25.28),
+        row("Europos 7", 54.69, 25.27),
+    ];
+    let keys = vec![
+        key("europos a 1", 0),
+        key("europos a 12", 1),
+        key("vilniaus gatve 3", 2),
+        key("gedimino prospektas 9", 3),
+        key("europos 7", 4),
+    ];
+    let index = AddrIndex::build(&rows, &keys).expect("build should succeed");
+    let labels = |q: &str| -> Vec<String> {
+        index
+            .search_variants(&address_search_query_variants(q), 10)
+            .into_iter()
+            .map(|m| m.label)
+            .collect()
+    };
+
+    assert_eq!(labels("europos 1"), vec!["Europos a. 1", "Europos a. 12"]);
+    assert_eq!(
+        labels("Europos a. 1"),
+        vec!["Europos a. 1", "Europos a. 12"]
+    );
+    assert_eq!(labels("vilniaus 3"), vec!["Vilniaus g. 3"]);
+    assert_eq!(labels("gedimino 9"), vec!["Gedimino pr. 9"]);
+    // A real house number, not a mark, is not skipped over.
+    assert!(labels("europos 2").is_empty());
+    assert_eq!(labels("europos 7"), vec!["Europos 7"]);
+}

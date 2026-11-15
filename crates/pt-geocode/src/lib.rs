@@ -194,6 +194,28 @@ fn is_canonical_address_term(token: &str) -> bool {
     matches!(token, "aikste" | "gatve" | "prospektas")
 }
 
+/// A token that names the kind of street rather than the street: a canonical
+/// term (`gatve`), or a short abbreviation (`g`, `a`, `pr`, `al`, `pl`, `skg`).
+fn is_street_mark(token: &str) -> bool {
+    is_canonical_address_term(token)
+        || (token.len() <= 3 && !token.starts_with(|c: char| c.is_ascii_digit()))
+}
+
+/// `key` tokens begin with `query` tokens, the last query token as a prefix
+/// (the user may still be typing it).
+fn tokens_start_with(key: &[&str], query: &[&str]) -> bool {
+    if query.len() > key.len() {
+        return false;
+    }
+    query.iter().enumerate().all(|(i, q)| {
+        if i + 1 == query.len() {
+            key[i].starts_with(q)
+        } else {
+            key[i] == *q
+        }
+    })
+}
+
 fn tokens_of(text: &str) -> impl Iterator<Item = &str> {
     text.split(' ').filter(|token| !token.is_empty())
 }
@@ -496,6 +518,98 @@ impl AddrIndex {
                 break;
             }
             out.extend(self.prefix_search_inner(prefix, limit - out.len(), &mut seen));
+        }
+        out
+    }
+
+    /// Searches the query variants, then fills any remaining slots with a
+    /// gap match: a query of the form `<name> <number>` also matches keys that
+    /// carry a street-type mark between the name and the number.
+    ///
+    /// Labels keep the local abbreviation (`Europos a. 1`, `Gedimino pr. 9`,
+    /// `Vilniaus g. 3`), so the stored keys read `europos a 1`. People type
+    /// `europos 1`; a plain prefix search never reaches the key because the
+    /// mark sits in the middle. Storing a mark-less copy of every key would
+    /// grow the FST, so the gap is bridged at query time instead: scan the
+    /// keys under `<name> ` and accept one extra short or term token before
+    /// the number.
+    pub fn search_variants(&self, variants: &[String], limit: usize) -> Vec<AddrMatch> {
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for prefix in variants {
+            if out.len() >= limit {
+                return out;
+            }
+            out.extend(self.prefix_search_inner(prefix, limit - out.len(), &mut seen));
+        }
+        for variant in variants {
+            if out.len() >= limit {
+                break;
+            }
+            let tokens: Vec<&str> = tokens_of(variant).collect();
+            let Some(first_number) = tokens
+                .iter()
+                .position(|t| t.starts_with(|c: char| c.is_ascii_digit()))
+            else {
+                continue;
+            };
+            if first_number == 0 {
+                continue;
+            }
+            let name = &tokens[..first_number];
+            let rest = &tokens[first_number..];
+            let prefix = format!("{} ", name.join(" "));
+            out.extend(self.gap_scan(&prefix, rest, limit - out.len(), &mut seen));
+        }
+        out
+    }
+
+    fn gap_scan(
+        &self,
+        prefix: &str,
+        rest: &[&str],
+        limit: usize,
+        seen: &mut HashSet<usize>,
+    ) -> Vec<AddrMatch> {
+        // Bounded: one street's keys sit together under its name, so a few
+        // thousand covers every house on the longest street without letting a
+        // one-letter name walk the whole corpus.
+        const SCAN_CAP: usize = 4096;
+        let mut stream = self.map.range().ge(prefix).into_stream();
+        let mut out = Vec::new();
+        let mut scanned = 0;
+        while let Some((encoded_key, value)) = stream.next() {
+            if !encoded_key.starts_with(prefix.as_bytes()) || out.len() >= limit {
+                break;
+            }
+            scanned += 1;
+            if scanned > SCAN_CAP {
+                break;
+            }
+            let key = decode_lookup_key(encoded_key);
+            let tail: Vec<&str> = tokens_of(&key[prefix.len()..]).collect();
+            let Some((mark, after)) = tail.split_first() else {
+                continue;
+            };
+            if !is_street_mark(mark) || !tokens_start_with(after, rest) {
+                continue;
+            }
+            let row_id = value as usize;
+            if !seen.insert(row_id) {
+                continue;
+            }
+            let (Some(label), Some((lat, lon))) =
+                (self.rows.label(row_id), self.rows.lat_lon(row_id))
+            else {
+                continue;
+            };
+            out.push(AddrMatch {
+                key,
+                row_id,
+                label: label.to_string(),
+                lat,
+                lon,
+            });
         }
         out
     }
