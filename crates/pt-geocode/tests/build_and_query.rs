@@ -278,6 +278,7 @@ fn number_without_street_mark_still_matches() {
         vec!["Europos a. 1", "Europos a. 12"]
     );
     assert_eq!(labels("vilniaus 3"), vec!["Vilniaus g. 3"]);
+    assert_eq!(labels("1 europos"), vec!["Europos a. 1", "Europos a. 12"]);
     assert_eq!(labels("gedimino 9"), vec!["Gedimino pr. 9"]);
     // Unfinished name, in either script.
     assert_eq!(labels("gedim 9"), vec!["Gedimino pr. 9"]);
@@ -319,6 +320,8 @@ fn multi_word_names_match_by_any_word_part() {
     assert_eq!(labels("vinc kudirk 14"), vec!["V. Kudirkos g. 14"]);
     assert_eq!(labels("vinc kudirk 1"), both);
     assert_eq!(labels("kudirk 14"), vec!["V. Kudirkos g. 14"]);
+    // Number first works too.
+    assert_eq!(labels("14 kudirk"), vec!["V. Kudirkos g. 14"]);
     // Every word must match: Vinciūniškių has no Kudirkos.
     assert!(!labels("vinc kudirk").contains(&"Vinciūniškių g. 1".to_string()));
 }
