@@ -628,5 +628,8 @@
   "settings.micromap_layer_green": "паркі і лясы",
   "settings.micromap_layer_waterways": "рэкі і каналы",
   "settings.micromap_layer_roads": "асноўныя дарогі",
-  "settings.micromap_layer_places": "назвы раёнаў і месцаў"
+  "settings.micromap_layer_places": "назвы раёнаў і месцаў",
+  "settings.trips": "Паездкі",
+  "settings.trip_alerts": "Абвесткі ў паездцы",
+  "settings.offline_load_error": "Не ўдалося загрузіць налады афлайн-рэжыму."
 }

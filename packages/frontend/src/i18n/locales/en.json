@@ -496,7 +496,7 @@
   "settings.offline_prep_ready": "Ready for offline.",
   "settings.offline_prep_stop": "Stop",
   "settings.optional_storage_load_error": "Could not load optional local-memory controls.",
-  "settings.poi_data": "POI Data",
+  "settings.poi_data": "Places in search",
   "settings.poi_category.school": "Schools",
   "settings.poi_category.kindergarten": "Kindergartens",
   "settings.poi_category.retail": "Supermarkets",
@@ -638,5 +638,8 @@
   "settings.micromap_layer_green": "parks and forests",
   "settings.micromap_layer_waterways": "rivers and canals",
   "settings.micromap_layer_roads": "main roads",
-  "settings.micromap_layer_places": "district and place names"
+  "settings.micromap_layer_places": "district and place names",
+  "settings.trips": "Trips",
+  "settings.trip_alerts": "Trip alerts",
+  "settings.offline_load_error": "Could not load offline settings."
 }

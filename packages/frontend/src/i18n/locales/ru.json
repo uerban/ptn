@@ -626,5 +626,8 @@
   "settings.micromap_layer_green": "парки и леса",
   "settings.micromap_layer_waterways": "реки и каналы",
   "settings.micromap_layer_roads": "основные дороги",
-  "settings.micromap_layer_places": "названия районов и мест"
+  "settings.micromap_layer_places": "названия районов и мест",
+  "settings.trips": "Поездки",
+  "settings.trip_alerts": "Оповещения в поездке",
+  "settings.offline_load_error": "Не удалось загрузить настройки офлайн-режима."
 }

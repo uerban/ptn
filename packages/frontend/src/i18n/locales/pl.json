@@ -607,5 +607,8 @@
   "settings.micromap_layer_green": "parki i lasy",
   "settings.micromap_layer_waterways": "rzeki i kanały",
   "settings.micromap_layer_roads": "główne drogi",
-  "settings.micromap_layer_places": "nazwy dzielnic i miejscowości"
+  "settings.micromap_layer_places": "nazwy dzielnic i miejscowości",
+  "settings.trips": "Podróże",
+  "settings.trip_alerts": "Powiadomienia o podróży",
+  "settings.offline_load_error": "Nie udało się wczytać ustawień trybu offline."
 }

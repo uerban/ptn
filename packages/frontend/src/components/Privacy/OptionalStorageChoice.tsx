@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ProtectionPolicy } from "@pt/shared/privacy";
 import { useTranslation } from "../../i18n/index.ts";
 import {
@@ -19,6 +19,9 @@ export interface OptionalStorageChoiceProps {
   presentation?: "contextual" | "settings";
   /** Test seam; defaults to the category's production deletion function. */
   cleanup?: () => Promise<void>;
+  /** Further controls for this kind of data, shown under the choice in
+   *  Settings so everything about it sits in one card. */
+  children?: ReactNode;
 }
 
 function policyPermits(
@@ -69,6 +72,7 @@ export function OptionalStorageChoice({
   description,
   presentation = "settings",
   cleanup,
+  children,
 }: OptionalStorageChoiceProps) {
   const { t } = useTranslation();
   const choice = usePrivacyChoicesStore((state) => state.choices[category]);
@@ -207,6 +211,9 @@ export function OptionalStorageChoice({
           )}
         </div>
       </div>
+      {children && presentation === "settings" && (
+        <div className="mt-3 space-y-3 border-t border-divider pt-3">{children}</div>
+      )}
       <div aria-live="polite" aria-atomic="true">
         {status && presentation === "settings" && (
           <p role="status" className="mt-2 text-xs text-accent">

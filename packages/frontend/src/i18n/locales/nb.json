@@ -613,5 +613,8 @@
   "settings.micromap_layer_green": "parker og skoger",
   "settings.micromap_layer_waterways": "elver og kanaler",
   "settings.micromap_layer_roads": "hovedveier",
-  "settings.micromap_layer_places": "distrikts- og stedsnavn"
+  "settings.micromap_layer_places": "distrikts- og stedsnavn",
+  "settings.trips": "Reiser",
+  "settings.trip_alerts": "Reisevarsler",
+  "settings.offline_load_error": "Kunne ikke laste inn frakoblede innstillinger."
 }

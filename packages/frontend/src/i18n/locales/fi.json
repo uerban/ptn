@@ -616,5 +616,8 @@
   "settings.micromap_layer_green": "puistot ja metsät",
   "settings.micromap_layer_waterways": "joet ja kanavat",
   "settings.micromap_layer_roads": "päätiet",
-  "settings.micromap_layer_places": "alue- ja paikannimet"
+  "settings.micromap_layer_places": "alue- ja paikannimet",
+  "settings.trips": "Matkat",
+  "settings.trip_alerts": "Matkailmoitukset",
+  "settings.offline_load_error": "Offline-asetusten lataaminen epäonnistui."
 }

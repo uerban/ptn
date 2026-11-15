@@ -613,5 +613,8 @@
   "settings.micromap_layer_green": "parker och skogar",
   "settings.micromap_layer_waterways": "floder och kanaler",
   "settings.micromap_layer_roads": "huvudvägar",
-  "settings.micromap_layer_places": "distrikts- och ortnamn"
+  "settings.micromap_layer_places": "distrikts- och ortnamn",
+  "settings.trips": "Resor",
+  "settings.trip_alerts": "Resaviseringar",
+  "settings.offline_load_error": "Det gick inte att läsa in offlineinställningarna."
 }

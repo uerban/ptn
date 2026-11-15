@@ -618,5 +618,8 @@
   "settings.micromap_layer_green": "parki un meži",
   "settings.micromap_layer_waterways": "upes un kanāli",
   "settings.micromap_layer_roads": "galvenie ceļi",
-  "settings.micromap_layer_places": "rajonu un vietu nosaukumi"
+  "settings.micromap_layer_places": "rajonu un vietu nosaukumi",
+  "settings.trips": "Braucieni",
+  "settings.trip_alerts": "Brauciena paziņojumi",
+  "settings.offline_load_error": "Neizdevās ielādēt bezsaistes iestatījumus."
 }

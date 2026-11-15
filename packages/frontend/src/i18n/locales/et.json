@@ -615,5 +615,8 @@
   "settings.micromap_layer_green": "pargid ja metsad",
   "settings.micromap_layer_waterways": "jõed ja kanalid",
   "settings.micromap_layer_roads": "peamised teed",
-  "settings.micromap_layer_places": "linnaosade ja paikade nimed"
+  "settings.micromap_layer_places": "linnaosade ja paikade nimed",
+  "settings.trips": "Sõidud",
+  "settings.trip_alerts": "Sõiduteated",
+  "settings.offline_load_error": "Võrguühenduseta seadete laadimine ebaõnnestus."
 }

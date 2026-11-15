@@ -620,5 +620,8 @@
   "settings.micromap_layer_green": "parkai ir miškai",
   "settings.micromap_layer_waterways": "upės ir kanalai",
   "settings.micromap_layer_roads": "pagrindiniai keliai",
-  "settings.micromap_layer_places": "rajonų ir vietovių pavadinimai"
+  "settings.micromap_layer_places": "rajonų ir vietovių pavadinimai",
+  "settings.trips": "Kelionės",
+  "settings.trip_alerts": "Kelionės pranešimai",
+  "settings.offline_load_error": "Nepavyko įkelti neprisijungus režimo nustatymų."
 }

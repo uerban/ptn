@@ -25,6 +25,7 @@ import { usePresentationText } from "../i18n/presentationStrings.ts";
 import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
 import { LanguagePicker } from "../components/Settings/LanguagePicker.tsx";
 import { MapModeSection } from "../components/Settings/MapModeSection.tsx";
+import { PoiCategoriesSection } from "../components/Settings/PoiCategoriesSection.tsx";
 import { ProjectLinks } from "../components/Settings/ProjectLinks.tsx";
 import { TransitAttribution } from "../components/Settings/TransitAttribution.tsx";
 import { getRoutingProvider } from "../config/routingProviders.ts";
@@ -38,11 +39,6 @@ import {
 
 const CitySavesSection = lazy(() => import("../components/Settings/CitySavesSection.tsx").then(m => ({default: m.CitySavesSection})));
 
-const AdvancedSettings = lazy(() =>
-  import("../components/Settings/AdvancedSettings.tsx").then((m) => ({
-    default: m.AdvancedSettings,
-  }))
-);
 
 const ColorSettings = lazy(() =>
   import("../components/Settings/ColorSettings.tsx").then((m) => ({
@@ -59,12 +55,6 @@ const OfflinePrepSection = lazy(() =>
 const PrivacyLevelSection = lazy(() =>
   import("../components/Settings/PrivacyLevelSection.tsx").then((m) => ({
     default: m.PrivacyLevelSection,
-  }))
-);
-
-const RecentsPurgeControl = lazy(() =>
-  import("../components/Settings/RecentsPurgeControl.tsx").then((m) => ({
-    default: m.RecentsPurgeControl,
   }))
 );
 
@@ -143,6 +133,7 @@ export function SettingsPage() {
     tripNotificationsEnabled, setTripNotificationsEnabled,
     routeSearchVariant, setRouteSearchVariant,
     searchProvider,
+    maxPopupLines, setMaxPopupLines,
   } = useSettingsStore();
   const routingMode = useSettingsStore((s) => s.routingMode);
   const routingProvider = useSettingsStore((s) => s.routingProvider);
@@ -201,7 +192,8 @@ export function SettingsPage() {
           {t("settings.city_scope_description", "General settings apply to all cities. Saved places, route groups and custom transport colours are saved per city.")}
         </p>
 
-        <GpsSettings />
+        <LanguagePicker />
+
 
         {/* Theme */}
         <section>
@@ -246,198 +238,66 @@ export function SettingsPage() {
           </Suspense>
         </ErrorBoundary>
 
-        <LanguagePicker />
-
-        {/* Search provider */}
-        <section aria-labelledby="settings-search-provider-heading">
-          <h2
-            id="settings-search-provider-heading"
-            className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
-          >
-            {t("settings.search_provider", "Search")}
+        {/* Route-search layout — A/B/C variants */}
+        <section id="appearance">
+          <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
+            {t("settings.appearance", "Appearance")}
           </h2>
-          <div
-            role="radiogroup"
-            aria-labelledby="settings-search-provider-heading"
-            className="bg-surface-raised rounded-xl border border-divider"
-          >
-            {(["local", "remote"] as const).map((provider) => {
-              return (
+          <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 space-y-3">
+            {(
+              [
+                {
+                  id: "consumer",
+                  label: t("settings.variant_consumer", "A · Consumer"),
+                  desc: t(
+                    "settings.variant_consumer_desc",
+                    "Clean cards with a time-proportional timeline bar per route.",
+                  ),
+                },
+                {
+                  id: "power",
+                  label: t("settings.variant_power", "B · Power-user"),
+                  desc: t(
+                    "settings.variant_power_desc",
+                    "Dense timetable-style rows, mono numerics, more routes at once.",
+                  ),
+                },
+                {
+                  id: "accessible",
+                  label: t("settings.variant_accessible", "C · Accessible"),
+                  desc: t(
+                    "settings.variant_accessible_desc",
+                    "Larger hit targets; each transit leg as its own row with explicit “Off at” copy.",
+                  ),
+                },
+              ] satisfies { id: RouteSearchVariant; label: string; desc: string }[]
+            ).map((v) => (
               <label
-                key={provider}
-                className="flex items-center justify-between gap-3 px-4 py-3
-                  border-b border-divider last:border-b-0 cursor-pointer"
+                key={v.id}
+                className="flex items-start gap-3 cursor-pointer"
               >
-                <div className="min-w-0">
-                  <span className="text-sm text-fg block">
-                    {provider === "local"
-                      ? t("settings.search_provider_local", "Search this device only")
-                      : t("settings.search_provider_remote", "Search online")}
-                  </span>
-                  <p className="text-xs text-fg-muted">
-                    {provider === "local"
-                      ? t(
-                          "settings.search_provider_local_desc",
-                          "Find stops and places from data downloaded for the city you're viewing. Works offline.",
-                        )
-                      : t(
-                          "settings.search_provider_remote_desc",
-                          "Find stops using the online routing service. May include results from other cities.",
-                        )}
-                  </p>
-                </div>
                 <input
                   type="radio"
-                  name="searchProvider"
-                  value={provider}
-                  checked={searchProvider === provider}
-                  onChange={() => chooseSearchProvider(provider satisfies SearchProvider)}
-                  className="accent-accent"
+                  name="routeSearchVariant"
+                  value={v.id}
+                  checked={routeSearchVariant === v.id}
+                  onChange={() => setRouteSearchVariant(v.id)}
+                  className="accent-accent mt-1"
                 />
+                <div>
+                  <div className="text-sm text-fg">{v.label}</div>
+                  <div className="text-xs text-fg-muted">{v.desc}</div>
+                </div>
               </label>
-              );
-            })}
+            ))}
           </div>
         </section>
 
-        <SearchLayoutSettings />
+        <GpsSettings />
 
-        {/* Routing source */}
-        <section id="routing-source" aria-labelledby="settings-routing-source-heading">
-          <h2
-            id="settings-routing-source-heading"
-            className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
-          >
-            {t("settings.routing_source", "Trip routing")}
-          </h2>
-          <div
-            role="radiogroup"
-            aria-labelledby="settings-routing-source-heading"
-            className="bg-surface-raised rounded-xl border border-divider"
-          >
-            {ROUTING_MODES.map((mode) => {
-              const copy = ROUTING_MODE_COPY[mode];
-              return (
-                <label
-                  key={mode}
-                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
-                >
-                  <div className="min-w-0">
-                    <span className="text-sm text-fg block">
-                      {t(copy.label[0], copy.label[1])}
-                      {/* The remote modes stay selectable (a user choice) — this
-                          is a hint, not a gate. */}
-                      {mode !== "on-device" && !remoteRoutingAvailable && (
-                        <span className="ml-2 text-xs text-warning italic" data-testid={`routing-mode-${mode}-unavailable`}>
-                          {t("settings.routing_source_unavailable", "Server unavailable right now")}
-                        </span>
-                      )}
-                    </span>
-                    <p className="text-xs text-fg-muted">{t(copy.desc[0], copy.desc[1])}</p>
-                  </div>
-                  <input
-                    type="radio"
-                    name="routingMode"
-                    value={mode}
-                    data-testid={`routing-mode-${mode}`}
-                    checked={routingMode === mode}
-                    onChange={() => chooseRoutingMode(mode satisfies RoutingMode)}
-                    className="accent-accent"
-                  />
-                </label>
-              );
-            })}
-          </div>
-          <h3 className="text-sm font-semibold text-fg mt-4 mb-2">
-            {t("settings.routing_provider", "Remote routing provider")}
-          </h3>
-          <div
-            role="radiogroup"
-            aria-label={t(
-              "settings.routing_provider",
-              "Remote routing provider",
-            )}
-            className="bg-surface-raised rounded-xl border border-divider"
-          >
-            {REMOTE_ROUTING_PROVIDERS.map((providerId) => {
-              const isTransitous = providerId === "transitous";
-              return (
-                <label
-                  key={providerId}
-                  className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
-                >
-                  <span className="flex flex-col gap-1">
-                    <span className="text-sm text-fg">
-                      {isTransitous
-                        ? TRANSITOUS_PROVIDER.name
-                        : t("settings.routing_provider_operator", "PTN operator")}
-                    </span>
-                    <span className="text-xs text-fg-muted">
-                      {isTransitous
-                        ? t(
-                            "privacy.disclosure.transitousProvider",
-                            "Trip start, destination, and departure time are sent through the PTN operator to transitous. Shared fields: {fields}.",
-                          ).replace(
-                            "{fields}",
-                            TRANSITOUS_PROVIDER.requestFields.join(", "),
-                          )
-                        : t(
-                            "settings.routing_provider_operator_desc",
-                            "Trip start, destination, and time are sent to the PTN operator when the routing strategy uses a remote provider.",
-                          )}
-                    </span>
-                    {isTransitous ? (
-                      <a
-                        href={TRANSITOUS_PROVIDER.tosUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-accent underline w-fit"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {t("transitous.terms", "Terms")}
-                      </a>
-                    ) : null}
-                  </span>
-                  <input
-                    type="radio"
-                    name="routingProvider"
-                    value={providerId}
-                    data-testid={`routing-provider-${providerId}`}
-                    checked={routingProvider === providerId}
-                    onChange={() =>
-                      chooseRoutingProvider(
-                        providerId satisfies RemoteRoutingProvider,
-                      )
-                    }
-                    className="accent-accent mt-1"
-                  />
-                </label>
-              );
-            })}
-          </div>
-        </section>
 
-        {/* Departures per line */}
-        <section>
-          <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-            {t("settings.departures_per_line", "Departures per line")}
-          </h2>
-          <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-fg">{departuresPerLine}</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setDeparturesPerLine(departuresPerLine - 1)}
-                disabled={departuresPerLine <= 1}
-                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
-              >−</button>
-              <button
-                onClick={() => setDeparturesPerLine(departuresPerLine + 1)}
-                disabled={departuresPerLine >= 5}
-                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
-              >+</button>
-            </div>
-          </div>
-        </section>
+        {/* Map — the single choice for what the canvas draws (map/mapMode.ts) */}
+        <MapModeSection />
 
         {/* Schedule mode */}
         <section>
@@ -529,8 +389,49 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* Map — the single choice for what the canvas draws (map/mapMode.ts) */}
-        <MapModeSection />
+        {/* Departures per line */}
+        <section>
+          <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
+            {t("settings.departures_per_line", "Departures per line")}
+          </h2>
+          <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-fg">{departuresPerLine}</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDeparturesPerLine(departuresPerLine - 1)}
+                disabled={departuresPerLine <= 1}
+                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
+              >−</button>
+              <button
+                onClick={() => setDeparturesPerLine(departuresPerLine + 1)}
+                disabled={departuresPerLine >= 5}
+                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
+              >+</button>
+            </div>
+          </div>
+        </section>
+
+        {/* Max lines in a stop popup on the map */}
+        <section>
+          <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
+            {t("settings.max_popup_lines", "Max lines in popup")}
+          </h2>
+          <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-fg">{maxPopupLines}</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMaxPopupLines(maxPopupLines - 1)}
+                disabled={maxPopupLines <= 2}
+                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
+              >−</button>
+              <button
+                onClick={() => setMaxPopupLines(maxPopupLines + 1)}
+                disabled={maxPopupLines >= 8}
+                className="w-8 h-8 rounded-lg bg-surface-overlay text-fg font-bold disabled:opacity-30"
+              >+</button>
+            </div>
+          </div>
+        </section>
 
         {/* Urban mode lookahead */}
         {urbanMode && (
@@ -567,65 +468,10 @@ export function SettingsPage() {
           </section>
         )}
 
-        {/* Route-search layout — A/B/C variants */}
-        <section id="appearance">
-          <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-            {t("settings.appearance", "Appearance")}
-          </h2>
-          <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 space-y-3">
-            {(
-              [
-                {
-                  id: "consumer",
-                  label: t("settings.variant_consumer", "A · Consumer"),
-                  desc: t(
-                    "settings.variant_consumer_desc",
-                    "Clean cards with a time-proportional timeline bar per route.",
-                  ),
-                },
-                {
-                  id: "power",
-                  label: t("settings.variant_power", "B · Power-user"),
-                  desc: t(
-                    "settings.variant_power_desc",
-                    "Dense timetable-style rows, mono numerics, more routes at once.",
-                  ),
-                },
-                {
-                  id: "accessible",
-                  label: t("settings.variant_accessible", "C · Accessible"),
-                  desc: t(
-                    "settings.variant_accessible_desc",
-                    "Larger hit targets; each transit leg as its own row with explicit “Off at” copy.",
-                  ),
-                },
-              ] satisfies { id: RouteSearchVariant; label: string; desc: string }[]
-            ).map((v) => (
-              <label
-                key={v.id}
-                className="flex items-start gap-3 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="routeSearchVariant"
-                  value={v.id}
-                  checked={routeSearchVariant === v.id}
-                  onChange={() => setRouteSearchVariant(v.id)}
-                  className="accent-accent mt-1"
-                />
-                <div>
-                  <div className="text-sm text-fg">{v.label}</div>
-                  <div className="text-xs text-fg-muted">{v.desc}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </section>
-
         {/* Routing */}
         <section>
           <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-            {t("settings.routing", "Routing")}
+            {t("settings.trips", "Trips")}
           </h2>
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
             <div className="py-3">
@@ -811,10 +657,125 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Routing source */}
+        <section id="routing-source" aria-labelledby="settings-routing-source-heading">
+          <h2
+            id="settings-routing-source-heading"
+            className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
+          >
+            {t("settings.routing_source", "Trip routing")}
+          </h2>
+          <div
+            role="radiogroup"
+            aria-labelledby="settings-routing-source-heading"
+            className="bg-surface-raised rounded-xl border border-divider"
+          >
+            {ROUTING_MODES.map((mode) => {
+              const copy = ROUTING_MODE_COPY[mode];
+              return (
+                <label
+                  key={mode}
+                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm text-fg block">
+                      {t(copy.label[0], copy.label[1])}
+                      {/* The remote modes stay selectable (a user choice) — this
+                          is a hint, not a gate. */}
+                      {mode !== "on-device" && !remoteRoutingAvailable && (
+                        <span className="ml-2 text-xs text-warning italic" data-testid={`routing-mode-${mode}-unavailable`}>
+                          {t("settings.routing_source_unavailable", "Server unavailable right now")}
+                        </span>
+                      )}
+                    </span>
+                    <p className="text-xs text-fg-muted">{t(copy.desc[0], copy.desc[1])}</p>
+                  </div>
+                  <input
+                    type="radio"
+                    name="routingMode"
+                    value={mode}
+                    data-testid={`routing-mode-${mode}`}
+                    checked={routingMode === mode}
+                    onChange={() => chooseRoutingMode(mode satisfies RoutingMode)}
+                    className="accent-accent"
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <h3 className="text-sm font-semibold text-fg mt-4 mb-2">
+            {t("settings.routing_provider", "Remote routing provider")}
+          </h3>
+          <div
+            role="radiogroup"
+            aria-label={t(
+              "settings.routing_provider",
+              "Remote routing provider",
+            )}
+            className="bg-surface-raised rounded-xl border border-divider"
+          >
+            {REMOTE_ROUTING_PROVIDERS.map((providerId) => {
+              const isTransitous = providerId === "transitous";
+              return (
+                <label
+                  key={providerId}
+                  className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
+                >
+                  <span className="flex flex-col gap-1">
+                    <span className="text-sm text-fg">
+                      {isTransitous
+                        ? TRANSITOUS_PROVIDER.name
+                        : t("settings.routing_provider_operator", "PTN operator")}
+                    </span>
+                    <span className="text-xs text-fg-muted">
+                      {isTransitous
+                        ? t(
+                            "privacy.disclosure.transitousProvider",
+                            "Trip start, destination, and departure time are sent through the PTN operator to transitous. Shared fields: {fields}.",
+                          ).replace(
+                            "{fields}",
+                            TRANSITOUS_PROVIDER.requestFields.join(", "),
+                          )
+                        : t(
+                            "settings.routing_provider_operator_desc",
+                            "Trip start, destination, and time are sent to the PTN operator when the routing strategy uses a remote provider.",
+                          )}
+                    </span>
+                    {isTransitous ? (
+                      <a
+                        href={TRANSITOUS_PROVIDER.tosUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-accent underline w-fit"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {t("transitous.terms", "Terms")}
+                      </a>
+                    ) : null}
+                  </span>
+                  <input
+                    type="radio"
+                    name="routingProvider"
+                    value={providerId}
+                    data-testid={`routing-provider-${providerId}`}
+                    checked={routingProvider === providerId}
+                    onChange={() =>
+                      chooseRoutingProvider(
+                        providerId satisfies RemoteRoutingProvider,
+                      )
+                    }
+                    className="accent-accent mt-1"
+                  />
+                </label>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Navigation */}
         <section>
           <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-            {t("settings.navigation", "Navigation")}
+            {t("settings.trip_alerts", "Trip alerts")}
           </h2>
           <div className="bg-surface-raised rounded-xl border border-divider px-4">
             <div className="flex items-center justify-between gap-3 py-3 border-b border-divider">
@@ -857,6 +818,120 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Search provider */}
+        <section aria-labelledby="settings-search-provider-heading">
+          <h2
+            id="settings-search-provider-heading"
+            className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
+          >
+            {t("settings.search_provider", "Search")}
+          </h2>
+          <div
+            role="radiogroup"
+            aria-labelledby="settings-search-provider-heading"
+            className="bg-surface-raised rounded-xl border border-divider"
+          >
+            {(["local", "remote"] as const).map((provider) => {
+              return (
+              <label
+                key={provider}
+                className="flex items-center justify-between gap-3 px-4 py-3
+                  border-b border-divider last:border-b-0 cursor-pointer"
+              >
+                <div className="min-w-0">
+                  <span className="text-sm text-fg block">
+                    {provider === "local"
+                      ? t("settings.search_provider_local", "Search this device only")
+                      : t("settings.search_provider_remote", "Search online")}
+                  </span>
+                  <p className="text-xs text-fg-muted">
+                    {provider === "local"
+                      ? t(
+                          "settings.search_provider_local_desc",
+                          "Find stops and places from data downloaded for the city you're viewing. Works offline.",
+                        )
+                      : t(
+                          "settings.search_provider_remote_desc",
+                          "Find stops using the online routing service. May include results from other cities.",
+                        )}
+                  </p>
+                </div>
+                <input
+                  type="radio"
+                  name="searchProvider"
+                  value={provider}
+                  checked={searchProvider === provider}
+                  onChange={() => chooseSearchProvider(provider satisfies SearchProvider)}
+                  className="accent-accent"
+                />
+              </label>
+              );
+            })}
+          </div>
+        </section>
+
+        <PoiCategoriesSection />
+
+        <ErrorBoundary
+          fallback={
+            <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
+              {t("settings.offline_load_error", "Could not load offline settings.")}
+            </div>
+          }
+        >
+          <Suspense
+            fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
+          >
+            <OfflinePrepSection />
+          </Suspense>
+        </ErrorBoundary>
+
+        <ErrorBoundary
+          fallback={
+            <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
+              {t("settings.privacy_load_error", "Could not load privacy settings.")}
+            </div>
+          }
+        >
+          <Suspense
+            fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
+          >
+            <PrivacyLevelSection part="level" />
+          </Suspense>
+        </ErrorBoundary>
+
+        <ErrorBoundary
+          fallback={
+            <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
+              {t("settings.optional_storage_load_error", "Could not load optional local-memory controls.")}
+            </div>
+          }
+        >
+          <Suspense
+            fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
+          >
+            <PrivacyStorageSettings />
+          </Suspense>
+        </ErrorBoundary>
+
+        <ErrorBoundary fallback={<p>{t("settings.saved_places_error", "Could not load saved-place recovery.")}</p>}>
+          <Suspense fallback={null}><CitySavesSection /></Suspense>
+        </ErrorBoundary>
+
+        <ErrorBoundary
+          fallback={
+            <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
+              {t("settings.data_deletion_load_error", "Could not load data-deletion controls.")}
+            </div>
+          }
+        >
+          <Suspense
+            fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
+          >
+            <DataDeletionControls />
+          </Suspense>
+        </ErrorBoundary>
+
         {/* Advanced toggle */}
         <button
           type="button"
@@ -873,19 +948,6 @@ export function SettingsPage() {
             <ErrorBoundary
               fallback={
                 <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
-                  {t("settings.advanced_load_error", "Could not load advanced settings.")}
-                </div>
-              }
-            >
-              <Suspense
-                fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
-              >
-                <AdvancedSettings />
-              </Suspense>
-            </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
                   {t("settings.privacy_load_error", "Could not load privacy settings.")}
                 </div>
               }
@@ -893,55 +955,12 @@ export function SettingsPage() {
               <Suspense
                 fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
               >
-                <PrivacyLevelSection />
-                <OfflinePrepSection />
+                <PrivacyLevelSection part="details" />
               </Suspense>
             </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
-                  {t("settings.optional_storage_load_error", "Could not load optional local-memory controls.")}
-                </div>
-              }
-            >
-              <Suspense
-                fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
-              >
-                <PrivacyStorageSettings />
-              </Suspense>
-            </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
-                  {t("settings.recents_purge_load_error", "Could not load the purge-recents control.")}
-                </div>
-              }
-            >
-              <Suspense
-                fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
-              >
-                <RecentsPurgeControl />
-              </Suspense>
-            </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="bg-surface-raised rounded-xl border border-divider p-4 text-sm text-fg-muted">
-                  {t("settings.data_deletion_load_error", "Could not load data-deletion controls.")}
-                </div>
-              }
-            >
-              <Suspense
-                fallback={<div className="h-20 bg-surface-overlay rounded-xl animate-pulse" />}
-              >
-                <DataDeletionControls />
-              </Suspense>
-            </ErrorBoundary>
+            <SearchLayoutSettings />
           </>
         )}
-
-        <ErrorBoundary fallback={<p>{t("settings.saved_places_error", "Could not load saved-place recovery.")}</p>}>
-          <Suspense fallback={null}><CitySavesSection /></Suspense>
-        </ErrorBoundary>
 
         {/* About */}
         <section>
