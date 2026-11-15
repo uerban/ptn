@@ -48,7 +48,7 @@ export function Layout() {
           to="/"
           end
           className={({ isActive }) =>
-            `flex-1 flex flex-col items-center py-2 text-xs ${
+            `flex-1 min-w-0 flex flex-col items-center px-1 py-2 text-center text-[min(0.75rem,20px)] leading-tight ${
               isActive
                 ? "text-nav-fg-active"
                 : "text-nav-fg"
@@ -61,7 +61,7 @@ export function Layout() {
         <NavLink
           to="/search"
           className={({ isActive }) =>
-            `flex-1 flex flex-col items-center py-2 text-xs ${
+            `flex-1 min-w-0 flex flex-col items-center px-1 py-2 text-center text-[min(0.75rem,20px)] leading-tight ${
               isActive
                 ? "text-nav-fg-active"
                 : "text-nav-fg"
@@ -74,7 +74,7 @@ export function Layout() {
         <NavLink
           to="/settings"
           className={({ isActive }) =>
-            `flex-1 flex flex-col items-center py-2 text-xs ${
+            `flex-1 min-w-0 flex flex-col items-center px-1 py-2 text-center text-[min(0.75rem,20px)] leading-tight ${
               isActive
                 ? "text-nav-fg-active"
                 : "text-nav-fg"

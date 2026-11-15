@@ -70,6 +70,10 @@ body {
      above the app shell) follows the theme, or a dark-theme banner sits on
      white. */
   background-color: var(--color-surface);
+  /* At very large text sizes (browser zoom or OS text scaling) a single long
+     word can be wider than a phone screen. Let it break instead of pushing
+     the page sideways. Only words that cannot fit are affected. */
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
