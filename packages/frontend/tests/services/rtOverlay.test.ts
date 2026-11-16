@@ -335,3 +335,11 @@ describe("initial boarding and RT freshness", () => {
     }
   });
 });
+
+
+it("does not restore a scheduled boarding before access arrival", () => {
+  const itinerary = twoLegItinerary();
+  itinerary.sourceWalkSecs = 540;
+  expect(applyRtOverlay([itinerary], (tripId) => tripId === "tripA"
+    ? { delaySeconds: 600, cancelled: false } : null)).toEqual([]);
+});

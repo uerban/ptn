@@ -129,6 +129,10 @@ export function applyRtOverlay(
     // `timingUnreliable` carries the signal without mutating individual
     // leg times into impossibilities.
     const adjustedLegs = brokenByDelay ? itin.legs : shiftedLegs;
+    // The fallback must not display boarding before the access walk ends.
+    const displayedFirst = adjustedLegs[0];
+    if (displayedFirst?.type === "transit"
+      && itin.departureSecs + itin.sourceWalkSecs > displayedFirst.departSecs) return [];
     const lastLeg = adjustedLegs[adjustedLegs.length - 1];
     const arrivalSecs = lastLeg.arriveSecs + itin.destWalkSecs;
     const totalSecs = arrivalSecs - itin.departureSecs;
