@@ -525,3 +525,19 @@ describe("findReachableStops", () => {
     expect(s2?.walkSecs).toBeGreaterThan(0);
   });
 });
+
+it.each([
+  {profile:"default" as const,run:false,budget:300,retained:false},
+  {profile:"default" as const,run:true,budget:300,retained:true},
+  {profile:"wheelchair" as const,run:true,budget:600,retained:false},
+])("enforces fallback time budget for $profile, run=$run", async ({profile,run,budget,retained}) => {
+  const candidates=[{id:"near",name:"Near",lat:0,lon:0},{id:"far",name:"Far",lat:0.0054,lon:0}];
+  const results=await findReachableStops({lat:0,lon:0},candidates,
+    {maxWalkSecs:budget,walkSpeedMps:1.25,radiusMeters:800,runToCatch:run},
+    {isReady:()=>false,table:vi.fn()},profile);
+  const far=results.find(stop=>stop.stopId==="far");
+  expect(!!far).toBe(retained);
+  expect(results.every(stop=>stop.walkSecs<=budget)).toBe(true);
+  if(retained) expect(far?.runToCatch).toBe(true);
+  expect(results.find(stop=>stop.stopId==="near")?.walkSecs).toBe(0);
+});

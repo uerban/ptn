@@ -192,7 +192,12 @@ export async function findReachableStops(
     destStopId: options.destStopId,
     osmLookup: options.osmLookup,
   };
-  const baseResults = findStopsInRadius(origin, stops, radiusMeters, effectiveWalkSpeed, findOpts);
+  // Radius is only a spatial prefilter. At a slower pace, or with a smaller
+  // configured time budget, a stop inside it can still be unreachable in time.
+  const withinTimeBudget = (stop: ReachableStop) => Number.isFinite(stop.walkSecs)
+    && stop.walkSecs >= 0 && stop.walkSecs <= maxWalkSecs;
+  const baseResults = findStopsInRadius(origin, stops, radiusMeters, effectiveWalkSpeed, findOpts)
+    .filter(withinTimeBudget);
 
   if (runToCatchActive) {
     // The radius is a distance proxy for the same time budget: what the rider
@@ -202,7 +207,8 @@ export async function findReachableStops(
     const runRadiusMeters = Math.round(
       (radiusMeters * runSpeed) / effectiveWalkSpeed,
     );
-    const runResults = findStopsInRadius(origin, stops, runRadiusMeters, runSpeed, findOpts);
+    const runResults = findStopsInRadius(origin, stops, runRadiusMeters, runSpeed, findOpts)
+      .filter(withinTimeBudget);
     const baseIds = new Set(baseResults.map((r) => r.stopId));
 
     for (const stop of runResults) {
