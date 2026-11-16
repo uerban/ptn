@@ -34,12 +34,15 @@ test("native search titles keep readable subtext and select the native label @mo
   await expect(subtext).toBeVisible();
   const metrics = await subtext.evaluate((element) => ({
     width: element.getBoundingClientRect().width,
-    overflow: getComputedStyle(element).textOverflow,
+    // Long subtext wraps to two lines and is cut there (large-text layout).
+    lineClamp: getComputedStyle(element).webkitLineClamp,
+    overflow: getComputedStyle(element).overflow,
     scrollWidth: document.documentElement.scrollWidth,
     viewportWidth: window.innerWidth,
   }));
   expect(metrics.width).toBeGreaterThan(0);
-  expect(metrics.overflow).toBe("ellipsis");
+  expect(metrics.lineClamp).toBe("2");
+  expect(metrics.overflow).toBe("hidden");
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
   await page.screenshot({ path: test.info().outputPath("search-subtext.png") });
   await option.click();

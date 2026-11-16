@@ -111,8 +111,12 @@ test.describe("M10 T-16: Per-session jitter across sessions @mock-api", () => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
+    // The dedup cache answers a repeated query without a second request, so
+    // it is switched off here: this test is about what goes out when the same
+    // query is sent twice, which the cache would hide.
     await bootAtPrivacyLevel(page, "standard", {
       m10CoarsenGridDefaultMeters: GRID,
+      m10DedupCache: "disabled",
     });
     await mockApi(page);
 
