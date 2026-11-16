@@ -4,6 +4,7 @@ import { useSettingsStore } from "../stores/settingsStore.ts";
 import { GuidanceSessionProvider } from "../components/Guidance/GuidanceSession.tsx";
 import { useTemporaryMap } from "../presentation/temporaryMap.ts";
 import { usePresentationText } from "../i18n/presentationStrings.ts";
+import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
 
 // Separate chunks: Text mode never loads the map surface, its MapLibre
 // dependency or any other map-only module.
@@ -33,10 +34,19 @@ export function HomeDispatcher() {
         }
       >
         {showMap ? (
-          <MapHome
-            onBackToText={textMode ? temporaryMap.close : undefined}
-            contextStop={textMode ? textStop : null}
-          />
+          <ErrorBoundary context="map-home" fallback={
+            <>
+              <div role="status" className="px-4 py-2 text-sm text-fg-muted bg-surface-overlay">
+                {text("mapStatus.failed")}
+              </div>
+              <TextHome temporaryMap={temporaryMap} selectedStop={textStop} onSelectStop={setTextStop} />
+            </>
+          }>
+            <MapHome
+              onBackToText={textMode ? temporaryMap.close : undefined}
+              contextStop={textMode ? textStop : null}
+            />
+          </ErrorBoundary>
         ) : (
           <TextHome temporaryMap={temporaryMap} selectedStop={textStop} onSelectStop={setTextStop} />
         )}

@@ -6,14 +6,19 @@ import type { Stop } from "@pt/shared";
 import type { TemporaryMap } from "../presentation/temporaryMap.ts";
 
 const CENTRAL: Stop = { id: "S1", name: "Central", location: { lat: 54.35, lon: 18.65 } };
+const mapFailure = vi.hoisted(() => ({active: false}));
+vi.mock("../services/errorReporter.ts", () => ({reportError: vi.fn()}));
 
 vi.mock("./Home.tsx", () => ({
-  HomePage: ({ onBackToText, contextStop }: { onBackToText?: () => void; contextStop?: Stop | null }) => (
+  HomePage: ({ onBackToText, contextStop }: { onBackToText?: () => void; contextStop?: Stop | null }) => {
+    if (mapFailure.active) throw new TypeError("Failed to fetch dynamically imported module");
+    return (
     <section data-testid="map">
       <span data-testid="map-stop">{contextStop?.name ?? "none"}</span>
       <button type="button" onClick={onBackToText}>Back to text</button>
     </section>
-  ),
+    );
+  },
 }));
 vi.mock("./TextHome.tsx", () => ({
   TextHome: ({
@@ -50,6 +55,7 @@ function renderHome() {
 }
 
 beforeEach(() => {
+  mapFailure.active = false;
   useSettingsStore.getState().setScheduleMode(true);
 });
 
@@ -70,5 +76,20 @@ describe("HomeDispatcher", () => {
     useSettingsStore.getState().setScheduleMode(false);
     renderHome();
     expect((await screen.findByTestId("map-stop")).textContent).toBe("none");
+  });
+
+  it("keeps text usable when the map cannot load without changing the saved view", async () => {
+    useSettingsStore.getState().setScheduleMode(false);
+    mapFailure.active = true;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderHome();
+      expect(await screen.findByTestId("text")).toBeTruthy();
+      expect(screen.getByRole("status").textContent).toContain("map could not be loaded");
+      expect(screen.queryByTestId("map")).toBeNull();
+      expect(useSettingsStore.getState().scheduleMode).toBe(false);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
