@@ -174,8 +174,7 @@ function validateTuple(value, index) {
   return tuple;
 }
 
-function loadTupleManifest(path, ptbHash) {
-  const raw = readFileSync(path);
+function loadTupleManifest(path, ptbHash, raw = readFileSync(path)) {
   let parsed;
   try {
     parsed = JSON.parse(raw.toString("utf8"));
@@ -268,15 +267,62 @@ function runtimeMetadata() {
   };
 }
 
+function retainReport(options, report, bytes, missingInputs = []) {
+  if (!options.captureStore) return;
+  const artifacts = Object.fromEntries(Object.entries(bytes)
+    .map(([name, value]) => [name, retainArtifact(options.captureStore, value)]));
+  retainRun(options.captureStore, options.runId, {
+    schemaVersion: 1,
+    classification: "partial capture",
+    scope: "stop-level compiled engine",
+    replayVerification: "unverified",
+    missingDependencies: ["source GTFS and producer provenance", ...missingInputs.map(name => `unread input: ${name}`)],
+    unsupported: ["frontend geometry", "real-time composition", "feed rebuild", "process termination/timeouts"],
+    completion: report.completion,
+    artifacts,
+    report,
+  });
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const ptbBytes = readFileSync(options.ptbPath);
-  const ptbHash = sha256(ptbBytes);
-  const manifest = loadTupleManifest(options.queryTuplesPath, ptbHash);
-
-  const glueBytes = readFileSync(options.pkgPath);
   const wasmPath = join(dirname(options.pkgPath), "pt_wasm_bg.wasm");
-  const wasmBytes = readFileSync(wasmPath);
+  const paths = {ptb: options.ptbPath, queryTuples: options.queryTuplesPath, glue: options.pkgPath, wasm: wasmPath};
+  const bytes = {};
+  const readErrors = [];
+  for (const [name, path] of Object.entries(paths)) {
+    try { bytes[name] = readFileSync(path); }
+    catch (error) { readErrors.push({name, message: error.message}); }
+  }
+  let manifest;
+  let inputError;
+  if (readErrors.length) {
+    inputError = {stage: "input reading", message: readErrors.map(e => `${e.name}: ${e.message}`).join("; "), failures: readErrors};
+  } else {
+    try { manifest = loadTupleManifest(options.queryTuplesPath, sha256(bytes.ptb), bytes.queryTuples); }
+    catch (error) { inputError = {stage: "query validation", message: error.message}; }
+  }
+  if (inputError) {
+    const report = {
+      schemaVersion: 1, completion: "error", error: inputError,
+      patternMode: options.patternMode, objective: options.objective,
+      input: {
+        ptb: {path: options.ptbPath, sha256: bytes.ptb ? sha256(bytes.ptb) : null},
+        queryTuples: {path: options.queryTuplesPath, sha256: bytes.queryTuples ? sha256(bytes.queryTuples) : null, tupleCount: null},
+        iterations: options.iterations, warmup: options.warmup,
+        windowStart: options.windowStart, windowEnd: options.windowEnd,
+      },
+      runtime: runtimeMetadata(), initialization: {wasmMs: null, routerMs: null, totalMs: null},
+      tuples: [],
+    };
+    retainReport(options, report, bytes, readErrors.map(error => error.name));
+    console.log(JSON.stringify(report));
+    console.error(`temporal-baseline: ${inputError.stage}: ${inputError.message}`);
+    process.exitCode = 1;
+    return;
+  }
+  const {ptb: ptbBytes, glue: glueBytes, wasm: wasmBytes} = bytes;
+  const ptbHash = sha256(ptbBytes);
   const artifact = {
     wasm: artifactMetrics(wasmPath, wasmBytes),
     glue: artifactMetrics(options.pkgPath, glueBytes),
@@ -375,24 +421,7 @@ async function main() {
       percentileMethod: "nearest-rank",
       tuples,
     };
-  if (options.captureStore) {
-    const queryBytes = readFileSync(options.queryTuplesPath);
-    if (sha256(queryBytes) !== manifest.sha256) fail("query manifest changed during capture");
-    const artifacts = Object.fromEntries(Object.entries({
-      ptb: ptbBytes, queryTuples: queryBytes, glue: glueBytes, wasm: wasmBytes,
-    }).map(([name, bytes]) => [name, retainArtifact(options.captureStore, bytes)]));
-    retainRun(options.captureStore, options.runId, {
-      schemaVersion: 1,
-      classification: "partial capture",
-      scope: "stop-level compiled engine",
-      replayVerification: "unverified",
-      missingDependencies: ["source GTFS and producer provenance"],
-      unsupported: ["frontend geometry", "real-time composition", "feed rebuild", "input-read failures", "process termination/timeouts"],
-      completion,
-      artifacts,
-      report,
-    });
-  }
+  retainReport(options, report, bytes);
   console.log(JSON.stringify(report));
   if (completion !== "success") {
     console.error(`temporal-baseline: ${planningError.stage}: ${planningError.message}`);

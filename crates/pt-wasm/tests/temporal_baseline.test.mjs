@@ -5,7 +5,7 @@ import { replayBaseline } from "./baseline_restore.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { after, before, test } from "node:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -59,7 +59,7 @@ before(() => {
 
 after(() => rmSync(tempDir, { recursive: true, force: true }));
 
-function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePath = pkgPath) {
+function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePath = pkgPath, ptbPath = tinyPtb) {
   const objectiveArgs = ["--objective", objective];
   if (objective !== "plan") {
     objectiveArgs.push("--window-start", "25000", "--window-end", "30000");
@@ -69,7 +69,7 @@ function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePat
     [
       script,
       "--pkg", packagePath,
-      "--ptb", tinyPtb,
+      "--ptb", ptbPath,
       "--query-tuples", queryTuples,
       "--iterations", "2",
       "--warmup", "0",
@@ -229,3 +229,53 @@ for (const [id, stage, source] of [
     assert.equal(record.report.error.stage, stage);
   });
 }
+
+for (const name of ["ptb", "queryTuples", "glue", "wasm"]) {
+  test(`unread ${name} retains other readable input bytes as a failed attempt`, () => {
+    const dir = join(tempDir, `missing-${name}`);
+    // Missing engine paths live in their own directory, including the fixed
+    // sibling WASM filename; do not affect other fixtures.
+    mkdirSync(dir);
+    const paths = {ptb: join(dir,"input.ptb"), queryTuples: join(dir,"queries.json"), glue: join(dir,"engine.mjs"), wasm: join(dir,"pt_wasm_bg.wasm")};
+    const inputs = {ptb: readFileSync(tinyPtb), queryTuples: readFileSync(tuplesPath), glue: Buffer.from("export function initSync(){} export class PtRouter {}"), wasm: Buffer.from("fixture")};
+    for (const [key, path] of Object.entries(paths)) if (key !== name) writeFileSync(path, inputs[key]);
+    const store = join(dir, "store");
+    const result = runBaseline(paths.queryTuples, "plan", ["--capture-store", store, "--run-id", "failed"], paths.glue, paths.ptb);
+    assert.equal(result.status, 1);
+    const record = JSON.parse(readFileSync(join(store,"runs","failed.json")));
+    assert.equal(record.report.error.stage, "input reading");
+    assert.deepEqual(record.report.tuples, []);
+    assert.equal(record.artifacts[name], undefined);
+    assert.ok(record.missingDependencies.includes(`unread input: ${name}`));
+    for (const key of Object.keys(inputs).filter(key => key !== name)) assert.equal(record.artifacts[key], sha256(inputs[key]));
+    assert.equal(record.completion, "error");
+  });
+}
+
+test("invalid query bytes are retained rather than reinterpreted as empty", () => {
+  const queryPath = join(tempDir, "malformed.json");
+  writeFileSync(queryPath, "{broken");
+  const store = join(tempDir, "invalid-query-store");
+  const result = runBaseline(queryPath, "plan", ["--capture-store", store, "--run-id", "failed"]);
+  assert.equal(result.status, 1);
+  const record = JSON.parse(readFileSync(join(store,"runs","failed.json")));
+  assert.equal(record.report.error.stage, "query validation");
+  assert.equal(record.artifacts.queryTuples, sha256(Buffer.from("{broken")));
+  assert.equal(record.completion, "error");
+});
+
+test("retains the query bytes consumed even if the source path changes during planning", () => {
+  const queryPath = join(tempDir, "changing-queries.json");
+  const original = readFileSync(tuplesPath);
+  writeFileSync(queryPath, original);
+  const fakePkg = join(tempDir, "query-mutator.mjs");
+  writeFileSync(fakePkg, `import {writeFileSync} from "node:fs"; export function initSync(){} export class PtRouter {plan(){writeFileSync(${JSON.stringify(queryPath)}, "replaced after input parsing"); return [];} free(){}}`);
+  writeFileSync(join(tempDir, "pt_wasm_bg.wasm"), "fixture");
+  const store = join(tempDir, "query-snapshot-store");
+  const result = runBaseline(queryPath, "plan", ["--capture-store", store, "--run-id", "snapshot"], fakePkg);
+  assert.equal(result.status, 0, result.stderr);
+  const record = JSON.parse(readFileSync(join(store,"runs","snapshot.json")));
+  assert.equal(record.artifacts.queryTuples, sha256(original));
+  assert.equal(record.report.input.queryTuples.sha256, sha256(original));
+  assert.notEqual(sha256(readFileSync(queryPath)), record.artifacts.queryTuples);
+});
