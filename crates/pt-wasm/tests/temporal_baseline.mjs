@@ -322,20 +322,23 @@ async function main() {
     }
   }
 
-  let tuples;
+  const tuples = [];
+  let completion = "success";
+  let planningError;
   try {
-    tuples = manifest.tuples.map((tuple, index) =>
-      benchmarkTuple(router, tuple, index, options),
-    );
+    for (const [index, tuple] of manifest.tuples.entries()) {
+      tuples.push(benchmarkTuple(router, tuple, index, options));
+    }
+  } catch (error) {
+    completion = "error";
+    planningError = { tupleIndex: tuples.length, message: error.message };
   } finally {
     router.free();
   }
 
-  if (!tuples.some((tuple) => tuple.resultCount > 0)) {
-    fail(`all ${tuples.length} tuple(s) returned no itineraries; the baseline input is invalid`);
-  }
-
   const report = {
+      completion,
+      ...(planningError ? { error: planningError } : {}),
       schemaVersion: 1,
       patternMode: options.patternMode,
       objective: options.objective,
@@ -375,12 +378,13 @@ async function main() {
       replayVerification: "unverified",
       missingDependencies: ["source GTFS and producer provenance"],
       unsupported: ["frontend geometry", "real-time composition", "feed rebuild"],
-      completion: "success",
+      completion,
       artifacts,
       report,
     });
   }
   console.log(JSON.stringify(report));
+  if (completion !== "success") process.exitCode = 1;
 }
 
 main().catch((error) => {

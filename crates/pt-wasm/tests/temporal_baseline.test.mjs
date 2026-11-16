@@ -59,7 +59,7 @@ before(() => {
 
 after(() => rmSync(tempDir, { recursive: true, force: true }));
 
-function runBaseline(queryTuples, objective = "plan", extraArgs = []) {
+function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePath = pkgPath) {
   const objectiveArgs = ["--objective", objective];
   if (objective !== "plan") {
     objectiveArgs.push("--window-start", "25000", "--window-end", "30000");
@@ -68,7 +68,7 @@ function runBaseline(queryTuples, objective = "plan", extraArgs = []) {
     process.execPath,
     [
       script,
-      "--pkg", pkgPath,
+      "--pkg", packagePath,
       "--ptb", tinyPtb,
       "--query-tuples", queryTuples,
       "--iterations", "2",
@@ -167,4 +167,35 @@ test("optional capture retains artifacts and refuses run replacement", {
   assert.notEqual(second.status, 0);
   assert.match(second.stderr, /EEXIST/);
   assert.deepEqual(JSON.parse(readFileSync(join(store, "runs", "baseline.json"))), record);
+});
+
+
+test("empty engine result is successful and replayable", {
+  skip: suppliedObjective !== undefined,
+}, () => {
+  const emptyTuples = join(tempDir, "empty-tuples.json");
+  writeFileSync(emptyTuples, JSON.stringify({ ptbSha256: tinyPtbSha256, tuples: [{ ...tinyTuple, date: "20300101" }] }));
+  const store = join(tempDir, "empty-captures");
+  const result = runBaseline(emptyTuples, "plan", ["--capture-store", store, "--run-id", "empty"]);
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.completion, "success");
+  assert.deepEqual(report.tuples[0].candidates, []);
+  assert.equal(replayBaseline(store, "empty", join(tempDir, "empty-restored")).replayVerified, true);
+});
+
+
+test("planner failure is retained as error and never empty success", () => {
+  const fakePkg = join(tempDir, "failing.mjs");
+  writeFileSync(fakePkg, 'export function initSync() {} export class PtRouter { plan() { throw new Error("fixture planner failure"); } free() {} }');
+  writeFileSync(join(tempDir, "pt_wasm_bg.wasm"), "fixture");
+  const store = join(tempDir, "failure-captures");
+  const result = runBaseline(tuplesPath, "plan", ["--capture-store", store, "--run-id", "failed"], fakePkg);
+  assert.equal(result.status, 1);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.completion, "error");
+  assert.match(report.error.message, /fixture planner failure/);
+  const record = JSON.parse(readFileSync(join(store, "runs", "failed.json")));
+  assert.equal(record.completion, "error");
+  assert.throws(() => replayBaseline(store, "failed", join(tempDir, "failed-restored")), /Unsupported/);
 });
