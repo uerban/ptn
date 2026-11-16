@@ -18,12 +18,24 @@ const manifest = Buffer.from(JSON.stringify({schemaVersion: 1, city: "vilnius", 
 }}));
 const release = hash(manifest);
 
-test("routed walk-only search can be selected for guidance @mock-api", async ({page, context}) => {
+for (const offline of [false, true]) {
+test(`routed walk-only selection ${offline ? "with warm guidance after disconnect" : "online"} @mock-api`, async ({page, context}) => {
+  const remotePlans: string[] = [];
+  const graphRequests: string[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    if (/\/api\/(?:[^/]+\/)?plan(?:\/|$)/.test(url.pathname)) remotePlans.push(request.url());
+  });
   await context.setGeolocation({latitude: 54.68, longitude: 25.28});
   await page.clock.setFixedTime(REF_FIXED_TIME);
   await mockApi(page, {catalogNow: REF_FIXED_TIME});
   await page.route("**/osm/**", async route => {
-    const path = new URL(route.request().url()).pathname;
+    const url = new URL(route.request().url());
+    graphRequests.push(url.pathname);
+    expect(url.search).toBe("");
+    expect(route.request().method()).toBe("GET");
+    expect(route.request().postData()).toBeNull();
+    const path = url.pathname;
     if (path === "/osm/current/vilnius.json") {
       await route.fulfill({json: {schemaVersion: 1, release, revision: 1}});
     } else if (path === `/osm/releases/${release}/manifest.json`) {
@@ -37,6 +49,20 @@ test("routed walk-only search can be selected for guidance @mock-api", async ({p
   await expect(card).toBeVisible({timeout: 15_000});
   // The fixture's 0.001 longitude segment at 54.68 latitude is 64 m.
   await expect(card).toContainText(/64/);
+  expect(graphRequests).toContain(`/osm/releases/${release}/walk-graph.ptwg.br`);
+  if (offline) {
+    // Warm the lazy guidance page. Cold offline installation requires the
+    // production service-worker harness, not Vite's on-demand modules.
+    await card.click();
+    await expect(page.getByTestId("leg-row")).toHaveCount(1);
+    await page.goBack();
+    await expect(card).toBeVisible();
+    // Route mocks can fulfill requests even with context offline. Abort every
+    // subsequent request too, so fixtures cannot mask a network dependency.
+    await page.route("**/*", route => route.abort("internetdisconnected"));
+    await context.setOffline(true);
+    expect(await page.evaluate(() => navigator.onLine)).toBe(false);
+  }
   await card.click();
   await expect(page.getByTestId("leg-row")).toHaveCount(1);
   await page.waitForFunction(() => {
@@ -47,4 +73,6 @@ test("routed walk-only search can be selected for guidance @mock-api", async ({p
     const map = (window as unknown as {__ptnMap?: {getSource(id: string): unknown}}).__ptnMap;
     return !!map?.getSource("guidance-leg-1");
   })).toBe(false);
+  expect(remotePlans).toEqual([]);
 });
+}
