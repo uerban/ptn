@@ -1,6 +1,8 @@
 // Runnable contract test for temporal_baseline.mjs.  It builds a disposable
 // web package so CI does not need a developer's locally generated pkg-web.
 
+import {readArtifact} from "./baseline_store.mjs";
+import {diffBaselines} from "./baseline_diff.mjs";
 import { replayBaseline } from "./baseline_restore.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -77,7 +79,7 @@ function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePat
       ...objectiveArgs,
       ...extraArgs,
     ],
-    { cwd: repoRoot, encoding: "utf8" },
+    { cwd: repoRoot, encoding: "utf8", timeout: 20_000 },
   );
 }
 
@@ -278,4 +280,88 @@ test("retains the query bytes consumed even if the source path changes during pl
   assert.equal(record.artifacts.queryTuples, sha256(original));
   assert.equal(record.report.input.queryTuples.sha256, sha256(original));
   assert.notEqual(sha256(readFileSync(queryPath)), record.artifacts.queryTuples);
+});
+
+for (const [id, source, completion] of [
+  ["blocked-init", 'export function initSync(){console.log("entered init");while(true){}} export class PtRouter {}', "timeout"],
+  ["blocked-plan", 'export function initSync(){} export class PtRouter {plan(){console.error("entered planner");while(true){}} free(){}}', "timeout"],
+  ["crash", 'export function initSync(){process.exit(23);} export class PtRouter {}', "error"],
+  ["killed", 'export function initSync(){process.kill(process.pid,"SIGKILL");} export class PtRouter {}', "error"],
+  ["init-error", 'export function initSync(){throw new Error("supervised init failure");} export class PtRouter {}', "error"],
+  ["empty", 'export function initSync(){} export class PtRouter {plan(){return [];} free(){}}', "success"],
+]) {
+  test(`supervised ${id} distinguishes timeout, failure and empty success`, () => {
+    const fakePkg = join(tempDir, `supervised-${id}.mjs`);
+    writeFileSync(fakePkg, source);
+    writeFileSync(join(tempDir, "pt_wasm_bg.wasm"), "fixture");
+    const store = join(tempDir, `supervised-${id}-store`);
+    const args = ["--capture-store", store, "--run-id", "attempt", "--timeout-ms", completion === "timeout" ? "500" : "5000"];
+    const result = runBaseline(tuplesPath, "plan", args, fakePkg);
+    assert.equal(result.status, completion === "success" ? 0 : 1, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.completion, completion);
+    const recordPath = join(store, "runs", "attempt.json");
+    const record = JSON.parse(readFileSync(recordPath));
+    assert.equal(record.completion, completion);
+    assert.equal(record.artifacts.glue, sha256(Buffer.from(source)));
+    assert.equal(record.artifacts.ptb, tinyPtbSha256);
+    assert.ok(record.artifacts.childStdout);
+    assert.ok(record.artifacts.childStderr);
+    if (completion === "timeout") {
+      assert.equal(diffBaselines(record, record).reason, "non-success completion");
+      assert.equal(report.supervision.signal, "SIGKILL");
+      assert.deepEqual(report.tuples, []);
+      assert.throws(() => replayBaseline(store, "attempt", join(tempDir, `no-replay-${id}`)), /Unsupported/);
+    }
+    if (id === "blocked-init") {
+      assert.match(readArtifact(store, record.artifacts.childStdout).toString(), /entered init/);
+      const original = readFileSync(recordPath);
+      assert.equal(runBaseline(tuplesPath, "plan", args, fakePkg).status, 1);
+      assert.deepEqual(readFileSync(recordPath), original);
+    }
+    if (id === "blocked-plan") assert.match(readArtifact(store, record.artifacts.childStderr).toString(), /entered planner/);
+    if (id === "crash") assert.equal(report.supervision.exitCode, 23);
+    if (id === "killed") assert.equal(report.supervision.signal, "SIGKILL");
+    if (id === "init-error") assert.equal(report.error.stage, "wasm initialization");
+    if (id === "empty") {
+      assert.deepEqual(report.tuples[0].candidates, []);
+      assert.equal(replayBaseline(store, "attempt", join(tempDir, "supervised-empty-restored")).replayVerified, true);
+    }
+  });
+}
+
+test("supervisor retains completed tuples before a subsequent query blocks", () => {
+  const queries = join(tempDir, "partial-timeout-queries.json");
+  writeFileSync(queries, JSON.stringify({ptbSha256: tinyPtbSha256, tuples: [tinyTuple, tinyTuple]}));
+  const fakePkg = join(tempDir, "partial-timeout.mjs");
+  writeFileSync(fakePkg, 'export function initSync(){} export class PtRouter {n=0; plan(){if(++this.n>2)while(true){} return [];} free(){}}');
+  writeFileSync(join(tempDir, "pt_wasm_bg.wasm"), "fixture");
+  const store = join(tempDir, "partial-timeout-store");
+  const result = runBaseline(queries, "plan", ["--capture-store", store, "--run-id", "partial", "--timeout-ms", "500"], fakePkg);
+  assert.equal(result.status, 1, result.stderr);
+  const record = JSON.parse(readFileSync(join(store,"runs","partial.json")));
+  assert.equal(record.completion, "timeout");
+  assert.equal(record.report.tuples.length, 1);
+  assert.deepEqual(record.report.tuples[0].candidates, []);
+});
+
+test("a deadline before a final report still records an incomplete timed-out attempt", () => {
+  const store = join(tempDir, "early-timeout-store");
+  const result = runBaseline(tuplesPath, "plan", ["--capture-store", store, "--run-id", "early", "--timeout-ms", "1"]);
+  assert.equal(result.status, 1, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.completion, "timeout");
+  assert.equal(report.supervision.timeoutMs, 1);
+  assert.equal(report.runtimeSource, "supervisor");
+  const record = JSON.parse(readFileSync(join(store,"runs","early.json")));
+  assert.equal(record.completion, "timeout");
+  for (const name of ["ptb", "queryTuples", "glue", "wasm"]) {
+    if (!record.artifacts[name]) assert.ok(record.missingDependencies.includes(`unobserved input: ${name}`));
+  }
+});
+
+test("deadline values reject timer overflow rather than becoming a one-millisecond timeout", () => {
+  const result = runBaseline(tuplesPath, "plan", ["--timeout-ms", "2147483648"]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /timer limit/);
 });

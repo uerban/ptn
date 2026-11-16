@@ -13,19 +13,20 @@
 
 import { retainArtifact, retainRun } from "./baseline_store.mjs";
 import { captureCandidates, assertCandidateEquality } from "./baseline_candidates.mjs";
+import {publishInputs, publishTuple, publishReport, superviseBaseline} from "./baseline_supervisor.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, platform, release } from "node:os";
 import { performance } from "node:perf_hooks";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 
 const USAGE =
   "usage: temporal_baseline.mjs --pkg <path/to/pt_wasm.js> --ptb <bundle.ptb> " +
   "--query-tuples <tuples.json> --iterations <positive integer> " +
   "--warmup <non-negative integer> --pattern-mode covering-merge " +
-  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>] [--capture-store <directory> --run-id <id>]";
+  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>] [--capture-store <directory> --run-id <id>] [--timeout-ms <positive milliseconds>]";
 
 function fail(message) {
   throw new Error(message);
@@ -55,6 +56,7 @@ function parseArgs(argv) {
     "window-end",
     "capture-store",
     "run-id",
+    "timeout-ms",
   ]);
   const values = new Map();
 
@@ -108,7 +110,10 @@ function parseArgs(argv) {
     fail("--window-start must be less than --window-end");
   }
 
+  const timeoutMs = values.has("timeout-ms") ? parseInteger(values.get("timeout-ms"), "--timeout-ms", {min: 1}) : null;
+  if (timeoutMs !== null && timeoutMs > 2147483647) fail("--timeout-ms exceeds the timer limit");
   return {
+    timeoutMs,
     captureStore: values.has("capture-store") ? resolve(values.get("capture-store")) : null,
     runId: values.get("run-id"),
     pkgPath: resolve(values.get("pkg")),
@@ -268,6 +273,7 @@ function runtimeMetadata() {
 }
 
 function retainReport(options, report, bytes, missingInputs = []) {
+  if (publishReport(report)) return;
   if (!options.captureStore) return;
   const artifacts = Object.fromEntries(Object.entries(bytes)
     .map(([name, value]) => [name, retainArtifact(options.captureStore, value)]));
@@ -276,8 +282,9 @@ function retainReport(options, report, bytes, missingInputs = []) {
     classification: "partial capture",
     scope: "stop-level compiled engine",
     replayVerification: "unverified",
-    missingDependencies: ["source GTFS and producer provenance", ...missingInputs.map(name => `unread input: ${name}`)],
-    unsupported: ["frontend geometry", "real-time composition", "feed rebuild", "process termination/timeouts"],
+    missingDependencies: ["source GTFS and producer provenance", ...missingInputs.map(name => `${options.timeoutMs ? "unobserved" : "unread"} input: ${name}`)],
+    unsupported: ["frontend geometry", "real-time composition", "feed rebuild",
+      ...(options.timeoutMs ? ["supervisor termination", "engine-created subprocess cleanup", "interrupted tuple iterations"] : ["process termination/timeouts"])],
     completion: report.completion,
     artifacts,
     report,
@@ -285,7 +292,45 @@ function retainReport(options, report, bytes, missingInputs = []) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const options = parseArgs(argv);
+  if (options.timeoutMs !== null) {
+    const childArgs = [];
+    for (let i = 0; i < argv.length; i += 2) {
+      if (argv[i] !== "--timeout-ms") childArgs.push(argv[i], argv[i + 1]);
+    }
+    const outcome = await superviseBaseline(fileURLToPath(import.meta.url), childArgs, options.timeoutMs);
+    const complete = outcome.exitCode === 0 && outcome.report?.completion === "success";
+    const completion = outcome.timedOut ? "timeout" : complete ? "success" : "error";
+    const report = outcome.report ?? {
+      schemaVersion: 1, patternMode: options.patternMode, objective: options.objective,
+      input: {
+        ptb: {path: options.ptbPath, sha256: outcome.bytes.ptb ? sha256(outcome.bytes.ptb) : null},
+        queryTuples: {path: options.queryTuplesPath, sha256: outcome.bytes.queryTuples ? sha256(outcome.bytes.queryTuples) : null, tupleCount: null},
+        iterations: options.iterations, warmup: options.warmup,
+        windowStart: options.windowStart, windowEnd: options.windowEnd,
+      },
+      runtime: runtimeMetadata(), runtimeSource: "supervisor",
+      initialization: {wasmMs: null, routerMs: null, totalMs: null}, tuples: outcome.tuples,
+    };
+    if (outcome.timedOut || (!complete && report.completion !== "error")) {
+      report.error = {stage: "supervised execution", message: outcome.timedOut
+        ? `Child exceeded ${options.timeoutMs} ms wall-clock deadline`
+        : outcome.processError ?? `Child exited without successful completion (code ${outcome.exitCode}, signal ${outcome.signal})`,
+        ...(report.error ? {childError: report.error} : {})};
+    }
+    report.completion = completion;
+    report.supervision = {timeoutMs: options.timeoutMs, exitCode: outcome.exitCode, signal: outcome.signal};
+    const missing = ["ptb", "queryTuples", "glue", "wasm"].filter(name => !outcome.bytes[name]);
+    retainReport(options, report, {...outcome.bytes, childStdout: outcome.stdout, childStderr: outcome.stderr}, missing);
+    console.log(JSON.stringify(report));
+    if (outcome.stderr.length) process.stderr.write(outcome.stderr);
+    if (completion !== "success") {
+      console.error(`temporal-baseline: ${completion}: ${report.error.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
   const wasmPath = join(dirname(options.pkgPath), "pt_wasm_bg.wasm");
   const paths = {ptb: options.ptbPath, queryTuples: options.queryTuplesPath, glue: options.pkgPath, wasm: wasmPath};
   const bytes = {};
@@ -294,6 +339,7 @@ async function main() {
     try { bytes[name] = readFileSync(path); }
     catch (error) { readErrors.push({name, message: error.message}); }
   }
+  await publishInputs(bytes, readErrors.map(error => error.name));
   let manifest;
   let inputError;
   if (readErrors.length) {
@@ -379,6 +425,7 @@ async function main() {
     stage = "planning";
     for (const [index, tuple] of manifest.tuples.entries()) {
       tuples.push(benchmarkTuple(router, tuple, index, options));
+      await publishTuple(tuples[tuples.length - 1]);
     }
   } catch (error) {
     completion = "error";
