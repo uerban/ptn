@@ -58,7 +58,7 @@ before(() => {
 
 after(() => rmSync(tempDir, { recursive: true, force: true }));
 
-function runBaseline(queryTuples, objective = "plan") {
+function runBaseline(queryTuples, objective = "plan", extraArgs = []) {
   const objectiveArgs = ["--objective", objective];
   if (objective !== "plan") {
     objectiveArgs.push("--window-start", "25000", "--window-end", "30000");
@@ -74,6 +74,7 @@ function runBaseline(queryTuples, objective = "plan") {
       "--warmup", "0",
       "--pattern-mode", "covering-merge",
       ...objectiveArgs,
+      ...extraArgs,
     ],
     { cwd: repoRoot, encoding: "utf8" },
   );
@@ -140,4 +141,25 @@ test("temporal baseline benchmarks a feature-gated direct objective", {
   const mismatched = runBaseline(tuplesPath, suppliedObjective === "r3" ? "m4" : "r3");
   assert.notEqual(mismatched.status, 0);
   assert.match(mismatched.stderr, /does not match temporal-direct artifact/);
+});
+
+
+test("optional capture retains artifacts and refuses run replacement", {
+  skip: suppliedObjective !== undefined,
+}, () => {
+  const store = join(tempDir, "captures");
+  const args = ["--capture-store", store, "--run-id", "baseline"];
+  const first = runBaseline(tuplesPath, "plan", args);
+  assert.equal(first.status, 0, first.stderr);
+  const record = JSON.parse(readFileSync(join(store, "runs", "baseline.json")));
+  assert.equal(record.classification, "partial capture");
+  assert.equal(record.replayVerification, "unverified");
+  assert.equal(Object.keys(record.artifacts).length, 4);
+  for (const digest of Object.values(record.artifacts)) {
+    assert.equal(sha256(readFileSync(join(store, "artifacts", digest))), digest);
+  }
+  const second = runBaseline(tuplesPath, "plan", args);
+  assert.notEqual(second.status, 0);
+  assert.match(second.stderr, /EEXIST/);
+  assert.deepEqual(JSON.parse(readFileSync(join(store, "runs", "baseline.json"))), record);
 });

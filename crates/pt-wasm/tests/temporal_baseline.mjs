@@ -11,6 +11,7 @@
 // Direct-profile packages additionally use:
 //     --objective r3|m4 --window-start 25000 --window-end 90000
 
+import { retainArtifact, retainRun } from "./baseline_store.mjs";
 import { captureCandidates, assertCandidateEquality } from "./baseline_candidates.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -24,7 +25,7 @@ const USAGE =
   "usage: temporal_baseline.mjs --pkg <path/to/pt_wasm.js> --ptb <bundle.ptb> " +
   "--query-tuples <tuples.json> --iterations <positive integer> " +
   "--warmup <non-negative integer> --pattern-mode covering-merge " +
-  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>]";
+  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>] [--capture-store <directory> --run-id <id>]";
 
 function fail(message) {
   throw new Error(message);
@@ -52,6 +53,8 @@ function parseArgs(argv) {
     "objective",
     "window-start",
     "window-end",
+    "capture-store",
+    "run-id",
   ]);
   const values = new Map();
 
@@ -75,6 +78,9 @@ function parseArgs(argv) {
     if (!values.has(name)) fail(`missing required option: --${name}\n${USAGE}`);
   }
 
+  if (values.has("capture-store") !== values.has("run-id")) {
+    fail("--capture-store and --run-id must be supplied together");
+  }
   const patternMode = values.get("pattern-mode");
   if (patternMode !== "covering-merge") {
     fail(`--pattern-mode must be covering-merge for the matched baseline, got: ${patternMode}`);
@@ -103,6 +109,8 @@ function parseArgs(argv) {
   }
 
   return {
+    captureStore: values.has("capture-store") ? resolve(values.get("capture-store")) : null,
+    runId: values.get("run-id"),
     pkgPath: resolve(values.get("pkg")),
     ptbPath: resolve(values.get("ptb")),
     queryTuplesPath: resolve(values.get("query-tuples")),
@@ -327,8 +335,7 @@ async function main() {
     fail(`all ${tuples.length} tuple(s) returned no itineraries; the baseline input is invalid`);
   }
 
-  console.log(
-    JSON.stringify({
+  const report = {
       schemaVersion: 1,
       patternMode: options.patternMode,
       objective: options.objective,
@@ -354,8 +361,26 @@ async function main() {
       },
       percentileMethod: "nearest-rank",
       tuples,
-    }),
-  );
+    };
+  if (options.captureStore) {
+    const queryBytes = readFileSync(options.queryTuplesPath);
+    if (sha256(queryBytes) !== manifest.sha256) fail("query manifest changed during capture");
+    const artifacts = Object.fromEntries(Object.entries({
+      ptb: ptbBytes, queryTuples: queryBytes, glue: glueBytes, wasm: wasmBytes,
+    }).map(([name, bytes]) => [name, retainArtifact(options.captureStore, bytes)]));
+    retainRun(options.captureStore, options.runId, {
+      schemaVersion: 1,
+      classification: "partial capture",
+      scope: "stop-level compiled engine",
+      replayVerification: "unverified",
+      missingDependencies: ["source GTFS and producer provenance"],
+      unsupported: ["frontend geometry", "real-time composition", "feed rebuild"],
+      completion: "success",
+      artifacts,
+      report,
+    });
+  }
+  console.log(JSON.stringify(report));
 }
 
 main().catch((error) => {
