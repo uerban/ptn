@@ -637,6 +637,72 @@ fn pinned_expectations_hold_independently_of_the_golden() {
     );
 }
 
+/// Only the final walking cost changes: 1200 + 300 beats the terminal's
+/// 1800, while 1200 + 900 loses to it. The winning terminal must be the
+/// repeated position 3, never its position-0 namesake before boarding.
+#[test]
+fn loop_alighting_uses_complete_arrival_and_preserves_terminal_occurrence() {
+    let records = run_corpus(&repo_root());
+    let mut checked = 0;
+    for record in records {
+        let tuple = &TUPLES[record.tuple_idx];
+        let expected = match tuple.name {
+            "circular-earlier-alight-door-arrival" => ("s2", 2, 1500),
+            "circular-stay-aboard-door-arrival" => ("s0", 3, 1800),
+            _ => continue,
+        };
+        // Engine order is transit arrival only; composition owns final-walk
+        // ranking. Both exits must survive so that boundary can choose either.
+        assert_eq!(record.itins.len(), 2);
+        let itinerary = record
+            .itins
+            .iter()
+            .min_by_key(|itinerary| {
+                let stop = match itinerary.legs.last().expect("loop leg") {
+                    ProjectedLeg::Transit(leg) => &leg.to_stop_id,
+                    _ => panic!("loop fixture must end on transit"),
+                };
+                let walk = tuple
+                    .exit
+                    .iter()
+                    .find(|(id, _)| *id == stop)
+                    .expect("exit walking cost")
+                    .1;
+                itinerary.alight_secs + i64::from(walk)
+            })
+            .expect("loop result");
+        let leg = match itinerary.legs.last().expect("loop leg") {
+            ProjectedLeg::Transit(leg) => leg,
+            _ => panic!("loop fixture must end on transit"),
+        };
+        assert_eq!(
+            leg.to_stop_id, expected.0,
+            "{} [{}]",
+            tuple.name, record.mode_key
+        );
+        assert_eq!(leg.board_stop_idx, 1);
+        assert_eq!(leg.alight_stop_idx, expected.1);
+        let walk = tuple
+            .exit
+            .iter()
+            .find(|(id, _)| *id == leg.to_stop_id)
+            .expect("winning exit")
+            .1;
+        assert_eq!(
+            itinerary.alight_secs + i64::from(walk),
+            expected.2,
+            "{} [{}]: full arrival",
+            tuple.name,
+            record.mode_key
+        );
+        checked += 1;
+    }
+    assert_eq!(
+        checked, 6,
+        "both controls must run in all three pattern modes"
+    );
+}
+
 /// Raw-recompute coverage oracle, ported from the differential harness's
 /// `patternsAtStop` union check.
 ///

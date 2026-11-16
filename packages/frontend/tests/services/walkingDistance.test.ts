@@ -272,3 +272,31 @@ it("an unknown candidate cannot switch known distances to pace-dependent orderin
   expect(rankResults([{...unknown,totalWalkMeters:distance},shorter],"least_walking")[0]).toBe(shorter);
  }
 });
+
+// Same occurrence-specific candidates as circular-loop.ptb in the native
+// corpus. Engine order is transit arrival; this boundary adds the final walk.
+it.each([
+ {walkSecs:300,stop:"s2",position:2,arrival:1500,meters:375},
+ {walkSecs:900,stop:"s0",position:3,arrival:1800,meters:0},
+])("chooses loop alighting by full arrival with $walkSecs seconds egress",async({walkSecs,stop,position,arrival,meters})=>{
+ const candidates:RaptorItinerary[]=[
+  {legs:[{type:"transit",fromStopId:"s1",toStopId:"s2",departSecs:600,arriveSecs:1200,routeId:"R",tripId:"T0",boardStopIdx:1,alightStopIdx:2,patternStopIds:["s0","s1","s2","s0"]}],boardSecs:600,alightSecs:1200,transfers:0},
+  {legs:[{type:"transit",fromStopId:"s1",toStopId:"s0",departSecs:600,arriveSecs:1800,routeId:"R",tripId:"T0",boardStopIdx:1,alightStopIdx:3,patternStopIds:["s0","s1","s2","s0"]}],boardSecs:600,alightSecs:1800,transfers:0},
+ ];
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"s1",walkSecs:0,distanceMeters:0}])
+  .mockResolvedValueOnce([{stopId:"s2",walkSecs,distanceMeters:walkSecs*1.25},{stopId:"s0",walkSecs:0,distanceMeters:0}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue(candidates);
+ const results=await new SearchOrchestrator({raptorIndex:index,allStops:[],getDelay:()=>null,maxResults:1,
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,
+ }).search({origin:{lat:0,lon:0},destination:{lat:0,lon:.001},departureTime:new Date(2026,4,5,0,0),ranking:"fastest"});
+ expect(results).toHaveLength(1);
+ expect(results[0].arrivalSecs).toBe(arrival);
+ expect(results[0].totalSecs).toBe(arrival);
+ expect(results[0].totalWalkMeters).toBe(meters);
+ const leg=results[0].legs[0];
+ expect(leg.toStopId).toBe(stop);
+ if(leg.type!=="transit") throw new Error("expected transit leg");
+ expect(leg.alightStopIdx).toBe(position);
+ expect(leg.patternStopIds).toEqual(["s0","s1","s2","s0"]);
+});
