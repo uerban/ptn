@@ -165,6 +165,10 @@ accept a comma-separated list of URLs and are not supported with multi-feed
 recipes. The app asks the server for live times or alerts only after the
 rider turns that service on.
 
+`realtimeClientName` (optional) is sent as the `ET-Client-Name` header on
+every realtime fetch. Entur (Norway) asks clients to identify themselves this
+way, in the form `<organisation>-<application>`; other publishers ignore it.
+
 ## Updates and restart
 
 Run `refresh` hourly using the same configuration. For a foreground process:
