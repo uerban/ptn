@@ -13,10 +13,10 @@ vi.mock("../../src/services/wasmPlanner.ts", () => ({
 }));
 
 import type { RaptorItinerary } from "@pt/shared";
-import { composeItineraries } from "../../src/services/raptorComposer.ts";
+import { composeItineraries, rankResults } from "../../src/services/raptorComposer.ts";
 import { SearchOrchestrator, type SearchConfig } from "../../src/services/searchOrchestrator.ts";
 import { findReachableStops } from "../../src/services/isochrone.ts";
-import { planOnDevice } from "../../src/services/wasmPlanner.ts";
+import { planOnDevice, resolveDepartureOnDevice } from "../../src/services/wasmPlanner.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
 
 const ride: RaptorItinerary = {
@@ -111,4 +111,73 @@ describe("SearchOrchestrator — walked metres reach the result", () => {
     expect(result.totalWalkSecs).toBe(617);
     expect(result.totalWalkMeters).toBe(600);
   });
+});
+
+
+describe("routed direct walking with no reachable transit stops", () => {
+  it.each(["fastest", "least_walking", "fewest_transfers"] as const)("returns walking in %s mode", async ranking => {
+    vi.mocked(findReachableStops).mockReset().mockResolvedValue([]);
+    vi.mocked(planOnDevice).mockReset();
+    vi.mocked(resolveDepartureOnDevice).mockClear();
+    const route = { distanceMeters: 15, coords: [[25.28,54.68],[25.2801,54.68]] as [number,number][], steps: [] };
+    const config: SearchConfig = {
+      raptorIndex: index, allStops: [], getDelay: () => null,
+      osrm: { isReady: () => false, table: vi.fn(), init: vi.fn() } as never,
+      walkSpeedMps: 1.5, directWalkRoute: async () => route,
+    };
+    const results = await new SearchOrchestrator(config).search({
+      origin: {lat:54.68,lon:25.28}, destination:{lat:54.68,lon:25.2801},
+      departureTime: new Date(2026,2,30,8), ranking,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].directWalk?.route).toBe(route);
+    expect(results[0].totalWalkMeters).toBe(15);
+    expect(planOnDevice).not.toHaveBeenCalled();
+    expect(resolveDepartureOnDevice).not.toHaveBeenCalled();
+  });
+});
+
+
+it("includes transfer walking without claiming unknown physical metres", () => {
+ const transfer = {type:"walk" as const,fromStopId:"S2",toStopId:"S3",departSecs:30000,arriveSecs:30120};
+ const itinerary = {...ride,legs:[...ride.legs,transfer],alightSecs:30120};
+ const compose = (distanceMeters?:number) => composeItineraries([{...itinerary,legs:[...ride.legs,{...transfer,distanceMeters}]}],
+  [{stopId:"S1",walkSecs:10,distanceMeters:15}], [{stopId:"S3",walkSecs:20,distanceMeters:30}],28500)[0];
+ expect(compose().totalWalkSecs).toBe(150);
+ expect(compose().totalWalkMeters).toBeUndefined();
+ expect(compose(80).totalWalkMeters).toBe(125);
+});
+
+it("ranks known physical distance independently of run duration", () => {
+ const base=composeItineraries([ride],[{stopId:"S1",walkSecs:5,distanceMeters:100}],
+  [{stopId:"S2",walkSecs:0,distanceMeters:0}],28500)[0];
+ const direct={...base,legs:[],totalWalkMeters:15,totalWalkSecs:10,totalSecs:10};
+ expect(rankResults([base,direct],"least_walking")[0]).toBe(direct);
+});
+
+
+it.each(["fastest", "least_walking", "fewest_transfers"] as const)("merges walking before the final limit in %s", async ranking => {
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"S1",walkSecs:30,distanceMeters:45}])
+  .mockResolvedValueOnce([{stopId:"S2",walkSecs:30,distanceMeters:45}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue([ride]);
+ const orchestrator=new SearchOrchestrator({raptorIndex:index,allStops:[],getDelay:()=>null,maxResults:1,
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,
+  directWalkRoute:async()=>({distanceMeters:15,coords:[[25.28,54.68],[25.2801,54.68]],steps:[]})});
+ const result=await orchestrator.search({origin:{lat:54.68,lon:25.28},destination:{lat:54.68,lon:25.2801},departureTime:new Date(2026,2,30,7,55),ranking});
+ expect(result).toHaveLength(1);
+ expect(result[0].directWalk).toBeDefined();
+});
+
+it("keeps a legitimate faster transit winner", async () => {
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"S1",walkSecs:0,distanceMeters:0}])
+  .mockResolvedValueOnce([{stopId:"S2",walkSecs:0,distanceMeters:0}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue([ride]);
+ const orchestrator=new SearchOrchestrator({raptorIndex:index,allStops:[],getDelay:()=>null,maxResults:1,
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,
+  directWalkRoute:async()=>({distanceMeters:15000,coords:[[25.28,54.68],[25.4,54.68]],steps:[]})});
+ const result=await orchestrator.search({origin:{lat:54.68,lon:25.28},destination:{lat:54.68,lon:25.4},departureTime:new Date(2026,2,30,7,55),ranking:"fastest"});
+ expect(result[0].directWalk).toBeUndefined();
+ expect(result[0].legs[0].type).toBe("transit");
 });

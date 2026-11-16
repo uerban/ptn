@@ -39,3 +39,20 @@ export function decodePolyline(encoded: string): LatLon[] {
 
   return points;
 }
+
+/** Encode routed points at the same 1e-5 degree precision as decodePolyline. */
+export function encodePolyline(points: LatLon[]): string {
+  let lat = 0, lon = 0, encoded = "";
+  const component = (delta: number) => {
+    let value = delta < 0 ? ~(delta << 1) : delta << 1;
+    let result = "";
+    while (value >= 0x20) { result += String.fromCharCode((0x20 | (value & 0x1f)) + 63); value >>>= 5; }
+    return result + String.fromCharCode(value + 63);
+  };
+  for (const point of points) {
+    const nextLat = Math.round(point.lat * 1e5), nextLon = Math.round(point.lon * 1e5);
+    encoded += component(nextLat - lat) + component(nextLon - lon);
+    lat = nextLat; lon = nextLon;
+  }
+  return encoded;
+}

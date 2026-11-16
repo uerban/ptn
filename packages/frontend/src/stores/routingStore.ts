@@ -1,3 +1,4 @@
+import { walkGraphClient, walkProfileFor, WalkGraphUnavailableError } from "../services/walkGraphClient.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
 import { effectiveExcludedModes } from "./settingsStore.ts";
 import { excludedRouteIdsForGroups } from "../services/routeGroups.ts";
@@ -127,9 +128,8 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
 
       // Privacy seam: resolve each endpoint to its candidate entry stops before
       // any coord reaches the orchestrator. Future milestones apply coarsening
-      // / redaction at this boundary. An empty resolution means the endpoint
-      // has no stops within the walk budget — short-circuit with a clear error
-      // rather than letting the orchestrator return [].
+      // / redaction at this boundary. Empty stop resolution does not rule out
+      // a routed direct pedestrian journey.
       const osmLookup = makeOsmTransferLookup(raptorIndex.footTransfers);
       const resolveOpts = { maxWalkSecs, walkSpeedMps, osmLookup };
       const originStops = resolveToEntryStops(origin, allStops, resolveOpts);
@@ -137,18 +137,20 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         ...resolveOpts,
         role: "destination",
       });
-      if (originStops.length === 0 || destStops.length === 0) {
-        set({
-          error: "No transit stops within walking distance of origin or destination.",
-          loading: false,
-        });
-        return;
-      }
 
+      const searchCityId = useCityStore.getState().activeCity.id;
       const config: SearchConfig = {
         raptorIndex,
         cityId: useCityStore.getState().activeCity.id,
         allStops,
+        directWalkRoute: async (from, to) => {
+          try {
+            return await walkGraphClient.routeFor(searchCityId, from, to, walkProfileFor(mobilityProfile));
+          } catch (error) {
+            if (error instanceof WalkGraphUnavailableError) return null;
+            throw error;
+          }
+        },
         getDelay: (tripId: string) => {
           // Stitch the trip delay together with its `receivedAt` stamp so
           // `applyRtOverlay`'s 120s freshness guard can drop stale entries.
@@ -177,6 +179,16 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           : undefined,
       };
 
+      if (originStops.length === 0 || destStops.length === 0) {
+        const route = await config.directWalkRoute!(endpointCoord(origin), endpointCoord(destination));
+        data.assertCurrent();
+        if (!route) {
+          set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });
+          return;
+        }
+        config.directWalkRoute = async () => route;
+      }
+
       const orchestrator = new SearchOrchestrator(config);
       const ranking = get().ranking;
 
@@ -192,7 +204,11 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       });
 
       data.assertCurrent();
-      set({ results: itineraries, loading: false });
+      set({ results: itineraries, loading: false,
+        error: itineraries.length === 0 && (originStops.length === 0 || destStops.length === 0)
+          ? "No transit stops within walking distance of origin or destination, and no pedestrian route available."
+          : null,
+      });
     } catch (err) {
       // Staleness: a reset()/city-switch/refresh invalidated the wasm build
       // mid-search, so THIS search is obsolete and a superseding one is already

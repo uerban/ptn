@@ -1,3 +1,4 @@
+import { encodePolyline } from "../utils/polyline.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
 import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
@@ -193,6 +194,20 @@ export async function convertRaptorResults(
     // results carry the engine's -86400-rewritten secs and project correctly against the query date
     // (CUT — the previous-day projection is algebraically identical). No per-result branch.
     const iso = (secs: number) => projectToIso(secs, queryServiceDateYmd, feedTz);
+    if (itin.directWalk) {
+      const walk = itin.directWalk;
+      return {
+        legs: [{ mode: "WALK" as TransportMode,
+          from: { name: endpointLabels.origin, location: walk.origin },
+          to: { name: endpointLabels.destination, location: walk.destination },
+          departureTime: iso(itin.departureSecs), arrivalTime: iso(itin.arrivalSecs),
+          durationSeconds: itin.totalSecs,
+          distanceMeters: itin.directWalk.route.distanceMeters,
+          polyline: encodePolyline(itin.directWalk.route.coords.map(([lon, lat]) => ({ lat, lon }))) }],
+        departureTime: iso(itin.departureSecs), arrivalTime: iso(itin.arrivalSecs),
+        durationSeconds: itin.totalSecs, transfers: 0, walkingDistanceMeters: walk.route.distanceMeters,
+      };
+    }
     const transitLegs: Leg[] = itin.legs.map((leg) => {
       const fromStop = stopMap.get(leg.fromStopId);
       const toStop = stopMap.get(leg.toStopId);

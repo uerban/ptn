@@ -24,6 +24,7 @@ type DelayLookup = (tripId: string) => {
  */
 
 export interface RtComposedItinerary extends ComposedItinerary {
+  directWalk?: import("./directWalkCandidate.ts").DirectWalkCandidate["directWalk"];
   cancelled?: boolean;
   timingUnreliable?: boolean;
 }

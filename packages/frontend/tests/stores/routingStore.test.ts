@@ -176,3 +176,23 @@ describe("useRoutingStore.search", () => {
     searchSpy.mockRestore();
   });
 });
+
+
+it("retains a pedestrian result when origin has no reachable stops", async () => {
+ const {useGtfsDataStore}=await import("../../src/stores/gtfsDataStore.ts");
+ await useGtfsDataStore.getState().init("vilnius");
+ const {useRoutingStore}=await import("../../src/stores/routingStore.ts");
+ const {SearchOrchestrator}=await import("../../src/services/searchOrchestrator.ts");
+ const {directWalkCandidate}=await import("../../src/services/directWalkCandidate.ts");
+ const origin={kind:"mappoint" as const,lat:0,lon:0}, destination={kind:"mappoint" as const,lat:0,lon:0.0001};
+ const {walkGraphClient}=await import("../../src/services/walkGraphClient.ts");
+ const graph=vi.spyOn(walkGraphClient,"routeFor").mockResolvedValue({distanceMeters:15,coords:[[0,0],[0.0001,0]],steps:[]});
+ const candidate=directWalkCandidate(origin,destination,{distanceMeters:15,coords:[[0,0],[0.0001,0]],steps:[]},28800,1.5)!;
+ const search=vi.spyOn(SearchOrchestrator.prototype,"search").mockResolvedValue([candidate]);
+ try {
+  await useRoutingStore.getState().search(origin,destination,new Date("2026-04-13T08:00:00Z"));
+  expect(search).toHaveBeenCalled();
+  expect(useRoutingStore.getState().results).toEqual([candidate]);
+  expect(useRoutingStore.getState().error).toBeNull();
+ } finally {search.mockRestore();graph.mockRestore();}
+});

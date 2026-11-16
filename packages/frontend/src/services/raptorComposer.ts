@@ -35,7 +35,13 @@ export function composeItineraries(
 
     const arrivalSecs = itin.alightSecs + destWalkSecs;
     const totalSecs = arrivalSecs - departureSecs;
-    const totalWalkSecs = sourceWalkSecs + destWalkSecs;
+    const transferWalks = itin.legs.filter(leg => leg.type === "walk");
+    const totalWalkSecs = sourceWalkSecs + destWalkSecs
+      + transferWalks.reduce((sum, leg) => sum + leg.arriveSecs - leg.departSecs, 0);
+    const distances = transferWalks.map(leg => "distanceMeters" in leg && typeof leg.distanceMeters === "number"
+      ? leg.distanceMeters : undefined);
+    const transferMetersKnown = distances.every(distance => distance !== undefined);
+    const transferMeters = distances.reduce<number>((sum, distance) => sum + (distance ?? 0), 0);
     const sourceMeters = entryMeters.get(firstLeg.fromStopId);
     const destMeters = exitMeters.get(lastLeg.toStopId);
 
@@ -49,8 +55,8 @@ export function composeItineraries(
       arrivalSecs,
       transfers: itin.transfers,
       totalWalkSecs,
-      ...(sourceMeters !== undefined && destMeters !== undefined
-        ? { totalWalkMeters: sourceMeters + destMeters }
+      ...(sourceMeters !== undefined && destMeters !== undefined && transferMetersKnown
+        ? { totalWalkMeters: sourceMeters + destMeters + transferMeters }
         : {}),
     });
   }
@@ -76,7 +82,12 @@ export function rankResults(
       sorted.sort((a, b) => a.transfers - b.transfers || a.totalSecs - b.totalSecs);
       break;
     case "least_walking":
-      sorted.sort((a, b) => a.totalWalkSecs - b.totalWalkSecs || a.totalSecs - b.totalSecs);
+      // One consistent metric across the set; never mix metres with seconds.
+      if (sorted.every(result => result.totalWalkMeters !== undefined)) {
+        sorted.sort((a, b) => a.totalWalkMeters! - b.totalWalkMeters! || a.totalSecs - b.totalSecs);
+      } else {
+        sorted.sort((a, b) => a.totalWalkSecs - b.totalWalkSecs || a.totalSecs - b.totalSecs);
+      }
       break;
   }
 

@@ -1,3 +1,5 @@
+import { directWalkCandidate } from "../../src/services/directWalkCandidate.ts";
+import { decodePolyline } from "../../src/utils/polyline.ts";
 import { describe, it, expect, beforeEach } from "vitest";
 import { convertRaptorResults } from "../../src/pages/Search.tsx";
 import { db } from "../../src/db/index.ts";
@@ -120,4 +122,18 @@ describe("convertRaptorResults — walking distance", () => {
     const [it] = await convert([composed({})]);
     expect(it.walkingDistanceMeters).toBe(375);
   });
+});
+
+
+it("converts a routed direct walk without fabricated stop locations", async () => {
+ const origin={lat:54.68,lon:25.28}, destination={lat:54.68,lon:25.2801};
+ const route={distanceMeters:15,coords:[[25.28,54.68],[25.2801,54.68]] as [number,number][],steps:[]};
+ const candidate=directWalkCandidate(origin,destination,route,28800,1.5)!;
+ const [result]=await convertRaptorResults([candidate],new Date(2026,2,30,8),origin,destination,undefined,20260330,labels);
+ expect(result.legs).toHaveLength(1);
+ expect(result.legs[0].mode).toBe("WALK");
+ expect(result.legs[0].from.location).toEqual(origin);
+ expect(result.legs[0].to.location).toEqual(destination);
+ expect(result.walkingDistanceMeters).toBe(15);
+ expect(decodePolyline(result.legs[0].polyline!)).toEqual([origin,destination]);
 });

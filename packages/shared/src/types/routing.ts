@@ -28,6 +28,8 @@ export interface RaptorQuery {
 }
 
 export interface RaptorWalkLeg {
+  /** Physical routed distance, when supplied; duration may include a transfer floor. */
+  distanceMeters?: number;
   type: "walk";
   fromStopId: string;
   toStopId: string;

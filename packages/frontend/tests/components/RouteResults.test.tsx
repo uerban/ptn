@@ -607,3 +607,15 @@ describe("RouteResults — appearance shortcut placement", () => {
     expect(screen.queryByRole("link", { name: /appearance/i })).toBeNull();
   });
 });
+
+it("renders and selects a walk-only candidate", () => {
+ const itinerary=makeItinerary({legs:[{
+  mode:"WALK",from:{name:"Origin",location:{lat:54.68,lon:25.28}},
+  to:{name:"Destination",location:{lat:54.68,lon:25.2801}},
+  departureTime:"2026-03-03T10:00:00Z",arrivalTime:"2026-03-03T10:00:10Z",durationSeconds:10,distanceMeters:15,
+ }],durationSeconds:10,walkingDistanceMeters:15});
+ const onSelect=vi.fn();
+ render(<BrowserRouter><RouteResults itineraries={[itinerary]} onSelect={onSelect}/></BrowserRouter>);
+ fireEvent.click(screen.getByTestId("itinerary-card"));
+ expect(onSelect).toHaveBeenCalledWith(itinerary);
+});

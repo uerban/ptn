@@ -1,3 +1,4 @@
+import { serviceDayFrame } from "./serviceDayFrame.ts";
 /**
  * Route endpoint seam invariant.
  *
@@ -11,6 +12,8 @@
  * (coarsening, snap, fallback-redaction) is applied at the store
  * boundary before coordinates reach this file.
  */
+import { directWalkCandidate } from "./directWalkCandidate.ts";
+import type { WalkRoute } from "./walkGraphClient.ts";
 import type { LatLon, RaptorQuery, RankingCriteria, MobilityProfile, RoutingPreference, TransportMode, PlanRequest, RaptorItinerary } from "@pt/shared";
 import {
   DEFAULT_WALK_SPEED_MPS,
@@ -63,6 +66,8 @@ export interface SearchConfig {
   fallbackRadiusMeters?: number;
   maxResults?: number;
   backendAssist?: BackendAssistConfig;
+  /** Local pedestrian route evidence; null means no usable path. */
+  directWalkRoute?: (origin: LatLon, destination: LatLon) => Promise<WalkRoute | null>;
   /**
  * Strategy for the stop-anchored plan step. Default: on-device `planOnDevice` (`pt-wasm`). A
  * remote planner (pt-serve via gateRemoteRouting) is injected ONLY for the consented "search on
@@ -128,7 +133,7 @@ export interface EndpointStops {
  * 7. Rank and return top results
  */
 export class SearchOrchestrator {
-  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds">;
+  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute">;
 
   constructor(config: SearchConfig) {
     this.config = {
@@ -255,6 +260,16 @@ export class SearchOrchestrator {
     // 0. Lazy OSRM init.
     await this.awaitOsrm();
 
+    const { entryStops, exitStops } = await this.findEndpointStops(query);
+    const pedestrianRoute = this.config.directWalkRoute
+      ? await this.config.directWalkRoute(query.origin, query.destination) : null;
+    if (entryStops.length === 0 || exitStops.length === 0) {
+      const frame = serviceDayFrame(Math.floor(query.departureTime.getTime() / 1000), this.config.feedTz);
+      const direct = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
+        frame.nowSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
+      return direct ? [direct].slice(0, maxResults) : [];
+    }
+
     // 1. Resolve the departure into the engine's service-day frame. The engine
     // plans in GTFS `Time` against the bundle's own service-day origins, so a
     // DST date keeps every departure; wall-clock seconds would be an hour off.
@@ -264,10 +279,10 @@ export class SearchOrchestrator {
     const { serviceDate, departureSecs } = await this.resolveDeparture(query.departureTime, feedTz);
     const activeServiceIds = resolveActiveServices(raptorIndex.services, query.departureTime, feedTz);
 
-    // 2. Find reachable entry/exit stops.
-    const { entryStops, exitStops } = await this.findEndpointStops(query);
-
-    if (entryStops.length === 0 || exitStops.length === 0) return [];
+    const walking = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
+      departureSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
+    const finish = (transit: RtComposedItinerary[]): RtComposedItinerary[] =>
+      rankResults(walking ? [...transit, walking] : transit, query.ranking).slice(0, maxResults);
 
     // 3. Build RAPTOR query (departureSecs hoisted above for the empty-services guard)
     const minTransferSecs = minTransferSecsFor(this.config.mobilityProfile);
@@ -316,7 +331,7 @@ export class SearchOrchestrator {
     // source ). The `backendAssist.plan` transport is kept in `SearchConfig`
     // for a later stage that re-introduces it behind explicit user consent, but
     // it is never invoked silently here.
-    if (raptorResults.length === 0) return [];
+    if (raptorResults.length === 0) return finish([]);
 
     // 5. Compose with walk times
     const composed = composeItineraries(raptorResults, entryWalks, exitWalks, departureSecs);
@@ -325,7 +340,7 @@ export class SearchOrchestrator {
     const withRt = applyRtOverlay(composed, getDelay, minTransferSecs);
 
     // 7. Rank and limit
-    const ranked = rankResults(withRt, query.ranking);
+    const ranked = finish(withRt);
     performance.mark("ptn:search-end");
     performance.measure("ptn:search", "ptn:search-start", "ptn:search-end");
     return ranked.slice(0, maxResults);

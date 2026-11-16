@@ -233,3 +233,16 @@ describe("RT integration", () => {
     expect(setModeSpy).toHaveBeenCalledWith("transfer");
   });
 });
+
+it("starts a walk-only itinerary without subscribing a transit route", () => {
+ useGuidanceStore.getState().reset();
+ parkRtPolling();
+ const subscribe=vi.spyOn(useRtStore.getState(),"subscribeRoutes");
+ try {
+  const itinerary={...mockItinerary,legs:[mockItinerary.legs[0]],transfers:0};
+  useGuidanceStore.getState().startNavigation(itinerary);
+  expect(useGuidanceStore.getState().phase).toBe("navigating");
+  expect(useGuidanceStore.getState().legStatuses).toEqual(["current"]);
+  expect(subscribe).not.toHaveBeenCalled();
+ } finally {subscribe.mockRestore();useGuidanceStore.getState().reset();}
+});
