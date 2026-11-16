@@ -199,3 +199,33 @@ test("planner failure is retained as error and never empty success", () => {
   assert.equal(record.completion, "error");
   assert.throws(() => replayBaseline(store, "failed", join(tempDir, "failed-restored")), /Unsupported/);
 });
+
+for (const [id, stage, source] of [
+  ["module", "module import", 'throw new Error("fixture module failure");'],
+  ["wasm", "wasm initialization", 'export function initSync(){throw new Error("fixture wasm failure");} export class PtRouter {}'],
+  ["router", "router initialization", 'export function initSync(){} export class PtRouter {constructor(){throw new Error("fixture router failure");}}'],
+  ["contract", "artifact contract", 'export function initSync(){} export class PtRouter {temporalDirectObjective(){return "r3";} free(){throw new Error("fixture cleanup failure");}}'],
+  ["cleanup", "router cleanup", 'export function initSync(){} export class PtRouter {plan(){return [];} free(){throw new Error("fixture cleanup failure");}}'],
+]) {
+  test(`${stage} failure retains available inputs and is not empty success`, () => {
+    const fakePkg = join(tempDir, `${id}-failure.mjs`);
+    writeFileSync(fakePkg, source);
+    writeFileSync(join(tempDir, "pt_wasm_bg.wasm"), "fixture");
+    const store = join(tempDir, `${id}-captures`);
+    const result = runBaseline(tuplesPath, "plan", ["--capture-store", store, "--run-id", "failure"], fakePkg);
+    assert.equal(result.status, 1, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.completion, "error");
+    assert.equal(report.error.stage, stage);
+    assert.equal(report.error.tupleIndex, undefined);
+    if (stage !== "router cleanup") assert.deepEqual(report.tuples, []);
+    if (stage === "module import" || stage === "wasm initialization") assert.equal(report.initialization.wasmMs, null);
+    if (stage === "router initialization") assert.equal(report.initialization.routerMs, null);
+    if (stage === "artifact contract") assert.equal(report.error.cleanupError, "fixture cleanup failure");
+    const record = JSON.parse(readFileSync(join(store, "runs", "failure.json")));
+    assert.equal(record.completion, "error");
+    assert.equal(record.artifacts.glue, sha256(Buffer.from(source)));
+    assert.equal(record.artifacts.ptb, tinyPtbSha256);
+    assert.equal(record.report.error.stage, stage);
+  });
+}

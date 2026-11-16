@@ -282,58 +282,68 @@ async function main() {
     glue: artifactMetrics(options.pkgPath, glueBytes),
   };
 
-  // The dynamic import is intentionally a file URL so absolute paths with
-  // spaces and paths outside this checkout behave exactly like a built package.
-  const pkg = await import(pathToFileURL(options.pkgPath).href);
-  if (typeof pkg.initSync !== "function") {
-    fail(`--pkg does not export initSync; expected a wasm-pack --target web package: ${options.pkgPath}`);
-  }
-  if (typeof pkg.PtRouter !== "function") {
-    fail(`--pkg does not export PtRouter: ${options.pkgPath}`);
-  }
-
-  const wasmInitStartedAt = performance.now();
-  pkg.initSync({ module: wasmBytes });
-  const wasmInitMs = performance.now() - wasmInitStartedAt;
-
-  const routerInitStartedAt = performance.now();
-  const router = new pkg.PtRouter(ptbBytes, options.patternMode);
-  const routerInitMs = performance.now() - routerInitStartedAt;
-  const artifactObjective = typeof router.temporalDirectObjective === "function"
-    ? router.temporalDirectObjective()
-    : null;
-  if (options.objective === "plan" && artifactObjective !== null) {
-    router.free();
-    fail(
-      `--objective plan requires a production pt-wasm artifact, got temporal-direct ${artifactObjective}`,
-    );
-  }
-  if (options.objective !== "plan" && typeof router.planTemporalDirect !== "function") {
-    router.free();
-    fail(`--objective ${options.objective} requires a temporal-direct pt-wasm package`);
-  }
-  if (options.objective !== "plan") {
-    if (artifactObjective !== options.objective) {
-      router.free();
-      fail(
-        `--objective ${options.objective} does not match temporal-direct artifact ` +
-          `${artifactObjective ?? "without objective metadata"}`,
-      );
-    }
-  }
-
   const tuples = [];
   let completion = "success";
   let planningError;
+  let router;
+  let wasmInitMs = null;
+  let routerInitMs = null;
+  let stage = "module import";
   try {
+    // The dynamic import is intentionally a file URL so absolute paths with
+    // spaces and paths outside this checkout behave exactly like a built package.
+    const pkg = await import(pathToFileURL(options.pkgPath).href);
+    if (typeof pkg.initSync !== "function") {
+      fail(`--pkg does not export initSync; expected a wasm-pack --target web package: ${options.pkgPath}`);
+    }
+    if (typeof pkg.PtRouter !== "function") {
+      fail(`--pkg does not export PtRouter: ${options.pkgPath}`);
+    }
+
+    stage = "wasm initialization";
+    const wasmInitStartedAt = performance.now();
+    pkg.initSync({ module: wasmBytes });
+    wasmInitMs = performance.now() - wasmInitStartedAt;
+
+    stage = "router initialization";
+    const routerInitStartedAt = performance.now();
+    router = new pkg.PtRouter(ptbBytes, options.patternMode);
+    routerInitMs = performance.now() - routerInitStartedAt;
+    stage = "artifact contract";
+    const artifactObjective = typeof router.temporalDirectObjective === "function"
+      ? router.temporalDirectObjective()
+      : null;
+    if (options.objective === "plan" && artifactObjective !== null) {
+      fail(
+        `--objective plan requires a production pt-wasm artifact, got temporal-direct ${artifactObjective}`,
+      );
+    }
+    if (options.objective !== "plan" && typeof router.planTemporalDirect !== "function") {
+      fail(`--objective ${options.objective} requires a temporal-direct pt-wasm package`);
+    }
+    if (options.objective !== "plan") {
+      if (artifactObjective !== options.objective) {
+        fail(
+          `--objective ${options.objective} does not match temporal-direct artifact ` +
+            `${artifactObjective ?? "without objective metadata"}`,
+        );
+      }
+    }
+
+    stage = "planning";
     for (const [index, tuple] of manifest.tuples.entries()) {
       tuples.push(benchmarkTuple(router, tuple, index, options));
     }
   } catch (error) {
     completion = "error";
-    planningError = { tupleIndex: tuples.length, message: error.message };
+    planningError = { stage, ...(stage === "planning" ? { tupleIndex: tuples.length } : {}), message: error.message };
   } finally {
-    router.free();
+    try { router?.free(); }
+    catch (error) {
+      completion = "error";
+      if (planningError) planningError.cleanupError = error.message;
+      else planningError = { stage: "router cleanup", message: error.message };
+    }
   }
 
   const report = {
@@ -360,7 +370,7 @@ async function main() {
       initialization: {
         wasmMs: wasmInitMs,
         routerMs: routerInitMs,
-        totalMs: wasmInitMs + routerInitMs,
+        totalMs: wasmInitMs !== null && routerInitMs !== null ? wasmInitMs + routerInitMs : null,
       },
       percentileMethod: "nearest-rank",
       tuples,
@@ -377,14 +387,17 @@ async function main() {
       scope: "stop-level compiled engine",
       replayVerification: "unverified",
       missingDependencies: ["source GTFS and producer provenance"],
-      unsupported: ["frontend geometry", "real-time composition", "feed rebuild"],
+      unsupported: ["frontend geometry", "real-time composition", "feed rebuild", "input-read failures", "process termination/timeouts"],
       completion,
       artifacts,
       report,
     });
   }
   console.log(JSON.stringify(report));
-  if (completion !== "success") process.exitCode = 1;
+  if (completion !== "success") {
+    console.error(`temporal-baseline: ${planningError.stage}: ${planningError.message}`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {
