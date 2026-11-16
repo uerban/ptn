@@ -1,4 +1,4 @@
-import type { ComposedItinerary, RaptorLeg } from "@pt/shared";
+import type { ComposedItinerary, RaptorLeg, RaptorTransitLeg } from "@pt/shared";
 import { RAPTOR_MIN_TRANSFER_SECS } from "@pt/shared/constants";
 // Single source of truth for the freshness window — shared with the
 // dashboard's `getNextDeparture` so the two paths agree about staleness.
@@ -62,6 +62,7 @@ export function applyRtOverlay(
   getDelay: DelayLookup,
   /** The rider's minimum transfer (`minTransferSecsFor`), as the engine used. */
   minTransferSecs: number = RAPTOR_MIN_TRANSFER_SECS,
+  transferFloor?: (from: RaptorTransitLeg, to: RaptorTransitLeg) => number | null,
 ): RtComposedItinerary[] {
   // Cache once per overlay invocation; per-leg recomputation in the loop
   // would issue a syscall on every leg of every itinerary.
@@ -120,7 +121,8 @@ export function applyRtOverlay(
       const current = shiftedLegs[i];
       const next = shiftedLegs[i + 1];
       if (current.type !== "transit" || next.type !== "transit") continue;
-      if (next.departSecs < current.arriveSecs + minTransferSecs) {
+      const floor = transferFloor ? transferFloor(current, next) : minTransferSecs;
+      if (floor === null || next.departSecs < current.arriveSecs + floor) {
         brokenByDelay = true;
         break;
       }

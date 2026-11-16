@@ -1,3 +1,5 @@
+import { effectiveTransferFloor } from "./effectiveTransferRule.ts";
+import type { RaptorTransitLeg } from "@pt/shared";
 import { feasibleRtCandidates } from "./rtFeasibility.ts";
 import { optionalPedestrianRoute } from "./pedestrianEvidence.ts";
 import { transferWalkEvidence } from "./transferWalkEvidence.ts";
@@ -344,10 +346,11 @@ export class SearchOrchestrator {
     const composed = composeItineraries(evidenced, entryWalks, exitWalks, departureSecs);
 
     // 6. Apply RT overlay
-    const withRt = applyRtOverlay(composed, getDelay, minTransferSecs);
+    const floorFor = (from: RaptorTransitLeg, to: RaptorTransitLeg) => effectiveTransferFloor(raptorIndex, from, to, minTransferSecs);
+    const withRt = applyRtOverlay(composed, getDelay, minTransferSecs, floorFor);
 
     // 7. Rank and limit
-    const ranked = finish(feasibleRtCandidates(withRt));
+    const ranked = finish(feasibleRtCandidates(withRt, floorFor));
     performance.mark("ptn:search-end");
     performance.measure("ptn:search", "ptn:search-start", "ptn:search-end");
     return ranked.slice(0, maxResults);
