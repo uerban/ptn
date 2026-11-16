@@ -1,3 +1,4 @@
+import { feasibleRtCandidates } from "./rtFeasibility.ts";
 import { optionalPedestrianRoute } from "./pedestrianEvidence.ts";
 import { transferWalkEvidence } from "./transferWalkEvidence.ts";
 import { serviceDayFrame } from "./serviceDayFrame.ts";
@@ -346,7 +347,7 @@ export class SearchOrchestrator {
     const withRt = applyRtOverlay(composed, getDelay, minTransferSecs);
 
     // 7. Rank and limit
-    const ranked = finish(withRt);
+    const ranked = finish(feasibleRtCandidates(withRt));
     performance.mark("ptn:search-end");
     performance.measure("ptn:search", "ptn:search-start", "ptn:search-end");
     return ranked.slice(0, maxResults);
