@@ -11,7 +11,16 @@ export function restoreBaseline(store, runId, destination) {
   const record = JSON.parse(readFileSync(join(store, "runs", `${runId}.json`)));
   if (record.schemaVersion !== 1 || record.completion !== "success") throw new Error("Unsupported run manifest");
   const names = { ptb: "bundle.ptb", queryTuples: "queries.json", glue: "pt_wasm.mjs", wasm: "pt_wasm_bg.wasm" };
-  const bytes = Object.fromEntries(Object.keys(names).map(name => [name, readArtifact(store, record.artifacts[name])]));
+  // Verify the entire declared snapshot, including retained source/provenance
+  // inputs that the narrower engine replay does not itself execute.
+  const bytes = {};
+  for (const [name, digest] of Object.entries(record.artifacts)) {
+    const value = readArtifact(store, digest);
+    if (Object.hasOwn(names, name)) bytes[name] = value;
+  }
+  for (const name of Object.keys(names)) {
+    if (!bytes[name]) throw new Error(`Missing required replay artifact: ${name}`);
+  }
   // A fresh directory prevents overwriting any previous restore evidence.
   mkdirSync(destination);
   for (const [name, filename] of Object.entries(names)) writeFileSync(join(destination, filename), bytes[name], { flag: "wx" });
