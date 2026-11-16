@@ -114,6 +114,12 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     set({ loading: true, error: null, engineError: null, engineFailureKind: null, results: [] });
 
     const releaseWalkGraph = walkGraphClient.retainForSearch();
+    let pedestrianGeneration: number | undefined;
+    const assertPedestrianCurrent = () => {
+      if (pedestrianGeneration !== undefined && pedestrianGeneration !== walkGraphClient.getGeneration()) {
+        throw new StaleWasmInitError();
+      }
+    };
     try {
       const allStops = await data.gtfsStops.toArray();
       const backendAssist = get().backendAssist;
@@ -145,7 +151,16 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         raptorIndex,
         cityId: useCityStore.getState().activeCity.id,
         allStops,
-        directWalkRoute: (from, to) => walkGraphClient.routeFor(searchCityId, from, to, walkProfileFor(mobilityProfile)),
+        directWalkRoute: async (from, to) => {
+          assertPedestrianCurrent();
+          const route = await walkGraphClient.routeFor(searchCityId, from, to, walkProfileFor(mobilityProfile));
+          assertPedestrianCurrent();
+          if (route) {
+            pedestrianGeneration ??= walkGraphClient.getRouteGeneration(route) ?? walkGraphClient.getGeneration();
+            assertPedestrianCurrent();
+          }
+          return route;
+        },
         getDelay: (tripId: string) => {
           // Stitch the trip delay together with its `receivedAt` stamp so
           // `applyRtOverlay`'s 120s freshness guard can drop stale entries.
@@ -204,6 +219,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       });
 
       data.assertCurrent();
+      assertPedestrianCurrent();
       set({ results: itineraries, loading: false,
         error: itineraries.length === 0 && (originStops.length === 0 || destStops.length === 0)
           ? "No transit stops within walking distance of origin or destination, and no pedestrian route available."

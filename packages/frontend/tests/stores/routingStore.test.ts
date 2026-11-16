@@ -201,3 +201,34 @@ it("retains a pedestrian result when origin has no reachable stops", async () =>
   expect(useRoutingStore.getState().error).toBeNull();
  } finally {search.mockRestore();graph.mockRestore();}
 });
+
+it("does not publish pedestrian evidence invalidated before search completes", async () => {
+  const {useGtfsDataStore} = await import("../../src/stores/gtfsDataStore.ts");
+  await useGtfsDataStore.getState().init("vilnius");
+  const {useRoutingStore} = await import("../../src/stores/routingStore.ts");
+  const {SearchOrchestrator} = await import("../../src/services/searchOrchestrator.ts");
+  const {walkGraphClient} = await import("../../src/services/walkGraphClient.ts");
+  const {StaleWasmInitError} = await import("../../src/services/raptorWasm.ts");
+  const {api} = await import("../../src/services/api.ts");
+  vi.mocked(api.plan).mockClear();
+  const graph = vi.spyOn(walkGraphClient, "routeFor").mockResolvedValue({
+    distanceMeters: 15, coords: [[0, 0], [0.0001, 0]], steps: [],
+  });
+  const search = vi.spyOn(SearchOrchestrator.prototype, "search").mockImplementation(async () => {
+    walkGraphClient.destroy();
+    return [];
+  });
+  try {
+    await expect(useRoutingStore.getState().search(
+      {kind: "mappoint", lat: 0, lon: 0}, {kind: "mappoint", lat: 0, lon: 0.0001},
+      new Date("2026-04-13T08:00:00Z"),
+    )).rejects.toBeInstanceOf(StaleWasmInitError);
+    expect(useRoutingStore.getState().results).toEqual([]);
+    expect(useRoutingStore.getState().loading).toBe(false);
+    expect(useRoutingStore.getState().error).toBeNull();
+    expect(api.plan).not.toHaveBeenCalled();
+  } finally {
+    graph.mockRestore();
+    search.mockRestore();
+  }
+});

@@ -301,6 +301,8 @@ export class WalkGraphClient {
   private port: WalkGraphPort | null = null;
   private guidanceActive = false;
   private activeSearches = 0;
+  private generation = 0;
+  private readonly routeGenerations = new WeakMap<WalkRoute, number>();
   /** The city the graph host holds, as of its last reply. */
   private loadedCity: string | null = null;
   private loading: { cityId: string; promise: Promise<WalkGraphLoadStatus> } | null = null;
@@ -322,7 +324,7 @@ export class WalkGraphClient {
     this.port ??= "createWorker" in this.deps
       ? workerPort(
         this.deps.createWorker,
-        () => { this.loadedCity = null; },
+        () => { this.loadedCity = null; this.generation++; },
         this.deps.timers ?? {
           set: (fn, ms) => setTimeout(fn, ms),
           clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
@@ -359,6 +361,15 @@ export class WalkGraphClient {
     return this.activeSearches > 0;
   }
 
+  /** Changes whenever previously returned pedestrian evidence is invalidated. */
+  getGeneration(): number {
+    return this.generation;
+  }
+
+  getRouteGeneration(route: WalkRoute): number | undefined {
+    return this.routeGenerations.get(route);
+  }
+
   isReady(cityId: string): boolean {
     return this.loadedCity === cityId;
   }
@@ -383,9 +394,12 @@ export class WalkGraphClient {
     // before this one loads, so switching back from tricity to vilnius does
     // not keep tricity's peak.
     if (this.loadedCity !== null) {
+      this.generation++;
       port.reset();
       this.loadedCity = null;
     }
+    if (this.loading && this.loading.cityId !== cityId) this.generation++;
+    const generation = this.generation;
     const promise = port
       .request({ op: "load", cityId })
       .then(
@@ -401,6 +415,9 @@ export class WalkGraphClient {
       .then((reply) => {
         // destroy() ran meanwhile: whatever this answered is gone with it.
         if (this.port !== port) return "superseded" as const;
+        if (this.generation !== generation) {
+          return reply.status === "transient" ? this.settle(cityId, reply) : "superseded" as const;
+        }
         this.loadedCity = reply.loadedCity;
         return this.settle(cityId, reply);
       })
@@ -442,13 +459,15 @@ export class WalkGraphClient {
     cityId: string, from: LatLon, to: LatLon, profile: WalkProfile,
   ): Promise<{ route: WalkRoute | null; stale: boolean }> {
     const port = this.connect();
+    const generation = this.generation;
     const reply = (await port.request({ op: "route", cityId, from, to, profile })) as RouteReply;
-    if (this.port !== port) return { route: null, stale: true };
+    if (this.port !== port || this.generation !== generation) return { route: null, stale: true };
     this.loadedCity = reply.loadedCity;
     if (reply.error) {
       this.reportRouteFailure(new Error(reply.error), cityId);
       this.recycle();
     }
+    if (reply.route) this.routeGenerations.set(reply.route, generation);
     return { route: reply.route, stale: reply.loadedCity !== cityId };
   }
 
@@ -458,6 +477,7 @@ export class WalkGraphClient {
    *  other requests still pending are superseded; the failing one has already
    *  been answered. A `bad` city is remembered, so this does not loop. */
   private recycle(): void {
+    this.generation++;
     this.port?.reset();
     this.loadedCity = null;
   }
@@ -498,13 +518,16 @@ export class WalkGraphClient {
       throw new WalkGraphUnavailableError(cityId, "transient"); // the worker died
     }
     // Another city replaced this one between the load and the route.
-    if (result.stale) throw new WalkGraphUnavailableError(cityId, "superseded");
+    if (result.stale || (result.route && this.routeGenerations.get(result.route) !== this.generation)) {
+      throw new WalkGraphUnavailableError(cityId, "superseded");
+    }
     return result.route;
   }
 
   /** Drop the graph and forget missing cities. With a worker, terminates it:
    *  the only way to return its wasm heap. The next call starts a new one. */
   destroy(): void {
+    this.generation++;
     this.port?.dispose();
     this.port = null;
     this.loading = null;

@@ -493,6 +493,20 @@ describe("walkGraphClient over a worker", () => {
     expect(FakeWalkWorker.instances).toHaveLength(2);
   });
 
+  it("stamps route evidence before a reset and changes generation on worker failure", async () => {
+    const {client} = workerClient();
+    const route = (await client.routeFor("vilnius", A, B, "default"))!;
+    const generation = client.getRouteGeneration(route);
+    expect(generation).toBe(client.getGeneration());
+    FakeWalkWorker.instances[0]!.crash("graph worker died between queries");
+    expect(client.getGeneration()).not.toBe(generation);
+    expect(client.getRouteGeneration(route)).toBe(generation);
+    const next = (await client.routeFor("vilnius", A, B, "default"))!;
+    expect(client.getRouteGeneration(next)).toBe(client.getGeneration());
+    client.destroy();
+    expect(client.getGeneration()).not.toBe(client.getRouteGeneration(next));
+  });
+
   it("a load cut off by destroy is superseded, not missing", async () => {
     const { client } = workerClient();
     const pending = client.loadCity("vilnius");
