@@ -43,7 +43,9 @@ export function diffBaselines(before, after) {
   }
   const runtime = run => {
     const value = run.report.runtime;
-    return value && { node: value.node, v8: value.v8, platform: value.platform, arch: value.arch, release: value.release };
+    const fields = ["node", "v8", "platform", "arch", "release"];
+    if (!value || !fields.every(field => typeof value[field] === "string" && value[field].trim().length > 0)) return null;
+    return Object.fromEntries(fields.map(field => [field, value[field]]));
   };
   if (!runtime(before) || !runtime(after)
       || !isDeepStrictEqual(runtime(before), runtime(after))) {

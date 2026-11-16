@@ -36,3 +36,15 @@ test("reports field paths and rejects runtime-confounded comparisons", () => {
  delete after.report.runtime;
  assert.equal(diffBaselines(before, after).status, "incomparable");
 });
+
+test("equally incomplete runtime records cannot establish comparable captures", () => {
+ for (const field of ["node", "v8", "platform", "arch", "release"]) {
+  for (const value of [undefined, null, "", "  ", 123]) {
+   const before = run([]), after = run([]);
+   before.report.runtime[field] = value;
+   after.report.runtime[field] = value;
+   assert.equal(diffBaselines(before, after).reason, "missing or mismatched runtime", `${field}: ${value}`);
+  }
+ }
+ assert.equal(diffBaselines(run([]), run([])).status, "unchanged");
+});
