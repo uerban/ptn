@@ -232,3 +232,27 @@ it("does not publish pedestrian evidence invalidated before search completes", a
     search.mockRestore();
   }
 });
+
+it.each([
+  {run:false,profile:"default" as const,planned:false},
+  {run:true,profile:"default" as const,planned:true},
+  {run:true,profile:"wheelchair" as const,planned:false},
+])("preflight respects run=$run and profile=$profile",async({run,profile,planned})=>{
+  const {useGtfsDataStore}=await import("../../src/stores/gtfsDataStore.ts");
+  await useGtfsDataStore.getState().init("vilnius");
+  const {useRoutingStore}=await import("../../src/stores/routingStore.ts");
+  const {useSettingsStore}=await import("../../src/stores/settingsStore.ts");
+  const {SearchOrchestrator}=await import("../../src/services/searchOrchestrator.ts");
+  const {walkGraphClient}=await import("../../src/services/walkGraphClient.ts");
+  const settings=useSettingsStore.getState();
+  const graph=vi.spyOn(walkGraphClient,"routeFor").mockResolvedValue(null);
+  const search=vi.spyOn(SearchOrchestrator.prototype,"search").mockResolvedValue([]);
+  try {
+    useSettingsStore.setState({runToCatch:run,mobilityProfile:profile,walkSpeedMps:1.25,maxWalkSecs:200});
+    await useRoutingStore.getState().search(
+      {kind:"mappoint",lat:54.6764,lon:25.28}, {kind:"mappoint",lat:54.69,lon:25.28},
+      new Date("2026-04-13T08:00:00Z"),
+    );
+    expect(search.mock.calls.length>0).toBe(planned);
+  } finally {useSettingsStore.setState(settings);search.mockRestore();graph.mockRestore();}
+});

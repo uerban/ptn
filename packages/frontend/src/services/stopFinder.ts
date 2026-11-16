@@ -1,5 +1,6 @@
 import type { LatLon } from "@pt/shared";
 import { DEFAULT_WALK_SPEED_MPS } from "@pt/shared/constants";
+import {runSpeedMps} from "@pt/shared/routing";
 
 interface StopLocation {
   id: string;
@@ -150,5 +151,29 @@ export function findStopsInRadius(
   }
 
   results.sort((a, b) => a.walkSecs - b.walkSecs);
+  return results;
+}
+
+/** Shared radius fallback/preflight calculation. The caller supplies the
+ * mobility-adjusted pace and disables running for profiles that cannot run. */
+export function findStopsInWalkingBudget(
+  origin: LatLon, stops: StopLocation[],
+  budget: {radiusMeters: number; maxWalkSecs: number; walkSpeedMps: number; runToCatch?: boolean},
+  options?: FindStopsOptions,
+): ReachableStop[] {
+  const {radiusMeters, maxWalkSecs, walkSpeedMps} = budget;
+  const withinTimeBudget = (stop: ReachableStop) => Number.isFinite(stop.walkSecs)
+    && stop.walkSecs >= 0 && stop.walkSecs <= maxWalkSecs;
+  const results = findStopsInRadius(origin, stops, radiusMeters, walkSpeedMps, options).filter(withinTimeBudget);
+  if (budget.runToCatch) {
+    const runSpeed = runSpeedMps(walkSpeedMps);
+    const runRadius = Math.round(radiusMeters * runSpeed / walkSpeedMps);
+    const running = findStopsInRadius(origin, stops, runRadius, runSpeed, options).filter(withinTimeBudget);
+    const walkIds = new Set(results.map(stop => stop.stopId));
+    for (const stop of running) {
+      if (!walkIds.has(stop.stopId)) results.push({...stop, runToCatch: true});
+    }
+    results.sort((a, b) => a.walkSecs - b.walkSecs);
+  }
   return results;
 }

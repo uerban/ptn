@@ -1,9 +1,12 @@
-import type { BaseEndpoint } from "@pt/shared";
-import { findStopsInRadius, type OsmTransferLookup, type ReachableStop } from "./stopFinder.ts";
+import type { BaseEndpoint, MobilityProfile } from "@pt/shared";
+import {riderWalkSpeedMps} from "@pt/shared/routing";
+import { findStopsInWalkingBudget, type OsmTransferLookup, type ReachableStop } from "./stopFinder.ts";
 
 export interface ResolveOptions {
   maxWalkSecs: number;
   walkSpeedMps: number;
+  mobilityProfile?: MobilityProfile;
+  runToCatch?: boolean;
   /**
    * Pre-computed pedestrian transfer table. When provided alongside a
    * `stop`-kind endpoint, `findStopsInRadius` uses the table's walk
@@ -45,11 +48,14 @@ export function resolveToEntryStops(
 ): ReachableStop[] {
   const endpointStopId = ep.kind === "stop" ? ep.stopId : undefined;
   const role = opts.role ?? "origin";
-  const nearby = findStopsInRadius(
+  const speed = riderWalkSpeedMps(opts.mobilityProfile ?? "default", opts.walkSpeedMps);
+  const nearby = findStopsInWalkingBudget(
     { lat: ep.lat, lon: ep.lon },
     stops,
-    opts.maxWalkSecs * opts.walkSpeedMps,
-    opts.walkSpeedMps,
+    {
+      radiusMeters: opts.maxWalkSecs * speed, maxWalkSecs: opts.maxWalkSecs,
+      walkSpeedMps: speed, runToCatch: opts.runToCatch && opts.mobilityProfile !== "wheelchair",
+    },
     {
       originStopId: role === "origin" ? endpointStopId : undefined,
       destStopId: role === "destination" ? endpointStopId : undefined,

@@ -139,7 +139,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       // / redaction at this boundary. Empty stop resolution does not rule out
       // a routed direct pedestrian journey.
       const osmLookup = makeOsmTransferLookup(raptorIndex.footTransfers);
-      const resolveOpts = { maxWalkSecs, walkSpeedMps, osmLookup };
+      const resolveOpts = { maxWalkSecs, walkSpeedMps, osmLookup, mobilityProfile, runToCatch };
       const originStops = resolveToEntryStops(origin, allStops, resolveOpts);
       const destStops = resolveToEntryStops(destination, allStops, {
         ...resolveOpts,

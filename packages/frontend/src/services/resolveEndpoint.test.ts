@@ -216,3 +216,17 @@ describe("resolveToEntryStops", () => {
     expect(self!.distanceMeters).toBe(0);
   });
 });
+
+test("endpoint preflight preserves physical distance across walking, running and wheelchair pace", () => {
+  const endpoint:BaseEndpoint={kind:"mappoint",lat:stops[0].lat,lon:stops[0].lon};
+  const walking=resolveToEntryStops(endpoint,stops,{walkSpeedMps:1.25,maxWalkSecs:100}).find(s=>s.stopId==="S2")!;
+  const running=resolveToEntryStops(endpoint,stops,{walkSpeedMps:1.25,maxWalkSecs:70,runToCatch:true}).find(s=>s.stopId==="S2")!;
+  const wheelchair=resolveToEntryStops(endpoint,stops,{walkSpeedMps:1.25,maxWalkSecs:200,runToCatch:true,mobilityProfile:"wheelchair"}).find(s=>s.stopId==="S2")!;
+  expect(running.distanceMeters).toBe(walking.distanceMeters);
+  expect(wheelchair.distanceMeters).toBe(walking.distanceMeters);
+  expect(running.walkSecs).toBeLessThan(walking.walkSecs);
+  expect(running.runToCatch).toBe(true);
+  expect(wheelchair.walkSecs).toBeGreaterThan(walking.walkSecs);
+  expect(wheelchair.runToCatch).toBeUndefined();
+  expect(resolveToEntryStops(endpoint,stops,{walkSpeedMps:1.25,maxWalkSecs:70}).some(s=>s.stopId==="S2")).toBe(false);
+});
