@@ -979,20 +979,42 @@ export function SearchPage() {
   // Granting or revoking the operator's address search reruns the suggestions.
   const placeSearchAllowed = useCanUse(PLACE_SEARCH_FLOW);
 
+  // Suggestions depend on the text, not on where the rider is: later GPS fixes
+  // never rerun the search (they arrive every few seconds and refreshed the list
+  // while the text had not changed). The location is only a small ranking hint
+  // (at most +0.1, fading out over 50 km), so movement cannot reorder results
+  // in practice. The one exception is the first fix: results ranked with no
+  // location at all are refreshed once when it arrives.
+  const userLocationRef = useRef(userLocation);
+  userLocationRef.current = userLocation;
+  const hasUserLocation = userLocation != null;
+
+  // A different field means different suggestions: clear them so the old
+  // field's rows never show under the new one.
+  useEffect(() => {
+    setSuggestions([]);
+  }, [activeField]);
+
   // One request identity per field/query/provider. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
+  // The rows on screen stay until the new results replace them, so the list
+  // does not blink empty on every keystroke.
   useEffect(() => {
     if (!activeField) return;
     const controller = new AbortController();
     searchAbortRef.current = controller;
-    setSuggestions([]);
     setSuggestionStatus(activeQuery.trim() ? "searching" : "idle");
     setVisibleSuggestionCount(SUGGESTION_PAGE_SIZE);
+    const location = userLocationRef.current ?? null;
+    let delivered = false;
     const accept = (rows: SearchSuggestion[]) => {
-      if (!controller.signal.aborted) {
-        setSuggestions(rows);
-        if (rows.length > 0) setSuggestionStatus("ready");
-      }
+      if (controller.signal.aborted) return;
+      // An empty interim batch from the stream would blank the list before
+      // the real rows arrive; the final empty answer is applied below.
+      if (rows.length === 0) return;
+      delivered = true;
+      setSuggestions(rows);
+      setSuggestionStatus("ready");
     };
     const timer = setTimeout(() => {
       const mode = resolvePoiFetchMode(cityId);
@@ -1029,7 +1051,7 @@ export function SearchPage() {
           }),
         }) : undefined;
         request = searchSuggestionsStream(
-          activeQuery, cityId, userLocation ?? null, controller.signal, searchProvider,
+          activeQuery, cityId, location, controller.signal, searchProvider,
           {
             onResults: accept,
             driver,
@@ -1038,10 +1060,12 @@ export function SearchPage() {
           },
         );
       } else {
-        request = searchSuggestions(activeQuery, cityId, userLocation ?? null, controller.signal, searchProvider).then(accept);
+        request = searchSuggestions(activeQuery, cityId, location, controller.signal, searchProvider).then(accept);
       }
       void request.then(() => {
-        if (!controller.signal.aborted) setSuggestionStatus("ready");
+        if (controller.signal.aborted) return;
+        if (!delivered) setSuggestions([]);
+        setSuggestionStatus("ready");
       }).catch((err) => {
         if (controller.signal.aborted) return;
         console.warn("Search suggestions failed:", err);
@@ -1050,7 +1074,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, userLocation?.lat, userLocation?.lon]);
+  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, hasUserLocation]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
@@ -1078,8 +1102,6 @@ export function SearchPage() {
     if (typedEndpoint) captureRecent(typedEndpoint, field);
     setItineraries([]);
     setLoading(false);
-
-    setSuggestions([]);
     setSuggestionStatus(query.trim() ? "searching" : "idle");
   }
 
@@ -1371,6 +1393,7 @@ export function SearchPage() {
         onEarlier={paginationTime !== null ? handleEarlier : undefined}
         onLater={handleLater}
         onNext={handleNext}
+        departAt={paginationTime}
         origin={fromEndpoint}
         destination={toEndpoint}
         feedTz={feedTz}
@@ -1380,17 +1403,19 @@ export function SearchPage() {
   );
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
-      {/* Search header — stacked from/to inputs with vertical swap button */}
-      <div className="bg-surface-raised p-4 shadow-sm space-y-3">
+    <div className="h-full min-h-0 flex flex-col overflow-y-auto bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
+      {/* Search header — stacked from/to inputs with vertical swap button.
+          Padding stops growing past 16px so the fields keep their width at
+          large text sizes. */}
+      <div className="shrink-0 bg-surface-raised p-[min(1rem,16px)] shadow-sm space-y-3">
         <div className="flex items-start gap-2">
           <button
             onClick={() => activeField ? closePicker() : navigate(-1)}
-            className="p-2 rounded-full hover:bg-surface-overlay mt-1"
+            className="shrink-0 p-2 rounded-full hover:bg-surface-overlay mt-1"
             aria-label={t("search.back", "Back")}
           >
             <svg
-              className="w-5 h-5 text-fg-secondary"
+              className="w-[min(1.25rem,28px)] h-[min(1.25rem,28px)] text-fg-secondary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1404,8 +1429,8 @@ export function SearchPage() {
             </svg>
           </button>
 
-          <div className="flex-1 flex items-stretch gap-2">
-            <div className="flex-1 space-y-2 search-picker-fields">
+          <div className="min-w-0 flex-1 flex items-stretch gap-2">
+            <div className="min-w-0 flex-1 space-y-2 search-picker-fields">
               {/* From field — live GPS pill when empty; text input when typing */}
               {fromIsLiveGps ? (
                 <button
@@ -1442,7 +1467,7 @@ export function SearchPage() {
                   onFocus={() => setActiveField("from")}
                   onKeyDown={handleSearchKeyDown}
                   placeholder={fromUsesGps ? t("search.change_origin_placeholder", "Search another starting point") : t("search.from", "From")}
-                  className="w-full px-3 py-2.5 text-sm rounded-lg border border-divider
+                  className="w-full px-[min(0.75rem,12px)] py-2.5 text-sm rounded-lg border border-divider
                     bg-input-bg text-fg
                     focus:outline-none focus:ring-2 focus:ring-accent"
                 />
@@ -1461,7 +1486,7 @@ export function SearchPage() {
                 onFocus={() => setActiveField("to")}
                 onKeyDown={handleSearchKeyDown}
                 placeholder={t("search.to", "Where to?")}
-                className="w-full px-3 py-2.5 text-sm rounded-lg border border-divider
+                className="w-full px-[min(0.75rem,12px)] py-2.5 text-sm rounded-lg border border-divider
                   bg-input-bg text-fg
                   focus:outline-none focus:ring-2 focus:ring-accent"
               />
@@ -1472,12 +1497,12 @@ export function SearchPage() {
               onClick={() => singleFieldPicker ? openField(activeField === "from" ? "to" : "from") : handleSwap()}
               aria-label={singleFieldPicker ? switchFieldLabel : t("search.swap", "Swap origin and destination")}
               title={singleFieldPicker ? switchFieldLabel : t("search.swap", "Swap origin and destination")}
-              className="w-11 min-h-11 shrink-0 flex flex-col gap-1 items-center justify-center rounded-lg border border-divider
+              className="w-[min(2.75rem,64px)] min-h-11 shrink-0 flex flex-col gap-1 items-center justify-center rounded-lg border border-divider
                 bg-input-bg text-fg-secondary hover:border-accent hover:text-accent
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               {singleFieldPicker ? <>
-                <span className="text-xs font-semibold">{activeField === "from" ? t("search.to_field", "To") : t("search.from", "From")}</span>
+                <span className="max-w-full text-[min(0.75rem,16px)] font-semibold [overflow-wrap:anywhere]">{activeField === "from" ? t("search.to_field", "To") : t("search.from", "From")}</span>
                 <span aria-hidden="true" className="text-sm">⇄</span>
               </> : <svg
                 width="18"
@@ -1588,16 +1613,20 @@ export function SearchPage() {
       </div>}
 
       {/* Search results or route results */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+      {/* At large text sizes the header and toolbar can be taller than the
+          screen. The page then scrolls, and the list keeps at least half of it. */}
+      <div className="flex-1 min-h-[50%] overflow-y-auto overscroll-contain"
         onTouchMove={() => { if (activeField && dismissOnScroll) dismissKeyboard(); }}
         onWheel={() => { if (activeField && dismissOnScroll) dismissKeyboard(); }}
       >
         {activeField ? (
           <div>
-            <div className="flex min-h-11 items-center justify-between gap-2 px-3">
-              <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1 py-1 text-[11px] leading-4 text-fg-muted">
+            {/* Wraps at large text sizes: the actions go under the status line
+                instead of squeezing it to one letter per line. */}
+            <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-2 px-3">
+              <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-[1_1_8rem] py-1 text-[0.6875rem] leading-snug text-fg-muted">
               {suggestionStatus === "error" ? t("search.suggestions_error", "Could not search for places. Try again.")
-                : suggestionStatus === "searching" ? t("search.searching", "Searching…")
+                : suggestionStatus === "searching" && suggestions.length === 0 ? t("search.searching", "Searching…")
                 : suggestions.length > 0 ? t("search.suggestion_count", "{n} place suggestions").replace("{n}", String(suggestions.length))
                 : activeQuery.trim() && suggestionStatus === "ready" ? t("search.no_place_suggestions", "No matching place suggestions")
                 : <span className="sr-only">{t("search.type_place", "Type a stop, address or place")}</span>}
@@ -1658,7 +1687,7 @@ export function SearchPage() {
                     >
                       <span className="text-fg-muted text-lg shrink-0" aria-hidden="true">{icon}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="text-sm text-fg block truncate">{label}</span>
+                        <span className="text-sm text-fg block line-clamp-2 break-words">{label}</span>
                         {/* Badge and subtitle are separate words, not one run —
                             they need a gap or they read as "RECENTPOI". */}
                         {(subtitle ||
@@ -1667,13 +1696,13 @@ export function SearchPage() {
                             {suggestion.kind !== "stopGroup" && suggestion.recent && (
                               <span
                                 data-testid="recent-badge"
-                                className="inline-flex shrink-0 items-center text-[10px] text-fg-muted font-medium uppercase tracking-wide"
+                                className="inline-flex shrink-0 items-center text-[0.625rem] text-fg-muted font-medium uppercase tracking-wide"
                               >
                                 {t("search.recent_badge", "Recent")}
                               </span>
                             )}
                             {subtitle && (
-                              <span className="text-xs text-fg-muted truncate" title={subtitle}>{subtitle}</span>
+                              <span className="text-xs text-fg-muted line-clamp-2 break-words" title={subtitle}>{subtitle}</span>
                             )}
                           </span>
                         )}

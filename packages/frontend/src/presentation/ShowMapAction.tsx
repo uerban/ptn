@@ -58,7 +58,7 @@ export function MapDownloadDisclosure({ onConfirm, onCancel }: DisclosureProps) 
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
-            className="min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold"
+            className="min-h-11 px-4 rounded-lg bg-accent text-badge-text text-sm font-semibold"
           >
             {text("presentation.mapDisclosureConfirm")}
           </button>

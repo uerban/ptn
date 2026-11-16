@@ -21,7 +21,7 @@ const city = (id: string, name: string): CityConfig =>
     bbox: { minLat: 0, minLon: 0, maxLat: 1, maxLon: 1 },
   }) as CityConfig;
 
-const QUICK = "How would you like to plan and explore?";
+const QUICK = "Ready to start";
 const CITY = "Choose your city";
 
 function renderShell(overrides: Partial<SetupShellProps> = {}) {

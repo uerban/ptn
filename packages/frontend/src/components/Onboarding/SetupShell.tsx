@@ -198,6 +198,8 @@ export function SetupShell(props: SetupShellProps) {
       className="min-h-dvh bg-surface px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-fg [&_h1]:outline-none"
     >
       <div className="mx-auto flex max-w-xl flex-col gap-6">
+        {/* Language comes first: everything below is read in it. */}
+        <LanguagePicker />
         {!props.storageAvailable && (
           <p role="status" className="rounded-lg border border-divider bg-surface-raised p-3 text-sm">
             {text("setup.storageUnavailable")}
@@ -245,7 +247,6 @@ export function SetupShell(props: SetupShellProps) {
             />
           </>
         )}
-        <LanguagePicker />
       </div>
     </main>
   );

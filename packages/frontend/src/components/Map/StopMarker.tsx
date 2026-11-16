@@ -22,7 +22,7 @@ export const STOP_CARD_NAME_CLASS = "text-xs font-semibold text-fg truncate mb-0
 export const STOP_CARD_LINES_CLASS = "flex flex-col gap-0.5";
 export const STOP_CARD_ROW_CLASS = "flex gap-0.5";
 export const STOP_CARD_BADGE_CLASS =
-  "text-[10px] font-bold px-1 py-px rounded leading-tight text-center whitespace-nowrap";
+  "text-[0.625rem] font-bold px-1 py-px rounded leading-tight text-center whitespace-nowrap";
 
 /** Split badges into balanced rows, max 6 per row */
 export function splitBadgeRows(lines: LineInfo[]): LineInfo[][] {

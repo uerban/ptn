@@ -67,7 +67,8 @@ describe("search place picker", () => {
   it("respects the keyboard-on-scroll preference without closing the picker", () => {
     const view = mount();
     (toInput() as HTMLInputElement).focus();
-    const scrollArea = view.container.querySelector(".overflow-y-auto")!;
+    // The suggestion list (the page itself also scrolls at large text sizes).
+    const scrollArea = view.container.querySelector(".overscroll-contain")!;
     fireEvent.wheel(scrollArea);
     expect(toInput()).not.toHaveFocus();
     expect(view.container.querySelector("[data-active-field]")).not.toBeNull();

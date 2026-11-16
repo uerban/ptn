@@ -168,7 +168,7 @@ export function FlowDisclosure({
         <button
           type="button"
           onClick={() => answer("allowed")}
-          className="min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold"
+          className="min-h-11 px-4 rounded-lg bg-accent text-badge-text text-sm font-semibold"
         >
           {allowLabel}
         </button>

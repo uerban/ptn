@@ -100,7 +100,7 @@ export function ExpandableStopGroup({
                   {platformCode && (
                     <span
                       data-testid="substop-platform-badge"
-                      className="text-[10px] text-fg-muted bg-surface-raised border border-divider rounded px-1.5 py-0.5 shrink-0"
+                      className="text-[0.625rem] text-fg-muted bg-surface-raised border border-divider rounded px-1.5 py-0.5 shrink-0"
                     >
                       {platformCode}
                     </span>

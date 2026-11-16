@@ -75,6 +75,28 @@ describe("Search.tsx consumes the stream in lazy-tile mode (AC-15)", () => {
   });
 });
 
+describe("Search.tsx keeps suggestions on screen while the next search runs", () => {
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+
+  it("does not blank the list when the query changes, before the new results arrive", async () => {
+    const { getAllByRole, queryByText } = render(
+      <MemoryRouter initialEntries={["/search"]}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+    const input = getAllByRole("searchbox")[0] as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "alpha" } });
+    await vi.advanceTimersByTimeAsync(350);
+    expect(queryByText("Second")).toBeInTheDocument();
+
+    // Next keystroke: still inside the 300 ms debounce, no new answer yet.
+    fireEvent.change(input, { target: { value: "alphab" } });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(queryByText("Second")).toBeInTheDocument();
+  });
+});
+
 describe("Search.tsx routes eager-bundle through the stream too (progressive augmentation)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

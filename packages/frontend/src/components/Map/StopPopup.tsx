@@ -146,19 +146,19 @@ export function StopPopup({
   visible.sort((a, b) => a.mins[0] - b.mins[0]);
 
   return (
-    <div data-testid="stop-popup" className="bg-surface-raised rounded-2xl shadow-2 w-80 overflow-hidden">
+    <div data-testid="stop-popup" className="bg-surface-raised rounded-2xl shadow-2 w-[min(20rem,calc(100vw-1rem))] max-h-[70dvh] overflow-x-hidden overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center justify-between px-[min(1rem,16px)] py-[min(0.75rem,12px)] border-b border-divider">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
           <h3
             data-testid="popup-stop-name"
-            className="font-semibold text-fg text-[17px] leading-tight"
+            className="min-w-0 flex-[1_1_6rem] break-words font-semibold text-fg text-[1.0625rem] leading-tight"
             style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}
           >
             {stopName}
           </h3>
           {departures.some((d) => d.predictedTime) && (
-            <span className="text-[9px] font-bold text-success bg-success/15
+            <span className="text-[0.5625rem] font-bold text-success bg-success/15
               px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
               <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
               {t("popup.live", "LIVE")}
@@ -170,7 +170,7 @@ export function StopPopup({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="ml-2 p-1 rounded-full hover:bg-surface-overlay"
+            className="ml-[min(0.5rem,8px)] p-[min(0.25rem,4px)] rounded-full hover:bg-surface-overlay"
           >
             <Icon name="close" size={16} className="text-fg-muted" />
           </button>
@@ -292,13 +292,13 @@ function LineCard({ group, departures, minutes, onLineClick }: LineCardProps) {
         >
           {group.routeShortName}
         </span>
-        <span className="text-sm text-fg-secondary truncate">
+        <span className="min-w-0 text-sm text-fg-secondary line-clamp-2 break-words">
           {group.headsign}
         </span>
       </div>
 
       {/* Row 2: Departure times */}
-      <div className="flex items-center gap-2.5 pl-0.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 pl-0.5">
         {group.allCancelled ? (
           <span className="text-sm font-medium text-danger">
             {t("popup.cancelled", "Cancelled")}

@@ -24,6 +24,12 @@ const STALE_FEED_THRESHOLD_BY_CITY: Record<string, number> = {};
  */
 const OUTAGE_AFTER_CONSECUTIVE_FAILURES = 2;
 
+// Text size is capped so that at very large text settings the banner stays a
+// few lines tall instead of covering half the screen. The message is a status
+// hint, and the map and departures below it matter more.
+const BANNER_CLASS =
+  "bg-warning/10 text-warning text-center leading-snug py-1.5 px-4 text-[min(0.75rem,18px)]";
+
 type ProbeState =
   /** 2xx from the backend. */
   | "ok"
@@ -107,7 +113,7 @@ export function BackendStatus() {
   ) {
     return (
       <div
-        className="bg-warning/10 text-warning text-xs text-center py-1.5 px-4"
+        className={BANNER_CLASS}
         role="status"
         aria-live="polite"
       >
@@ -122,7 +128,7 @@ export function BackendStatus() {
   if (probe.state !== "ok") {
     return (
       <div
-        className="bg-warning/10 text-warning text-xs text-center py-1.5 px-4"
+        className={BANNER_CLASS}
         role="status"
         aria-live="polite"
       >
@@ -143,7 +149,7 @@ export function BackendStatus() {
     ).replace("{hours}", String(hours));
     return (
       <div
-        className="bg-warning/10 text-warning text-xs text-center py-1.5 px-4"
+        className={BANNER_CLASS}
         role="status"
         aria-live="polite"
       >
