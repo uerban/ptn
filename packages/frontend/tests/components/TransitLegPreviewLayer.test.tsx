@@ -15,6 +15,16 @@ vi.mock("../../src/stores/gtfsDataStore.ts", () => ({
   useGtfsDataStore: (selector: (s: { raptorIndex: unknown }) => unknown) =>
     selector({ raptorIndex: raptorIndexReturn.value }),
 }));
+// Shape geometry per one-hop leg, keyed `board-alight`; absent = pending.
+const hopGeometry: { value: Record<string, [number, number][]> } = { value: {} };
+vi.mock("../../src/hooks/useTransitLegGeometry.ts", () => ({
+  useTransitLegGeometry: (leg: { boardStopIdx: number; alightStopIdx: number }) => {
+    const coords = hopGeometry.value[`${leg.boardStopIdx}-${leg.alightStopIdx}`];
+    return coords
+      ? { coords, source: "shape", partial: false, pending: false }
+      : { coords: [], source: "endpoints", partial: false, pending: true };
+  },
+}));
 vi.mock("../../src/db/index.ts", () => ({
   db: { gtfsStops: { bulkGet: vi.fn() } },
 }));
@@ -61,6 +71,20 @@ describe("TransitLegPreviewLayer", () => {
       routeIdToIdx: new Map([["R1", 0]]),
     };
     liveQueryReturn.value = [stops.A, stops.E];
+    hopGeometry.value = {};
+  });
+
+  it("follows the route shape for the approach and the run-on", () => {
+    const pre: [number, number][] = [[25.10, 54.10], [25.12, 54.18], [25.20, 54.20]];
+    const post: [number, number][] = [[25.40, 54.40], [25.47, 54.43], [25.50, 54.50]];
+    hopGeometry.value = { "0-1": pre, "3-4": post };
+    const map = makeMap();
+    render(<TransitLegPreviewLayer map={map as any} leg={baseLeg} index={2} status="current" />);
+    const data = map.addSource.mock.calls[0][1].data as GeoJSON.FeatureCollection;
+    const coordsOf = (kind: string) =>
+      (data.features.find((f) => f.properties?.kind === kind)!.geometry as GeoJSON.LineString).coordinates;
+    expect(coordsOf("pre")).toEqual(pre);
+    expect(coordsOf("post")).toEqual(post);
   });
 
   it("renders pre + post preview features for a current leg", () => {

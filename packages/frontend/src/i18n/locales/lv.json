@@ -470,7 +470,7 @@
   "settings.offline_prep_ready": "Gatavs darbam bezsaistē.",
   "settings.offline_prep_stop": "Apturēt",
   "settings.optional_storage_load_error": "Neizdevās ielādēt izvēles vietējās atmiņas vadīklas.",
-  "settings.poi_data": "POI dati",
+  "settings.poi_data": "Vietas meklēšanā",
   "settings.poi_category.school": "Skolas",
   "settings.poi_category.kindergarten": "Bērnudārzi",
   "settings.poi_category.retail": "Lielveikali",
@@ -547,7 +547,7 @@
   "route.power_transfer_wait_token": "{n} m",
   "arriveBy.when": "Kad",
   "arriveBy.leave_now": "Izbraukt tagad",
-  "arriveBy.arrive_by": "Ierodas ar",
+  "arriveBy.arrive_by": "Ierasties līdz",
   "arriveBy.date": "Datums",
   "arriveBy.time": "Laiks",
   "arriveBy.apply": "Pieteikties",
@@ -621,5 +621,13 @@
   "settings.micromap_layer_places": "rajonu un vietu nosaukumi",
   "settings.trips": "Braucieni",
   "settings.trip_alerts": "Brauciena paziņojumi",
-  "settings.offline_load_error": "Neizdevās ielādēt bezsaistes iestatījumus."
+  "settings.offline_load_error": "Neizdevās ielādēt iestatījumus bezsaistē.",
+  "search.next": "Tālāk",
+  "arriveBy.leave": "Izbraukšana",
+  "arriveBy.leave_at": "Izbraukt plkst.",
+  "arriveBy.now": "Tagad",
+  "arriveBy.in_15": "Pēc 15 minūtēm",
+  "arriveBy.in_30": "Pēc 30 minūtēm",
+  "arriveBy.in_60": "Pēc 1 stundas",
+  "arriveBy.pick_time": "Izvēlieties laiku"
 }

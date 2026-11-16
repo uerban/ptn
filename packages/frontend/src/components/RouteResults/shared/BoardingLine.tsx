@@ -28,7 +28,7 @@ interface Props {
  */
 export const BoardingLine = memo(function BoardingLine({
   segments,
-  className = "text-[11px] text-fg-muted",
+  className = "text-[0.6875rem] text-fg-muted",
 }: Props) {
   const { t } = useTranslation();
   const boarding = deriveBoarding(segments);

@@ -12,6 +12,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
+import { SETUP_HEADING, openSetupOptions, setupActionName } from "../helpers/setup-step";
 import { waitForActiveServiceWorker } from "../helpers/service-worker";
 import {
   disallowedRequests,
@@ -60,15 +61,16 @@ async function freshProfile(page: Page): Promise<RecordedRequest[]> {
 async function chooseCity(page: Page): Promise<void> {
   await page.goto("/");
   await page.getByRole("button", { name: /^Vilnius/ }).click();
-  await expect(page.getByRole("heading", { name: "How would you like to plan and explore?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
 }
 
 async function finishSetup(page: Page, preset: Preset, mode: StartMode): Promise<void> {
   await chooseCity(page);
+  await openSetupOptions(page);
   await page.getByRole("radio", { name: new RegExp(`${mode} mode`) }).check();
   await page
     .getByRole("button", {
-      name: preset === "recommended" ? "Start with recommended settings" : "Start with strict privacy",
+      name: setupActionName(preset, mode),
     })
     .click();
   await expect(page.getByTestId("setup-shell")).toHaveCount(0);

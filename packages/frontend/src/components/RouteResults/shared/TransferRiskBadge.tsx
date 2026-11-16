@@ -20,7 +20,7 @@ export function TransferRiskBadge({ kind, compact = false }: Props) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded border border-danger bg-danger/10 text-danger font-mono font-bold tracking-wider
-        ${compact ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"}`}
+        ${compact ? "px-1 py-px text-[0.5625rem]" : "px-1.5 py-0.5 text-[0.625rem]"}`}
     >
       <span aria-hidden>{kind === "miss" ? "→!" : "◷"}</span>
       {label}

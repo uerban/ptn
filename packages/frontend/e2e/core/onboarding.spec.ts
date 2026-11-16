@@ -1,11 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { isAllowedBeforeSetup } from "../helpers/request-allowlist";
+import { SETUP_HEADING, START_MAP_ACTION, openSetupOptions } from "../helpers/setup-step";
 
 // A fresh profile must never be prompted for location by setup itself.
 test.use({ permissions: [] });
-
-const SETUP_HEADING = "How would you like to plan and explore?";
 
 async function readStorage(page: Page, key: string): Promise<unknown> {
   return page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null"), key);
@@ -39,7 +38,12 @@ test.describe("first-run setup @mock-api", () => {
     await expect(page.getByLabel("Find a city")).toHaveCount(0);
     // Map is the disclosed initial selection; Text comes first.
     await chooseCity(page);
-    const modes = page.getByRole("radio");
+    // One big action first; the choices are behind "More options".
+    await expect(page.getByRole("button", { name: START_MAP_ACTION })).toBeVisible();
+    await openSetupOptions(page);
+    const modes = page
+      .getByRole("group", { name: "How would you like to plan and explore?" })
+      .getByRole("radio");
     await expect(modes.first()).toHaveAccessibleName(/Text mode/);
     await expect(page.getByRole("radio", { name: /Map mode/ })).toBeChecked();
     await expect(page.getByText("You can change every choice in Settings", { exact: false })).toBeVisible();
@@ -86,6 +90,7 @@ test.describe("first-run setup @mock-api", () => {
   test("strict privacy keeps the chosen presentation and grants nothing", async ({ page }) => {
     await page.goto("/");
     await chooseCity(page);
+    await openSetupOptions(page);
     await page.getByText("What strict privacy changes").click();
     await expect(page.getByText("History is kept for 7 days.")).toBeVisible();
     await page.getByRole("button", { name: "Start with strict privacy" }).click();
@@ -103,8 +108,9 @@ test.describe("first-run setup @mock-api", () => {
   test("customize asks the network question and writes only its answer", async ({ page }) => {
     await page.goto("/");
     await chooseCity(page);
+    await openSetupOptions(page);
     await page.getByRole("button", { name: "Customize" }).click();
-    const proceed = page.getByRole("button", { name: "Continue" });
+    const proceed = page.getByRole("button", { name: "Continue", exact: true });
     await expect(proceed).toBeDisabled();
     await page.getByRole("radio", { name: /Ask before connecting/ }).check();
     await proceed.click();
@@ -121,10 +127,12 @@ test.describe("first-run setup @mock-api", () => {
   test("back, reload and resume keep setup progress without activating anything", async ({ page }) => {
     await page.goto("/");
     await chooseCity(page);
+    await openSetupOptions(page);
     await page.getByRole("radio", { name: /Text mode/ }).check();
 
     await page.reload();
     await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
+    await openSetupOptions(page);
     await expect(page.getByRole("radio", { name: /Text mode/ })).toBeChecked();
     expect(await readStorage(page, "ptn-network-decisions")).toBeNull();
     const pending = (await readStorage(page, "ptn-onboarding")) as { decisions: unknown };
@@ -176,6 +184,7 @@ test.describe("first-run setup @mock-api", () => {
     await expect(page.getByText("Choose a city to open the link you followed", { exact: false })).toBeVisible();
     await chooseCity(page);
     await expect(page.getByText("The link you followed opens after this step.")).toBeVisible();
+    await openSetupOptions(page);
     await page.getByRole("button", { name: "Start with strict privacy" }).click();
     await expect(page).toHaveURL(/\/search\?toLat=54\.6872&toLon=25\.2797&toName=Cathedral$/);
     await expect(page.getByTestId("setup-shell")).toHaveCount(0);
@@ -231,6 +240,7 @@ test.describe("compact city choice @mock-api", () => {
     await expect(page.getByRole("heading", { name: "Choose your city" })).toBeVisible();
     await chooseCity(page);
 
+    await openSetupOptions(page);
     await page.getByRole("button", { name: "Start with strict privacy" }).click();
     await expectInApp(page);
     const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
@@ -246,6 +256,7 @@ test.describe("compact city choice @mock-api", () => {
     );
     await page.goto("/");
     await expect(page.getByText("City: Krakow")).toBeVisible();
+    await openSetupOptions(page);
     await page.getByRole("button", { name: "Start with strict privacy" }).click();
     await expectInApp(page);
     const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
@@ -281,7 +292,7 @@ test.describe("compact city choice @mock-api", () => {
       expect(await overflow()).toBeLessThanOrEqual(0);
 
       await chooseCity(page);
-      const start = page.getByRole("button", { name: "Start with recommended settings" });
+      const start = page.getByRole("button", { name: START_MAP_ACTION });
       await start.scrollIntoViewIfNeeded();
       await expect(start).toBeInViewport({ ratio: 1 });
       expect(await overflow()).toBeLessThanOrEqual(0);

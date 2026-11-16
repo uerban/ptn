@@ -28,7 +28,7 @@ export function TransportModeIcon({ mode, size = "sm" }: Props) {
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const highContrastEnabled = useSettingsStore((s) => s.highContrastEnabled);
   const colorConfig = useColorConfigStore((s) => s.config);
-  const px = size === "sm" ? "w-5 h-5 text-[10px]" : "w-7 h-7 text-xs";
+  const px = size === "sm" ? "w-5 h-5 text-[0.625rem]" : "w-7 h-7 text-xs";
   const rs = resolveRouteStyle(undefined, mode, modeOverrides, scheme, theme, undefined, highContrastEnabled, colorConfig);
 
   return (

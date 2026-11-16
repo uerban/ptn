@@ -980,7 +980,7 @@ export function SettingsPage() {
             {overthrow && (
               <div className="mt-2">
                 <p className="text-xs text-fg-muted italic">{overthrow.label}</p>
-                <p className="text-[11px] text-fg-muted/70 mt-0.5 italic">
+                <p className="text-[0.6875rem] text-fg-muted/70 mt-0.5 italic">
                   {overthrow.subtext}
                 </p>
               </div>

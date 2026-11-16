@@ -35,13 +35,13 @@ export function TripStartExplainer({ prompts, onStart, onCancel }: TripStartExpl
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto bg-black/40 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
         data-testid="trip-start-explainer"
-        className="w-full max-w-md rounded-2xl bg-surface-raised p-4 shadow-2 text-fg"
+        className="w-full max-w-md max-h-full overflow-y-auto rounded-2xl bg-surface-raised p-4 shadow-2 text-fg"
       >
         <h2 id={headingId} className="text-base font-semibold">{text("tripStart.heading")}</h2>
         <p className="mt-2 text-sm text-fg-secondary">{text("tripStart.intro")}</p>
@@ -56,7 +56,7 @@ export function TripStartExplainer({ prompts, onStart, onCancel }: TripStartExpl
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 px-4 rounded-lg border border-divider text-sm"
+            className="min-h-11 max-w-full px-[min(1rem,16px)] rounded-lg border border-divider text-sm"
           >
             {text("tripStart.cancel")}
           </button>
@@ -65,7 +65,7 @@ export function TripStartExplainer({ prompts, onStart, onCancel }: TripStartExpl
             type="button"
             onClick={onStart}
             data-testid="trip-start-confirm"
-            className="min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold"
+            className="min-h-11 max-w-full px-[min(1rem,16px)] rounded-lg bg-accent text-badge-text text-sm font-semibold"
           >
             {text("tripStart.start")}
           </button>

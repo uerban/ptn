@@ -32,7 +32,7 @@ export function ServiceAlertsOffer({ cityName }: ServiceAlertsOfferProps) {
         <button
           type="button"
           onClick={() => answerAlertsOffer("allowed")}
-          className="min-h-9 px-3 rounded-lg bg-primary text-white font-semibold"
+          className="min-h-9 px-3 rounded-lg bg-accent text-badge-text font-semibold"
         >
           {text("serviceAlerts.turnOn")}
         </button>

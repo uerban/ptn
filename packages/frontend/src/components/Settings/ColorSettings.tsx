@@ -151,7 +151,7 @@ function SubModeRow({
         <div className="flex flex-col">
           <span className="text-sm text-fg">{displayLabel}</span>
           {subMode.sampleRoutes.length > 0 && (
-            <span className="text-[10px] text-fg-muted">
+            <span className="text-[0.625rem] text-fg-muted">
               {subMode.sampleRoutes.join(", ")} ({subMode.routeCount} routes)
             </span>
           )}
@@ -407,7 +407,7 @@ export function ColorSettings() {
           {previewBadges.length > 0 ? (
             <div className="space-y-1 mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-fg-muted w-12">
+                <span className="text-[0.6875rem] text-fg-muted w-12">
                   {t("settings.preview_default", "Default")}
                 </span>
                 <div className="flex gap-1.5 flex-wrap">
@@ -434,7 +434,7 @@ export function ColorSettings() {
               </div>
               {(scheme !== "none" || highContrastEnabled || hasOverrides) && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-fg-muted w-12">
+                  <span className="text-[0.6875rem] text-fg-muted w-12">
                     {t("settings.preview_current", "Current")}
                   </span>
                   <div className="flex gap-1.5 flex-wrap">
@@ -493,7 +493,7 @@ export function ColorSettings() {
         {/* GTFS-driven grouped sub-mode list (when colorConfig available) */}
         {colorConfig && groupedModes.map(([parentMode, subModes]) => (
           <div key={parentMode}>
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted ml-1 mb-1">
+            <div className="text-[0.625rem] uppercase tracking-wider text-fg-muted ml-1 mb-1">
               {t(`settings.mode_${parentMode.toLowerCase()}`, MODE_LABELS[parentMode] ?? parentMode)}
             </div>
             <div className="bg-surface-overlay rounded-lg border border-divider overflow-hidden mb-3">

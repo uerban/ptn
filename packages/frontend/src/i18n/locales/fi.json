@@ -469,7 +469,7 @@
   "settings.offline_prep_ready": "Valmis käytettäväksi ilman verkkoyhteyttä.",
   "settings.offline_prep_stop": "Pysäytä",
   "settings.optional_storage_load_error": "Valinnaisen paikallisen muistin hallintaa ei voitu ladata.",
-  "settings.poi_data": "POI-tiedot",
+  "settings.poi_data": "Paikat haussa",
   "settings.poi_category.school": "Koulut",
   "settings.poi_category.kindergarten": "Päiväkodit",
   "settings.poi_category.retail": "Supermarketit",
@@ -545,7 +545,7 @@
   "route.power_transfer_wait_token": "{n} m",
   "arriveBy.when": "Kun",
   "arriveBy.leave_now": "Lähde nyt",
-  "arriveBy.arrive_by": "Saapuminen",
+  "arriveBy.arrive_by": "Saapuminen viimeistään",
   "arriveBy.date": "Päivämäärä",
   "arriveBy.time": "Aika",
   "arriveBy.apply": "Hae",
@@ -619,5 +619,13 @@
   "settings.micromap_layer_places": "alue- ja paikannimet",
   "settings.trips": "Matkat",
   "settings.trip_alerts": "Matkailmoitukset",
-  "settings.offline_load_error": "Offline-asetusten lataaminen epäonnistui."
+  "settings.offline_load_error": "Ei verkkoyhteyttä, joten offline-asetuksia ei voitu ladata.",
+  "search.next": "Seuraava",
+  "arriveBy.leave": "Lähtö",
+  "arriveBy.leave_at": "Lähde klo",
+  "arriveBy.now": "Nyt",
+  "arriveBy.in_15": "15 minuutin kuluttua",
+  "arriveBy.in_30": "30 minuutin kuluttua",
+  "arriveBy.in_60": "1 tunnin kuluttua",
+  "arriveBy.pick_time": "Valitse aika"
 }
