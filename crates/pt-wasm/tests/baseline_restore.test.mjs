@@ -22,3 +22,16 @@ for (const damage of ["missing", "corrupt"]) {
     } finally {rmSync(root,{recursive:true,force:true});}
   });
 }
+
+for (const contract of ["unknown", null]) {
+  test(`restore refuses unsupported glue contract ${contract} before writing output`, () => {
+    const root=mkdtempSync(join(tmpdir(),"pt-baseline-contract-"));
+    try {
+      const artifacts=Object.fromEntries(["ptb","queryTuples","glue","wasm"].map(name=>[name,retainArtifact(root,Buffer.from(name))]));
+      retainRun(root,"baseline",{schemaVersion:1,completion:"success",artifacts,report:{glueExecution:contract}});
+      const destination=join(root,"restored");
+      assert.throws(()=>restoreBaseline(root,"baseline",destination),/Unsupported glue execution contract/);
+      assert.equal(existsSync(destination),false);
+    } finally {rmSync(root,{recursive:true,force:true});}
+  });
+}

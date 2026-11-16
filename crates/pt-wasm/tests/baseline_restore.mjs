@@ -4,12 +4,14 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { readArtifact } from "./baseline_store.mjs";
 import { assertCandidateEquality } from "./baseline_candidates.mjs";
+import {GLUE_EXECUTION, glueExecutionMode} from "./baseline_glue.mjs";
 
 // Retained JS is executable code. Restore only captures from trusted local runs.
 export function restoreBaseline(store, runId, destination) {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new Error("Invalid run ID");
   const record = JSON.parse(readFileSync(join(store, "runs", `${runId}.json`)));
   if (record.schemaVersion !== 1 || record.completion !== "success") throw new Error("Unsupported run manifest");
+  glueExecutionMode(record.report?.glueExecution);
   const names = { ptb: "bundle.ptb", queryTuples: "queries.json", glue: "pt_wasm.mjs", wasm: "pt_wasm_bg.wasm" };
   // Verify the entire declared snapshot, including retained source/provenance
   // inputs that the narrower engine replay does not itself execute.
@@ -30,16 +32,19 @@ export function restoreBaseline(store, runId, destination) {
 export function replayBaseline(store, runId, destination) {
   const record = restoreBaseline(store, runId, destination);
   const report = record.report;
+  const glueMode = glueExecutionMode(report.glueExecution);
   const args = [join(dirname(fileURLToPath(import.meta.url)), "temporal_baseline.mjs"),
     "--pkg", join(destination, "pt_wasm.mjs"), "--ptb", join(destination, "bundle.ptb"),
     "--query-tuples", join(destination, "queries.json"), "--iterations", "2", "--warmup", "0",
-    "--pattern-mode", report.patternMode, "--objective", report.objective];
+    "--pattern-mode", report.patternMode, "--objective", report.objective,
+    "--glue-execution", glueMode];
   if (report.objective !== "plan") args.push("--window-start", String(report.input.windowStart), "--window-end", String(report.input.windowEnd));
   const result = spawnSync(process.execPath, args, { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`Replay failed: ${result.stderr || result.error?.message}`);
   const actual = JSON.parse(result.stdout);
+  if (actual.glueExecution !== GLUE_EXECUTION[glueMode]) throw new Error("Replay glue execution contract mismatch");
   assertCandidateEquality(report.tuples.map(t => t.candidates), actual.tuples.map(t => t.candidates), "restored replay");
-  const verification = { schemaVersion: 1, scope: record.scope, equivalence: "exact ordered candidates", replayVerified: true, report: actual };
+  const verification = { schemaVersion: 1, scope: record.scope, glueExecution: actual.glueExecution, equivalence: "exact ordered candidates", replayVerified: true, report: actual };
   writeFileSync(join(destination, "verification.json"), `${JSON.stringify(verification, null, 2)}\n`, { flag: "wx" });
   return verification;
 }

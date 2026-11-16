@@ -48,3 +48,13 @@ test("equally incomplete runtime records cannot establish comparable captures", 
  }
  assert.equal(diffBaselines(run([]), run([])).status, "unchanged");
 });
+
+test("execution origin changes are incomparable even with equal candidate arrays", () => {
+ const before=run([]),after=run([]);
+ after.report.glueExecution="snapshot-data-url-v1";
+ assert.equal(diffBaselines(before,after).status,"incomparable");
+ before.report.glueExecution="snapshot-data-url-v1";
+ assert.equal(diffBaselines(before,after).status,"unchanged");
+ before.report.glueExecution="unknown";after.report.glueExecution="unknown";
+ assert.equal(diffBaselines(before,after).reason,"unsupported glue execution contract");
+});

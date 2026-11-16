@@ -1,7 +1,7 @@
 // Runnable contract test for temporal_baseline.mjs.  It builds a disposable
 // web package so CI does not need a developer's locally generated pkg-web.
 
-import {readArtifact} from "./baseline_store.mjs";
+import {readArtifact, retainRun} from "./baseline_store.mjs";
 import {diffBaselines} from "./baseline_diff.mjs";
 import { replayBaseline } from "./baseline_restore.mjs";
 import assert from "node:assert/strict";
@@ -61,7 +61,7 @@ before(() => {
 
 after(() => rmSync(tempDir, { recursive: true, force: true }));
 
-function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePath = pkgPath, ptbPath = tinyPtb) {
+function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePath = pkgPath, ptbPath = tinyPtb, nodeArgs = []) {
   const objectiveArgs = ["--objective", objective];
   if (objective !== "plan") {
     objectiveArgs.push("--window-start", "25000", "--window-end", "30000");
@@ -69,6 +69,7 @@ function runBaseline(queryTuples, objective = "plan", extraArgs = [], packagePat
   return spawnSync(
     process.execPath,
     [
+      ...nodeArgs,
       script,
       "--pkg", packagePath,
       "--ptb", ptbPath,
@@ -364,4 +365,48 @@ test("deadline values reject timer overflow rather than becoming a one-milliseco
   const result = runBaseline(tuplesPath, "plan", ["--timeout-ms", "2147483648"]);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /timer limit/);
+});
+
+test("legacy file-import captures without new metadata replay with their original contract", () => {
+  const fakePkg=join(tempDir,"legacy-file.mjs");
+  writeFileSync(fakePkg,'export function initSync(){} export class PtRouter {plan(){return [];} free(){}}');
+  writeFileSync(join(tempDir,"pt_wasm_bg.wasm"),"fixture");
+  const store=join(tempDir,"legacy-file-store");
+  const result=runBaseline(tuplesPath,"plan",["--capture-store",store,"--run-id","explicit","--glue-execution","file"],fakePkg);
+  assert.equal(result.status,0,result.stderr);
+  const record=JSON.parse(readFileSync(join(store,"runs","explicit.json")));
+  assert.equal(record.report.glueExecution,"file-url-v0");
+  delete record.report.glueExecution; // Equivalent to original schema-v1 records.
+  retainRun(store,"legacy",record);
+  const verified=replayBaseline(store,"legacy",join(tempDir,"legacy-contract-restored"));
+  assert.equal(verified.glueExecution,"file-url-v0");
+  assert.equal(verified.replayVerified,true);
+});
+
+test("runner executes the observed glue when its file is replaced immediately after reading", () => {
+  const fakePkg=join(tempDir,"replaced-glue.mjs");
+  const original='export function initSync(){} export class PtRouter {plan(){return [];} free(){}}';
+  const replacement='export function initSync(){throw new Error("replacement file executed");} export class PtRouter {}';
+  const preload=join(tempDir,"replace-after-read.mjs");
+  writeFileSync(preload, `import fs from "node:fs"; import {syncBuiltinESMExports} from "node:module";
+    const read=fs.readFileSync;
+    fs.readFileSync=function(...args){const bytes=read.apply(this,args);
+      if(String(args[0])===${JSON.stringify(fakePkg)})fs.writeFileSync(${JSON.stringify(fakePkg)},${JSON.stringify(replacement)});
+      return bytes;};syncBuiltinESMExports();`);
+  writeFileSync(join(tempDir,"pt_wasm_bg.wasm"),"fixture");
+  const store=join(tempDir,"glue-race-store");
+  for(const mode of ["snapshot","file"]) {
+    writeFileSync(fakePkg,original);
+    const result=runBaseline(tuplesPath,"plan",["--capture-store",store,"--run-id",mode,"--glue-execution",mode],fakePkg,tinyPtb,["--import",preload]);
+    const record=JSON.parse(readFileSync(join(store,"runs",`${mode}.json`)));
+    assert.equal(record.artifacts.glue,sha256(Buffer.from(original)));
+    assert.equal(readFileSync(fakePkg,"utf8"),replacement);
+    if(mode==="snapshot") {
+      assert.equal(result.status,0,result.stderr);
+      assert.equal(record.report.glueExecution,"snapshot-data-url-v1");
+    } else {
+      assert.equal(result.status,1);
+      assert.match(record.report.error.message,/replacement file executed/);
+    }
+  }
 });

@@ -14,19 +14,20 @@
 import { retainArtifact, retainRun } from "./baseline_store.mjs";
 import { captureCandidates, assertCandidateEquality } from "./baseline_candidates.mjs";
 import {publishInputs, publishTuple, publishReport, superviseBaseline} from "./baseline_supervisor.mjs";
+import {GLUE_EXECUTION, importBaselineGlue} from "./baseline_glue.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, platform, release } from "node:os";
 import { performance } from "node:perf_hooks";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 
 const USAGE =
   "usage: temporal_baseline.mjs --pkg <path/to/pt_wasm.js> --ptb <bundle.ptb> " +
   "--query-tuples <tuples.json> --iterations <positive integer> " +
   "--warmup <non-negative integer> --pattern-mode covering-merge " +
-  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>] [--capture-store <directory> --run-id <id>] [--timeout-ms <positive milliseconds>]";
+  "--objective plan|r3|m4 [--window-start <seconds> --window-end <seconds>] [--capture-store <directory> --run-id <id>] [--timeout-ms <positive milliseconds>] [--glue-execution snapshot|file (default: snapshot)]";
 
 function fail(message) {
   throw new Error(message);
@@ -57,6 +58,7 @@ function parseArgs(argv) {
     "capture-store",
     "run-id",
     "timeout-ms",
+    "glue-execution",
   ]);
   const values = new Map();
 
@@ -112,8 +114,11 @@ function parseArgs(argv) {
 
   const timeoutMs = values.has("timeout-ms") ? parseInteger(values.get("timeout-ms"), "--timeout-ms", {min: 1}) : null;
   if (timeoutMs !== null && timeoutMs > 2147483647) fail("--timeout-ms exceeds the timer limit");
+  const glueExecution = values.get("glue-execution") ?? "snapshot";
+  if (!Object.hasOwn(GLUE_EXECUTION, glueExecution)) fail("--glue-execution must be snapshot or file");
   return {
     timeoutMs,
+    glueExecution,
     captureStore: values.has("capture-store") ? resolve(values.get("capture-store")) : null,
     runId: values.get("run-id"),
     pkgPath: resolve(values.get("pkg")),
@@ -273,6 +278,7 @@ function runtimeMetadata() {
 }
 
 function retainReport(options, report, bytes, missingInputs = []) {
+  report.glueExecution = GLUE_EXECUTION[options.glueExecution];
   if (publishReport(report)) return;
   if (!options.captureStore) return;
   const artifacts = Object.fromEntries(Object.entries(bytes)
@@ -284,6 +290,8 @@ function retainReport(options, report, bytes, missingInputs = []) {
     replayVerification: "unverified",
     missingDependencies: ["source GTFS and producer provenance", ...missingInputs.map(name => `${options.timeoutMs ? "unobserved" : "unread"} input: ${name}`)],
     unsupported: ["frontend geometry", "real-time composition", "feed rebuild",
+      "external glue module/file dependency capture",
+      ...(options.glueExecution === "snapshot" ? ["file-relative import.meta.url semantics"] : ["legacy file import byte identity"]),
       ...(options.timeoutMs ? ["supervisor termination", "engine-created subprocess cleanup", "interrupted tuple iterations"] : ["process termination/timeouts"])],
     completion: report.completion,
     artifacts,
@@ -382,9 +390,7 @@ async function main() {
   let routerInitMs = null;
   let stage = "module import";
   try {
-    // The dynamic import is intentionally a file URL so absolute paths with
-    // spaces and paths outside this checkout behave exactly like a built package.
-    const pkg = await import(pathToFileURL(options.pkgPath).href);
+    const pkg = await importBaselineGlue(glueBytes, options.pkgPath, options.glueExecution);
     if (typeof pkg.initSync !== "function") {
       fail(`--pkg does not export initSync; expected a wasm-pack --target web package: ${options.pkgPath}`);
     }

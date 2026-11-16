@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {GLUE_EXECUTION, glueExecutionMode} from "./baseline_glue.mjs";
 
 // v1 ignores object property order only. No candidate field is hidden.
 export function normalize(value) {
@@ -33,13 +34,20 @@ export function changedFields(before, after, path = []) {
 }
 export function diffBaselines(before, after) {
   if (before.schemaVersion !== 1 || after.schemaVersion !== 1) throw new Error("Unsupported baseline schema");
+  try {
+    glueExecutionMode(before.report.glueExecution);
+    glueExecutionMode(after.report.glueExecution);
+  } catch {
+    return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "unsupported glue execution contract" };
+  }
   const contract = run => ({
     ptb: run.artifacts.ptb, queryTuples: run.artifacts.queryTuples,
     patternMode: run.report.patternMode, objective: run.report.objective,
     windowStart: run.report.input.windowStart, windowEnd: run.report.input.windowEnd,
+    glueExecution: run.report.glueExecution ?? GLUE_EXECUTION.file,
   });
   if (!isDeepStrictEqual(normalize(contract(before)), normalize(contract(after)))) {
-    return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "mismatched inputs or planning settings" };
+    return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "mismatched inputs, planning settings or execution contract" };
   }
   const runtime = run => {
     const value = run.report.runtime;
