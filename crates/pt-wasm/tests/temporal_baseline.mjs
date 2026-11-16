@@ -11,6 +11,7 @@
 // Direct-profile packages additionally use:
 //     --objective r3|m4 --window-start 25000 --window-end 90000
 
+import { captureCandidates, assertCandidateEquality } from "./baseline_candidates.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, platform, release } from "node:os";
@@ -202,7 +203,7 @@ function percentileNearestRank(samples, percentile) {
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * percentile) - 1)];
 }
 
-function resultCount(router, tuple, label, options) {
+function planCandidates(router, tuple, label, options) {
   const result = options.objective === "plan"
     ? router.plan(tuple)
     : router.planTemporalDirect(tuple, {
@@ -210,29 +211,25 @@ function resultCount(router, tuple, label, options) {
         endSecs: options.windowEnd,
       });
   if (!Array.isArray(result)) fail(`${label} returned a non-array result`);
-  return result.length;
+  return result;
 }
 
 function benchmarkTuple(router, tuple, index, options) {
   const { warmup, iterations } = options;
   for (let iteration = 0; iteration < warmup; iteration += 1) {
-    resultCount(router, tuple, `tuples[${index}] warmup ${iteration}`, options);
+    planCandidates(router, tuple, `tuples[${index}] warmup ${iteration}`, options);
   }
 
   const samples = [];
-  let expectedResultCount;
+  let expectedCandidates;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const startedAt = performance.now();
-    const count = resultCount(router, tuple, `tuples[${index}] iteration ${iteration}`, options);
+    const result = planCandidates(router, tuple, `tuples[${index}] iteration ${iteration}`, options);
     samples.push(performance.now() - startedAt);
-    if (expectedResultCount === undefined) {
-      expectedResultCount = count;
-    } else if (count !== expectedResultCount) {
-      fail(
-        `tuples[${index}] returned a non-deterministic result count ` +
-          `(${expectedResultCount} then ${count})`,
-      );
-    }
+    // Snapshot/compare outside the timed planner call.
+    const candidates = captureCandidates(result, `tuples[${index}] iteration ${iteration}`);
+    if (expectedCandidates === undefined) expectedCandidates = candidates;
+    else assertCandidateEquality(expectedCandidates, candidates, `tuples[${index}] iteration ${iteration}`);
   }
 
   return {
@@ -240,7 +237,9 @@ function benchmarkTuple(router, tuple, index, options) {
     query: tuple,
     p50Ms: percentileNearestRank(samples, 0.5),
     p95Ms: percentileNearestRank(samples, 0.95),
-    resultCount: expectedResultCount,
+    resultCount: expectedCandidates.length,
+    candidates: expectedCandidates,
+    capture: { equivalence: "exact", truncated: false, boundary: "stop-level engine" },
   };
 }
 

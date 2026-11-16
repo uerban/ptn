@@ -93,6 +93,8 @@ test("temporal baseline emits one matched tiny tuple as machine JSON", {
   assert.equal(report.input.queryTuples.ptbSha256, tinyPtbSha256);
   assert.equal(report.tuples.length, 1);
   assert.equal(report.tuples[0].resultCount > 0, true);
+  assert.equal(report.tuples[0].candidates.length, report.tuples[0].resultCount);
+  assert.equal(report.tuples[0].capture.truncated, false);
   assert.equal(report.tuples[0].p50Ms >= 0, true);
   assert.equal(report.tuples[0].p95Ms >= report.tuples[0].p50Ms, true);
   assert.equal(report.initialization.wasmMs >= 0, true);
