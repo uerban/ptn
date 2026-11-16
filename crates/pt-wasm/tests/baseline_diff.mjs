@@ -19,6 +19,18 @@ function difference(left, right) {
     return false;
   });
 }
+// Paths are positional: a reorder may produce many field changes. Identity
+// matching and subjective usefulness are deliberately separate concerns.
+export function changedFields(before, after, path = []) {
+  if (isDeepStrictEqual(normalize(before), normalize(after))) return [];
+  if (before && after && typeof before === "object" && typeof after === "object"
+      && Array.isArray(before) === Array.isArray(after)) {
+    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+    return keys.flatMap(k => changedFields(before[k], after[k], [...path, k]));
+  }
+  return [{ path, beforePresent: before !== undefined, afterPresent: after !== undefined,
+    ...(before !== undefined ? { before } : {}), ...(after !== undefined ? { after } : {}) }];
+}
 export function diffBaselines(before, after) {
   if (before.schemaVersion !== 1 || after.schemaVersion !== 1) throw new Error("Unsupported baseline schema");
   const contract = run => ({
@@ -28,6 +40,14 @@ export function diffBaselines(before, after) {
   });
   if (!isDeepStrictEqual(normalize(contract(before)), normalize(contract(after)))) {
     return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "mismatched inputs or planning settings" };
+  }
+  const runtime = run => {
+    const value = run.report.runtime;
+    return value && { node: value.node, v8: value.v8, platform: value.platform, arch: value.arch, release: value.release };
+  };
+  if (!runtime(before) || !runtime(after)
+      || !isDeepStrictEqual(runtime(before), runtime(after))) {
+    return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "missing or mismatched runtime" };
   }
   if (before.completion !== "success" || after.completion !== "success") {
     return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "non-success completion", before: before.completion, after: after.completion };
@@ -42,6 +62,7 @@ export function diffBaselines(before, after) {
     const changed = key(tuple.candidates) !== key(next.candidates);
     return { index, status: changed ? "changed/unreviewed" : "unchanged", added, removed,
       orderingOnly: changed && added.length === 0 && removed.length === 0,
+      fieldChanges: changedFields(tuple.candidates, next.candidates),
       before: tuple.candidates, after: next.candidates };
   });
   return { schemaVersion: 1, normalizerVersion: 1, status: tuples.some(t => t.status !== "unchanged") ? "changed/unreviewed" : "unchanged", tuples };
