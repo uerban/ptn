@@ -246,3 +246,82 @@ fn query_rotation_places_term_before_the_house_number() {
         "{variants:?}"
     );
 }
+
+#[test]
+fn number_without_street_mark_still_matches() {
+    let rows = vec![
+        row("Europos a. 1", 54.69, 25.27),
+        row("Europos a. 12", 54.69, 25.27),
+        row("Vilniaus g. 3", 54.68, 25.28),
+        row("Gedimino pr. 9", 54.68, 25.28),
+        row("Europos 7", 54.69, 25.27),
+    ];
+    let keys = vec![
+        key("europos a 1", 0),
+        key("europos a 12", 1),
+        key("vilniaus gatve 3", 2),
+        key("gedimino prospektas 9", 3),
+        key("europos 7", 4),
+    ];
+    let index = AddrIndex::build(&rows, &keys).expect("build should succeed");
+    let labels = |q: &str| -> Vec<String> {
+        index
+            .search_variants(&address_search_query_variants(q), 10)
+            .into_iter()
+            .map(|m| m.label)
+            .collect()
+    };
+
+    assert_eq!(labels("europos 1"), vec!["Europos a. 1", "Europos a. 12"]);
+    assert_eq!(
+        labels("Europos a. 1"),
+        vec!["Europos a. 1", "Europos a. 12"]
+    );
+    assert_eq!(labels("vilniaus 3"), vec!["Vilniaus g. 3"]);
+    assert_eq!(labels("1 europos"), vec!["Europos a. 1", "Europos a. 12"]);
+    assert_eq!(labels("gedimino 9"), vec!["Gedimino pr. 9"]);
+    // Unfinished name, in either script.
+    assert_eq!(labels("gedim 9"), vec!["Gedimino pr. 9"]);
+    assert_eq!(labels("гедим 9"), vec!["Gedimino pr. 9"]);
+    // Too short to scan for.
+    assert!(labels("ge 9").is_empty());
+    // A real house number, not a mark, is not skipped over.
+    assert!(labels("europos 2").is_empty());
+    assert_eq!(labels("europos 7"), vec!["Europos 7"]);
+}
+
+#[test]
+fn multi_word_names_match_by_any_word_part() {
+    let rows = vec![
+        row("V. Kudirkos g. 1", 54.69, 25.27),
+        row("V. Kudirkos g. 14", 54.69, 25.27),
+        row("Vinciūniškių g. 1", 54.68, 25.28),
+    ];
+    let keys = vec![
+        key("v kudirkos gatve 1", 0),
+        key("kudirkos gatve 1", 0),
+        key("v kudirkos gatve 14", 1),
+        key("kudirkos gatve 14", 1),
+        key("vinciuniskiu gatve 1", 2),
+    ];
+    let index = AddrIndex::build(&rows, &keys).expect("build should succeed");
+    let labels = |q: &str| -> Vec<String> {
+        index
+            .search_variants(&address_search_query_variants(q), 10)
+            .into_iter()
+            .map(|m| m.label)
+            .collect()
+    };
+    let both = vec!["V. Kudirkos g. 1", "V. Kudirkos g. 14"];
+    assert_eq!(labels("vinc kudirk"), both);
+    assert_eq!(labels("kudirkos vinco"), both);
+    assert_eq!(labels("винц кудирк"), both);
+    // Exact house number first.
+    assert_eq!(labels("vinc kudirk 14"), vec!["V. Kudirkos g. 14"]);
+    assert_eq!(labels("vinc kudirk 1"), both);
+    assert_eq!(labels("kudirk 14"), vec!["V. Kudirkos g. 14"]);
+    // Number first works too.
+    assert_eq!(labels("14 kudirk"), vec!["V. Kudirkos g. 14"]);
+    // Every word must match: Vinciūniškių has no Kudirkos.
+    assert!(!labels("vinc kudirk").contains(&"Vinciūniškių g. 1".to_string()));
+}

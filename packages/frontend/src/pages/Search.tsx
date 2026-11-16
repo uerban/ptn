@@ -1393,6 +1393,7 @@ export function SearchPage() {
         onEarlier={paginationTime !== null ? handleEarlier : undefined}
         onLater={handleLater}
         onNext={handleNext}
+        departAt={paginationTime}
         origin={fromEndpoint}
         destination={toEndpoint}
         feedTz={feedTz}
