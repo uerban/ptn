@@ -1,6 +1,7 @@
 // Runnable contract test for temporal_baseline.mjs.  It builds a disposable
 // web package so CI does not need a developer's locally generated pkg-web.
 
+import { replayBaseline } from "./baseline_restore.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { after, before, test } from "node:test";
@@ -155,6 +156,10 @@ test("optional capture retains artifacts and refuses run replacement", {
   assert.equal(record.classification, "partial capture");
   assert.equal(record.replayVerification, "unverified");
   assert.equal(Object.keys(record.artifacts).length, 4);
+  const restored = join(tempDir, "restored");
+  const verification = replayBaseline(store, "baseline", restored);
+  assert.equal(verification.replayVerified, true);
+  assert.throws(() => replayBaseline(store, "baseline", restored), /EEXIST/);
   for (const digest of Object.values(record.artifacts)) {
     assert.equal(sha256(readFileSync(join(store, "artifacts", digest))), digest);
   }
