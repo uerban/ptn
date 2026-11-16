@@ -473,7 +473,7 @@
   "settings.offline_prep_ready": "Paruošta darbui neprisijungus.",
   "settings.offline_prep_stop": "Stabdyti",
   "settings.optional_storage_load_error": "Nepavyko įkelti pasirinktinės vietinės atminties valdiklių.",
-  "settings.poi_data": "POI duomenys",
+  "settings.poi_data": "Vietos paieškoje",
   "settings.poi_category.school": "Mokyklos",
   "settings.poi_category.kindergarten": "Darželiai",
   "settings.poi_category.retail": "Prekybos centrai",
@@ -549,7 +549,7 @@
   "route.power_transfer_wait_token": "{n} m",
   "arriveBy.when": "Kai",
   "arriveBy.leave_now": "Išvykti dabar",
-  "arriveBy.arrive_by": "Atvykimas",
+  "arriveBy.arrive_by": "Atvykti iki",
   "arriveBy.date": "Data",
   "arriveBy.time": "Laikas",
   "arriveBy.apply": "Pateikti paraišką",
@@ -623,5 +623,13 @@
   "settings.micromap_layer_places": "rajonų ir vietovių pavadinimai",
   "settings.trips": "Kelionės",
   "settings.trip_alerts": "Kelionės pranešimai",
-  "settings.offline_load_error": "Nepavyko įkelti neprisijungus režimo nustatymų."
+  "settings.offline_load_error": "Nepavyko įkelti nustatymų, kurie taikomi neprisijungus prie interneto.",
+  "search.next": "Toliau",
+  "arriveBy.leave": "Išvykimas",
+  "arriveBy.leave_at": "Išvykti",
+  "arriveBy.now": "Dabar",
+  "arriveBy.in_15": "Po 15 min.",
+  "arriveBy.in_30": "Po 30 min.",
+  "arriveBy.in_60": "Po 1 val.",
+  "arriveBy.pick_time": "Pasirinkite laiką"
 }

@@ -469,7 +469,7 @@
   "settings.offline_prep_ready": "Gotowe do trybu offline.",
   "settings.offline_prep_stop": "Zatrzymaj",
   "settings.optional_storage_load_error": "Nie udało się wczytać opcji opcjonalnej pamięci lokalnej.",
-  "settings.poi_data": "Dane POI",
+  "settings.poi_data": "Miejsca w wyszukiwarce",
   "settings.poi_category.school": "Szkoły",
   "settings.poi_category.kindergarten": "Przedszkola",
   "settings.poi_category.retail": "Supermarkety",
@@ -610,5 +610,13 @@
   "settings.micromap_layer_places": "nazwy dzielnic i miejscowości",
   "settings.trips": "Podróże",
   "settings.trip_alerts": "Powiadomienia o podróży",
-  "settings.offline_load_error": "Nie udało się wczytać ustawień trybu offline."
+  "settings.offline_load_error": "Nie udało się załadować ustawień offline.",
+  "search.next": "Dalej",
+  "arriveBy.leave": "Odjazd",
+  "arriveBy.leave_at": "Wyjazd o",
+  "arriveBy.now": "Teraz",
+  "arriveBy.in_15": "Za 15 min",
+  "arriveBy.in_30": "Za 30 min",
+  "arriveBy.in_60": "Za 1 godzinę",
+  "arriveBy.pick_time": "Wybierz godzinę"
 }

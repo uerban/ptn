@@ -188,7 +188,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
 
   return (
     <div
-      className="flex items-center gap-1.5 shrink-0"
+      className="flex min-w-0 flex-wrap items-center justify-end gap-x-1.5"
       style={{ fontSize: "var(--variant-meta-text-size)" }}
     >
       {/* Due items shown separately */}

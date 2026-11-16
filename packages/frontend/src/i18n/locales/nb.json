@@ -469,7 +469,7 @@
   "settings.offline_prep_ready": "Klart for frakoblet bruk.",
   "settings.offline_prep_stop": "Stopp",
   "settings.optional_storage_load_error": "Kunne ikke laste kontrollene for valgfritt lokalt minne.",
-  "settings.poi_data": "POI-data",
+  "settings.poi_data": "Steder i søket",
   "settings.poi_category.school": "Skoler",
   "settings.poi_category.kindergarten": "Barnehager",
   "settings.poi_category.retail": "Supermarkeder",
@@ -542,7 +542,7 @@
   "route.power_transfer_wait_token": "{n} m",
   "arriveBy.when": "Når",
   "arriveBy.leave_now": "Dra nå",
-  "arriveBy.arrive_by": "Ankomst kl.",
+  "arriveBy.arrive_by": "Ankom senest",
   "arriveBy.date": "Dato",
   "arriveBy.time": "Tid",
   "arriveBy.apply": "Søk",
@@ -616,5 +616,13 @@
   "settings.micromap_layer_places": "distrikts- og stedsnavn",
   "settings.trips": "Reiser",
   "settings.trip_alerts": "Reisevarsler",
-  "settings.offline_load_error": "Kunne ikke laste inn frakoblede innstillinger."
+  "settings.offline_load_error": "Kunne ikke laste inn frakoblede innstillinger.",
+  "search.next": "Neste",
+  "arriveBy.leave": "Avgang",
+  "arriveBy.leave_at": "Avgang kl.",
+  "arriveBy.now": "Nå",
+  "arriveBy.in_15": "Om 15 min",
+  "arriveBy.in_30": "Om 30 minutter",
+  "arriveBy.in_60": "Om 1 time",
+  "arriveBy.pick_time": "Velg tidspunkt"
 }

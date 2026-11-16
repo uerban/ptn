@@ -129,7 +129,7 @@ function WhatsNewCardBody({
                     <button
                       type="button"
                       onClick={() => answerOffer("allowed")}
-                      className="min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold"
+                      className="min-h-11 px-4 rounded-lg bg-accent text-badge-text text-sm font-semibold"
                     >
                       {text("serviceAlerts.turnOn")}
                     </button>

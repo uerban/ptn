@@ -3,7 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "env": ["PTN_ARRIVE_BY_EXPERIMENT"]
     },
     "dev": {
       "cache": false,
