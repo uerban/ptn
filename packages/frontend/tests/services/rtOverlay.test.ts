@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { composeItineraries } from "../../src/services/raptorComposer.ts";
+import { runSpeedMps } from "@pt/shared/routing";
 import { applyRtOverlay } from "../../src/services/rtOverlay.ts";
 import type { ComposedItinerary } from "@pt/shared";
 
@@ -217,6 +219,7 @@ describe("rtOverlay 120s freshness guard", () => {
           arriveSecs: 30600,
         },
       ],
+      sourceWalkSecs: 0,
       departureSecs: 30000,
       destWalkSecs: 0,
       arrivalSecs: 30600,
@@ -260,5 +263,75 @@ describe("rtOverlay 120s freshness guard", () => {
       tripId === "T1" ? { delaySeconds: 60, cancelled: false } : null;
     const out = applyRtOverlay(itineraries as never, getDelay);
     expect(out[0].legs[0].departSecs).toBe(30060);
+  });
+});
+
+
+describe("applyRtOverlay — initial boarding feasibility", () => {
+  it.each([[-60, 420, 0], [0, 420, 1], [60, 420, 1], [0, 900, 0]])(
+    "checks delay %i against access duration %i",
+    (delay, accessSecs, count) => {
+      const itinerary = twoLegItinerary();
+      itinerary.legs = [itinerary.legs[0]];
+      itinerary.legs[0].departSecs = itinerary.departureSecs + 420;
+      itinerary.sourceWalkSecs = accessSecs;
+      expect(applyRtOverlay([itinerary], () => ({ delaySeconds: delay, cancelled: false }))).toHaveLength(count);
+    },
+  );
+});
+
+
+describe("access feasibility before scheduled display fallback", () => {
+  it("rejects early boarding even when a later transfer is broken", () => {
+    const itinerary = twoLegItinerary();
+    itinerary.sourceWalkSecs = 480;
+    expect(applyRtOverlay([itinerary], (tripId) => ({
+      delaySeconds: tripId === "tripA" ? -60 : -600, cancelled: false,
+    }))).toEqual([]);
+  });
+});
+
+
+describe("routed 1214 m access with a seven-minute boarding gap", () => {
+  it.each([
+    [1.4, false, 0, 0],
+    [0.8, false, 0, 0],
+    [1.4, true, 0, 0],
+    [1.4, true, 60, 1],
+    [1.4, false, 480, 1],
+  ])("pace %s, running %s, delay %s", (pace, running, delay, count) => {
+    const itinerary = twoLegItinerary();
+    const leg = { ...itinerary.legs[0], departSecs: itinerary.departureSecs + 420 };
+    const walkSecs = Math.round(1214 / (running ? runSpeedMps(pace) : pace));
+    const composed = composeItineraries([{
+      legs: [leg], boardSecs: leg.departSecs, alightSecs: leg.arriveSecs, transfers: 0,
+    }], [{ stopId: "A", walkSecs, distanceMeters: 1214, runToCatch: running }],
+    [{ stopId: "B", walkSecs: 0, distanceMeters: 0 }], itinerary.departureSecs);
+    expect(composed[0].totalWalkMeters).toBe(1214);
+    expect(composed[0].sourceWalkSecs).toBe(walkSecs);
+    const results = applyRtOverlay(composed, () => ({ delaySeconds: delay, cancelled: false }));
+    expect(results).toHaveLength(count);
+    if (count) {
+      expect(results[0].departureSecs + walkSecs).toBeLessThanOrEqual(results[0].legs[0].departSecs);
+      expect(results[0].totalWalkMeters).toBe(1214);
+    }
+  });
+});
+
+
+describe("initial boarding and RT freshness", () => {
+  it.each([[119, 0], [120, 1]])("update age %s seconds", (age, count) => {
+    const now = Date.UTC(2026, 10, 13, 8);
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      const itinerary = twoLegItinerary();
+      itinerary.legs = [itinerary.legs[0]];
+      itinerary.sourceWalkSecs = 480;
+      expect(applyRtOverlay([itinerary], () => ({
+        delaySeconds: -60, cancelled: false, receivedAt: now - age * 1000,
+      }))).toHaveLength(count);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
