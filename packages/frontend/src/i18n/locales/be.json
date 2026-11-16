@@ -481,7 +481,7 @@
   "settings.offline_prep_ready": "Гатова да афлайну.",
   "settings.offline_prep_stop": "Спыніць",
   "settings.optional_storage_load_error": "Не ўдалося загрузіць кіраванне неабавязковай лакальнай памяццю.",
-  "settings.poi_data": "Даныя POI",
+  "settings.poi_data": "Месцы ў пошуку",
   "settings.poi_category.school": "Школы",
   "settings.poi_category.kindergarten": "Дзіцячыя садкі",
   "settings.poi_category.retail": "Супермаркеты",
@@ -628,5 +628,18 @@
   "settings.micromap_layer_green": "паркі і лясы",
   "settings.micromap_layer_waterways": "рэкі і каналы",
   "settings.micromap_layer_roads": "асноўныя дарогі",
-  "settings.micromap_layer_places": "назвы раёнаў і месцаў"
+  "settings.micromap_layer_places": "назвы раёнаў і месцаў",
+  "settings.trips": "Паездкі",
+  "settings.trip_alerts": "Апавяшчэнні пра паездку",
+  "settings.offline_load_error": "Не ўдалося загрузіць аўтаномныя налады.",
+  "popup.live": "Ужываць",
+  "search.next": "Далей",
+  "search.live": "Ужываць",
+  "arriveBy.leave": "Адпраўленне",
+  "arriveBy.leave_at": "Адправіцца а",
+  "arriveBy.now": "Цяпер",
+  "arriveBy.in_15": "Праз 15 хв",
+  "arriveBy.in_30": "Праз 30 хвілін",
+  "arriveBy.in_60": "Праз 1 гадзіну",
+  "arriveBy.pick_time": "Выберыце час"
 }

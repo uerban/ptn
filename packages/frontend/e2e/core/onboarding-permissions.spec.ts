@@ -4,6 +4,7 @@
 // both permissions (prompt, denied, granted) still reaches the app.
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+import { SETUP_HEADING, openSetupOptions } from "../helpers/setup-step";
 
 type PermissionState = "prompt" | "denied" | "granted";
 
@@ -97,7 +98,8 @@ const calls = (page: Page) =>
   page.evaluate(() => (window as unknown as { __permissionCalls: Calls }).__permissionCalls);
 
 async function finishRecommendedSetup(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { name: "How would you like to plan and explore?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
+  await openSetupOptions(page);
   await page.getByRole("radio", { name: /Text mode/ }).check();
   await page.getByRole("button", { name: "Start with recommended settings" }).click();
   await expect(page.getByTestId("setup-shell")).toHaveCount(0);

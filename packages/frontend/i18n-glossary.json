@@ -2334,6 +2334,66 @@
           "status": "proposed"
         }
       }
+    },
+    "trip alert": {
+      "note": "Settings section for alerts during a trip (get-off, transfer, delay). Same word as 'notification', not 'warning'.",
+      "match": [
+        "trip alert",
+        "trip alerts"
+      ],
+      "enforce": "check",
+      "locales": {
+        "lt": {
+          "term": "Kelionės pranešimai",
+          "stem": "pranešim",
+          "status": "proposed"
+        },
+        "pl": {
+          "term": "Powiadomienia o podróży",
+          "stem": "powiadom",
+          "status": "proposed"
+        },
+        "be": {
+          "term": "Апавяшчэнні пра паездку",
+          "stem": "апавяшч",
+          "status": "proposed"
+        },
+        "ru": {
+          "term": "Уведомления о поездке",
+          "stem": "уведомл",
+          "status": "proposed"
+        },
+        "uk": {
+          "term": "Сповіщення про поїздку",
+          "stem": "сповіщ",
+          "status": "proposed"
+        },
+        "lv": {
+          "term": "Brauciena paziņojumi",
+          "stem": "paziņojum",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "Reisiteated",
+          "stem": "teat",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "Reseaviseringar",
+          "stem": "avisering",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "Reisevarsler",
+          "stem": "varsl",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "Matkailmoitukset",
+          "stem": "ilmoitu",
+          "status": "proposed"
+        }
+      }
     }
   }
 }

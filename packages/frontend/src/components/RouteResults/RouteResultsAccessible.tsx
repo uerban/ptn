@@ -18,6 +18,7 @@ import {
   type Segment,
 } from "./shared/legHelpers.ts";
 import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay.ts";
+import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
@@ -157,6 +158,7 @@ const AccessibleCard = memo(function AccessibleCard({
   const handleClick = useCallback(() => onSelect(it), [onSelect, it]);
   // Live RT for the first ride (the list keeps its route polled).
   const live = useFirstRideLive(it);
+  const earliestLeaveMs = useLeaveFloorMs();
   const display = useMemo(
     () =>
       deriveItineraryDisplay(it, {
@@ -166,8 +168,9 @@ const AccessibleCard = memo(function AccessibleCard({
         firstDepartureShiftSeconds: live.shiftSeconds,
         firstRideCancelled: live.cancelled,
         firstRideRemoved: live.removed,
+        earliestLeaveMs,
       }),
-    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed],
+    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed, earliestLeaveMs],
   );
   // The header counts from the leave time — see shownTripSpan.
   const span = shownTripSpan(it, display);
@@ -203,7 +206,7 @@ const AccessibleCard = memo(function AccessibleCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {fastest && (
-            <div className="text-[11px] font-bold tracking-widest text-accent mb-0.5">
+            <div className="text-[0.6875rem] font-bold tracking-widest text-accent mb-0.5">
               ★ {t("route.fastest_label", "FASTEST")}
               {stepFree
                 ? ` · ${t("route.step_free", "STEP-FREE")}`

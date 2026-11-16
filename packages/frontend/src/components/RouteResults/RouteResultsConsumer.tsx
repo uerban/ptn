@@ -23,6 +23,7 @@ import {
   type Segment,
 } from "./shared/legHelpers.ts";
 import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay.ts";
+import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
@@ -118,6 +119,7 @@ const ConsumerCard = memo(function ConsumerCard({
   const handleClick = useCallback(() => onSelect(it), [onSelect, it]);
   // Live RT for the first ride (the list keeps its route polled).
   const live = useFirstRideLive(it);
+  const earliestLeaveMs = useLeaveFloorMs();
   const display = useMemo(
     () =>
       deriveItineraryDisplay(it, {
@@ -127,8 +129,9 @@ const ConsumerCard = memo(function ConsumerCard({
         firstDepartureShiftSeconds: live.shiftSeconds,
         firstRideCancelled: live.cancelled,
         firstRideRemoved: live.removed,
+        earliestLeaveMs,
       }),
-    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed],
+    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed, earliestLeaveMs],
   );
   // The header counts from the leave time — see shownTripSpan.
   const span = shownTripSpan(it, display);
@@ -167,17 +170,17 @@ const ConsumerCard = memo(function ConsumerCard({
       className="w-full text-left rounded-2xl bg-surface-raised border border-divider
         hover:border-accent transition-colors p-3.5 flex flex-col gap-2"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="text-sm font-semibold text-fg tabular-nums">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <div className="min-w-0 text-sm font-semibold text-fg tabular-nums">
           {formatTime(span.departureTime, formattingLocale, feedTz)} →{" "}
           {formatTime(span.arrivalTime, formattingLocale, feedTz)}
         </div>
-        <div className="text-right shrink-0">
+        <div className="ml-auto min-w-0 text-right">
           <div className="text-sm font-semibold text-fg tabular-nums">
             {duration} {t("time.min", "min")}
           </div>
           {onBoard > 0 && onBoard !== duration && (
-            <div className="text-[10px] text-fg-muted tabular-nums mt-0.5">
+            <div className="text-[0.625rem] text-fg-muted tabular-nums mt-0.5">
               {t("route.on_vehicle", "on vehicle")} {onBoard}{" "}
               {t("time.min", "min")}
             </div>
@@ -216,7 +219,7 @@ const ConsumerCard = memo(function ConsumerCard({
 
       {/* Live delay callout when a route is running late */}
       {liveDelay.minutes >= 2 && risk !== "miss" && (
-        <div className="flex items-center gap-2 rounded-lg bg-warning/10 text-warning px-2.5 py-1.5 text-[11px] leading-snug">
+        <div className="flex items-center gap-2 rounded-lg bg-warning/10 text-warning px-2.5 py-1.5 text-[0.6875rem] leading-snug">
           <span aria-hidden>⚠</span>
           <span>
             {t("route.live_update_line", "Live:")}{" "}
@@ -231,7 +234,7 @@ const ConsumerCard = memo(function ConsumerCard({
 
       {/* Miss-risk callout — stronger */}
       {risk === "miss" && (
-        <div className="flex items-start gap-2 rounded-lg bg-danger/10 text-danger px-2.5 py-1.5 text-[11px] leading-snug border border-danger/30">
+        <div className="flex items-start gap-2 rounded-lg bg-danger/10 text-danger px-2.5 py-1.5 text-[0.6875rem] leading-snug border border-danger/30">
           <span aria-hidden>⚠</span>
           <span>
             {t(
@@ -252,7 +255,7 @@ const ConsumerCard = memo(function ConsumerCard({
         />
       )}
 
-      <div className="flex items-center gap-3 text-[11px] text-fg-muted tabular-nums">
+      <div className="flex flex-wrap items-center gap-x-3 text-[0.6875rem] text-fg-muted tabular-nums">
         <span>
           {it.transfers}{" "}
           {pluralize(
@@ -282,7 +285,7 @@ const ConsumerCard = memo(function ConsumerCard({
       {eco.savingsPercent > 0 && (
         <div
           data-testid="eco-score"
-          className="flex items-center gap-1 text-[10px] text-success"
+          className="flex items-center gap-1 text-[0.625rem] text-success"
         >
           <span aria-hidden>{"🌿"}</span>
           <span>
@@ -363,7 +366,7 @@ function LegChip({ leg }: { leg: Leg }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1">
       <LineBadge
         mode={leg.mode}
         label={leg.routeShortName}
@@ -372,7 +375,7 @@ function LegChip({ leg }: { leg: Leg }) {
       />
       {leg.headsign && (
         <span
-          className="text-xs text-fg-muted truncate max-w-[120px]"
+          className="min-w-0 text-xs text-fg-muted truncate max-w-[min(7.5rem,100%)]"
           title={leg.headsign}
         >
           › {leg.headsign}

@@ -18,7 +18,7 @@ export function SearchPlaceActions({ onMap, onLocation, locationAvailable }: {
   const { t } = useTranslation();
   const target = "group inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
   const pill = "inline-flex items-center gap-1.5 rounded-full border border-divider/60 bg-surface-raised px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors group-hover:bg-surface-overlay group-hover:text-accent";
-  return <div className="flex shrink-0 items-center gap-1">
+  return <div className="flex max-w-full flex-wrap items-center gap-1">
     <button type="button" onClick={onMap} className={target}
       aria-label={t("search.choose_on_map", "Choose on map")} title={t("search.choose_on_map", "Choose on map")}>
       <span className={pill}><Icon name="map" size={16} /><span>{t("nav.map", "Map")}</span></span>

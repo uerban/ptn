@@ -58,7 +58,7 @@ export function TzIndicator({ bundleTz }: { bundleTz?: string }) {
   }
   return (
     <span
-      className="ml-1 align-middle text-[10px] font-medium text-fg-muted"
+      className="ml-1 align-middle text-[0.625rem] font-medium text-fg-muted"
       title={hint}
       data-testid="tz-indicator"
     >

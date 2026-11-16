@@ -6,6 +6,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createRequire } from "node:module";
 import { mockApi } from "../helpers/mock-api";
+import { SETUP_HEADING, openSetupOptions } from "../helpers/setup-step";
 
 // axe-core ships with jest-axe, already a dev dependency.
 const AXE_PATH = createRequire(
@@ -74,15 +75,18 @@ test.describe("accessibility @mock-api", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "How would you like to plan and explore?",
+        name: SETUP_HEADING,
       }),
-    ).toBeVisible();
-    expect(await axeViolations(page)).toEqual([]);
-    await expect(
-      page.getByRole("group", { name: "Starting view" }),
     ).toBeVisible();
     // The setup heading takes focus after a step change, for screen readers.
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+    expect(await axeViolations(page)).toEqual([]);
+    // The choices behind "More options" are checked too.
+    await openSetupOptions(page);
+    expect(await axeViolations(page)).toEqual([]);
+    await expect(
+      page.getByRole("group", { name: "How would you like to plan and explore?" }),
+    ).toBeVisible();
 
     // Tab to the first control: its focus indicator is drawn.
     await page.keyboard.press("Tab");

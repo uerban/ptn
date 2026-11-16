@@ -1,8 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
+  GLOBAL_ANCHOR,
+  TILE_EDGE_KM,
   tilesForViewport,
   type Bbox,
   type PoiEntry,
+  type TileAnchor,
 } from "@pt/shared";
 import { mockApi } from "../helpers/mock-api";
 import { bootAtPrivacyLevel } from "../../tests/privacy-harness/bootAtLevel";
@@ -38,33 +41,63 @@ const BBOX_B: Bbox = {
 };
 
 const TILE_LOADER_MODULE = "/src/services/tileLoader.ts";
+const DB_MODULE = "/src/db/index.ts";
 const TILE_PATH_PREFIX = "/api/gtfs/poi-tile/";
+// The loader takes the city's tiling contract from the POI manifest. This spec
+// uses the default grid, so `tilesForViewport` below computes the same keys,
+// and stand-in digests for the bundle and tiling generation.
+const TILING = {
+  edgeKm: TILE_EDGE_KM,
+  anchor: GLOBAL_ANCHOR,
+  bundleSha256: "a".repeat(64),
+  generationId: "b".repeat(64),
+};
 
 function tileKeyFromUrl(url: string): string {
   const idx = url.indexOf(TILE_PATH_PREFIX);
   if (idx === -1) return "";
-  return url.slice(idx + TILE_PATH_PREFIX.length);
+  // Drop the `?v=<bundle>` cache key the loader appends.
+  return url.slice(idx + TILE_PATH_PREFIX.length).split("?")[0]!;
 }
 
 async function driveLoadViewport(page: Page, bbox: Bbox): Promise<void> {
   await page.evaluate(
-    async ({ modulePath, cityId, bbox }) => {
+    async ({ modulePath, dbPath, cityId, bbox, tiling }) => {
       const w = window as unknown as {
         __m11Loader?: { loadViewport: (b: Bbox) => Promise<void> };
       };
       if (!w.__m11Loader) {
+        // The loader only serves a generation the app has activated; in the
+        // app that record comes from the validated POI manifest.
+        const { db } = (await import(/* @vite-ignore */ dbPath)) as {
+          db: { poiTileGenerations: { put: (record: unknown) => Promise<unknown> } };
+        };
+        await db.poiTileGenerations.put({
+          cityId,
+          ...tiling,
+          schemaVersion: 1,
+          tileBounds: { minX: -100_000, maxX: 100_000, minY: -100_000, maxY: 100_000 },
+          tilingPolicy: "fixed-edge",
+          kAnonWaived: false,
+          deliveryActive: true,
+          validatedAt: Date.now(),
+        });
         const mod = (await import(/* @vite-ignore */ modulePath)) as {
           createTileLoader: (opts: {
             cityId: string;
+            edgeKm: number;
+            anchor: TileAnchor;
+            bundleSha256: string;
+            generationId: string;
             debounceMs?: number;
           }) => { loadViewport: (b: Bbox) => Promise<void>; dispose: () => void };
         };
         // Tight debounce so awaits are quick but the mechanism still runs.
-        w.__m11Loader = mod.createTileLoader({ cityId, debounceMs: 20 });
+        w.__m11Loader = mod.createTileLoader({ cityId, ...tiling, debounceMs: 20 });
       }
       await w.__m11Loader!.loadViewport(bbox);
     },
-    { modulePath: TILE_LOADER_MODULE, cityId: CITY_ID, bbox },
+    { modulePath: TILE_LOADER_MODULE, dbPath: DB_MODULE, cityId: CITY_ID, bbox, tiling: TILING },
   );
 }
 

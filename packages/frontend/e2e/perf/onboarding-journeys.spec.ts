@@ -22,6 +22,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
+import { openSetupOptions, setupActionName } from "../helpers/setup-step";
 
 type Preset = "recommended" | "strict";
 type StartMode = "Text" | "Map";
@@ -118,14 +119,15 @@ test.describe("@perf onboarding journeys", () => {
       const start = Date.now();
       await page.goto("/");
       await act(() => page.getByRole("button", { name: /^Vilnius/ }).click());
-      const mode = page.getByRole("radio", { name: new RegExp(`${journey.mode} mode`) });
-      if (!(await mode.isChecked())) await act(() => mode.check());
+      // Recommended in Map mode is the one big action; every other journey
+      // opens "More options" first, which counts as an action.
+      if (journey.preset !== "recommended" || journey.mode !== "Map") {
+        await act(() => openSetupOptions(page));
+        const mode = page.getByRole("radio", { name: new RegExp(`${journey.mode} mode`) });
+        if (!(await mode.isChecked())) await act(() => mode.check());
+      }
       await act(() =>
-        page
-          .getByRole("button", {
-            name: journey.preset === "recommended" ? "Start with recommended settings" : "Start with strict privacy",
-          })
-          .click(),
+        page.getByRole("button", { name: setupActionName(journey.preset, journey.mode) }).click(),
       );
       await expect(page.getByTestId("setup-shell")).toHaveCount(0);
 

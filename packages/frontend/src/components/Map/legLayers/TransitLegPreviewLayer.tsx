@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useCityDataQuery } from "../../../hooks/useCityDataQuery.ts";
 import type * as maplibregl from "maplibre-gl";
-import type { Leg, LegStatus } from "@pt/shared";
+import type { Leg, LegStatus, RaptorTransitLeg } from "@pt/shared";
+import { useTransitLegGeometry } from "../../../hooks/useTransitLegGeometry.ts";
 import { useGtfsDataStore } from "../../../stores/gtfsDataStore.ts";
 
 interface Props {
@@ -41,10 +42,9 @@ const PREVIEW_OPACITY = 0.45;
  *
  * Drawn as a separate map layer per leg, so removing it on status change
  * (e.g. `current → completed`) doesn't disturb the main `TransitLegLayer`.
- * Geometry is a stop-chord (board±1 / alight±1) — `shapes.txt` polylines
- * lack `shape_dist_traveled` in our pipeline today, so slicing the road-
- * following shape at exact stop boundaries isn't reliable. The preview is
- * a deliberately faded teaser, not a precise route segment.
+ * Geometry follows the route shape between the neighbour stop and the
+ * board / alight stop, through the same builder as the main leg; it falls
+ * back to a straight stop-chord only when the shape is missing.
  */
 export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
   const showPre = status === "current" || status === "upcoming";
@@ -118,6 +118,41 @@ export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
   const postLon = postLoc?.lon;
   const postLat = postLoc?.lat;
 
+  // Shape-following geometry for each extension: a one-hop transit leg on
+  // the same trip. When an extension does not apply the hop is empty
+  // (board === alight) and its geometry is ignored below.
+  const boardIdx = leg.boardStopIdx ?? 0;
+  const alightIdx = leg.alightStopIdx ?? 0;
+  const hop = (from: number, to: number): RaptorTransitLeg => ({
+    type: "transit",
+    fromStopId: "",
+    toStopId: "",
+    departSecs: 0,
+    arriveSecs: 0,
+    routeId: leg.routeId ?? "",
+    tripId: leg.tripId ?? "",
+    boardStopIdx: from,
+    alightStopIdx: to,
+    mode: leg.mode,
+    patternStopIds: leg.patternStopIds,
+  });
+  const hasPre = preLon !== undefined && preLat !== undefined;
+  const hasPost = postLon !== undefined && postLat !== undefined;
+  const preGeom = useTransitLegGeometry(
+    hasPre ? hop(boardIdx - 1, boardIdx) : hop(boardIdx, boardIdx),
+    hasPre ? { lat: preLat, lon: preLon } : leg.from.location,
+    leg.from.location,
+  );
+  const postGeom = useTransitLegGeometry(
+    hasPost ? hop(alightIdx, alightIdx + 1) : hop(alightIdx, alightIdx),
+    leg.to.location,
+    hasPost ? { lat: postLat, lon: postLon } : leg.to.location,
+  );
+  const shapeCoords = (g: { coords: readonly (readonly [number, number])[] | [number, number][]; pending: boolean }) =>
+    !g.pending && g.coords.length >= 2 ? (g.coords as [number, number][]) : null;
+  const preCoords = hasPre ? shapeCoords(preGeom) : null;
+  const postCoords = hasPost ? shapeCoords(postGeom) : null;
+
   useEffect(() => {
     const sourceId = `${SOURCE_PREFIX}${index}`;
     const layerId = `${LAYER_PREFIX}${index}`;
@@ -137,7 +172,7 @@ export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
         type: "Feature",
         geometry: {
           type: "LineString",
-          coordinates: [
+          coordinates: preCoords ?? [
             [preLon, preLat],
             [leg.from.location.lon, leg.from.location.lat],
           ],
@@ -150,7 +185,7 @@ export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
         type: "Feature",
         geometry: {
           type: "LineString",
-          coordinates: [
+          coordinates: postCoords ?? [
             [leg.to.location.lon, leg.to.location.lat],
             [postLon, postLat],
           ],
@@ -222,6 +257,8 @@ export function TransitLegPreviewLayer({ map, leg, index, status }: Props) {
     leg.to.location.lat,
     leg.routeColor,
     leg.mode,
+    preCoords,
+    postCoords,
   ]);
 
   return null;

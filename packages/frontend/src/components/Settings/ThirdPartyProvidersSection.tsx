@@ -54,9 +54,11 @@ export function ThirdPartyProvidersSection() {
                 key={id}
                 className="flex items-start justify-between gap-3 px-4 py-3 border-b border-divider last:border-b-0 cursor-pointer"
               >
-                <span className="flex flex-col gap-1">
+                <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm text-fg">{cfg.name}</span>
-                  <span className="text-xs text-fg-muted">{cfg.tosUrl}</span>
+                  {/* A URL is one long word: let it break anywhere so it never
+                      pushes the settings page wider than the screen. */}
+                  <span className="text-xs text-fg-muted [overflow-wrap:anywhere]">{cfg.tosUrl}</span>
                   {cfg.apiKeyFormat && (
                     <input
                       type="password"

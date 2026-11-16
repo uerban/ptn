@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ProtectionPolicy } from "@pt/shared/privacy";
 import { useTranslation } from "../../i18n/index.ts";
 import {
@@ -19,6 +19,9 @@ export interface OptionalStorageChoiceProps {
   presentation?: "contextual" | "settings";
   /** Test seam; defaults to the category's production deletion function. */
   cleanup?: () => Promise<void>;
+  /** Further controls for this kind of data, shown under the choice in
+   *  Settings so everything about it sits in one card. */
+  children?: ReactNode;
 }
 
 function policyPermits(
@@ -69,6 +72,7 @@ export function OptionalStorageChoice({
   description,
   presentation = "settings",
   cleanup,
+  children,
 }: OptionalStorageChoiceProps) {
   const { t } = useTranslation();
   const choice = usePrivacyChoicesStore((state) => state.choices[category]);
@@ -153,10 +157,13 @@ export function OptionalStorageChoice({
         className={
           presentation === "contextual"
             ? "flex flex-col items-stretch gap-2"
-            : "flex items-start justify-between gap-3"
+            : "flex flex-wrap items-start justify-between gap-3"
         }
       >
-        <div className="min-w-0">
+        {/* In settings the buttons sit beside the text only while the text keeps
+            about 12rem. On a narrow screen or with large text they wrap below it,
+            instead of squeezing the text to a word per line. */}
+        <div className={presentation === "contextual" ? "min-w-0" : "min-w-0 flex-[1_1_12rem]"}>
           <h3 className="text-sm font-medium text-fg">{title}</h3>
           <p className="text-xs text-fg-muted">{description}</p>
           {presentation === "settings" && (
@@ -169,7 +176,7 @@ export function OptionalStorageChoice({
           className={
             presentation === "contextual"
               ? "flex flex-wrap justify-start gap-2"
-              : "flex shrink-0 flex-wrap justify-end gap-2"
+              : "flex max-w-full flex-wrap justify-end gap-2"
           }
         >
           {choice === "enabled" ? (
@@ -177,7 +184,7 @@ export function OptionalStorageChoice({
               type="button"
               onClick={() => void withdraw()}
               disabled={busy}
-              className="rounded-lg border border-danger px-3 py-1.5 text-xs font-medium text-danger disabled:opacity-50"
+              className="max-w-full rounded-lg border border-danger px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-danger disabled:opacity-50"
             >
               {busy
                 ? t("privacy.optional.stopping", "Stopping…")
@@ -188,7 +195,7 @@ export function OptionalStorageChoice({
               type="button"
               onClick={remember}
               disabled={!permitted}
-              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-badge-text disabled:opacity-50"
+              className="max-w-full rounded-lg bg-accent px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-badge-text disabled:opacity-50"
             >
               {t("privacy.optional.remember", "Remember")}
             </button>
@@ -197,13 +204,16 @@ export function OptionalStorageChoice({
             <button
               type="button"
               onClick={decline}
-              className="rounded-lg border border-divider px-3 py-1.5 text-xs font-medium text-fg-secondary"
+              className="max-w-full rounded-lg border border-divider px-3 py-1.5 [overflow-wrap:anywhere] text-xs font-medium text-fg-secondary"
             >
               {t("privacy.optional.no_thanks", "No thanks")}
             </button>
           )}
         </div>
       </div>
+      {children && presentation === "settings" && (
+        <div className="mt-3 space-y-3 border-t border-divider pt-3">{children}</div>
+      )}
       <div aria-live="polite" aria-atomic="true">
         {status && presentation === "settings" && (
           <p role="status" className="mt-2 text-xs text-accent">

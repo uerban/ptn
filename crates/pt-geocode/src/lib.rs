@@ -500,6 +500,140 @@ impl AddrIndex {
         out
     }
 
+    /// Searches the query variants, then fills any remaining slots with a
+    /// token match that a plain prefix scan cannot reach.
+    ///
+    /// Address labels abbreviate (`V. Kudirkos a. 11`, `Gedimino pr. 9`), and
+    /// people type the parts they remember in any shape: `europos 1` (no
+    /// street mark), `sava 1` (unfinished), `vinc kudirk` (full first name
+    /// where the label has an initial). Storing every such form as a key would
+    /// multiply the FST, so the match is done at query time instead:
+    ///
+    /// * scan the keys that start with one query word (3+ letters) — keys
+    ///   already include every word-suffix of a label, so any word works;
+    /// * keep a row when every query word starts a word of its label, or is
+    ///   the full form of a one-letter initial there, in any order;
+    /// * keep it only when every number in the query starts a number in the
+    ///   label; an exact house number ranks first.
+    ///
+    /// Street marks (`g`, `a`, `pr`, `gatve`) in the query are optional.
+    pub fn search_variants(&self, variants: &[String], limit: usize) -> Vec<AddrMatch> {
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for prefix in variants {
+            if out.len() >= limit {
+                return out;
+            }
+            out.extend(self.prefix_search_inner(prefix, limit - out.len(), &mut seen));
+        }
+        let mut extra = Vec::new();
+        for variant in variants {
+            // `11 a` is house 11A, not house 11 on an `a.` square.
+            let mut tokens: Vec<String> = Vec::new();
+            for t in tokens_of(variant) {
+                match tokens.last_mut() {
+                    Some(prev)
+                        if t.len() == 1
+                            && t.starts_with(|c: char| c.is_ascii_lowercase())
+                            && prev.chars().all(|c| c.is_ascii_digit()) =>
+                    {
+                        prev.push_str(t)
+                    }
+                    _ => tokens.push(t.to_string()),
+                }
+            }
+            let tokens: Vec<&str> = tokens.iter().map(String::as_str).collect();
+            let (numbers, words): (Vec<&str>, Vec<&str>) = tokens
+                .iter()
+                .partition(|t| t.starts_with(|c: char| c.is_ascii_digit()));
+            let words: Vec<&str> = words
+                .into_iter()
+                .filter(|w| !is_canonical_address_term(w) && w.len() > 2)
+                .collect();
+            // A single word with no number is exactly what the prefix pass did.
+            if words.is_empty() || (words.len() == 1 && numbers.is_empty()) {
+                continue;
+            }
+            for anchor in &words {
+                self.token_scan(anchor, &words, &numbers, limit * 4, &mut seen, &mut extra);
+            }
+        }
+        // Stable: FST order within each group.
+        extra.sort_by_key(|(exact, _)| !*exact);
+        out.extend(extra.into_iter().map(|(_, m)| m).take(limit - out.len()));
+        out
+    }
+
+    fn token_scan(
+        &self,
+        anchor: &str,
+        words: &[&str],
+        numbers: &[&str],
+        cap: usize,
+        seen: &mut HashSet<usize>,
+        out: &mut Vec<(bool, AddrMatch)>,
+    ) {
+        // Bounded: keys sharing a 3+ letter prefix sit together, so this
+        // covers every house on the streets it names without letting a short
+        // prefix walk the whole corpus.
+        const SCAN_CAP: usize = 16_384;
+        let mut stream = self.map.range().ge(anchor).into_stream();
+        let mut scanned = 0;
+        while let Some((encoded_key, value)) = stream.next() {
+            if !encoded_key.starts_with(anchor.as_bytes()) || out.len() >= cap {
+                break;
+            }
+            scanned += 1;
+            if scanned > SCAN_CAP {
+                break;
+            }
+            let row_id = value as usize;
+            if seen.contains(&row_id) {
+                continue;
+            }
+            let (Some(label), Some((lat, lon))) =
+                (self.rows.label(row_id), self.rows.lat_lon(row_id))
+            else {
+                continue;
+            };
+            let normalized = replace_address_terms(&normalize_address_search_text(label));
+            let label_tokens: Vec<&str> = tokens_of(&normalized).collect();
+            let word_ok = words.iter().all(|q| {
+                label_tokens.iter().any(|l| {
+                    !l.starts_with(|c: char| c.is_ascii_digit())
+                        && (l.starts_with(q) || (l.len() == 1 && q.starts_with(l)))
+                })
+            });
+            if !word_ok {
+                continue;
+            }
+            let label_numbers: Vec<&str> = label_tokens
+                .iter()
+                .copied()
+                .filter(|l| l.starts_with(|c: char| c.is_ascii_digit()))
+                .collect();
+            if !numbers
+                .iter()
+                .all(|q| label_numbers.iter().any(|l| l.starts_with(q)))
+            {
+                continue;
+            }
+            let exact =
+                !numbers.is_empty() && numbers.iter().all(|q| label_numbers.iter().any(|l| l == q));
+            seen.insert(row_id);
+            out.push((
+                exact,
+                AddrMatch {
+                    key: decode_lookup_key(encoded_key),
+                    row_id,
+                    label: label.to_string(),
+                    lat,
+                    lon,
+                },
+            ));
+        }
+    }
+
     fn prefix_search_inner(
         &self,
         prefix: &str,
