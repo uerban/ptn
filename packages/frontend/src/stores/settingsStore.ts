@@ -154,6 +154,10 @@ interface SettingsState {
   /** When true, the map flies to the user's GPS location on startup. */
   startupLocate: boolean;
   gpsMode: "enabled" | "until-locate" | "disabled";
+  /** The device delivered a fix before and has not refused since. Some
+   * browsers (iOS) report a granted permission as "prompt" after a restart;
+   * this lets the next launch resume the watch without a Locate me tap. */
+  gpsGranted: boolean;
   searchProvider: SearchProvider;
   /** Temporary Search UI choices, retained while device feedback settles defaults. */
   searchActiveFieldOnly: boolean;
@@ -208,6 +212,7 @@ interface SettingsState {
   setPoiLooseCategories: (categories: LoosePoiCategory[]) => void;
   setStartupLocate: (enabled: boolean) => void;
   setGpsMode: (mode: "enabled" | "until-locate" | "disabled") => void;
+  setGpsGranted: (granted: boolean) => void;
   setSearchProvider: (provider: SearchProvider) => void;
   setSearchActiveFieldOnly: (enabled: boolean) => void;
   setSearchKeyboardFit: (enabled: boolean) => void;
@@ -394,6 +399,7 @@ export const useSettingsStore = create<SettingsState>()(
       poiIncludeLooseTierUserSet: false,
       startupLocate: false,
       gpsMode: "enabled",
+      gpsGranted: false,
       searchProvider: "local" satisfies SearchProvider,
       searchActiveFieldOnly: true,
       searchKeyboardFit: true,
@@ -546,7 +552,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ poiLooseCategories: selected, poiIncludeLooseTier: selected.length > 0, poiIncludeLooseTierUserSet: true });
       },
       setStartupLocate: (enabled) => set({ startupLocate: enabled }),
-      setGpsMode: (gpsMode) => set({ gpsMode }),
+      setGpsMode: (gpsMode) => set(gpsMode === "enabled" ? { gpsMode } : { gpsMode, gpsGranted: false }),
+      setGpsGranted: (gpsGranted) => { if (get().gpsGranted !== gpsGranted) set({ gpsGranted }); },
       setSearchActiveFieldOnly: (enabled) => set({ searchActiveFieldOnly: enabled }),
       setSearchKeyboardFit: (enabled) => set({ searchKeyboardFit: enabled }),
       setSearchCompactRows: (enabled) => set({ searchCompactRows: enabled }),
@@ -716,6 +723,7 @@ export const useSettingsStore = create<SettingsState>()(
           startupLocate: coerceBool(stored?.startupLocate, current.startupLocate),
           gpsMode: (stored?.gpsMode === "enabled" || stored?.gpsMode === "until-locate" || stored?.gpsMode === "disabled")
             ? stored.gpsMode : current.gpsMode,
+          gpsGranted: stored?.gpsGranted === true && (stored?.gpsMode === undefined || stored?.gpsMode === "enabled"),
           searchProvider: isSearchProvider(stored?.searchProvider)
             ? stored.searchProvider
             : current.searchProvider,

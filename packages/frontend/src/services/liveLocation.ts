@@ -21,7 +21,10 @@ const EMPTY: LiveLocation = {
 };
 
 /** One foreground watch shared by the map, search, and navigation.
- * Coordinates remain in memory. Hidden documents cannot depend on GPS updates:
+ * Coordinates remain in memory. The watch starts by itself when the browser
+ * reports the permission as granted, or when this device delivered a fix
+ * before (`gpsGranted`): iOS reports "prompt" again after every restart, so
+ * without that memory each launch would wait for a Locate me tap. Hidden documents cannot depend on GPS updates:
  * https://www.w3.org/TR/geolocation/#request-a-position
  */
 export class LiveLocationController {
@@ -108,6 +111,7 @@ export class LiveLocationController {
       const onChange = () => {
         if (permission.state !== "granted") {
           this.explicitConsent = false;
+          if (permission.state === "denied") useSettingsStore.getState().setGpsGranted(false);
           this.stop(true);
         } else if (permission.state === "granted") this.start();
       };
@@ -119,8 +123,10 @@ export class LiveLocationController {
     if (query !== this.permissionQuery || !this.active) return;
     if (this.permission?.state === "denied") {
       this.explicitConsent = false;
+      useSettingsStore.getState().setGpsGranted(false);
       this.stop(true);
-    } else if (this.permission?.state === "granted" || this.explicitConsent) this.start();
+    } else if (this.permission?.state === "granted" || this.explicitConsent ||
+        useSettingsStore.getState().gpsGranted) this.start();
   }
 
   /** Stop the device watch but keep the last fix (muted) so nearby stops stay put.
@@ -167,6 +173,7 @@ export class LiveLocationController {
     this.watchId = navigator.geolocation.watchPosition((position) => {
       if (generation !== this.generation) return;
       this.explicitConsent = true;
+      useSettingsStore.getState().setGpsGranted(true);
       this.publish({
         position: { lat: position.coords.latitude, lon: position.coords.longitude },
         accuracy: position.coords.accuracy, speed: position.coords.speed,
@@ -177,6 +184,7 @@ export class LiveLocationController {
       if (generation !== this.generation) return;
       if (error.code === 1) {
         this.explicitConsent = false;
+        useSettingsStore.getState().setGpsGranted(false);
         this.stop(true);
       }
       this.publish({ ...this.state, loading: false, error: error.message });
