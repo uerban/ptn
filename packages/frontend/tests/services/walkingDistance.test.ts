@@ -201,3 +201,31 @@ it.each([[30,true],[181,false]] as const)("revalidates %sm routed transfer befor
  expect(results.some(result=>result.legs.length>0)).toBe(retained);
  if(retained) expect(results.find(result=>result.legs.length>0)?.totalWalkMeters).toBe(30);
 });
+
+it.each([[110,false,true],[230,false,false],[0,true,false]] as const)("validates delayed transfer %s cancelled %s",async(delay,cancelled,retained)=>{
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"S1",walkSecs:0,distanceMeters:0}])
+  .mockResolvedValueOnce([{stopId:"S4",walkSecs:0,distanceMeters:0}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue([{
+  ...ride,alightSecs:31000,transfers:1,legs:[ride.legs[0],
+   {type:"walk",fromStopId:"S2",toStopId:"S3",departSecs:30000,arriveSecs:30120},
+   {...ride.legs[0],fromStopId:"S3",toStopId:"S4",departSecs:30240,arriveSecs:31000,tripId:"T2"}],
+ }]);
+ const config:SearchConfig={raptorIndex:index,walkSpeedMps:1.5,getDelay:(tripId)=>tripId==="T1"?{delaySeconds:delay,cancelled}:null,
+  allStops:[{id:"S2",name:"S2",lat:54.69,lon:25.28},{id:"S3",name:"S3",lat:54.70,lon:25.28}],
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,
+  directWalkRoute:async(from)=>({distanceMeters:from.lat===54.69?30:1000,
+   coords:[[25.28,54.69],[25.28,54.70]],steps:[]})};
+ const results=await new SearchOrchestrator(config).search({origin:{lat:54.68,lon:25.28},destination:{lat:54.71,lon:25.28},departureTime:new Date(2026,2,30,7,55),ranking:"least_walking"});
+ expect(results.some(result=>!!result.directWalk)).toBe(true);
+ expect(results.some(result=>result.legs.length>0)).toBe(retained);
+ if(retained) {
+  const transit=results.find(result=>result.legs.length>0)!;
+  expect(transit.totalWalkMeters).toBe(30);
+  expect(transit.totalWalkSecs).toBe(20);
+  expect(transit.legs[1].departSecs).toBe(30110);
+  expect(transit.legs[1].arriveSecs).toBe(30130);
+  expect(transit.legs[2].departSecs).toBe(30240);
+ }
+
+});
