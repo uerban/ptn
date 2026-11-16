@@ -1,4 +1,5 @@
-import { walkGraphClient, walkProfileFor, WalkGraphUnavailableError } from "../services/walkGraphClient.ts";
+import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
+import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
 import { effectiveExcludedModes } from "./settingsStore.ts";
 import { excludedRouteIdsForGroups } from "../services/routeGroups.ts";
@@ -143,14 +144,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         raptorIndex,
         cityId: useCityStore.getState().activeCity.id,
         allStops,
-        directWalkRoute: async (from, to) => {
-          try {
-            return await walkGraphClient.routeFor(searchCityId, from, to, walkProfileFor(mobilityProfile));
-          } catch (error) {
-            if (error instanceof WalkGraphUnavailableError) return null;
-            throw error;
-          }
-        },
+        directWalkRoute: (from, to) => walkGraphClient.routeFor(searchCityId, from, to, walkProfileFor(mobilityProfile)),
         getDelay: (tripId: string) => {
           // Stitch the trip delay together with its `receivedAt` stamp so
           // `applyRtOverlay`'s 120s freshness guard can drop stale entries.
@@ -180,7 +174,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       };
 
       if (originStops.length === 0 || destStops.length === 0) {
-        const route = await config.directWalkRoute!(endpointCoord(origin), endpointCoord(destination));
+        const route = await optionalPedestrianRoute(() => config.directWalkRoute!(endpointCoord(origin), endpointCoord(destination)));
         data.assertCurrent();
         if (!route) {
           set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });

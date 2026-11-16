@@ -1,3 +1,4 @@
+import {WalkGraphUnavailableError} from "../../src/services/walkGraphClient.ts";
 import {it,expect,vi} from "vitest";
 import type {RaptorItinerary} from "@pt/shared";
 import {transferWalkEvidence} from "../../src/services/transferWalkEvidence.ts";
@@ -12,6 +13,20 @@ it("preserves physical distance and transfer buffer, deduplicating route work",a
  expect(itinerary.legs[0]).not.toHaveProperty("distanceMeters");
 });
 it("rejects longer or unreachable pedestrian transfers",async()=>{
- expect(await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:181,coords:[],steps:[]}),1.5)).toEqual([]);
+ expect(await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:181,coords:[[25,54],[25.001,54]],steps:[]}),1.5)).toEqual([]);
  expect(await transferWalkEvidence([itinerary],stops,async()=>null,1.5)).toEqual([]);
+});
+
+
+it("rejects malformed geometry independently of distance and validates pace",async()=>{
+ expect(await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:1,coords:[[NaN,54],[25,54]],steps:[]}),1.5)).toEqual([]);
+ await expect(transferWalkEvidence([itinerary],stops,async()=>null,0)).rejects.toThrow(/speed/);
+});
+
+
+it("preserves unknown transfer metres on transient provider failure",async()=>{
+ const result=await transferWalkEvidence([itinerary],stops,async()=>{throw new WalkGraphUnavailableError("fixture","transient");},1.5);
+ expect(result).toHaveLength(1);
+ expect(result[0].legs[0]).not.toHaveProperty("distanceMeters");
+ await expect(transferWalkEvidence([itinerary],stops,async()=>{throw new Error("bug");},1.5)).rejects.toThrow("bug");
 });

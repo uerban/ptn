@@ -1,3 +1,4 @@
+import { optionalPedestrianRoute } from "./pedestrianEvidence.ts";
 import { transferWalkEvidence } from "./transferWalkEvidence.ts";
 import { serviceDayFrame } from "./serviceDayFrame.ts";
 /**
@@ -263,7 +264,7 @@ export class SearchOrchestrator {
 
     const { entryStops, exitStops } = await this.findEndpointStops(query);
     const pedestrianRoute = this.config.directWalkRoute
-      ? await this.config.directWalkRoute(query.origin, query.destination) : null;
+      ? await optionalPedestrianRoute(() => this.config.directWalkRoute!(query.origin, query.destination)) : null;
     if (entryStops.length === 0 || exitStops.length === 0) {
       const frame = serviceDayFrame(Math.floor(query.departureTime.getTime() / 1000), this.config.feedTz);
       const direct = directWalkCandidate(query.origin, query.destination, pedestrianRoute,

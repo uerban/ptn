@@ -1,3 +1,4 @@
+import { validPedestrianRoute } from "./pedestrianEvidence.ts";
 import type { LatLon } from "@pt/shared";
 import type { WalkRoute } from "./walkGraphClient.ts";
 import type { RtComposedItinerary } from "./rtOverlay.ts";
@@ -11,9 +12,9 @@ export function directWalkCandidate(
   origin: LatLon, destination: LatLon, route: WalkRoute | null,
   departureSecs: number, walkSpeedMps: number,
 ): DirectWalkCandidate | null {
-  if (!route || !Number.isFinite(route.distanceMeters) || route.distanceMeters < 0
+  if (!validPedestrianRoute(route)
     || !Number.isFinite(walkSpeedMps) || walkSpeedMps <= 0
-    || !Number.isFinite(departureSecs) || route.coords.length < 2) return null;
+    || !Number.isFinite(departureSecs)) return null;
   const duration = Math.ceil(route.distanceMeters / walkSpeedMps);
   return {
     directWalk: { origin, destination, route }, legs: [],

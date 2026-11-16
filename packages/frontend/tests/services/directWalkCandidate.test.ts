@@ -20,3 +20,8 @@ describe("routed direct-walking candidate", () => {
   expect(directWalkCandidate(point,point,route,28800,0)).toBeNull();
  });
 });
+
+
+it("rejects non-finite routed geometry",()=>{
+ expect(directWalkCandidate(point,point,{...route,coords:[[NaN,54],[25,54]]},28800,1.5)).toBeNull();
+});
