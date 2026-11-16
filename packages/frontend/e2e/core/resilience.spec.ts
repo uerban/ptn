@@ -10,6 +10,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
+import { openSetupOptions } from "../helpers/setup-step";
 
 test.use({ permissions: [] });
 
@@ -61,6 +62,7 @@ test.describe("resilience @mock-api", () => {
     await refuseWrites(page, /^ptn-/);
     await page.goto("/");
     await page.getByRole("button", { name: /^Vilnius/ }).click();
+    await openSetupOptions(page);
     await page.getByRole("radio", { name: /Text mode/ }).check();
     await page.getByRole("button", { name: "Start with strict privacy" }).click();
     await expectInApp(page);

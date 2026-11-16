@@ -32,31 +32,16 @@ test.describe("Route search @mock-api", () => {
     expect(planCalls).toHaveLength(0);
   });
 
-  test("Settings page shows RAPTOR as an available routing engine", async ({
+  test("Settings offers no routing engine choice; planning stays on the device", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // Expand the Advanced section
+    // The old engine choice lived under Advanced. Picking MOTIS there did not
+    // route through MOTIS; it only stopped the timetable loading on the device.
     await page.getByRole("button", { name: /Advanced/ }).click();
-
-    // RAPTOR option should be visible and selectable
-    const raptorLabel = page.locator("text=RAPTOR (on-device)");
-    await expect(raptorLabel).toBeVisible({ timeout: 5000 });
-
-    // MOTIS option should also be visible
-    const motisLabel = page.locator("text=MOTIS (Transitous)");
-    await expect(motisLabel).toBeVisible({ timeout: 5000 });
-  });
-
-  test("RAPTOR is selected as default routing engine", async ({ page }) => {
-    await page.goto("/settings");
-
-    // Expand the Advanced section
-    await page.getByRole("button", { name: /Advanced/ }).click();
-
-    // The RAPTOR radio button should be checked by default
-    const raptorRadio = page.locator('input[type="radio"][value="raptor"]');
-    await expect(raptorRadio).toBeChecked({ timeout: 5000 });
+    await expect(page.getByRole("heading", { name: "Network services" })).toBeVisible();
+    await expect(page.getByText("Routing Engine")).toHaveCount(0);
+    await expect(page.locator('input[type="radio"][value="motis"]')).toHaveCount(0);
   });
 });
