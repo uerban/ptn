@@ -1,0 +1,24 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { diffBaselines } from "./baseline_diff.mjs";
+const run = candidates => ({ schemaVersion: 1, completion: "success", artifacts: {ptb:"p",queryTuples:"q"}, report: {patternMode:"covering-merge",objective:"plan",input:{},tuples:[{query:{departureSecs:10},candidates}]} });
+test("reports ordering, timing and additions without a quality verdict", () => {
+ const a={tripId:"A",arriveSecs:20}, b={tripId:"B",arriveSecs:30};
+ assert.equal(diffBaselines(run([a,b]),run([b,a])).tuples[0].orderingOnly,true);
+ const timing=diffBaselines(run([a]),run([{...a,arriveSecs:21}]));
+ assert.equal(timing.status,"changed/unreviewed");
+ assert.deepEqual(timing.tuples[0].removed,[a]);
+ assert.equal(timing.tuples[0].added[0].arriveSecs,21);
+ assert.equal(diffBaselines(run([a,a]),run([a])).tuples[0].removed.length,1);
+ assert.equal(diffBaselines(run([]),run([])).status,"unchanged");
+});
+test("normalizes property order but retains all fields", () => {
+ assert.equal(diffBaselines(run([{a:1,b:2}]),run([{b:2,a:1}])).status,"unchanged");
+ assert.equal(diffBaselines(run([{a:1}]),run([{a:1,unknown:2}])).status,"changed/unreviewed");
+});
+test("rejects confounded comparisons and distinguishes errors from empty", () => {
+ const a=run([]), b=run([]); b.artifacts.ptb="other";
+ assert.equal(diffBaselines(a,b).status,"incomparable");
+ b.artifacts.ptb="p";b.completion="timeout";
+ assert.equal(diffBaselines(a,b).reason,"non-success completion");
+});
