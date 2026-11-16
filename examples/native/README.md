@@ -180,8 +180,42 @@ with the original `builder.json` when refreshing the local OSM catalog; the
 host updater does not rebuild OSM. Retain the state directory across restarts.
 
 Run the server, updater, and Caddy under your host's process supervisor for a
-persistent deployment. No systemd or other supervisor template is included in
-the initial example; those need separate lifecycle validation before shipping.
+persistent deployment. `examples/native/systemd/` has two systemd units:
+`ptn-serve.service` runs the server and `ptn-refresh.service` runs the
+refresh loop. They expect the archive at `/opt/ptn`, the configuration at
+`/etc/ptn/config.json`, `stateDirectory` set to `/var/lib/ptn`, and a `ptn`
+system user that owns the state directory. Edit the paths if yours differ:
+
+```sh
+useradd --system --home-dir /var/lib/ptn --shell /usr/sbin/nologin ptn
+install -d -o ptn -g ptn /var/lib/ptn
+cp examples/native/systemd/ptn-*.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now ptn-serve.service ptn-refresh.service
+journalctl -u ptn-refresh.service -f
+```
+
+Run the first `refresh` by hand as that user before enabling the units, so a
+configuration error shows up directly. Caddy has its own unit in most
+distributions; point it at the generated Caddyfile. The units are templates:
+check them against your distribution and paths before relying on them.
+
+### Holding feeds still
+
+Feeds refresh on their own. To keep the published data unchanged for a while,
+for example while you compare this host with another one or during an upgrade,
+set a pin:
+
+```sh
+python3 examples/native/host.py --config /absolute/path/config.json pin --reason "comparing with candidate" --hours 6
+python3 examples/native/host.py --config /absolute/path/config.json pin-status
+python3 examples/native/host.py --config /absolute/path/config.json unpin
+```
+
+A pin lasts 24 hours unless `--hours` says otherwise, and at most 168. While
+it is active, `refresh` still downloads and validates, but does not publish.
+The pin expires by itself, so a forgotten pin cannot let the timetable run
+out. A damaged pin file counts as pinned; remove it with `unpin`.
 
 ## City discovery and custom cities
 

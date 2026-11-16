@@ -67,6 +67,15 @@ Keep the `caddy-data` volume: it stores certificate state. Only the web server
 publishes ports. Transit, metrics and the internal departure listener stay on
 the container network. The inherited 8080 host binding remains loopback-only.
 
+To hold the published feeds still for a while, set an expiring pin; the
+updater keeps validating but does not publish until it expires or is removed:
+
+```sh
+docker compose -f docker/compose.yml run --rm transit pin --reason "comparing hosts" --hours 6
+docker compose -f docker/compose.yml run --rm transit pin-status
+docker compose -f docker/compose.yml run --rm transit unpin
+```
+
 Use the same `-f` arguments for logs, restart and shutdown. Retain the volumes:
 `down -v` deletes transit data and certificate state. To inspect a failed
 startup, use `docker compose -f docker/compose.yml logs --tail 100`.

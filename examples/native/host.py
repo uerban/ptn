@@ -12,6 +12,8 @@ import time
 from prebuilt import refresh_delay, run as run_prebuilt
 from gtfs import prepare
 from catalog import publish_catalog, descriptor
+import pin
+import published
 
 
 def data_root_environment(config, data, binary_dir):
@@ -38,7 +40,12 @@ def data_root_environment(config, data, binary_dir):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("command", choices=("refresh", "serve", "refresh-loop", "web-config"))
+    parser.add_argument(
+        "command",
+        choices=("refresh", "serve", "refresh-loop", "web-config", "pin", "unpin", "pin-status"),
+    )
+    parser.add_argument("--hours", type=float, default=pin.DEFAULT_HOURS, help="pin duration (pin only)")
+    parser.add_argument("--reason", help="why the feeds are held (pin only)")
     args = parser.parse_args()
     config_path = args.config.resolve()
     config = json.loads(config_path.read_text())
@@ -63,6 +70,17 @@ def main():
     state = (config_path.parent / config["stateDirectory"]).resolve()
     binary_dir = root / "bin"
     state.mkdir(parents=True, exist_ok=True)
+    pin_path = state / "refresh-pin.json"
+    if args.command == "pin":
+        print(pin.describe(pin.write(pin_path, args.reason, args.hours)))
+        return
+    if args.command == "unpin":
+        pin.clear(pin_path)
+        print("unpinned")
+        return
+    if args.command == "pin-status":
+        print(pin.describe(pin.read(pin_path)))
+        return
     data = state / "transit"
     data.mkdir(exist_ok=True)
     runtime = state / "run"
@@ -76,6 +94,11 @@ def main():
         return
 
     if mode == "prebuilt":
+        held = pin.read(pin_path) if args.command == "refresh" else None
+        if held:
+            # A prebuilt sync activates what it downloads, so it is skipped whole.
+            print(f"PTN refresh skipped, {pin.describe(held)}", flush=True)
+            return
         run_prebuilt(args.command, config, state, binary_dir)
         return
 
@@ -145,6 +168,22 @@ def main():
                 "multi-feed recipes require source-aware realtime ID mapping; "
                 "omit tripUpdatesURL and serviceAlertsURL"
             )
+        try:
+            change_records = published.changes(state / "feeds", prepared)
+        except Exception as error:  # A record must never block a refresh.
+            change_records = []
+            print(f"PTN change record failed: {error}", file=sys.stderr)
+        for change in change_records:
+            print(
+                f"PTN feed {change['sourceId']}: change "
+                f"{change.get('changePercent')}% against the published feed",
+                flush=True,
+            )
+        held = pin.read(pin_path)
+        if held:
+            # The candidate stays validated and recorded; publication waits.
+            print(f"PTN publication skipped, {pin.describe(held)}", flush=True)
+            return
         feed_args = [
             value
             for feed in prepared["feeds"]
@@ -187,6 +226,10 @@ def main():
             check=True,
             env={**environment, "PT_COLOR_BUILD": "rust", "PT_TILE_BUILD": "rust"},
         )
+        try:
+            published.record(state / "feeds", prepared, change_records)
+        except Exception as error:  # Publication already succeeded.
+            print(f"PTN change record failed: {error}", file=sys.stderr)
 
 
 if __name__ == "__main__":
