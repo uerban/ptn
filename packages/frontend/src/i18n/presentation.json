@@ -128,5 +128,6 @@
   "update.updating": "Updating…",
   "update.notNow": "Not now",
   "serviceAlerts.offerCityFallback": "this city",
-  "serviceAlerts.lines": "Line {lines}"
+  "serviceAlerts.lines": "Line {lines}",
+  "search.incompleteWalkingDistance": "Routes without a complete walking distance are listed last. Distances estimated from walking time are marked ~."
 }

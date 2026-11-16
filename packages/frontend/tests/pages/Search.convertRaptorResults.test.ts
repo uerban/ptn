@@ -117,11 +117,13 @@ describe("convertRaptorResults — walking distance", () => {
     // 300 m at 3.5 km/h is 309 s; at 1.25 m/s that would read 386 m.
     const [it] = await convert([composed({ sourceWalkSecs: 309, totalWalkSecs: 309, totalWalkMeters: 300 })]);
     expect(it.walkingDistanceMeters).toBe(300);
+    expect(it.walkingDistanceEstimated).toBeUndefined();
   });
 
   it("falls back to the seconds when no distance is known", async () => {
     const [it] = await convert([composed({})]);
     expect(it.walkingDistanceMeters).toBe(375);
+    expect(it.walkingDistanceEstimated).toBe(true);
   });
 });
 

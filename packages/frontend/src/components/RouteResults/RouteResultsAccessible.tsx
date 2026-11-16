@@ -234,7 +234,7 @@ const AccessibleCard = memo(function AccessibleCard({
             {it.transfers} {t("route.transfer_short", "tr")} ·{" "}
             {t("unit.meters", "{n} m").replace(
               "{n}",
-              String(Math.round(it.walkingDistanceMeters)),
+              `${it.walkingDistanceEstimated ? "~" : ""}${Math.round(it.walkingDistanceMeters)}`,
             )}
           </div>
         </div>

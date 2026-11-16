@@ -61,6 +61,16 @@ describe("RouteResults — variant dispatch", () => {
   });
 
   for (const variant of ["consumer", "power", "accessible"] as RouteSearchVariant[]) {
+    it(`marks estimated walking totals in variant=${variant}`, () => {
+      useSettingsStore.setState({routeSearchVariant: variant});
+      render(<BrowserRouter>
+        <RouteResults itineraries={[itinerary({walkingDistanceEstimated: true})]} onSelect={() => {}} />
+      </BrowserRouter>);
+      const card = screen.getByTestId("itinerary-card");
+      expect(card).toHaveTextContent("~200");
+      expect(card).toHaveAccessibleName(/approx\. 200 m walking/);
+    });
+
     it(`renders an itinerary without crashing in variant=${variant}`, () => {
       useSettingsStore.setState({ routeSearchVariant: variant });
       render(

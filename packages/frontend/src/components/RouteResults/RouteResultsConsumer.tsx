@@ -270,7 +270,7 @@ const ConsumerCard = memo(function ConsumerCard({
           <span>
             {t("unit.meters", "{n} m").replace(
               "{n}",
-              String(Math.round(it.walkingDistanceMeters)),
+              `${it.walkingDistanceEstimated ? "~" : ""}${Math.round(it.walkingDistanceMeters)}`,
             )}{" "}
             {t("route.walk", "walk")}
           </span>

@@ -128,5 +128,6 @@
   "serviceAlerts.lines": "Linja {lines}",
   "placeSearch.show": "Osoitteiden haku palvelimelta",
   "placeSearch.heading": "Osoitteiden haku palvelimelta?",
-  "placeSearch.details": "Kun kirjoitat paikkaa, sovellus lähettää kirjoittamasi tekstin ja hakualueen tämän sovelluksen palvelimelle, joka etsii vastaavia osoitteita. Pysäkit ja paikat tällä laitteella haetaan edelleen täältä."
+  "placeSearch.details": "Kun kirjoitat paikkaa, sovellus lähettää kirjoittamasi tekstin ja hakualueen tämän sovelluksen palvelimelle, joka etsii vastaavia osoitteita. Pysäkit ja paikat tällä laitteella haetaan edelleen täältä.",
+  "search.incompleteWalkingDistance": "Reitit, joiden koko kävelymatkaa ei tiedetä, näytetään viimeisinä. Kävelyajasta arvioidut matkat on merkitty ~."
 }

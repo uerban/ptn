@@ -128,5 +128,6 @@
   "serviceAlerts.lines": "Linija {lines}",
   "placeSearch.show": "Adresų paieška serveryje",
   "placeSearch.heading": "Ar adresų paieška vykdoma serveryje?",
-  "placeSearch.details": "Kai įvedate vietovės pavadinimą, programėlė siunčia įvestą tekstą ir paieškos vietovę į šios programėlės serverį, kuris suranda atitinkančius adresus. Stotelės ir vietovės šiame įrenginyje vis tiek ieškomos čia."
+  "placeSearch.details": "Kai įvedate vietovės pavadinimą, programėlė siunčia įvestą tekstą ir paieškos vietovę į šios programėlės serverį, kuris suranda atitinkančius adresus. Stotelės ir vietovės šiame įrenginyje vis tiek ieškomos čia.",
+  "search.incompleteWalkingDistance": "Maršrutai, kurių visas ėjimo atstumas nežinomas, pateikiami pabaigoje. Pagal ėjimo laiką apskaičiuoti atstumai pažymėti ~."
 }

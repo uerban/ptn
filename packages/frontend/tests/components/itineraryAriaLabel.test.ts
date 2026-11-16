@@ -198,6 +198,13 @@ describe("itineraryAriaLabel — boarding stop", () => {
     expect(out).toContain("450 m walking");
   });
 
+  it("identifies a total estimated from walking time as approximate", () => {
+    const it = fromPin("Konstitucijos pr.", 103, "43");
+    it.walkingDistanceMeters = 450;
+    it.walkingDistanceEstimated = true;
+    expect(label(it, {bufferSeconds: 0})).toContain("approx. 450 m walking");
+  });
+
   it("says board here when the trip already starts at the boarding stop", () => {
     const out = label(transferTrip({ walkingDistanceMeters: 0 }), { bufferSeconds: 0 });
     expect(out).toContain("Board here");

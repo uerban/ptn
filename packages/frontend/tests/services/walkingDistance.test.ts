@@ -259,3 +259,16 @@ it.each([[1,undefined,true],[4,undefined,false],[2,60,true],[2,180,false],[3,und
  }
 
 });
+
+it("an unknown candidate cannot switch known distances to pace-dependent ordering", () => {
+ const longer=composeItineraries([ride],[{stopId:"S1",walkSecs:5,distanceMeters:100}],
+  [{stopId:"S2",walkSecs:0,distanceMeters:0}],28500)[0];
+ const shorter={...longer,legs:[],totalWalkMeters:15,totalWalkSecs:10,totalSecs:10};
+ const unknown={...longer,totalWalkMeters:undefined,totalWalkSecs:1,totalSecs:1};
+ expect(rankResults([longer,unknown,shorter],"least_walking")).toEqual([shorter,longer,unknown]);
+ const otherUnknown={...unknown,totalWalkSecs:100,totalSecs:0};
+ expect(rankResults([unknown,otherUnknown],"least_walking")).toEqual([otherUnknown,unknown]);
+ for(const distance of [NaN,Infinity,-1]) {
+  expect(rankResults([{...unknown,totalWalkMeters:distance},shorter],"least_walking")[0]).toBe(shorter);
+ }
+});

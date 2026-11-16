@@ -82,12 +82,15 @@ export function rankResults(
       sorted.sort((a, b) => a.transfers - b.transfers || a.totalSecs - b.totalSecs);
       break;
     case "least_walking":
-      // One consistent metric across the set; never mix metres with seconds.
-      if (sorted.every(result => result.totalWalkMeters !== undefined)) {
-        sorted.sort((a, b) => a.totalWalkMeters! - b.totalWalkMeters! || a.totalSecs - b.totalSecs);
-      } else {
-        sorted.sort((a, b) => a.totalWalkSecs - b.totalWalkSecs || a.totalSecs - b.totalSecs);
-      }
+      // Missing evidence must not change the physical ordering of known
+      // distances. Incomplete totals follow, ordered by arrival rather than
+      // claiming that their pace-dependent walking time measures distance.
+      sorted.sort((a, b) => {
+        const knownA = Number.isFinite(a.totalWalkMeters) && a.totalWalkMeters! >= 0;
+        const knownB = Number.isFinite(b.totalWalkMeters) && b.totalWalkMeters! >= 0;
+        if (knownA !== knownB) return knownA ? -1 : 1;
+        return (knownA ? a.totalWalkMeters! - b.totalWalkMeters! : 0) || a.totalSecs - b.totalSecs;
+      });
       break;
   }
 

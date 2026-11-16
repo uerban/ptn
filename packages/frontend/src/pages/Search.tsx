@@ -11,6 +11,7 @@ import { RoutingModeIndicator } from "../components/RoutingModeIndicator.tsx";
 import { RoutingFallbackNotice, type RoutingFallbackSignal } from "../components/RoutingFallbackNotice.tsx";
 import { useGeolocation } from "../hooks/useGeolocation.ts";
 import { useTranslation } from "../i18n/index.ts";
+import {usePresentationText} from "../i18n/presentationStrings.ts";
 import { searchResultSubtext } from "../services/searchResultSubtext.ts";
 import { pluralize } from "../i18n/plurals.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
@@ -287,6 +288,7 @@ export async function convertRaptorResults(
       });
     }
 
+    const walkDistanceKnown = Number.isFinite(itin.totalWalkMeters) && itin.totalWalkMeters! >= 0;
     return {
       legs,
       departureTime: iso(itin.departureSecs),
@@ -295,7 +297,8 @@ export async function convertRaptorResults(
       transfers: itin.transfers,
       // The walked metres themselves; seconds × 1.25 m/s overstated it for
       // anyone slower and understated a run to catch.
-      walkingDistanceMeters: Math.round(itin.totalWalkMeters ?? itin.totalWalkSecs * DEFAULT_WALK_SPEED_MPS),
+      walkingDistanceMeters: Math.round(walkDistanceKnown ? itin.totalWalkMeters! : itin.totalWalkSecs * DEFAULT_WALK_SPEED_MPS),
+      ...(!walkDistanceKnown ? {walkingDistanceEstimated: true} : {}),
       ...(itin.cancelled ? { cancelled: true } : {}),
       ...(itin.timingUnreliable ? { timingUnreliable: true } : {}),
     };
@@ -328,6 +331,7 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
 }
 
 export function SearchPage() {
+  const presentationText = usePresentationText();
   const navigate = useNavigate();
   const tripStart = useTripStart(useCallback(() => navigate("/"), [navigate]));
   const [searchParams] = useSearchParams();
@@ -1397,6 +1401,9 @@ export function SearchPage() {
     <>
       <RoutingModeIndicator />
       <RoutingFallbackNotice signal={routingFallback} />
+      {ranking === "least_walking" && itineraries.some(itinerary => itinerary.walkingDistanceEstimated) && (
+        <p role="status" className="px-4 py-2 text-sm text-fg-muted">{presentationText("search.incompleteWalkingDistance")}</p>
+      )}
       <RouteResults
         itineraries={itineraries}
         onSelect={handleItinerarySelect}

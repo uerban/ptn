@@ -161,6 +161,8 @@ export interface Itinerary {
   transfers: number;
   /** Total walking distance across all WALK legs, in meters. */
   walkingDistanceMeters: number;
+  /** Total inferred from walking time because a complete distance was unavailable. */
+  walkingDistanceEstimated?: boolean;
   /** Opaque pagination cursor — pass to planTrip to retrieve subsequent itineraries. */
   paginationCursor?: string;
   /**

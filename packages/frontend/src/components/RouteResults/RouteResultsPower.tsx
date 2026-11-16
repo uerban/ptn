@@ -299,7 +299,7 @@ const PowerCard = memo(function PowerCard({
               {t("route.walk_short", "walk")}{" "}
               {t("unit.meters_compact", "{n}m").replace(
                 "{n}",
-                String(Math.round(it.walkingDistanceMeters)),
+                `${it.walkingDistanceEstimated ? "~" : ""}${Math.round(it.walkingDistanceMeters)}`,
               )}
             </span>
           )}

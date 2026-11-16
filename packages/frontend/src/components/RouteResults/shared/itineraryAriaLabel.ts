@@ -251,6 +251,7 @@ export function itineraryAriaLabel(
   //    already long, so it is dropped rather than restated.
   const walkMeters = Math.round(it.walkingDistanceMeters);
   const accessCoversWalk =
+    !it.walkingDistanceEstimated &&
     boarding !== null &&
     boarding.meters !== null &&
     Math.abs(walkMeters - boarding.meters) <= 5;
@@ -258,7 +259,7 @@ export function itineraryAriaLabel(
     meta.push(
       t("route.aria_walking_total", "{n} m walking").replace(
         "{n}",
-        String(walkMeters),
+        `${it.walkingDistanceEstimated ? `${t("guidance.approximate", "approx.")} ` : ""}${walkMeters}`,
       ),
     );
   }
