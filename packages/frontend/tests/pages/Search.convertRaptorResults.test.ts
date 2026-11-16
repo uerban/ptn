@@ -1,3 +1,4 @@
+import { serviceDayFrame } from "../../src/services/serviceDayFrame.ts";
 import { directWalkCandidate } from "../../src/services/directWalkCandidate.ts";
 import { decodePolyline } from "../../src/utils/polyline.ts";
 import { describe, it, expect, beforeEach } from "vitest";
@@ -136,4 +137,15 @@ it("converts a routed direct walk without fabricated stop locations", async () =
  expect(result.legs[0].to.location).toEqual(destination);
  expect(result.walkingDistanceMeters).toBe(15);
  expect(decodePolyline(result.legs[0].polyline!)).toEqual([origin,destination]);
+});
+
+
+it.each(["2026-03-29T00:59:55Z","2026-03-29T01:00:05Z","2026-10-25T00:59:55Z","2026-10-25T01:00:05Z"])("preserves direct-walk instants at %s", async timestamp => {
+ const departure=new Date(timestamp),origin={lat:54.68,lon:25.28},destination={lat:54.68,lon:25.2801};
+ const frame=serviceDayFrame(departure.getTime()/1000,"Europe/Vilnius");
+ const candidate=directWalkCandidate(origin,destination,{distanceMeters:15,coords:[[25.28,54.68],[25.2801,54.68]],steps:[]},frame.nowSecs,1.5)!;
+ const [result]=await convertRaptorResults([candidate],departure,origin,destination,"Europe/Vilnius",Number(frame.todayYmd),labels);
+ expect(Date.parse(result.departureTime)).toBe(departure.getTime());
+ expect(Date.parse(result.arrivalTime)).toBe(departure.getTime()+10000);
+ expect(result.legs[0].durationSeconds).toBe(10);
 });
