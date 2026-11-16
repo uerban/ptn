@@ -1,3 +1,4 @@
+import { transferWalkEvidence } from "./transferWalkEvidence.ts";
 import { serviceDayFrame } from "./serviceDayFrame.ts";
 /**
  * Route endpoint seam invariant.
@@ -334,7 +335,11 @@ export class SearchOrchestrator {
     if (raptorResults.length === 0) return finish([]);
 
     // 5. Compose with walk times
-    const composed = composeItineraries(raptorResults, entryWalks, exitWalks, departureSecs);
+    const evidenced = walking && this.config.directWalkRoute
+      ? await transferWalkEvidence(raptorResults, this.config.allStops, this.config.directWalkRoute,
+        riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps))
+      : raptorResults;
+    const composed = composeItineraries(evidenced, entryWalks, exitWalks, departureSecs);
 
     // 6. Apply RT overlay
     const withRt = applyRtOverlay(composed, getDelay, minTransferSecs);

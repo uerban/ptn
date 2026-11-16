@@ -186,7 +186,12 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });
           return;
         }
-        config.directWalkRoute = async () => route;
+        const routeProvider = config.directWalkRoute!;
+        const fromPoint = endpointCoord(origin), toPoint = endpointCoord(destination);
+        config.directWalkRoute = async (from, to) =>
+          from.lat === fromPoint.lat && from.lon === fromPoint.lon
+          && to.lat === toPoint.lat && to.lon === toPoint.lon
+            ? route : routeProvider(from, to);
       }
 
       const orchestrator = new SearchOrchestrator(config);
