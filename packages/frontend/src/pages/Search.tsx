@@ -234,6 +234,8 @@ export async function convertRaptorResults(
         departureTime: iso(leg.departSecs),
         arrivalTime: iso(leg.arriveSecs),
         durationSeconds: leg.arriveSecs - leg.departSecs,
+        ...(!isTransit && "distanceMeters" in leg && typeof leg.distanceMeters === "number"
+          ? { distanceMeters: leg.distanceMeters } : {}),
         routeShortName: display?.routeShortName,
         routeColor: display?.routeColor,
         tripId: isTransit ? leg.tripId : undefined,

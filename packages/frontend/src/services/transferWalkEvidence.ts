@@ -35,7 +35,10 @@ export async function transferWalkEvidence(
         || Math.ceil(route.distanceMeters/speed)>leg.arriveSecs-leg.departSecs) {
         feasible=false;break;
       }
-      legs.push({...leg,distanceMeters:route.distanceMeters});
+      const duration = Math.ceil(route.distanceMeters / speed);
+      // Preserve the engine's transfer deadline and overall arrival. Any
+      // minimum-transfer floor becomes waiting before the physical walk.
+      legs.push({...leg, departSecs: leg.arriveSecs - duration, distanceMeters:route.distanceMeters});
     }
     if(feasible) retained.push({...itinerary,legs});
   }

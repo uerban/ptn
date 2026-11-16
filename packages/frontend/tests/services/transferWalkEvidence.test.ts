@@ -8,7 +8,7 @@ it("preserves physical distance and transfer buffer, deduplicating route work",a
  const route=vi.fn(async()=>({distanceMeters:30,coords:[[25,54],[25.001,54]] as [number,number][],steps:[]}));
  const result=await transferWalkEvidence([itinerary,itinerary],stops,route,1.5);
  expect(result).toHaveLength(2);
- expect(result[0].legs[0]).toMatchObject({distanceMeters:30,arriveSecs:120});
+ expect(result[0].legs[0]).toMatchObject({distanceMeters:30,departSecs:100,arriveSecs:120});
  expect(route).toHaveBeenCalledTimes(1);
  expect(itinerary.legs[0]).not.toHaveProperty("distanceMeters");
 });
@@ -29,4 +29,11 @@ it("preserves unknown transfer metres on transient provider failure",async()=>{
  expect(result).toHaveLength(1);
  expect(result[0].legs[0]).not.toHaveProperty("distanceMeters");
  await expect(transferWalkEvidence([itinerary],stops,async()=>{throw new Error("bug");},1.5)).rejects.toThrow("bug");
+});
+
+
+it("preserves transfer deadline while separating walking from the buffer",async()=>{
+ const result=await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:30,coords:[[25,54],[25.001,54]],steps:[]}),0.75);
+ expect(result[0].legs[0]).toMatchObject({departSecs:80,arriveSecs:120,distanceMeters:30});
+ expect(result[0].alightSecs).toBe(itinerary.alightSecs);
 });
