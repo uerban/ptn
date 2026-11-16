@@ -118,8 +118,8 @@ export interface PtRouterHandle {
   setTransfers(bytes: Uint8Array): Promise<void>;
   free(): void;
   isAlive(): boolean;
-  /** The opt-in arrive-by owner, in its own worker (H74). Only a
-   * `PTN_ARRIVE_BY_EXPERIMENT=1` build has it; never in-process. */
+  /** The arrive-by owner, in its own worker (H74). Only an arrive-by
+   * build has it; never in-process. */
   readonly arriveBy?: ArriveByChannel;
 }
 /** The raw wasm-bindgen `PtRouter` as the in-process path calls it. */

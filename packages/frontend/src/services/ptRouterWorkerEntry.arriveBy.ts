@@ -1,8 +1,7 @@
 /**
- * Opt-in replacement for `ptRouterWorkerEntry.ts`, selected by the Vite alias
- * in a `PTN_ARRIVE_BY_EXPERIMENT=1` build. The page starts the default router
- * worker unchanged and, beside it, the experimental arrive-by owner in its own
- * worker (H74).
+ * Replacement for `ptRouterWorkerEntry.ts`, selected by the Vite alias in an
+ * arrive-by build (the default). The page starts the default router worker
+ * unchanged and, beside it, the arrive-by owner in its own worker (H74).
  */
 import { createArriveByLink as create, type ArriveByLinkFactory } from "./temporalArriveByLink.ts";
 

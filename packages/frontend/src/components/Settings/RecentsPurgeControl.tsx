@@ -7,11 +7,15 @@ export interface RecentsPurgeControlProps {
   confirmFn?: (message: string) => boolean;
   /** Test hook: replace the underlying purge call. */
   onPurge?: () => Promise<void>;
+  /** Render as a row inside another card (the Recent places card) instead
+   *  of a section with its own heading. */
+  embedded?: boolean;
 }
 
 export function RecentsPurgeControl({
   confirmFn,
   onPurge,
+  embedded = false,
 }: RecentsPurgeControlProps) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -34,12 +38,8 @@ export function RecentsPurgeControl({
     }
   }
 
-  return (
-    <section>
-      <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
-        {t("settings.recents_data", "Recent locations")}
-      </h2>
-      <div className="bg-surface-raised rounded-xl border border-divider px-4 py-3 flex items-center justify-between gap-3">
+  const row = (
+      <div className={embedded ? "flex items-center justify-between gap-3" : "bg-surface-raised rounded-xl border border-divider px-4 py-3 flex items-center justify-between gap-3"}>
         <div className="min-w-0">
           <p className="text-sm text-fg">
             {t("settings.recents_purge_label", "Clear recent locations")}
@@ -70,6 +70,14 @@ export function RecentsPurgeControl({
             : t("settings.recents_purge_button", "Purge")}
         </button>
       </div>
+  );
+  if (embedded) return row;
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
+        {t("settings.recents_data", "Recent locations")}
+      </h2>
+      {row}
     </section>
   );
 }

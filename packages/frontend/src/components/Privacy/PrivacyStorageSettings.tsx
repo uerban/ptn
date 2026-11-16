@@ -1,6 +1,8 @@
 import { useTranslation } from "../../i18n/index.ts";
 import { OptionalStorageChoice } from "./OptionalStorageChoice.tsx";
 import { PersonalStorageDetail, PersonalStorageNotice } from "./PersonalStorageNotice.tsx";
+import { RecentsRetentionControl } from "../Settings/PrivacyLevelSection.tsx";
+import { RecentsPurgeControl } from "../Settings/RecentsPurgeControl.tsx";
 
 export function PrivacyStorageSettings() {
   const { t } = useTranslation();
@@ -25,7 +27,12 @@ export function PrivacyStorageSettings() {
             "privacy.optional.recents_desc",
             "Keep origins and destinations for quicker searches. Your privacy level controls encryption and retention.",
           )}
-        />
+        >
+          {/* Everything about recent places in one card: whether to keep
+              them (above), how they are stored, and clearing them. */}
+          <RecentsRetentionControl />
+          <RecentsPurgeControl embedded />
+        </OptionalStorageChoice>
         <OptionalStorageChoice
           category="viewport"
           title={t("privacy.optional.viewport_title", "Last map area")}

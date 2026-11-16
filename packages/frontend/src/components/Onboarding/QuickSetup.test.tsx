@@ -44,10 +44,27 @@ describe("QuickSetup", () => {
     expect(props.onStartModeChange).toHaveBeenCalledWith("text");
   });
 
-  it("starts with one preset action", () => {
+  it("leads with one big button to continue to the map; the rest is under More options", () => {
     const props = renderQuick();
-    fireEvent.click(screen.getByRole("button", { name: "Start with recommended settings" }));
+    const more = screen.getByText("More options and details").closest("details")!;
+    expect(more.open).toBe(false);
+    expect(screen.getByRole("heading", { name: "Ready to start" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to the map" }));
     expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended" });
+    // The mode choice, strict and customize live inside the expandable section.
+    expect(more.contains(screen.getByRole("radio", { name: /Map mode/ }))).toBe(true);
+    expect(more.contains(screen.getByRole("button", { name: "Start with strict privacy" }))).toBe(true);
+    expect(more.contains(screen.getByRole("button", { name: "Customize" }))).toBe(true);
+  });
+
+  it("names the big button by the chosen start mode", () => {
+    renderQuick({ startMode: "text" });
+    expect(screen.queryByRole("button", { name: "Continue to the map" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Start with recommended settings" })).toBeTruthy();
+  });
+
+  it("starts with strict from the details", () => {
+    const props = renderQuick();
     fireEvent.click(screen.getByRole("button", { name: "Start with strict privacy" }));
     expect(props.onChoose).toHaveBeenLastCalledWith({ presetId: "strict" });
   });

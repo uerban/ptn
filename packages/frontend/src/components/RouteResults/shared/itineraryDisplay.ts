@@ -37,6 +37,14 @@ export interface ItineraryDisplayContext {
   firstRideCancelled?: boolean;
   /** Live RT marks the first ride's trip DELETED: removed, not cancelled. */
   firstRideRemoved?: boolean;
+  /**
+   * The time the rider asked to leave at ("In 30 min", a picked time, Later),
+   * when it is not now. The recommended leave time is never put before it:
+   * the wait at the stop shrinks instead. Ignored when the walk no longer
+   * fits from that time (an early bus), so a reachable plan is never shown
+   * with a leave time that misses it.
+   */
+  earliestLeaveMs?: number;
 }
 
 /**
@@ -328,7 +336,14 @@ export function deriveItineraryDisplay(
   // none and suppresses the buffer chrome.
   const bufferOff = ctx.bufferSeconds <= 0;
   const requestedBufferMs = bufferOff ? 0 : ctx.bufferSeconds * 1000;
-  const appliedBufferMs = Math.max(0, Math.min(requestedBufferMs, slackMs));
+  // A leave time chosen by the rider is the floor for the recommendation.
+  const askedSlackMs =
+    ctx.earliestLeaveMs !== undefined && ctx.earliestLeaveMs > ctx.referenceNowMs
+      ? firstTransitDepMs - walkMs - ctx.earliestLeaveMs
+      : NaN;
+  const leaveFloorMs = askedSlackMs >= 0 ? (ctx.earliestLeaveMs as number) : ctx.referenceNowMs;
+  const bufferSlackMs = askedSlackMs >= 0 ? askedSlackMs : slackMs;
+  const appliedBufferMs = Math.max(0, Math.min(requestedBufferMs, bufferSlackMs));
   const appliedBufferSecs = Math.floor(appliedBufferMs / 1000);
   const bufferClamped = appliedBufferMs < requestedBufferMs;
 
@@ -336,7 +351,7 @@ export function deriveItineraryDisplay(
   // with no margin at all.
   const recommendedDepartureMs = running
     ? ctx.referenceNowMs
-    : Math.max(ctx.referenceNowMs, firstTransitDepMs - walkMs - appliedBufferMs);
+    : Math.max(leaveFloorMs, firstTransitDepMs - walkMs - appliedBufferMs);
   // With the buffer off the hint is suppressed, and it keys off this — keep it
   // 0 rather than the raw gap.
   const leadingWaitSeconds = bufferOff

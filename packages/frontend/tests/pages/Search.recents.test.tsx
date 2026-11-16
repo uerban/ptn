@@ -105,7 +105,9 @@ describe("Search.tsx records committed endpoints", () => {
     );
     await selectFirstSuggestion(getAllByRole("searchbox")[1] as HTMLInputElement, "galleria");
     const option = await findByRole("option", { name: /გალერია თბილისი/ });
-    expect(getByText("Galleria Tbilisi · Rustaveli Ave 2/4")).toHaveClass("truncate");
+    // Long subtitles wrap to two lines (readable at large text sizes) and are
+    // cut only after that.
+    expect(getByText("Galleria Tbilisi · Rustaveli Ave 2/4")).toHaveClass("line-clamp-2");
     fireEvent.click(option);
     await waitFor(() => expect(recordRecentMock).toHaveBeenCalledWith(
       expect.objectContaining({ label: "გალერია თბილისი" }), { usedAsOrigin: false },

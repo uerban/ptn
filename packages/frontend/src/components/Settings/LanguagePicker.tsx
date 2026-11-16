@@ -60,7 +60,7 @@ export function LanguagePicker() {
     <section>
       <h2
         id={HEADING_ID}
-        className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2"
+        className="text-sm font-semibold text-fg-muted uppercase tracking-wider [overflow-wrap:anywhere] mb-2"
       >
         {t("settings.language", "Language")}
       </h2>

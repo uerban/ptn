@@ -1,4 +1,4 @@
-/** The opt-in build's side of `arriveByExperiment.ts`. */
+/** The arrive-by build's side of `arriveByEntry.ts`. */
 import type { ComponentType } from "react";
 import type { ArriveByResultsProps, ArriveByToolbarProps } from "./arriveByTypes.ts";
 import { ArriveByToolbar as Toolbar } from "./ArriveByToolbar.tsx";

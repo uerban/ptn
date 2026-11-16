@@ -1,15 +1,21 @@
 /**
- * Session state of the opt-in Arrive-by UI: the chosen mode, the deadline the
+ * Session state of the Arrive-by UI: the chosen mode, the deadline the
  * toolbar shows (the draft), and the deadline the results use (applied).
  * In memory only, so returning to Search restores it and a reload does not.
  */
 import { create } from "zustand";
 
-export type ArriveByMode = "leave-now" | "arrive-by";
+/** `on-bus` is the planned third mode (already aboard); it has no UI behavior yet. */
+export type ArriveByMode = "leave" | "arrive-by" | "on-bus";
+/** What the Leave mode departs at: now, a preset offset from the choice, or a picked time. */
+export type LeaveOption = "now" | "in15" | "in30" | "in60" | "custom";
 
 interface ArriveByUiState {
   readonly cityId: string | null;
   readonly mode: ArriveByMode;
+  readonly leaveOption: LeaveOption;
+  /** Departure instant of the Leave mode, epoch ms; null means now. */
+  readonly leaveAtMs: number | null;
   /** Deadline in the toolbar, epoch ms; null while the inputs are incomplete. */
   readonly draftMs: number | null;
   /** True once the rider changed the deadline; a mode switch then keeps it. */
@@ -21,7 +27,9 @@ interface ArriveByUiState {
   /** Default deadline per endpoint pair, from its initial Recommended page. */
   readonly defaults: Readonly<Record<string, number>>;
   chooseArriveBy(defaultMs: number): void;
+  chooseLeave(): void;
   chooseLeaveNow(): void;
+  setLeaveAt(option: LeaveOption, ms: number | null): void;
   editDraft(ms: number | null): void;
   apply(): void;
   rememberDefault(pairKey: string, ms: number): void;
@@ -29,7 +37,7 @@ interface ArriveByUiState {
 }
 
 const initial = {
-  mode: "leave-now" as ArriveByMode, draftMs: null, edited: false, appliedMs: null, defaults: {},
+  mode: "leave" as ArriveByMode, leaveOption: "now" as LeaveOption, leaveAtMs: null, draftMs: null, edited: false, appliedMs: null, defaults: {},
 };
 
 export const useArriveByUi = create<ArriveByUiState>()((set, get) => ({
@@ -42,8 +50,14 @@ export const useArriveByUi = create<ArriveByUiState>()((set, get) => ({
     if (s.edited && s.draftMs !== null) set({ mode: "arrive-by" });
     else set({ mode: "arrive-by", draftMs: defaultMs, edited: false, draftVersion: s.draftVersion + 1 });
   },
+  chooseLeave() {
+    set({ mode: "leave", appliedMs: null });
+  },
   chooseLeaveNow() {
-    set({ mode: "leave-now", appliedMs: null });
+    set({ mode: "leave", appliedMs: null, leaveOption: "now", leaveAtMs: null });
+  },
+  setLeaveAt(option, ms) {
+    set({ leaveOption: option, leaveAtMs: option === "now" ? null : ms });
   },
   editDraft(ms) {
     set({ draftMs: ms, edited: true });

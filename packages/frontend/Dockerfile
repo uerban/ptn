@@ -62,7 +62,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=shared \
     --mount=type=cache,target=/src/target,sharing=locked \
     wasm-pack build --release --target web --out-dir pkg-web
 
-# Optional staging arrive-by package; ordinary builds keep it empty.
+# Arrive-by package; set PTN_ARRIVE_BY_EXPERIMENT=0 to build without it.
 ARG PTN_ARRIVE_BY_EXPERIMENT=1
 ARG GIT_SHA=
 COPY scripts/build-pt-wasm-arrive-by.mjs /src/scripts/build-pt-wasm-arrive-by.mjs

@@ -601,7 +601,10 @@ export const useSettingsStore = create<SettingsState>()(
         const validThemes: ThemeMode[] = ["light", "dark", "system"];
         const VALID_MOBILITY_PROFILES: MobilityProfile[] = ["default", "wheelchair", "vision_impaired", "bicycle"];
         const validLanguages: readonly string[] = ["auto", ...SUPPORTED_LOCALES];
-        const validAdapters = ["raptor", "motis"];
+        // "motis" was a Settings choice that only stopped the timetable from
+        // loading on the device; routing source is chosen by routingMode. A
+        // stored "motis" falls back to the default so on-device data loads.
+        const validAdapters = ["raptor"];
         const mergedTheme = validThemes.includes(stored?.theme as ThemeMode)
           ? (stored!.theme as ThemeMode)
           : current.theme;

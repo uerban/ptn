@@ -17,6 +17,7 @@ import { TransitousPanel, type TransitousPanelProps } from "./TransitousPanel.ts
 import { RouteResultsConsumer } from "./RouteResultsConsumer.tsx";
 import { RouteResultsPower } from "./RouteResultsPower.tsx";
 import { RouteResultsAccessible } from "./RouteResultsAccessible.tsx";
+import { LeaveFloorContext } from "./shared/leaveFloor.ts";
 import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
 import { legTargets } from "../../hooks/useServiceAlertSelection.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
@@ -58,6 +59,10 @@ interface RouteResultsProps {
   emptyRemoteSearch?: { onSearchOnServer: () => void };
   onEarlier?: () => void;
   onLater?: () => void;
+  /** The set after the latest departure shown (not a fixed time shift). */
+  onNext?: () => void;
+  /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
+  departAt?: Date | null;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */
@@ -92,6 +97,8 @@ export function RouteResults({
   emptyRemoteSearch,
   onEarlier,
   onLater,
+  onNext,
+  departAt,
   origin,
   destination,
   feedTz,
@@ -278,6 +285,7 @@ export function RouteResults({
         surface="route-results"
         listAlerts={false}
       />
+      <LeaveFloorContext.Provider value={departAt?.getTime()}>
       {variant === "power" ? (
         <RouteResultsPower
           itineraries={itineraries}
@@ -306,6 +314,7 @@ export function RouteResults({
           feedTz={feedTz}
         />
       )}
+      </LeaveFloorContext.Provider>
 
       {canSavePair && (
         <div className="px-3 pt-1 pb-2 space-y-2">
@@ -345,7 +354,15 @@ export function RouteResults({
                 onClick={onLater}
                 className="flex-1 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10"
               >
-                {t("search.later", "Later")} ↓
+                {t("search.later", "Later")}
+              </button>
+            )}
+            {onNext && (
+              <button
+                onClick={onNext}
+                className="flex-1 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10"
+              >
+                {t("search.next", "Next")} ↓
               </button>
             )}
           </div>

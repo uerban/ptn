@@ -37,7 +37,7 @@ export function StopFavoriteButton({ stop }: { stop: Pick<Stop, "id" | "name" | 
       disabled={!favoritesLoaded}
       aria-busy={!favoritesLoaded}
       aria-pressed={!!existing}
-      className="p-2 rounded-full hover:bg-surface-overlay disabled:opacity-50"
+      className="p-[min(0.5rem,8px)] rounded-full hover:bg-surface-overlay disabled:opacity-50"
       aria-label={existing ? "Remove from favorites" : "Add to favorites"}
     >
       <Icon

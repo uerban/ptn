@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
 import { SearchPage } from "../../src/pages/Search.tsx";
-import { ArriveByResults, ArriveByToolbar } from "../../src/components/ArriveBy/arriveByExperiment.ts";
+import { ArriveByResults, ArriveByToolbar } from "../../src/components/ArriveBy/arriveByEntry.ts";
 
 describe("Search without the arrive-by experiment", () => {
   it("has a null gate and no arrive-by control", () => {

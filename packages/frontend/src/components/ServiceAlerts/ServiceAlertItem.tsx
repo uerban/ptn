@@ -59,7 +59,7 @@ export function SeverityLabel({ severity }: { severity: AlertSeverity }) {
       {severity === "SEVERE" || severity === "WARNING" ? (
         <Icon name="warning" size={14} />
       ) : (
-        <span aria-hidden className="inline-flex w-3.5 h-3.5 items-center justify-center rounded-full border border-current text-[9px] leading-none">
+        <span aria-hidden className="inline-flex w-3.5 h-3.5 items-center justify-center rounded-full border border-current text-[0.5625rem] leading-none">
           i
         </span>
       )}

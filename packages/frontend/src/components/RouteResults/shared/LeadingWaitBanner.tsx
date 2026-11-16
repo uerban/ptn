@@ -81,7 +81,7 @@ export function LeadingWaitBanner({
   ).replace("{n}", String(nMin));
   const [before, after] = copy.split("{time}");
   return (
-    <div className="flex items-start gap-2 rounded-lg bg-accent/10 px-2.5 py-1.5 text-[11px] leading-snug text-fg-muted">
+    <div className="flex items-start gap-2 rounded-lg bg-accent/10 px-2.5 py-1.5 text-[0.6875rem] leading-snug text-fg-muted">
       <span aria-hidden className="text-accent">
         ⓘ
       </span>

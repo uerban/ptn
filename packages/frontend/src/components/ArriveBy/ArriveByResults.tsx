@@ -1,10 +1,10 @@
 import { useEffectiveExcludedModes } from "../../hooks/useEffectiveExcludedModes.ts";
 /**
- * Opt-in Arrive-by results: while a deadline is applied, runs the selected
+ * Arrive-by results: while a deadline is applied, runs the selected
  * latest-then-portfolio search on the router's arrive-by channel and shows
  * its options in the existing results list, latest departure first. Without
  * an applied deadline it renders Search's normal results unchanged. Bundled
- * only in a `PTN_ARRIVE_BY_EXPERIMENT=1` build (`arriveByExperiment.ts`).
+ * unless the arrive-by build is off (`arriveByEntry.ts`).
  *
  * H62 keeps a certified latest card only after a known resource limit in
  * the alternatives stage; integrity/context failures clear it. A running
@@ -36,6 +36,8 @@ type View =
   | { readonly kind: "error"; readonly message: string }
   | { readonly kind: "search"; readonly state: ArriveBySearchState; readonly scope: ArriveByMovementScope;
       readonly cards: readonly ArriveByCard[] };
+
+const ACTION_CLASS = "w-full min-h-12 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 export function ArriveByResults({ origin, destination, onSelect, children }: ArriveByResultsProps) {
   const appliedMs = useArriveByUi((s) => s.appliedMs);
@@ -159,13 +161,12 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
 
   const deadlineText = formatTime(new Date(deadlineMs).toISOString(), locale, tz);
   const leaveNow = (
-    <button type="button" onClick={() => useArriveByUi.getState().chooseLeaveNow()}
-      className="mt-3 w-full min-h-12 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10">
+    <button type="button" onClick={() => useArriveByUi.getState().chooseLeaveNow()} className={ACTION_CLASS}>
       {t("arriveBy.leave_now_action", "Show journeys leaving now")}
     </button>
   );
   const notice = (text: string, actions?: ReactNode) => (
-    <div className="p-6 text-center text-fg-muted text-sm" data-testid="arrive-by-notice">
+    <div className="px-4 py-5 text-center text-fg-muted text-sm space-y-2" data-testid="arrive-by-notice">
       <p>{text}</p>
       {actions}
     </div>
@@ -181,8 +182,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
     const code = view.kind === "search" ? `${view.state.failure?.stage}/${view.state.failure?.code}` : "client";
     body = notice(t("arriveBy.failed", "The arrive-by search failed ({code}).").replace("{code}", code), (
       <>
-        <button type="button" onClick={() => setAttempt((n) => n + 1)}
-          className="mt-3 w-full min-h-12 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10">
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className={ACTION_CLASS}>
           {t("arriveBy.retry", "Try again")}
         </button>
         {leaveNow}
@@ -214,7 +214,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
 
   return (
     <div data-testid="arrive-by-results" data-status={view.kind === "search" ? view.state.status : view.kind}>
-      <p role="status" className="px-4 pt-3 text-xs text-fg-secondary">{status}</p>
+      <p role="status" className="px-1 pt-2 pb-1 text-xs text-fg-secondary empty:hidden">{status}</p>
       {body}
     </div>
   );

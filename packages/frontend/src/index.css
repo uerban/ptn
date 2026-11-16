@@ -70,6 +70,10 @@ body {
      above the app shell) follows the theme, or a dark-theme banner sits on
      white. */
   background-color: var(--color-surface);
+  /* At very large text sizes (browser zoom or OS text scaling) a single long
+     word can be wider than a phone screen. Let it break instead of pushing
+     the page sideways. Only words that cannot fit are affected. */
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -88,7 +92,8 @@ body {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   textarea,
   select {
-    font-size: 16px;
+    /* A floor, so larger text settings still enlarge typed text. */
+    font-size: max(16px, 1rem);
   }
 }
 
@@ -120,6 +125,32 @@ body {
   flex-direction: column;
 }
 
+
+/* Settings rows put a label on the left and a control (toggle, radio, button,
+   stepper) on the right. With large text the label alone can be wider than a
+   phone screen, and the control is pushed off the side so the page scrolls
+   sideways. The label keeps the row while it has about 10rem, which scales with
+   the text size; below that the control wraps under it. At normal sizes nothing
+   moves. */
+.settings-rows .justify-between {
+  flex-wrap: wrap;
+}
+.settings-rows .justify-between > :first-child {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.settings-rows .justify-between > * {
+  max-width: 100%;
+}
+/* Flex items default to their longest word as a minimum width, which stops the
+   body's break-word from ever applying inside them. Zero specificity, so any
+   component that sets its own min-width still wins. */
+.settings-rows :where(*) {
+  min-width: 0;
+}
+.settings-rows :where(select, input, button) {
+  max-width: 100%;
+}
 
 /* GPS pause toggle inside the locate control group. */
 .maplibregl-ctrl-group button.ptn-gps-pause {

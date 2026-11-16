@@ -81,7 +81,7 @@ Native binaries:
 cargo build --release --locked --workspace   # target/release/{pt-serve,pt-producer,pt-artifacts,...}
 ```
 
-The release build also builds the arrive-by package: `node scripts/build-pt-wasm-arrive-by.mjs`, then `PTN_ARRIVE_BY_EXPERIMENT=1 pnpm build`.
+Arrive-by is on by default. Build its package with `node scripts/build-pt-wasm-arrive-by.mjs` before `pnpm build`; the release build sets `PTN_ARRIVE_BY_EXPERIMENT=1` so a missing package fails the build. `PTN_ARRIVE_BY_EXPERIMENT=0` builds without it.
 
 ## Installable archive
 

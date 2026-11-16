@@ -219,7 +219,7 @@ export function CitySelection(props: CitySelectionProps) {
           type="button"
           onClick={locate}
           aria-describedby={locateHelpId}
-          className="self-start min-h-11 rounded-lg border border-divider bg-surface-raised px-4 py-2 text-sm font-medium text-fg"
+          className="self-start max-w-full min-h-11 rounded-lg border border-divider bg-surface-raised px-4 py-2 text-sm font-medium text-fg [overflow-wrap:anywhere]"
         >
           {text("setup.city.locate")}
         </button>

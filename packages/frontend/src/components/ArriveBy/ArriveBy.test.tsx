@@ -107,7 +107,7 @@ async function applyDefault(): Promise<void> {
 }
 
 beforeEach(() => {
-  useArriveByUi.setState({ cityId: null, mode: "leave-now", draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {} });
+  useArriveByUi.setState({ cityId: null, mode: "leave", draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {} });
   useRoutingStore.setState({ ranking: "fastest" });
   useCityStore.setState({ activeCity: { ...useCityStore.getState().activeCity, tz: TZ } });
   vi.mocked(prepareArriveBy).mockReset().mockResolvedValue({
@@ -125,7 +125,7 @@ describe("Arrive-by toolbar", () => {
     render(<Page page={recommended("2026-10-12T07:12:01Z")} />);
     const deadline = Date.parse("2026-10-12T07:13:00Z");
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
-    expect(useArriveByUi.getState().mode).toBe("leave-now");
+    expect(useArriveByUi.getState().mode).toBe("leave");
     expect(prepareArriveBy).toHaveBeenCalledWith(ORIGIN, DEST, deadline, useGtfsDataStore.getState().ptRouter, "results");
     expect(channel.warm).toHaveBeenCalledWith(INPUT);
     await waitFor(() => expect(performance.getEntriesByName(ARRIVE_BY_MARKS.warm)).toHaveLength(1));
@@ -168,7 +168,7 @@ describe("Arrive-by toolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(performance.getEntriesByName(ARRIVE_BY_MARKS.warm)[0]).toMatchObject({ detail: { trigger: "choice" } }));
-    fireEvent.click(screen.getByRole("button", { name: "Leave now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
     rerender(<Page />);
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(channel.warm).toHaveBeenCalledTimes(1);
@@ -201,7 +201,7 @@ describe("Arrive-by toolbar", () => {
     await applyDefault();
     act(() => { useCityStore.setState({ activeCity: { ...useCityStore.getState().activeCity, id: "elsewhere" } }); });
     await waitFor(() => expect(screen.getByTestId("normal-results")).toBeInTheDocument());
-    expect(useArriveByUi.getState().mode).toBe("leave-now");
+    expect(useArriveByUi.getState().mode).toBe("leave");
     expect(runs[0]!.cancelled).toBe(true);
   });
 });
@@ -269,7 +269,7 @@ describe("Arrive-by results", () => {
     await waitFor(() => expect(screen.getByTestId("arrive-by-notice")).toHaveTextContent("No journey starting in the 4 hours"));
     fireEvent.click(screen.getByRole("button", { name: "Show journeys leaving now" }));
     expect(screen.getByTestId("normal-results")).toBeInTheDocument();
-    expect(useArriveByUi.getState()).toMatchObject({ mode: "leave-now", appliedMs: null });
+    expect(useArriveByUi.getState()).toMatchObject({ mode: "leave", appliedMs: null });
   });
 
   it("shows a failure with its stage and code, clears the latest card, and retries", async () => {

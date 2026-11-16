@@ -1,8 +1,8 @@
 /**
  * Which workers the page starts. This default starts the normal router worker
- * only. A `PTN_ARRIVE_BY_EXPERIMENT=1` Vite build aliases this module to
- * `ptRouterWorkerEntry.arriveBy.ts`, so the default build never sees the
- * opt-in owner worker or its WASM package.
+ * only. An arrive-by Vite build (the default when the package is built)
+ * aliases this module to `ptRouterWorkerEntry.arriveBy.ts`; a build with
+ * `PTN_ARRIVE_BY_EXPERIMENT=0` never sees the owner worker or its WASM package.
  */
 import type { ArriveByLinkFactory } from "./temporalArriveByLink.ts";
 
