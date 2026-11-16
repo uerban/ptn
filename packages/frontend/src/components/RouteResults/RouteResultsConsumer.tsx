@@ -23,6 +23,7 @@ import {
   type Segment,
 } from "./shared/legHelpers.ts";
 import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay.ts";
+import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
@@ -118,6 +119,7 @@ const ConsumerCard = memo(function ConsumerCard({
   const handleClick = useCallback(() => onSelect(it), [onSelect, it]);
   // Live RT for the first ride (the list keeps its route polled).
   const live = useFirstRideLive(it);
+  const earliestLeaveMs = useLeaveFloorMs();
   const display = useMemo(
     () =>
       deriveItineraryDisplay(it, {
@@ -127,8 +129,9 @@ const ConsumerCard = memo(function ConsumerCard({
         firstDepartureShiftSeconds: live.shiftSeconds,
         firstRideCancelled: live.cancelled,
         firstRideRemoved: live.removed,
+        earliestLeaveMs,
       }),
-    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed],
+    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed, earliestLeaveMs],
   );
   // The header counts from the leave time — see shownTripSpan.
   const span = shownTripSpan(it, display);

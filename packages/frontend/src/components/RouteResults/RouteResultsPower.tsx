@@ -17,6 +17,7 @@ import {
   deriveItineraryDisplay,
   shownTripSpan,
 } from "./shared/itineraryDisplay.ts";
+import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { LeaveHint } from "./shared/LeaveHint.tsx";
 import {
@@ -160,6 +161,7 @@ const PowerCard = memo(function PowerCard({
 
   // Live RT for the first ride (the list keeps its route polled).
   const live = useFirstRideLive(it);
+  const earliestLeaveMs = useLeaveFloorMs();
   const display = useMemo(
     () =>
       deriveItineraryDisplay(it, {
@@ -169,8 +171,9 @@ const PowerCard = memo(function PowerCard({
         firstDepartureShiftSeconds: live.shiftSeconds,
         firstRideCancelled: live.cancelled,
         firstRideRemoved: live.removed,
+        earliestLeaveMs,
       }),
-    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed],
+    [it, referenceNowMs, bufferSeconds, runSpeedRatio, live.shiftSeconds, live.cancelled, live.removed, earliestLeaveMs],
   );
 
   const handleClick = useCallback(() => {

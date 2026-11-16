@@ -637,3 +637,38 @@ describe("deriveItineraryDisplay — the first ride is removed (DELETED)", () =>
     expect(shownTripSpan(trip, out).departureTime).toBe(trip.departureTime);
   });
 });
+
+describe("deriveItineraryDisplay — a leave time chosen by the rider", () => {
+  const Home = place("Home"),
+    Stop = place("Centre Stop", 0, 0, "S1"),
+    Dest = place("Office");
+  // Planned from 10:24: a 5 min walk reaches the stop one minute before the bus.
+  const plan = itinerary([
+    walk({ from: Home, to: Stop, depart: "2026-04-25T10:24:00Z", arrive: "2026-04-25T10:29:00Z", meters: 350 }),
+    ride({ from: Stop, to: Dest, depart: "2026-04-25T10:30:00Z", arrive: "2026-04-25T10:54:00Z", routeShortName: "42" }),
+  ]);
+  const base = { referenceNowMs: ms("2026-04-25T08:00:00Z"), bufferSeconds: 180 };
+
+  it("never recommends leaving before it; the wait at the stop shrinks instead", () => {
+    const out = deriveItineraryDisplay(plan, { ...base, earliestLeaveMs: ms("2026-04-25T10:24:00Z") });
+    expect(out.recommendedDepartureMs).toBe(ms("2026-04-25T10:24:00Z"));
+    expect(out.bufferSeconds).toBe(60);
+    expect(out.bufferClamped).toBe(true);
+    expect(out.catchStatus).toBe("on-time");
+  });
+
+  it("keeps the full wait when the bus leaves long after it", () => {
+    const out = deriveItineraryDisplay(plan, { ...base, earliestLeaveMs: ms("2026-04-25T10:00:00Z") });
+    expect(out.recommendedDepartureMs).toBe(ms("2026-04-25T10:22:00Z"));
+    expect(out.bufferSeconds).toBe(180);
+    expect(out.bufferClamped).toBe(false);
+  });
+
+  it("is ignored when the walk no longer fits from it, and when it is not in the future", () => {
+    const plain = deriveItineraryDisplay(plan, base);
+    expect(plain.recommendedDepartureMs).toBe(ms("2026-04-25T10:22:00Z"));
+    // An early bus: leaving at the asked 10:27 would miss it.
+    expect(deriveItineraryDisplay(plan, { ...base, earliestLeaveMs: ms("2026-04-25T10:27:00Z") })).toEqual(plain);
+    expect(deriveItineraryDisplay(plan, { ...base, earliestLeaveMs: ms("2026-04-25T07:00:00Z") })).toEqual(plain);
+  });
+});
