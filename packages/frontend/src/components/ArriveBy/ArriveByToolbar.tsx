@@ -1,5 +1,8 @@
 /**
- * Arrive-by choice in the Search header: Leave now or Arrive by, the
+ * Time choice in the Search header. Collapsed it is one button that says
+ * what the results are planned for ("Leave: Now", "Arrive by 10:13") and
+ * shares its row with Search's vehicle filters, so the header stays short.
+ * Opened it shows Leave or Arrive by, the
  * deadline in city time, and Apply. The arrive-by owner is warmed for the
  * likely query (the pair's default deadline) when Search shows the pair's
  * initial Recommended list (H75; the owner has its own worker, H74), and on
@@ -53,8 +56,10 @@ const LEAVE_OPTIONS: readonly (readonly [LeaveOption, string, string])[] = [
 ];
 const inputClass = "min-h-12 w-full min-w-0 px-3 text-sm rounded-lg border border-divider bg-input-bg text-fg focus:outline-none focus:ring-2 focus:ring-accent";
 
-export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt }: ArriveByToolbarProps) {
-  const { t } = useTranslation();
+const summaryClass = "min-h-[min(2.5rem,44px)] shrink-0 inline-flex items-center gap-1.5 px-3 text-sm font-semibold whitespace-nowrap rounded-full border border-divider bg-input-bg text-fg hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+
+export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, filters }: ArriveByToolbarProps) {
+  const { t, locale } = useTranslation();
   const cityId = useCityStore((s) => s.activeCity.id);
   const tz = useCityStore((s) => s.activeCity.tz) ?? deviceTz();
   const router = useGtfsDataStore((s) => s.ptRouter);
@@ -136,8 +141,31 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
     setLeaveDate(w.date);
     setLeaveTime(w.time);
   }, [leaveOption, leaveAtMs, tz]);
+  // The controls stay folded until asked for. An Arrive-by choice that is
+  // not applied yet (restored on return to Search) is shown open.
+  const [open, setOpen] = useState(() => mode === "arrive-by" && appliedMs === null);
+  const toggle = (): void => {
+    // Folding an unapplied Arrive by goes back to Leave: the summary then
+    // says what the results show. The edited deadline is kept.
+    if (open && mode === "arrive-by" && appliedMs === null) useArriveByUi.getState().chooseLeave();
+    setOpen(!open);
+  };
+  const clock = (ms: number): string => {
+    const wall = toCityWallClock(ms, tz);
+    if (wall.date === toCityWallClock(Date.now(), tz).date) return wall.time;
+    let day = wall.date;
+    try { day = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: tz }).format(ms); } catch { /* keep the date */ }
+    return `${day} ${wall.time}`;
+  };
+  const deadlineMs = appliedMs ?? draftMs;
+  const summary = mode === "arrive-by" && deadlineMs !== null
+    ? `${t("arriveBy.arrive_by", "Arrive by")} ${clock(deadlineMs)}`
+    : leaveAtMs !== null ? `${t("arriveBy.leave", "Leave")} ${clock(leaveAtMs)}`
+    : `${t("arriveBy.leave", "Leave")}: ${t("arriveBy.now", "Now")}`;
+
   const chooseLeaveOption = (option: LeaveOption): void => {
     const ui = useArriveByUi.getState();
+    if (option !== "custom") setOpen(false);
     if (option === "now") { ui.setLeaveAt("now", null); return; }
     if (option === "custom") {
       const ms = leaveAtMs ?? Date.now();
@@ -181,12 +209,26 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
   const apply = (): void => {
     markArriveBy(ARRIVE_BY_MARKS.apply, { deadlineMs: draftMs });
     useArriveByUi.getState().apply();
+    setOpen(false);
   };
   const canApply = mode === "arrive-by" && draftMs !== null && draftMs !== appliedMs;
 
   return (
     <div className="space-y-2" data-testid="arrive-by-toolbar">
-      <div className="flex gap-1 p-[min(0.25rem,4px)] rounded-lg border border-divider bg-input-bg" role="group"
+      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+        <button type="button" className={summaryClass} data-testid="when-summary" aria-expanded={open}
+          aria-label={`${t("arriveBy.when", "When")}: ${summary}`} onClick={toggle}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="shrink-0 text-accent">
+            <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+          </svg>
+          <span>{summary}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={`shrink-0 text-fg-muted transition-transform ${open ? "rotate-180" : ""}`}>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {filters}
+      </div>
+      {open && <div className="flex gap-1 p-[min(0.25rem,4px)] rounded-lg border border-divider bg-input-bg" role="group"
         aria-label={t("arriveBy.when", "When")}>
         <button type="button" aria-pressed={mode === "leave"} className={segmentClass(mode === "leave")}
           onClick={() => useArriveByUi.getState().chooseLeave()}>
@@ -196,8 +238,8 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
           onClick={chooseArriveBy}>
           {t("arriveBy.arrive_by", "Arrive by")}
         </button>
-      </div>
-      {mode === "leave" && (
+      </div>}
+      {open && mode === "leave" && (
         <div className="space-y-2">
           <div className="flex gap-2 overflow-x-auto" role="group" aria-label={t("arriveBy.leave_at", "Leave at")}>
             {LEAVE_OPTIONS.map(([option, key, fallback]) => (
@@ -223,7 +265,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
           )}
         </div>
       )}
-      {mode === "arrive-by" && (
+      {open && mode === "arrive-by" && (
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex-[3] min-w-0">

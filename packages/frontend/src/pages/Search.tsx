@@ -310,6 +310,10 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
   return unixToServiceDate(Math.floor(departureTime.getTime() / 1000), tz);
 }
 
+const vehicleChipClass = (excluded: boolean): string =>
+  `min-h-[min(2.5rem,44px)] flex items-center gap-1 px-2.5 rounded-full text-xs font-medium border shrink-0 transition-colors ${excluded
+    ? "border-divider bg-surface text-fg-muted line-through opacity-50" : "border-accent/30 bg-accent/10 text-fg"}`;
+
 export function SearchPage() {
   const navigate = useNavigate();
   const tripStart = useTripStart(useCallback(() => navigate("/"), [navigate]));
@@ -1402,6 +1406,44 @@ export function SearchPage() {
     </>
   );
 
+  // Vehicle filter chips. They sit beside the time summary; without the
+  // arrive-by package they keep a row of their own.
+  const vehicleFilters = (availableModes.length >= 2 || availableRouteGroups.length >= 2) ? (
+    <div
+      className="flex shrink-0 gap-1.5"
+      role="group"
+      aria-label={t("search.filter_modes", "Filter by vehicle type")}
+    >
+      {availableModes.flatMap((mode) => {
+        const children = availableRouteGroups.filter((g) => g.parentMode === mode);
+        if (children.length > 0) return children.map((group: RouteGroup) => {
+          const isExcluded = excludedModes.includes(mode) || (excludedRouteGroupsByCity[cityId] ?? []).includes(group.id);
+          return <button key={`group-${group.id}`} data-testid={`route-group-${group.id}`}
+            onClick={() => toggleRouteGroup(cityId, group, cityRouteGroups ?? [])}
+            aria-pressed={!isExcluded}
+            className={vehicleChipClass(isExcluded)}>
+            <TransportModeIcon mode={mode} size="sm" />
+            <span>{t(group.labelKey, group.label)}</span>
+          </button>;
+        });
+        const isExcluded = excludedModes.includes(mode);
+        const config = MODE_CONFIG[mode];
+        return (
+          <button
+            key={mode}
+            onClick={() => toggleMode(mode)}
+            aria-pressed={!isExcluded}
+            className={vehicleChipClass(isExcluded)}
+            title={t(`settings.mode_${mode.toLowerCase()}`, config.label)}
+          >
+            <TransportModeIcon mode={mode} size="sm" />
+            <span>{t(`settings.mode_${mode.toLowerCase()}`, config.label)}</span>
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
   return (
     <div className="h-full min-h-0 flex flex-col overflow-y-auto bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
       {/* Search header — stacked from/to inputs with vertical swap button.
@@ -1530,50 +1572,13 @@ export function SearchPage() {
             recommendedInitial={paginationTime === null}
             departAt={paginationTime}
             onDepartAt={setPaginationTime}
+            filters={vehicleFilters}
           />
         )}
 
         {/* Route-only controls return after place picking. */}
-        {!activeField && (availableModes.length >= 2 || availableRouteGroups.length >= 2) && (
-          <div
-            className="flex gap-1.5 overflow-x-auto pt-1 pb-0.5"
-            role="group"
-            aria-label={t("search.filter_modes", "Filter by vehicle type")}
-          >
-            {availableModes.flatMap((mode) => {
-              const children = availableRouteGroups.filter((g) => g.parentMode === mode);
-              if (children.length > 0) return children.map((group: RouteGroup) => {
-                const isExcluded = excludedModes.includes(mode) || (excludedRouteGroupsByCity[cityId] ?? []).includes(group.id);
-                return <button key={`group-${group.id}`} data-testid={`route-group-${group.id}`}
-                  onClick={() => toggleRouteGroup(cityId, group, cityRouteGroups ?? [])}
-                  aria-pressed={!isExcluded}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border shrink-0 transition-colors ${isExcluded
-                    ? "border-divider bg-surface text-fg-muted line-through opacity-50" : "border-accent/30 bg-accent/10 text-fg"}`}>
-                  <TransportModeIcon mode={mode} size="sm" />
-                  <span>{t(group.labelKey, group.label)}</span>
-                </button>;
-              });
-              const isExcluded = excludedModes.includes(mode);
-              const config = MODE_CONFIG[mode];
-              return (
-                <button
-                  key={mode}
-                  onClick={() => toggleMode(mode)}
-                  aria-pressed={!isExcluded}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
-                    border shrink-0 transition-colors
-                    ${isExcluded
-                      ? "border-divider bg-surface text-fg-muted line-through opacity-50"
-                      : "border-accent/30 bg-accent/10 text-fg"
-                    }`}
-                  title={t(`settings.mode_${mode.toLowerCase()}`, config.label)}
-                >
-                  <TransportModeIcon mode={mode} size="sm" />
-                  <span>{t(`settings.mode_${mode.toLowerCase()}`, config.label)}</span>
-                </button>
-              );
-            })}
-          </div>
+        {!activeField && !ArriveByToolbar && vehicleFilters && (
+          <div className="flex overflow-x-auto pt-1 pb-0.5">{vehicleFilters}</div>
         )}
       </div>
 
@@ -1581,9 +1586,10 @@ export function SearchPage() {
         {t("search.vehicle_filter_local", "Use on-device planning for bus and minibus filters.")}
       </p>}
 
-      {/* Sort chips — pill-style, horizontally scrollable */}
+      {/* Sort chips — pill-style, horizontally scrollable. Never squeezed:
+          a scrolling flex item may shrink to nothing when the header is tall. */}
       {!activeField && <div
-        className="flex gap-2 px-3 py-2 overflow-x-auto bg-surface-raised border-b border-divider"
+        className="flex shrink-0 gap-2 px-3 py-2 overflow-x-auto bg-surface-raised border-b border-divider"
         role="tablist"
         aria-label={t("search.sort", "Sort")}
       >

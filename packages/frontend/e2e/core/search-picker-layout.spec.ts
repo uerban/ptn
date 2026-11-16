@@ -58,4 +58,35 @@ test.describe("compact place picker @mock-api", () => {
     await expect(page.getByRole("button", { name: "Choose on map", exact: true })).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath("search-gps-swap.png") });
   });
+  test("large text: the header stays short and the sort tabs are not squeezed", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => { document.documentElement.style.fontSize = "135%"; });
+    });
+    await page.goto("/search?toName=Airport&toLat=54.6&toLon=25.3");
+    const tabs = page.getByRole("tablist", { name: "Sort", exact: true });
+    await expect(tabs).toBeVisible();
+    const layout = await tabs.evaluate((list) => {
+      const tab = list.querySelector('[role="tab"]')!.getBoundingClientRect();
+      const box = list.getBoundingClientRect();
+      return { tab: tab.height, top: tab.top - box.top, room: box.bottom - tab.bottom,
+        header: box.bottom - list.parentElement!.getBoundingClientRect().top,
+        scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth, height: window.innerHeight };
+    });
+    // The whole tab is inside its row, and the header with the tabs takes less than half the screen.
+    expect(layout.tab).toBeGreaterThanOrEqual(24);
+    expect(layout.top).toBeGreaterThanOrEqual(0);
+    expect(layout.room).toBeGreaterThanOrEqual(0);
+    expect(layout.header).toBeLessThan(layout.height / 2);
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
+    const summary = page.getByTestId("when-summary");
+    if (await summary.count()) { // Builds without the arrive-by package have no time controls.
+      await expect(summary).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toHaveCount(0);
+      await summary.click();
+      await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toBeVisible();
+      await expect(tabs.getByRole("tab").first()).toBeVisible();
+    }
+    await page.screenshot({ path: test.info().outputPath("search-large-text-header.png") });
+  });
 });
