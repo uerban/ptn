@@ -113,6 +113,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
 
     set({ loading: true, error: null, engineError: null, engineFailureKind: null, results: [] });
 
+    const releaseWalkGraph = walkGraphClient.retainForSearch();
     try {
       const allStops = await data.gtfsStops.toArray();
       const backendAssist = get().backendAssist;
@@ -237,6 +238,8 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         // main effect, which surfaces the bare message.
         set({ error: err instanceof Error ? err.message : String(err), loading: false });
       }
+    } finally {
+      releaseWalkGraph();
     }
   },
 

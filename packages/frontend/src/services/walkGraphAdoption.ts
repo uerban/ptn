@@ -12,11 +12,11 @@ export function installWalkGraphAdoption(
 ): () => void {
   walkGraphClient.setGuidanceActive(useGuidanceStore.getState().phase !== "idle");
   const maybeReset = () => {
-    if (useGuidanceStore.getState().phase === "idle") reset();
+    if (useGuidanceStore.getState().phase === "idle" && !walkGraphClient.hasActiveSearch()) reset();
   };
   const unsubscribe = useGuidanceStore.subscribe((state, previous) => {
     walkGraphClient.setGuidanceActive(state.phase !== "idle");
-    if (state.phase === "idle" && previous.phase !== "idle") reset();
+    if (state.phase === "idle" && previous.phase !== "idle") maybeReset();
   });
   const visible = () => {
     if (document.visibilityState === "visible") maybeReset();

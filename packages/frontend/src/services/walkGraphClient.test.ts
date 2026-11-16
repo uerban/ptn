@@ -450,6 +450,28 @@ describe("walkGraphClient over a worker", () => {
     expect(armed.size).toBe(1);
   });
 
+  it("retains one worker across overlapping searches and releases it after guidance", async () => {
+    const {client, armed, fireIdle} = workerClient();
+    const releaseFirst = client.retainForSearch();
+    expect(await client.routeFor("vilnius", A, B, "default")).toEqual(ROUTE);
+    const releaseSecond = client.retainForSearch();
+    expect(armed.size).toBe(0);
+    releaseFirst();
+    releaseFirst(); // cannot release the second search
+    expect(client.hasActiveSearch()).toBe(true);
+    expect(armed.size).toBe(0);
+    expect(await client.routeFor("vilnius", B, A, "default")).toEqual(ROUTE);
+    expect(FakeWalkWorker.instances).toHaveLength(1);
+    client.setGuidanceActive(true);
+    releaseSecond();
+    expect(client.hasActiveSearch()).toBe(false);
+    expect(armed.size).toBe(0);
+    client.setGuidanceActive(false);
+    expect(armed.size).toBe(1);
+    fireIdle();
+    expect(FakeWalkWorker.instances[0]!.terminated).toBe(true);
+  });
+
   it("starts the worker lazily, loads and routes through it", async () => {
     const { client } = workerClient();
     expect(FakeWalkWorker.instances).toHaveLength(0);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { db } from "../../src/db/index.ts";
 import type { BaseEndpoint, RoutingBundleData } from "@pt/shared";
 import {
@@ -44,6 +44,11 @@ beforeEach(async () => {
   useGtfsDataStore.setState({ raptorIndex: null, loadedCityId: null, syncing: false, error: null });
   const { useRoutingStore } = await import("../../src/stores/routingStore.ts");
   useRoutingStore.setState({ results: [], error: null, loading: false });
+});
+
+afterEach(async () => {
+  const {walkGraphClient} = await import("../../src/services/walkGraphClient.ts");
+  expect(walkGraphClient.hasActiveSearch()).toBe(false);
 });
 
 describe("useRoutingStore.search", () => {

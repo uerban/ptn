@@ -300,6 +300,7 @@ function defaultDeps(): WalkGraphClientDeps | WalkGraphWorkerDeps {
 export class WalkGraphClient {
   private port: WalkGraphPort | null = null;
   private guidanceActive = false;
+  private activeSearches = 0;
   /** The city the graph host holds, as of its last reply. */
   private loadedCity: string | null = null;
   private loading: { cityId: string; promise: Promise<WalkGraphLoadStatus> } | null = null;
@@ -328,7 +329,7 @@ export class WalkGraphClient {
         },
       )
       : inProcessPort(this.deps);
-    this.port.setPinned(this.guidanceActive);
+    this.port.setPinned(this.guidanceActive || this.activeSearches > 0);
     return this.port;
   }
 
@@ -336,7 +337,26 @@ export class WalkGraphClient {
    * exact worker until the session ends instead of adopting midway through it. */
   setGuidanceActive(active: boolean): void {
     this.guidanceActive = active;
-    this.port?.setPinned(active);
+    this.port?.setPinned(active || this.activeSearches > 0);
+  }
+
+  /** Keep the worker between the several pedestrian queries in one search.
+   * Release is idempotent so cancellation/error cleanup cannot unpin another
+   * overlapping search. Explicit destroy/city switches still invalidate it. */
+  retainForSearch(): () => void {
+    this.activeSearches++;
+    this.port?.setPinned(true);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.activeSearches--;
+      this.port?.setPinned(this.guidanceActive || this.activeSearches > 0);
+    };
+  }
+
+  hasActiveSearch(): boolean {
+    return this.activeSearches > 0;
   }
 
   isReady(cityId: string): boolean {
