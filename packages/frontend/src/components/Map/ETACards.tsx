@@ -240,7 +240,7 @@ function ETAColumns({ columns, labels, mainStopNames, alerted, alertLabel, onSel
           key={row}
           id={labelId[row]}
           data-testid="eta-column-label"
-          className="sticky left-0 z-10 w-24 flex items-center px-1.5 text-[10px] font-medium text-fg-secondary bg-surface-raised rounded shadow-1"
+          className="sticky left-0 z-10 w-24 flex items-center px-1.5 text-[0.625rem] font-medium text-fg-secondary bg-surface-raised rounded shadow-1"
         >
           <span className="line-clamp-3 break-words">{labels[row]}</span>
         </div>
@@ -299,7 +299,7 @@ function ETARow({ row, header, mainStopName, pills, alerted, alertLabel, onSelec
         <div
           id={headerId}
           data-testid="eta-row-header"
-          className="inline-block max-w-full truncate mb-1 px-1.5 py-0.5 text-[10px] font-medium text-fg-secondary bg-surface-raised rounded shadow-1 pointer-events-auto"
+          className="inline-block max-w-full truncate mb-1 px-1.5 py-0.5 text-[0.625rem] font-medium text-fg-secondary bg-surface-raised rounded shadow-1 pointer-events-auto"
         >
           {header}
         </div>
@@ -372,14 +372,14 @@ function ETAPill({ pill, showStop, describedBy, alertLabel, onSelect }: ETAPillP
         mode={departure.mode}
         subMode={departure.subMode}
         routeColor={departure.routeColor}
-        className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+        className="text-[0.625rem] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
       />
       {alertLabel && <ServiceAlertIndicator className="w-4 h-4 -ml-1" />}
       <div className="flex flex-col min-w-0">
-        <span className="text-[10px] text-fg-muted truncate">{departure.headsign}</span>
+        <span className="text-[0.625rem] text-fg-muted truncate">{departure.headsign}</span>
         <span data-testid="eta-countdown" data-countdown className="text-xs font-semibold text-fg">{countdown}</span>
         {showStop && (
-          <span data-testid="eta-pill-stop" className="text-[10px] text-fg-muted truncate">{pill.stop.name}</span>
+          <span data-testid="eta-pill-stop" className="text-[0.625rem] text-fg-muted truncate">{pill.stop.name}</span>
         )}
       </div>
     </button>

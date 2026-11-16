@@ -109,22 +109,18 @@ const DISCLOSURES: Record<string, string> = {
     "Panning the map fetches area-of-interest tiles from the PTN backend. Each tile names a ~12 km grid cell and is guaranteed to contain at least 50 places (build-time check). Single tiles reveal a coarse area; a long sequence of tiles from the same IP reveals pan patterns at that granularity. Your privacy preset picks a defense: Baseline loads on demand (no extra traffic); Standard prefetches the whole city once (~70–110 kB per city, zero runtime requests after that); Hardened adds 2 decoy tiles alongside each real fetch; Strict does the same; Paranoid also fires a decoy tile every 2–5 minutes while the app is visible. None of these defenses fully defeat an operator who logs tile requests over time — use Tor or a VPN if you need network-layer unlinkability.",
 };
 
-export function PrivacyLevelSection() {
+/**
+ * Intercept changes to the recentsEncryption axis: when the user selects
+ * "off", confirm they want to purge any existing recents and then clear
+ * them before applying the override.
+ *
+ * Limitation: this gate fires only via the Settings UI interceptChange.
+ * A programmatic `setOverride("recentsEncryption", "off")` would not
+ * trigger the purge — no such caller exists today.
+ */
+function useRecentsInterceptChange() {
   const { t } = useTranslation();
-  // This section renders privacy.* copy, which is fetched on demand rather
-  // than shipped in the base locale — see loadPrivacyNamespace in i18n/index.
-  usePrivacyNamespace();
-  const level = usePrivacyStore((s) => s.level);
-  const setLevel = usePrivacyStore((s) => s.setLevel);
-
-  // Intercept changes to the recentsEncryption axis: when the user selects
-  // "off", confirm they want to purge any existing recents and then clear
-  // them before applying the override.
-  //
-  // Limitation: this gate fires only via this Settings UI interceptChange.
-  // A programmatic `setOverride("recentsEncryption", "off")` would not
-  // trigger the purge — no such caller exists today.
-  const recentsInterceptChange = async (
+  return async (
     next: ProtectionPolicy["recentsEncryption"],
   ): Promise<boolean> => {
     if (next !== "off") return true;
@@ -139,9 +135,62 @@ export function PrivacyLevelSection() {
     await clearRecents();
     return true;
   };
+}
+
+/** How recent places are stored and for how long. Shown inside the Recent
+ *  places card, next to remembering and clearing them. */
+export function RecentsRetentionControl() {
+  const { t } = useTranslation();
+  usePrivacyNamespace();
+  const interceptChange = useRecentsInterceptChange();
+  const axis = AXES.find((a) => a.axis === "recentsEncryption")!;
+  return (
+    <div data-axis-group="recentsEncryption">
+      <h4 className="text-sm font-medium text-fg mb-1">
+        {t("privacy.axis.recentsEncryption.title", axis.title)}
+      </h4>
+      <p className="text-xs text-fg-muted mb-2">
+        {t("privacy.axis.recentsEncryption.description", axis.description)}
+      </p>
+      <PolicyAxisControl
+        axis="recentsEncryption"
+        i18nKeyPrefix="privacy.axis.recentsEncryption"
+        interceptChange={interceptChange as never}
+      />
+      <details className="mt-2">
+        <summary className="text-xs text-fg-muted cursor-pointer select-none">
+          {t("settings.privacy_full_detail", "Full detail")}
+        </summary>
+        <p className="text-xs text-fg-secondary mt-1">
+          {t("privacy.disclosure.installKey", DISCLOSURES.installKey)}
+        </p>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * `level`: the protection level (main Settings list).
+ * `details`: per-axis overrides, network services and providers (Advanced).
+ *   Recent places storage is left out there: it lives in the Recent places
+ *   card ({@link RecentsRetentionControl}).
+ * `all` (default): both, with every axis.
+ */
+export function PrivacyLevelSection({
+  part = "all",
+}: { part?: "all" | "level" | "details" } = {}) {
+  const { t } = useTranslation();
+  // This section renders privacy.* copy, which is fetched on demand rather
+  // than shipped in the base locale — see loadPrivacyNamespace in i18n/index.
+  usePrivacyNamespace();
+  const level = usePrivacyStore((s) => s.level);
+  const setLevel = usePrivacyStore((s) => s.setLevel);
+  const recentsInterceptChange = useRecentsInterceptChange();
+  const axes = part === "details" ? AXES.filter((a) => a.axis !== "recentsEncryption") : AXES;
 
   return (
     <div className="space-y-6">
+      {part !== "details" && (
       <section>
         <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
           {t("settings.privacy", "Privacy")}
@@ -212,12 +261,15 @@ export function PrivacyLevelSection() {
           </p>
         </details>
       </section>
+      )}
 
+      {part !== "level" && (
+      <>
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider">
           {t("settings.privacy_overrides", "Per-axis overrides")}
         </h2>
-        {AXES.map(({ axis, title, description, disclosure }) => (
+        {axes.map(({ axis, title, description, disclosure }) => (
           <div key={String(axis)} data-axis-group={String(axis)}>
             <h3 className="text-sm font-semibold text-fg mb-1">
               {t(`privacy.axis.${String(axis)}.title`, title)}
@@ -256,6 +308,8 @@ export function PrivacyLevelSection() {
       <CarriedOverOverrides />
 
       <ThirdPartyProvidersSection />
+      </>
+      )}
     </div>
   );
 }

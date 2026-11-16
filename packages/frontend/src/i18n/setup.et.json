@@ -30,7 +30,7 @@
   "setup.quick.city": "Linn: {city}",
   "setup.quick.changeCity": "Vaheta linna",
   "setup.quick.briefHeading": "Valmis alustama",
-  "setup.quick.continueMap": "Jätka kaardiga",
+  "setup.quick.continueMap": "Jätka kaardile",
   "setup.quick.moreOptions": "Rohkem valikuid ja üksikasju",
   "setup.quick.download": "Alustab {city} sõiduplaanide, peatuste ja liinide allalaadimist selle rakenduse serverist. See päring paljastab sinu valitud linna.",
   "setup.presentation.legend": "Algusvaade",

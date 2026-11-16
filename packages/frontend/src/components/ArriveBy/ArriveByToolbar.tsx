@@ -39,7 +39,7 @@ async function warmArriveBy(origin: BaseEndpoint, destination: BaseEndpoint, dea
 }
 
 const segmentClass = (active: boolean): string =>
-  `min-h-10 flex-1 px-3 text-sm font-semibold rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+  `min-h-10 min-w-0 flex-1 px-[min(0.75rem,8px)] text-[min(0.875rem,24px)] leading-tight font-semibold rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
     active ? "bg-accent text-badge-text" : "text-fg hover:bg-surface-overlay"}`;
 const chipClass = (active: boolean): string =>
   `min-h-10 shrink-0 px-3 text-sm rounded-full border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
@@ -186,7 +186,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
 
   return (
     <div className="space-y-2" data-testid="arrive-by-toolbar">
-      <div className="flex gap-1 p-1 rounded-lg border border-divider bg-input-bg" role="group"
+      <div className="flex gap-1 p-[min(0.25rem,4px)] rounded-lg border border-divider bg-input-bg" role="group"
         aria-label={t("arriveBy.when", "When")}>
         <button type="button" aria-pressed={mode === "leave"} className={segmentClass(mode === "leave")}
           onClick={() => useArriveByUi.getState().chooseLeave()}>
@@ -225,7 +225,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
       )}
       {mode === "arrive-by" && (
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="flex-[3] min-w-0">
               <span className="sr-only">{t("arriveBy.date", "Date")}</span>
               <input type="date" className={inputClass} value={dateText} data-testid="arrive-by-date"

@@ -114,9 +114,7 @@ pub fn search(query: &str, gen: &Generation) -> Resp {
         return ok_search(Vec::new(), variants);
     }
 
-    let matches = sidecar
-        .index
-        .prefix_search_any(variants.iter().map(String::as_str), limit);
+    let matches = sidecar.index.search_variants(&variants, limit);
     let data = matches
         .into_iter()
         .map(|m| {

@@ -75,7 +75,7 @@ export function LiveBadge({ delaySeconds, compact = false, size }: Props) {
       <span
         className={`inline-flex items-center gap-1 font-mono font-bold tracking-wider tabular-nums
           ${toneColorClass}
-          ${compact ? "text-[9px]" : "text-[10px]"}`}
+          ${compact ? "text-[0.5625rem]" : "text-[0.625rem]"}`}
         title={schedule ? scheduledTitle(t) : liveTitle(t)}
       >
         <Marker />
@@ -102,7 +102,7 @@ export function LiveBadge({ delaySeconds, compact = false, size }: Props) {
       <span
         className={`inline-flex items-center gap-1 font-mono font-bold tracking-wider tabular-nums
           ${toneColorClass} ${bgClass}
-          ${compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]"}`}
+          ${compact ? "px-1.5 py-0.5 text-[0.625rem]" : "px-2 py-1 text-[0.6875rem]"}`}
         style={underlineStyle}
         title={schedule ? scheduledTitle(t) : liveTitle(t)}
       >
@@ -125,7 +125,7 @@ export function LiveBadge({ delaySeconds, compact = false, size }: Props) {
       <span
         className={`inline-flex items-center gap-1 rounded border font-mono font-bold tracking-wider tabular-nums
           ${borderClass} ${toneColorClass}
-          ${compact ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"}`}
+          ${compact ? "px-1 py-px text-[0.5625rem]" : "px-1.5 py-0.5 text-[0.625rem]"}`}
         title={schedule ? scheduledTitle(t) : liveTitle(t)}
       >
         <Marker />
@@ -164,7 +164,7 @@ export function LiveLegBadge({ leg, compact = false, size }: { leg: Leg; compact
   if (live?.deleted) return null;
   if (live?.cancelled) {
     return (
-      <span className="text-[10px] font-semibold text-danger line-through">
+      <span className="text-[0.625rem] font-semibold text-danger line-through">
         {t("popup.cancelled", "Cancelled")}
       </span>
     );

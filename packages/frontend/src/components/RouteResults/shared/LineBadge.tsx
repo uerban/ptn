@@ -21,7 +21,7 @@ interface Props {
 }
 
 const SIZE_CLASS: Record<Size, string> = {
-  sm: "h-5 min-w-[1.5rem] px-1.5 text-[11px]",
+  sm: "h-5 min-w-[1.5rem] px-1.5 text-[0.6875rem]",
   md: "h-7 min-w-[1.75rem] px-2 text-xs",
   lg: "h-9 min-w-[2.25rem] px-2.5 text-sm",
 };

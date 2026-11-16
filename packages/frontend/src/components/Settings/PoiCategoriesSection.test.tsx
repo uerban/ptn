@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { AdvancedSettings } from "./AdvancedSettings.tsx";
+import { PoiCategoriesSection } from "./PoiCategoriesSection.tsx";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 
 beforeEach(() => { useSettingsStore.getState().setPoiIncludeLooseTier(true); });
@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); useSettingsStore.getState().setPoiIncludeLooseTier(
 
 describe("additional POI categories", () => {
   it("lets users hide schools independently of kindergartens and supermarkets", () => {
-    render(<AdvancedSettings />);
+    render(<PoiCategoriesSection />);
     expect(screen.getAllByRole("checkbox")).toHaveLength(5);
     fireEvent.click(screen.getByRole("checkbox", { name: "Schools" }));
     expect((screen.getByRole("checkbox", { name: "Schools" }) as HTMLInputElement).checked).toBe(false);
@@ -18,7 +18,7 @@ describe("additional POI categories", () => {
   });
 
   it("allows disabling all additional categories", () => {
-    render(<AdvancedSettings />);
+    render(<PoiCategoriesSection />);
     for (const checkbox of screen.getAllByRole("checkbox")) fireEvent.click(checkbox);
     expect(useSettingsStore.getState().poiLooseCategories).toEqual([]);
     expect(useSettingsStore.getState().poiIncludeLooseTier).toBe(false);

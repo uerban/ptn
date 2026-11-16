@@ -60,7 +60,8 @@ try {
   // A fresh install opens onboarding: either a city picker, or (when the
   // city is preselected) the plan-mode/privacy step. Accept both.
   const chooseCity = page.getByRole("button", {name: /^Vilnius/}).first();
-  const recommended = page.getByRole("button", {name: "Start with recommended settings"});
+  // Recommended setup reads "Continue to the map" in Map mode (the default).
+  const recommended = page.getByRole("button", {name: /^(Continue to the map|Start with recommended settings)$/});
   await chooseCity.or(recommended).first().waitFor({timeout: 30_000});
   if (await chooseCity.isVisible()) await chooseCity.click();
   await recommended.waitFor({timeout: 30_000}).catch(() => {});

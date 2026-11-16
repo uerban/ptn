@@ -120,7 +120,7 @@ export function ScheduleHome({
             type="button"
             data-testid="plan-trip-btn"
             onClick={() => navigate("/search")}
-            className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold shadow hover:bg-primary/90 active:scale-95 transition-all"
+            className="px-4 py-2 rounded-full bg-accent text-badge-text text-sm font-semibold shadow hover:bg-accent/90 active:scale-95 transition-all"
           >
             {t("schedule.plan_trip", "Plan trip")}
           </button>
