@@ -120,11 +120,11 @@ export function FlowDisclosure({
       <h2 id={headingId} className="text-base font-semibold">
         {heading}
       </h2>
-      <div id={bodyId} className="mt-2 space-y-2 text-sm text-fg-secondary">
+      <div className="mt-2 space-y-2 text-sm text-fg-secondary">
         {flow && privacyReady ? (
-          <p>{t(flow.purposeKey, "")}</p>
+          <p id={bodyId}>{t(flow.purposeKey, "")}</p>
         ) : flow ? (
-          <p>{text("flow.loading")}</p>
+          <p id={bodyId}>{text("flow.loading")}</p>
         ) : null}
         {details && <div>{details}</div>}
         <div>
@@ -215,10 +215,10 @@ export function FlowDisclosure({
       >
         {/* The text scrolls; the actions stay on screen below it. On a very
             short screen the whole dialog scrolls instead, so the text keeps
-            room. The region is a tab stop so the keyboard can scroll it. */}
+            room. The text is a tab stop so the keyboard can scroll it; it
+            has no role or name, so screen readers do not repeat the heading.
+            The dialog's description is the purpose line only. */}
         <div
-          role="region"
-          aria-labelledby={headingId}
           tabIndex={0}
           data-testid="flow-disclosure-body"
           className="min-h-0 flex-1 overflow-y-auto p-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent [@media(max-height:420px)]:flex-none [@media(max-height:420px)]:overflow-visible"

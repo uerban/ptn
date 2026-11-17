@@ -74,7 +74,11 @@ describe("FlowDisclosure dialog", () => {
     const names = screen.getAllByRole("button").map((b) => b.textContent);
     expect(names).toEqual(["Show detailed map", "Not now", "Don't ask again"]);
     const body = screen.getByTestId("flow-disclosure-body");
-    expect(body.getAttribute("role")).toBe("region");
+    expect(body.getAttribute("role")).toBeNull();
+    // Described by the purpose line only, not by the whole text.
+    const describedBy = screen.getByRole("dialog").getAttribute("aria-describedby")!;
+    expect(body.contains(document.getElementById(describedBy))).toBe(true);
+    expect(document.getElementById(describedBy)!.tagName).toBe("P");
     expect(body.contains(screen.getByRole("button", { name: "Not now" }))).toBe(false);
   });
 
