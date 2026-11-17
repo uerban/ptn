@@ -15,8 +15,6 @@ import type { FavoritePlace } from "@pt/shared";
 import { Icon } from "../components/Icon.tsx";
 import { usePresentationText } from "../i18n/presentationStrings.ts";
 
-const FIRST_LAUNCH_KEY = "ptn-schedule-seen";
-
 export interface ScheduleHomeProps {
   /** Show map: opens the temporary map without changing the starting view. */
   onShowMap: () => void;
@@ -53,16 +51,6 @@ export function ScheduleHome({
 
   // Load stop groups from IndexedDB (schedule mode uses IndexedDB, not API preloader)
   const stopGroups = useCityDataQuery(data => data.stopGroups.toArray(), []) ?? [];
-
-  // First-launch hint
-  const [showHint, setShowHint] = useState<boolean>(
-    () => !localStorage.getItem(FIRST_LAUNCH_KEY),
-  );
-
-  const dismissHint = useCallback(() => {
-    localStorage.setItem(FIRST_LAUNCH_KEY, "1");
-    setShowHint(false);
-  }, []);
 
   // Selected stop for departure sheet
   const [localStop, setLocalStop] = useState<Stop | null>(null);
@@ -118,14 +106,6 @@ export function ScheduleHome({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            data-testid="plan-trip-btn"
-            onClick={() => navigate("/search")}
-            className="px-4 py-2 rounded-full bg-accent text-badge-text text-sm font-semibold shadow hover:bg-accent/90 active:scale-95 transition-all"
-          >
-            {t("schedule.plan_trip", "Plan trip")}
-          </button>
-          <button
-            type="button"
             onClick={onShowMap}
             data-return-focus="show-map"
             className="p-2 rounded-lg border border-divider hover:bg-surface-overlay"
@@ -138,41 +118,6 @@ export function ScheduleHome({
         </div>
       </header>
 
-      {/* Search bar */}
-      <nav aria-label={t("schedule.search", "Search")} className="px-3 py-2 border-b border-divider">
-        <button
-          type="button"
-          data-testid="search-bar"
-          onClick={() => navigate("/search")}
-          className="w-full flex items-center gap-2 px-4 py-3 bg-surface-overlay rounded-xl border border-divider text-fg-muted text-left hover:bg-surface-raised transition-colors"
-          aria-label={t("search.where_to", "Where to?")}
-        >
-          <Icon name="search" className="shrink-0" />
-          <span className="truncate">{t("search.where_to", "Where to?")}</span>
-        </button>
-      </nav>
-
-      {/* First-launch hint */}
-      {showHint && (
-        <div
-          data-testid="first-launch-hint"
-          className="flex items-center justify-between gap-2 mx-3 mt-2 px-3 py-2 bg-surface-raised border border-divider rounded-lg text-sm text-fg-muted"
-          role="note"
-        >
-          <span>
-            {t("schedule.hint", "Looking for a route? Tap 'Plan trip' above.")}
-          </span>
-          <button
-            type="button"
-            data-testid="dismiss-hint-btn"
-            aria-label={t("schedule.dismiss_hint", "Dismiss hint")}
-            onClick={dismissHint}
-            className="p-1 rounded hover:bg-surface-overlay shrink-0"
-          >
-            <Icon name="close" size={16} />
-          </button>
-        </div>
-      )}
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
