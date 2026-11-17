@@ -294,7 +294,7 @@ export function QuickSetup(props: QuickSetupProps) {
                   <span className="text-base font-medium text-fg">
                     {text(value === "minimal" ? "setup.map.minimal" : "setup.map.detailed")}
                   </span>
-                  <span id={ids[value]} className="text-sm text-fg-secondary">
+                  <span id={ids[value]} aria-hidden="true" className="text-sm text-fg-secondary">
                     {value === "minimal"
                       ? text("setup.map.minimalLine")
                       : text("setup.map.detailedLine", { provider: providerName })}
