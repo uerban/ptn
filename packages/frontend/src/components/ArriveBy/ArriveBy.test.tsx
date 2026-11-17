@@ -211,7 +211,7 @@ describe("Arrive-by toolbar", () => {
     render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial
       filters={<button type="button">Bus</button>} /></MemoryRouter>);
     const summary = screen.getByTestId("when-summary");
-    expect(summary).toHaveTextContent("Leave: Now");
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Bus" }));
     expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
@@ -229,13 +229,13 @@ describe("Arrive-by toolbar", () => {
     fireEvent.click(summary);
     fireEvent.click(screen.getByTestId("leave-in15"));
     expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
-    expect(summary.textContent).toMatch(/^Leave (\S+ )?\d\d:\d\d$/);
+    expect(summary.textContent).toMatch(/^When: Leave (\S+ )?\d\d:\d\d$/);
     expect(onDepartAt).toHaveBeenCalledTimes(1);
     fireEvent.click(summary);
     fireEvent.click(screen.getByTestId("leave-custom"));
     expect(screen.getByTestId("leave-time")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("leave-now"));
-    expect(summary).toHaveTextContent("Leave: Now");
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -245,7 +245,7 @@ describe("Arrive-by toolbar", () => {
     expect(useArriveByUi.getState().mode).toBe("arrive-by");
     fireEvent.click(screen.getByTestId("when-summary"));
     expect(useArriveByUi.getState().mode).toBe("leave");
-    expect(screen.getByTestId("when-summary")).toHaveTextContent("Leave: Now");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
     expect(screen.queryByTestId("arrive-by-apply")).not.toBeInTheDocument();
   });
 

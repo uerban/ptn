@@ -21,6 +21,8 @@ import { ARRIVE_BY_MARKS, markArriveBy, type ArriveByCaller } from "./arriveByMa
 import { prepareArriveBy } from "./arriveByQuery.ts";
 import type { ArriveByToolbarProps } from "./arriveByTypes.ts";
 import { endpointPairKey, useArriveByUi, type LeaveOption } from "./arriveByUiStore.ts";
+import { searchChipClass } from "../Search/searchChip.ts";
+import { ScrollFade } from "../Search/ScrollFade.tsx";
 
 const deviceTz = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -42,11 +44,9 @@ async function warmArriveBy(origin: BaseEndpoint, destination: BaseEndpoint, dea
 }
 
 const segmentClass = (active: boolean): string =>
-  `min-h-10 min-w-0 flex-1 px-[min(0.75rem,8px)] text-[min(0.875rem,24px)] leading-tight font-semibold rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+  `min-h-11 min-w-0 flex-1 px-[min(0.75rem,8px)] text-[min(0.875rem,24px)] leading-tight font-semibold rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
     active ? "bg-accent text-badge-text" : "text-fg hover:bg-surface-overlay"}`;
-const chipClass = (active: boolean): string =>
-  `min-h-10 shrink-0 px-3 text-sm rounded-full border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-    active ? "bg-accent text-badge-text border-accent font-semibold" : "bg-input-bg text-fg border-divider hover:border-accent"}`;
+const chipClass = (active: boolean): string => searchChipClass(active ? "selected" : "idle");
 const LEAVE_OPTIONS: readonly (readonly [LeaveOption, string, string])[] = [
   ["now", "arriveBy.now", "Now"],
   ["in15", "arriveBy.in_15", "In 15 min"],
@@ -56,7 +56,7 @@ const LEAVE_OPTIONS: readonly (readonly [LeaveOption, string, string])[] = [
 ];
 const inputClass = "min-h-12 w-full min-w-0 px-3 text-sm rounded-lg border border-divider bg-input-bg text-fg focus:outline-none focus:ring-2 focus:ring-accent";
 
-const summaryClass = "min-h-[min(2.5rem,44px)] shrink-0 inline-flex items-center gap-1.5 px-3 text-sm font-semibold whitespace-nowrap rounded-full border border-divider bg-input-bg text-fg hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const summaryClass = searchChipClass("idle");
 
 export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, filters }: ArriveByToolbarProps) {
   const { t, locale } = useTranslation();
@@ -158,10 +158,16 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
     return `${day} ${wall.time}`;
   };
   const deadlineMs = appliedMs ?? draftMs;
+  // Short visible label; the spoken name starts with "When:" and contains the
+  // visible text word for word (label in name), plus the mode where the
+  // short label leaves it implicit.
   const summary = mode === "arrive-by" && deadlineMs !== null
-    ? `${t("arriveBy.arrive_by", "Arrive by")} ${clock(deadlineMs)}`
-    : leaveAtMs !== null ? `${t("arriveBy.leave", "Leave")} ${clock(leaveAtMs)}`
-    : `${t("arriveBy.leave", "Leave")}: ${t("arriveBy.now", "Now")}`;
+    ? t("arriveBy.by_short", "By {time}").replace("{time}", clock(deadlineMs))
+    : leaveAtMs !== null ? t("arriveBy.leave_short", "Leave {time}").replace("{time}", clock(leaveAtMs))
+    : t("arriveBy.now", "Now");
+  const summaryMode = mode === "arrive-by" && deadlineMs !== null
+    ? t("arriveBy.arrive_by", "Arrive by")
+    : leaveAtMs === null ? t("arriveBy.leave_now", "Leave now") : null;
 
   const chooseLeaveOption = (option: LeaveOption): void => {
     const ui = useArriveByUi.getState();
@@ -215,18 +221,21 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
 
   return (
     <div className="space-y-2" data-testid="arrive-by-toolbar">
-      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-        <button type="button" className={summaryClass} data-testid="when-summary" aria-expanded={open}
-          aria-label={`${t("arriveBy.when", "When")}: ${summary}`} onClick={toggle}>
+      {/* The time chip stays put; only the vehicle filters scroll, with a
+          fade at an edge that hides more. Below 360 px the row wraps. */}
+      <div className="flex items-center gap-1.5 py-0.5 max-[359px]:flex-wrap">
+        <button type="button" className={summaryClass} data-testid="when-summary" aria-expanded={open} onClick={toggle}>
+          <span className="sr-only">{`${t("arriveBy.when", "When")}: `}</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="shrink-0 text-accent">
             <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
           </svg>
           <span>{summary}</span>
+          {summaryMode && <span className="sr-only">{` (${summaryMode})`}</span>}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={`shrink-0 text-fg-muted transition-transform ${open ? "rotate-180" : ""}`}>
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
-        {filters}
+        {filters && <ScrollFade>{filters}</ScrollFade>}
       </div>
       {open && <div className="flex gap-1 p-[min(0.25rem,4px)] rounded-lg border border-divider bg-input-bg" role="group"
         aria-label={t("arriveBy.when", "When")}>
@@ -241,7 +250,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
       </div>}
       {open && mode === "leave" && (
         <div className="space-y-2">
-          <div className="flex gap-2 overflow-x-auto" role="group" aria-label={t("arriveBy.leave_at", "Leave at")}>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("arriveBy.leave_at", "Leave at")}>
             {LEAVE_OPTIONS.map(([option, key, fallback]) => (
               <button key={option} type="button" aria-pressed={leaveOption === option} data-testid={`leave-${option}`}
                 className={chipClass(leaveOption === option)} onClick={() => chooseLeaveOption(option)}>

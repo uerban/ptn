@@ -560,6 +560,8 @@
   "arriveBy.leave_now": "Leave now",
   "arriveBy.leave": "Leave",
   "arriveBy.leave_at": "Leave at",
+  "arriveBy.leave_short": "Leave {time}",
+  "arriveBy.by_short": "By {time}",
   "arriveBy.now": "Now",
   "arriveBy.in_15": "In 15 min",
   "arriveBy.in_30": "In 30 min",

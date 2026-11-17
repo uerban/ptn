@@ -629,5 +629,7 @@
   "arriveBy.in_15": "Pēc 15 minūtēm",
   "arriveBy.in_30": "Pēc 30 minūtēm",
   "arriveBy.in_60": "Pēc 1 stundas",
-  "arriveBy.pick_time": "Izvēlieties laiku"
+  "arriveBy.pick_time": "Izvēlieties laiku",
+  "arriveBy.leave_short": "Izbraukšana {time}",
+  "arriveBy.by_short": "Ierasties līdz {time}"
 }
