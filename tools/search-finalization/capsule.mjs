@@ -13,7 +13,7 @@ function runtime() {
 }
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
 const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const SCOPES={"ptn-search-finalization":"frontend RT feasibility and ranking","ptn-search-composition":"frontend post-planner walking composition","ptn-search-reach":"frontend directed endpoint reach"};
+const SCOPES={"ptn-search-finalization":"frontend RT feasibility and ranking","ptn-search-composition":"frontend post-planner walking composition","ptn-search-reach":"frontend directed endpoint reach","ptn-search-pipeline":"frontend linked stages with observed planner"};
 const scopeOf=record=>record.scope===undefined?(record.format==="ptn-search-reach"?SCOPES[record.format]:undefined):record.scope;
 const PRODUCER_UNVERIFIED="unverified; imported observation is not proof of original application bytes/runtime";
 const digest=value=>typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
@@ -28,7 +28,8 @@ function checkRecord(bytes) {
   const record=JSON.parse(bytes);
   if(!Object.hasOwn(SCOPES,record?.format)||record.version!==1||scopeOf(record)!==SCOPES[record.format]
     ||record.classification!=="partial capture"||record.normalization!=="finite-json-wire-v1"
-    ||(record.format!=="ptn-search-reach"&&!Number.isFinite(record.nowMs))||!record.input||!Array.isArray(record.reads)||!Array.isArray(record.output))throw new Error("Unsupported finalization record");
+    ||(record.format!=="ptn-search-reach"&&record.format!=="ptn-search-pipeline"&&!Number.isFinite(record.nowMs))
+    ||(record.format==="ptn-search-pipeline"?(!record.query||!record.reach||!record.composition):(!record.input||!Array.isArray(record.reads)))||!Array.isArray(record.output))throw new Error("Unsupported finalization record");
   const finite=value=>{if(typeof value==="number"&&!Number.isFinite(value))throw new Error("Non-finite finalization value");if(value&&typeof value==="object")Object.values(value).forEach(finite);};
   finite(record);return record;
 }
@@ -50,7 +51,9 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   const capsule={schemaVersion:1,format:"ptn-search-finalization-capsule",scope:scopeOf(record),classification:"partial capture",
     replayVerification:"unverified",artifacts,replayRuntime:runtime(),
     recordProducerIdentity:PRODUCER_UNVERIFIED,
-    missingDependencies:record.format==="ptn-search-reach"
+    missingDependencies:record.format==="ptn-search-pipeline"
+      ? ["endpoint selection and readiness wait before reach","planner/time-frame/service eligibility execution and artifacts","raw pedestrian graphs and provider execution","raw RT feeds before lookup","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]
+      : record.format==="ptn-search-reach"
       ? ["endpoint selection before reach resolution","OSRM module/graph and transfer-table artifacts","planner execution","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]
       : ["upstream endpoint reach and planner execution","raw pedestrian graph and route execution","raw RT feeds before lookup","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]};
   retainRun(store,id,capsule);return capsule;

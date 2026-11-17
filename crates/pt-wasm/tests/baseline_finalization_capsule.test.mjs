@@ -204,3 +204,29 @@ test("directed reach capsules relocate and replay without clock or live provider
  capsule.artifacts.moduleBuild=retainArtifact(moved,Buffer.from(JSON.stringify(build)));writeFileSync(join(moved,"runs/reach.json"),JSON.stringify(capsule));
  const unsupported=join(root,"reach-legacy-module");assert.throws(()=>replayFinalizationCapsule(moved,"reach",unsupported),/scope mismatch/);assert.equal(existsSync(unsupported),false);
 });
+
+test("linked stage capsule replays and rejects an individually valid but disconnected planner query",async()=>{
+ const origin={lat:54.68,lon:25.28},destination={lat:54.70,lon:25.28};
+ const stops=[{id:"A",name:"A",...origin},{id:"B",name:"B",...destination}];
+ const options={maxWalkSecs:300,walkSpeedMps:1.25,radiusMeters:500},reach={};
+ const osrm={isReady:()=>false,table:async()=>null};
+ const entry=await compiled.captureReachableStops(origin,stops,{...options,role:"origin"},osrm,"default",r=>{reach.entry=r;});
+ const exit=await compiled.captureReachableStops(destination,stops,{...options,role:"destination"},osrm,"default",r=>{reach.exit=r;});
+ const raw=[{boardSecs:28850,alightSecs:29000,transfers:0,legs:[{type:"transit",tripId:"T",routeId:"R",fromStopId:"A",toStopId:"B",departSecs:28850,arriveSecs:29000,boardStopIdx:0,alightStopIdx:1}]}];
+ let composition;
+ const output=await compiled.composeSearchResults({itineraries:raw,entryWalks:entry,exitWalks:exit,departureSecs:28800,stops,walkSpeedMps:1.25,
+  walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120},undefined,()=>null,undefined,r=>{composition=r;});
+ assert.equal(output.length,1);
+ const record={format:"ptn-search-pipeline",version:1,scope:"frontend linked stages with observed planner",classification:"partial capture",normalization:"finite-json-wire-v1",
+  query:{origin,destination,departureTimeMs:Date.parse("2026-11-13T08:00:00+02:00"),ranking:"fastest"},reach,directRoute:null,
+  planner:{source:"injected",serviceDate:"20261113",query:{entryStops:entry.map(({stopId,walkSecs})=>({stopId,walkSecs})),exitStops:exit.map(({stopId,walkSecs})=>({stopId,walkSecs})),
+   departureSecs:28800,activeServiceIds:["svc"],walkSpeedMps:1.25,minTransferSecs:120},output:raw},composition,output,missingDependencies:["observed fixture planner; execution artifacts absent"]};
+ const path=join(root,"pipeline.json"),store=join(root,"pipeline-store");writeFileSync(path,JSON.stringify(record));
+ const capsule=retainFinalization(store,"linked",path,moduleDir);assert.equal(capsule.scope,record.scope);
+ const proof=replayFinalizationCapsule(store,"linked",join(root,"pipeline-replay"));assert.equal(proof.completion,"success");assert.deepEqual(proof.output,output);
+ record.planner.query.entryStops[0].walkSecs++;
+ writeFileSync(path,JSON.stringify(record));retainFinalization(store,"disconnected",path,moduleDir);
+ const failed=replayFinalizationCapsule(store,"disconnected",join(root,"pipeline-disconnected-replay"));
+ assert.equal(failed.completion,"error");assert.equal(failed.output,null);
+ assert.match(readFileSync(join(root,"pipeline-disconnected-replay/stderr.txt"),"utf8"),/planner entry/);
+});

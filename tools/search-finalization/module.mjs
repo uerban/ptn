@@ -44,7 +44,7 @@ export async function buildFinalizationModule(destination,inputRoot=sourceRoot) 
   const module=Buffer.from(result.outputFiles[0].contents);
   const sources=[...observed].sort(([a],[b])=>a<b?-1:a>b?1:0).map(([path,bytes])=>({path,sha256:sha(bytes)}));
   const manifest={format:"ptn-search-finalization-module",version:1,moduleSha256:sha(module),sources,
-    recordFormats:["ptn-search-finalization","ptn-search-composition","ptn-search-reach"],
+    recordFormats:["ptn-search-finalization","ptn-search-composition","ptn-search-reach","ptn-search-pipeline"],
     compiler:{esbuild:esbuild.version,options,sharedSources},buildReproducibility:"compiler/resolver installation not fully retained"};
   mkdirSync(destination,{mode:0o700});mkdirSync(join(destination,"sources"),{mode:0o700});
   writeFileSync(join(destination,"module.mjs"),module,{flag:"wx",mode:0o400});

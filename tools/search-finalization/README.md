@@ -1,11 +1,16 @@
 # Retained local finalization replay
 
-The replay module supports `ptn-search-finalization`, `ptn-search-composition`
-and `ptn-search-reach` version 1 records. Reach records re-run one directed
+The replay module supports `ptn-search-finalization`, `ptn-search-composition`,
+`ptn-search-reach` and `ptn-search-pipeline` version 1 records. Pipeline records
+join the actual orchestrator query, reach, observed planner invocation/output,
+direct walking and composition. Their scope is `frontend linked stages with
+observed planner`: replay verifies stage continuity without re-executing the
+planner or rebuilding its feed artifacts. Reach records re-run one directed
 endpoint reach calculation from observed readiness, duration-table and transfer
 lookup responses. Their capsule scope is `frontend directed endpoint reach`;
 they need no query clock because this stage does not read one. They do not
-retain the original provider graphs, endpoint selection or planner execution. Composition records re-run post-planner
+retain the original provider graphs, endpoint selection or planner execution.
+Composition records re-run post-planner
 transfer walking evidence and itinerary composition before frozen RT/ranking;
 they retain raw planner results and pedestrian responses rather than rebuilding
 a graph or executing the planner. The module manifest declares supported formats.
@@ -58,8 +63,9 @@ the process deadline is not a security or network sandbox. Use an OS network
 denial when verifying offline operation.
 
 These capsules remain **partial captures** at their declared frontend stage.
-Reach, composition and finalization records are separate observations rather
-than a joined full-search execution. They do not retain endpoint selection,
+Individual reach/composition/finalization records remain readable, alongside
+linked pipeline records. Linked records still use an observed planner response;
+they are not full-search engine execution captures. They do not retain endpoint selection,
 planner execution, raw pedestrian graphs and route execution, or pre-lookup RT
 feeds. Building a replay module after
 importing a record also does not establish the original producer application's

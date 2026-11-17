@@ -1,3 +1,4 @@
+import {SearchPipelineCapture, type PipelineCapture} from "./searchPipelineCapture.ts";
 import { effectiveTransferFloor } from "./effectiveTransferRule.ts";
 import type { RaptorTransitLeg } from "@pt/shared";
 import { type FinalizationCapture } from "./searchFinalization.ts";
@@ -58,6 +59,7 @@ export interface SearchConfig {
   compositionCapture?: (record: CompositionCapture) => void;
   /** Local, opt-in directed endpoint reach observations, before planner execution. */
   reachCapture?: (record: ReachCapture) => void;
+  pipelineCapture?: (record: PipelineCapture) => void;
   allStops: StopLocation[];
   getDelay: (tripId: string) => {
     delaySeconds: number;
@@ -142,7 +144,7 @@ export interface EndpointStops {
  * 7. Rank and return top results
  */
 export class SearchOrchestrator {
-  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture">;
+  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture" | "pipelineCapture">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture" | "pipelineCapture">;
 
   constructor(config: SearchConfig) {
     this.config = {
@@ -223,7 +225,7 @@ export class SearchOrchestrator {
    * path swaps in OSM-routed walk seconds so the stop-to-stop reach
    * doesn't get a false "across the river" hit.
    */
-  private async findEndpointStops(query: EndpointStopsQuery): Promise<EndpointStops> {
+  private async findEndpointStops(query: EndpointStopsQuery, trace?: SearchPipelineCapture): Promise<EndpointStops> {
     const { raptorIndex, allStops, osrm, walkSpeedMps, maxWalkSecs, fallbackRadiusMeters } = this.config;
     const osmLookup = makeOsmTransferLookup(raptorIndex.footTransfers);
     const baseIsoOptions = {
@@ -235,7 +237,7 @@ export class SearchOrchestrator {
       captureReachableStops(
         query.origin, allStops,
         { ...baseIsoOptions, originStopId: query.originStopId, originStopIds: query.originStopIds, role: "origin" },
-        osrm, this.config.mobilityProfile, this.config.reachCapture,
+        osrm, this.config.mobilityProfile, trace ? record => {trace.reach("entry", record); this.config.reachCapture?.(record);} : this.config.reachCapture,
       ),
       // Exit walk goes "candidate stop → destination" — pass destStopId
       // and role="destination" so both the transfer-table lookup and the
@@ -246,7 +248,7 @@ export class SearchOrchestrator {
       captureReachableStops(
         query.destination, allStops,
         { ...baseIsoOptions, destStopId: query.destStopId, destStopIds: query.destStopIds, role: "destination" },
-        osrm, this.config.mobilityProfile, this.config.reachCapture,
+        osrm, this.config.mobilityProfile, trace ? record => {trace.reach("exit", record); this.config.reachCapture?.(record);} : this.config.reachCapture,
       ),
     ]);
     return { entryStops, exitStops };
@@ -264,7 +266,7 @@ export class SearchOrchestrator {
 
   private compose(results: RaptorItinerary[], entry: ReachableStop[], exit: ReachableStop[], departureSecs: number,
     walking: RtComposedItinerary | null, ranking: RankingCriteria,
-    floor?: (from: RaptorTransitLeg, to: RaptorTransitLeg) => number | null): Promise<RtComposedItinerary[]> {
+    floor?: (from: RaptorTransitLeg, to: RaptorTransitLeg) => number | null, trace?: SearchPipelineCapture): Promise<RtComposedItinerary[]> {
     return composeSearchResults({itineraries: results,
       entryWalks: entry.map(s => ({stopId: s.stopId, walkSecs: s.walkSecs, distanceMeters: s.distanceMeters,
         ...(s.runToCatch ? {runToCatch: true} : {})})),
@@ -272,24 +274,32 @@ export class SearchOrchestrator {
       departureSecs, stops: this.config.allStops, walking, ranking,
       walkSpeedMps: riderWalkSpeedMps(this.config.mobilityProfile, this.config.walkSpeedMps),
       maxResults: this.config.maxResults, minTransferSecs: minTransferSecsFor(this.config.mobilityProfile)},
-      this.config.directWalkRoute, this.config.getDelay, floor, this.config.compositionCapture, this.config.finalizationCapture);
+      this.config.directWalkRoute, this.config.getDelay, floor, trace ? record => {trace.composition(record); this.config.compositionCapture?.(record);} : this.config.compositionCapture, this.config.finalizationCapture);
   }
 
   async search(query: SearchQuery): Promise<RtComposedItinerary[]> {
+    const trace = this.config.pipelineCapture ? new SearchPipelineCapture(query, this.config.pipelineCapture) : undefined;
+    const output = await this.executeSearch(query, trace);
+    trace?.finish(output);
+    return output;
+  }
+
+  private async executeSearch(query: SearchQuery, trace?: SearchPipelineCapture): Promise<RtComposedItinerary[]> {
     performance.mark("ptn:search-start");
     const { raptorIndex, maxResults, walkSpeedMps } = this.config;
 
     // 0. Lazy OSRM init.
     await this.awaitOsrm();
 
-    const { entryStops, exitStops } = await this.findEndpointStops(query);
+    const { entryStops, exitStops } = await this.findEndpointStops(query, trace);
     const pedestrianRoute = this.config.directWalkRoute
       ? await optionalPedestrianRoute(() => this.config.directWalkRoute!(query.origin, query.destination)) : null;
+    trace?.direct(pedestrianRoute);
     if (entryStops.length === 0 || exitStops.length === 0) {
       const frame = serviceDayFrame(Math.floor(query.departureTime.getTime() / 1000), this.config.feedTz);
       const direct = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
         frame.nowSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
-      return this.compose([], entryStops, exitStops, frame.nowSecs, direct, query.ranking);
+      return this.compose([], entryStops, exitStops, frame.nowSecs, direct, query.ranking, undefined, trace);
     }
 
     // 1. Resolve the departure into the engine's service-day frame. The engine
@@ -330,17 +340,19 @@ export class SearchOrchestrator {
     // error out of `planOnDevice` and is surfaced, not substituted).
     const raptorPlan: StopPlanner = this.config.stopPlanner
       ?? ((q, ymd) => planOnDevice(q, this.onDeviceContext(), ymd));
+    trace?.planStart(raptorQuery, serviceDate, this.config.stopPlanner ? "injected" : "on-device");
     const raptorResults: RaptorItinerary[] = await raptorPlan(raptorQuery, serviceDate);
+    trace?.planEnd(raptorResults);
 
     // An empty on-device result returns []. The app never *silently* auto-fires
     // a server query; the consented remote `stopPlanner` is explicit (routing-
     // source ). The `backendAssist.plan` transport is kept in `SearchConfig`
     // for a later stage that re-introduces it behind explicit user consent, but
     // it is never invoked silently here.
-    if (raptorResults.length === 0) return this.compose([], entryStops, exitStops, departureSecs, walking, query.ranking, floorFor);
+    if (raptorResults.length === 0) return this.compose([], entryStops, exitStops, departureSecs, walking, query.ranking, floorFor, trace);
 
     // 5–7. Revalidate transfer geometry, compose physical walks, apply RT and rank.
-    const ranked = await this.compose(raptorResults, entryStops, exitStops, departureSecs, walking, query.ranking, floorFor);
+    const ranked = await this.compose(raptorResults, entryStops, exitStops, departureSecs, walking, query.ranking, floorFor, trace);
     performance.mark("ptn:search-end");
     performance.measure("ptn:search", "ptn:search-start", "ptn:search-end");
     return ranked.slice(0, maxResults);
