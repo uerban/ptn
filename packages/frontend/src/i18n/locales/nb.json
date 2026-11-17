@@ -626,5 +626,7 @@
   "arriveBy.in_60": "Om 1 time",
   "arriveBy.pick_time": "Velg tidspunkt",
   "arriveBy.leave_short": "Avgang {time}",
-  "arriveBy.by_short": "Ankom senest {time}"
+  "arriveBy.by_short": "Ankom senest {time}",
+  "arriveBy.done": "Ferdig",
+  "arriveBy.not_applied": "Ankomsttiden ble ikke brukt"
 }

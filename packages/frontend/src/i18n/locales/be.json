@@ -643,5 +643,7 @@
   "arriveBy.in_60": "Праз 1 гадзіну",
   "arriveBy.pick_time": "Выберыце час",
   "arriveBy.leave_short": "Адпраўленне {time}",
-  "arriveBy.by_short": "Прыбыць да {time}"
+  "arriveBy.by_short": "Прыбыць да {time}",
+  "arriveBy.done": "Гатова",
+  "arriveBy.not_applied": "Час прыбыцця не ўжыты"
 }

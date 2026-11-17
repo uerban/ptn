@@ -629,5 +629,7 @@
   "arriveBy.in_60": "1 tunnin kuluttua",
   "arriveBy.pick_time": "Valitse aika",
   "arriveBy.leave_short": "Lähtö {time}",
-  "arriveBy.by_short": "Saapuminen viimeistään {time}"
+  "arriveBy.by_short": "Saapuminen viimeistään {time}",
+  "arriveBy.done": "Valmis",
+  "arriveBy.not_applied": "Saapumisaikaa ei otettu käyttöön"
 }

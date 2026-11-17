@@ -628,5 +628,7 @@
   "arriveBy.in_60": "1 tunni pärast",
   "arriveBy.pick_time": "Vali aeg",
   "arriveBy.leave_short": "Väljumine {time}",
-  "arriveBy.by_short": "Saabumine kell {time}"
+  "arriveBy.by_short": "Saabumine kell {time}",
+  "arriveBy.done": "Valmis",
+  "arriveBy.not_applied": "Saabumisaega ei rakendatud"
 }
