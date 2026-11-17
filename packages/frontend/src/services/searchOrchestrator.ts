@@ -1,6 +1,6 @@
 import { effectiveTransferFloor } from "./effectiveTransferRule.ts";
 import type { RaptorTransitLeg } from "@pt/shared";
-import { feasibleRtCandidates } from "./rtFeasibility.ts";
+import { finalizeSearch, type FinalizationCapture } from "./searchFinalization.ts";
 import { optionalPedestrianRoute } from "./pedestrianEvidence.ts";
 import { transferWalkEvidence } from "./transferWalkEvidence.ts";
 import { serviceDayFrame } from "./serviceDayFrame.ts";
@@ -33,9 +33,9 @@ import { makeOsmTransferLookup } from "./raptorIndex.ts";
 import type { OsrmWasmClient } from "./osrmWasm.ts";
 import { resolveActiveServices } from "./serviceDay.ts";
 import { planOnDevice, resolveDepartureOnDevice, type WasmPlanContext } from "./wasmPlanner.ts";
-import { composeItineraries, rankResults } from "./raptorComposer.ts";
+import { composeItineraries } from "./raptorComposer.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
-import { applyRtOverlay, type RtComposedItinerary } from "./rtOverlay.ts";
+import { type RtComposedItinerary } from "./rtOverlay.ts";
 import { findReachableStops } from "./isochrone.ts";
 import type { ReachableStop } from "./stopFinder.ts";
 import type { StopPlanner } from "./routingSource.ts";
@@ -54,6 +54,8 @@ export interface BackendAssistConfig {
 
 export interface SearchConfig {
   raptorIndex: RaptorIndex;
+  /** Explicit local diagnostic observer; absent by default. */
+  finalizationCapture?: (record: FinalizationCapture) => void;
   allStops: StopLocation[];
   getDelay: (tripId: string) => {
     delaySeconds: number;
@@ -138,7 +140,7 @@ export interface EndpointStops {
  * 7. Rank and return top results
  */
 export class SearchOrchestrator {
-  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute">;
+  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture">;
 
   constructor(config: SearchConfig) {
     this.config = {
@@ -272,7 +274,8 @@ export class SearchOrchestrator {
       const frame = serviceDayFrame(Math.floor(query.departureTime.getTime() / 1000), this.config.feedTz);
       const direct = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
         frame.nowSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
-      return direct ? [direct].slice(0, maxResults) : [];
+      return finalizeSearch({composed: [], walking: direct, ranking: query.ranking, maxResults,
+        minTransferSecs: minTransferSecsFor(this.config.mobilityProfile)}, getDelay, undefined, this.config.finalizationCapture);
     }
 
     // 1. Resolve the departure into the engine's service-day frame. The engine
@@ -286,11 +289,13 @@ export class SearchOrchestrator {
 
     const walking = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
       departureSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
-    const finish = (transit: RtComposedItinerary[]): RtComposedItinerary[] =>
-      rankResults(walking ? [...transit, walking] : transit, query.ranking).slice(0, maxResults);
+    const minTransferSecs = minTransferSecsFor(this.config.mobilityProfile);
+    const floorFor = (from: RaptorTransitLeg, to: RaptorTransitLeg) => effectiveTransferFloor(raptorIndex, from, to, minTransferSecs);
+    const finish = (composed: RtComposedItinerary[]): RtComposedItinerary[] =>
+      finalizeSearch({composed, walking, ranking: query.ranking, maxResults, minTransferSecs},
+        getDelay, floorFor, this.config.finalizationCapture);
 
     // 3. Build RAPTOR query (departureSecs hoisted above for the empty-services guard)
-    const minTransferSecs = minTransferSecsFor(this.config.mobilityProfile);
     const raptorQuery: RaptorQuery = {
       entryStops: entryStops.map((s) => ({ stopId: s.stopId, walkSecs: s.walkSecs })),
       exitStops: exitStops.map((s) => ({ stopId: s.stopId, walkSecs: s.walkSecs })),
@@ -347,12 +352,8 @@ export class SearchOrchestrator {
       : raptorResults;
     const composed = composeItineraries(evidenced, entryWalks, exitWalks, departureSecs);
 
-    // 6. Apply RT overlay
-    const floorFor = (from: RaptorTransitLeg, to: RaptorTransitLeg) => effectiveTransferFloor(raptorIndex, from, to, minTransferSecs);
-    const withRt = applyRtOverlay(composed, getDelay, minTransferSecs, floorFor);
-
-    // 7. Rank and limit
-    const ranked = finish(feasibleRtCandidates(withRt, floorFor));
+    // 6–7. Apply observed RT, validate effective feasibility, rank and limit.
+    const ranked = finish(composed);
     performance.mark("ptn:search-end");
     performance.measure("ptn:search", "ptn:search-start", "ptn:search-end");
     return ranked.slice(0, maxResults);

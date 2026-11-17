@@ -1,3 +1,4 @@
+import {replayFinalization, type FinalizationCapture} from "../../src/services/searchFinalization.ts";
 import { describe, it, expect, vi } from "vitest";
 
 // The on-device plan step is `pt-wasm`, whose routing correctness is pinned by
@@ -84,6 +85,25 @@ describe("SearchOrchestrator", () => {
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].totalSecs).toBeGreaterThan(0);
     expect(results[0].legs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("captures the actual finalization boundary for transit and empty reachable sets", async () => {
+    const records: FinalizationCapture[] = [];
+    const config: SearchConfig = {
+      raptorIndex: usePlannerOver(buildMinimalIndex()), allStops,
+      getDelay: () => ({delaySeconds: 120, cancelled: false}),
+      osrm: {isReady: () => false, table: vi.fn(), init: vi.fn()},
+      finalizationCapture: record => records.push(record),
+    };
+    const orchestrator = new SearchOrchestrator(config);
+    const query = {origin: {lat: 54.6800, lon: 25.2797}, destination: {lat: 54.7200, lon: 25.2797},
+      departureTime: new Date(2026, 2, 30, 7, 55, 0), ranking: "fastest" as const};
+    const result = await orchestrator.search(query);
+    expect(result.length).toBeGreaterThan(0);
+    expect(JSON.stringify(replayFinalization(JSON.parse(JSON.stringify(records[0]))))).toBe(JSON.stringify(result));
+    const empty = await orchestrator.search({...query, origin: {lat: 0, lon: 0}, destination: {lat: 1, lon: 1}});
+    expect(empty).toEqual([]);expect(records).toHaveLength(2);
+    expect(replayFinalization(records[1])).toEqual([]);
   });
 
   it("returns empty when no transit path exists", async () => {

@@ -63,10 +63,10 @@ export function applyRtOverlay(
   /** The rider's minimum transfer (`minTransferSecsFor`), as the engine used. */
   minTransferSecs: number = RAPTOR_MIN_TRANSFER_SECS,
   transferFloor?: (from: RaptorTransitLeg, to: RaptorTransitLeg) => number | null,
+  nowMs: number = Date.now(),
 ): RtComposedItinerary[] {
   // Cache once per overlay invocation; per-leg recomputation in the loop
   // would issue a syscall on every leg of every itinerary.
-  const nowMs = Date.now();
 
   // A trip the feed DELETED must not be shown to riders, not even as
   // cancelled: an itinerary that rides one is not offered at all. No
