@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { ProtectionAxis } from "@pt/shared/privacy";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import { useOnboardingStore } from "../../stores/onboardingStore.ts";
 import { usePrivacyStore } from "../../stores/privacyStore.ts";
 
@@ -11,6 +11,7 @@ import { usePrivacyStore } from "../../stores/privacyStore.ts";
  */
 export function CarriedOverOverrides() {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   const record = useOnboardingStore((s) => s.record);
   const load = useOnboardingStore((s) => s.load);
   const remove = useOnboardingStore((s) => s.removeCarriedOverOverride);

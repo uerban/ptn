@@ -9,7 +9,7 @@ import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { findDataFlow, getDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import { DEFAULT_BASEMAP_PROVIDER } from "../../services/basemapPrivacy.ts";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import { useOnboardingStore } from "../../stores/onboardingStore.ts";
 
 interface FlowRow {
@@ -39,6 +39,7 @@ export function NetworkDecisionsSection({
   details?: Readonly<Record<string, ReactNode>>;
 }) {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   const decisions = useNetworkDecisionsStore((s) => s.decisions);
   const setDecision = useNetworkDecisionsStore((s) => s.setDecision);
   const placeSearchProvider = useSettingsStore((s) => s.thirdPartyProvider);
