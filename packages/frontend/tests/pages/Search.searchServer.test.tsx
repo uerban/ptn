@@ -183,7 +183,7 @@ describe("Search 'search on the server' re-run + remoteAllowed", () => {
     // Flip ranking WHILE the remote /plan is still pending. This re-fires the
     // main auto-search effect (ranking is in its deps) and, critically, advances
     // latestQueryRef.current.ranking so the in-flight remote result is now stale.
-    fireEvent.click(screen.getByRole("tab", { name: /fewest transfers/i }));
+    fireEvent.click(screen.getByRole("button", { name: /fewest transfers/i }));
 
     // Now resolve the stale remote result and let its .then chain run.
     await act(async () => {

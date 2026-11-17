@@ -132,5 +132,6 @@
   "placeSearch.details": "När du skriver in en plats skickar appen det du skriver och det område du söker i till appens server, som söker efter matchande adresser. Hållplatser och platser på den här enheten söks fortfarande här.",
   "serviceAlerts.onRoutes": "Varningar på dessa rutter: {count}",
   "serviceAlerts.affectsLines": "Tjänstevarning för linje {lines}",
-  "serviceAlerts.sameAsAbove": "Samma meddelande som ovan"
+  "serviceAlerts.sameAsAbove": "Samma meddelande som ovan",
+  "nearby.inHours": "om {time}"
 }

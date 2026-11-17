@@ -11,6 +11,7 @@ import {
   clearRecents,
   countRecents,
   endpointFingerprint,
+  forgetRecent,
   listRecents,
   migrateRecentsForLevelChange,
   recordRecent,
@@ -169,6 +170,17 @@ describe("recordRecent", () => {
     expect(await db.recentLocations.count()).toBe(1);
     expect(findLeaks(await rawTableText("recentLocations"), SENSITIVE)).toEqual([]);
     expect((await __getRamRecentsForTests()).size).toBe(1);
+  });
+});
+
+describe("forgetRecent", () => {
+  it("removes only the named stop or place", async () => {
+    await recordRecent(stopEndpoint, { usedAsOrigin: true, now: () => 10 });
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false, now: () => 20 });
+    await forgetRecent({ stopId: "S1", label: "Central", lat: 54.35, lon: 18.65 });
+    expect((await listRecents()).map((r) => r.base.kind)).toEqual(["geocoded"]);
+    await forgetRecent({ label: "Długa 21", lat: 54.4, lon: 18.6 });
+    expect(await listRecents()).toEqual([]);
   });
 });
 

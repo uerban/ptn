@@ -10,6 +10,7 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { useDelayReportStore } from "../../stores/delayReportStore.ts";
 import { Icon } from "../Icon.tsx";
+import { waitClock, waitSpoken } from "../../utils/waitTime.ts";
 import { dayMarkers, type DayMarker } from "./dayMarkers.ts";
 
 const EMPTY_OVERRIDES: Partial<Record<TransportMode, string>> = {};
@@ -47,6 +48,7 @@ export function LineGroup({
     (d) => d.predictedTime ?? d.scheduledTime
   );
   const minutes = useCountdown(timestamps);
+  const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
   const badgeStyle = resolveRouteStyle(routeColor, mode, modeOverrides, scheme, theme, subMode, highContrastEnabled, colorConfig);
 
   // Crowdsourced delay indicator — only when no official RT data exists
@@ -119,6 +121,7 @@ export function LineGroup({
           <CollapsedChips
             departures={departures}
             minutes={minutes}
+            minutesOnly={minutesOnly}
             t={t}
           />
 
@@ -156,10 +159,11 @@ const MAX_COLLAPSED_CHIPS = 4;
 interface CollapsedChipsProps {
   departures: readonly Departure[];
   minutes: number[];
+  minutesOnly: boolean;
   t: (key: string, fallback?: string) => string;
 }
 
-function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
+function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsProps) {
   // Separate into due items and regular upcoming items
   const dueItems: { dep: Departure; mins: number }[] = [];
   const upcomingItems: { dep: Departure; mins: number }[] = [];
@@ -205,7 +209,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
               className="text-xs font-medium text-danger line-through"
               title={t("popup.cancelled", "Cancelled")}
             >
-              {mins}&thinsp;m
+              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
             </span>
           );
         }
@@ -227,7 +231,9 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
             key={`${dep.tripId}_${dep.scheduledTime}`}
             className="flex items-center gap-0.5 text-xs font-semibold"
           >
-            <span data-countdown className={timeColor}>{mins}&thinsp;m</span>
+            <span data-countdown className={timeColor}>
+              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
+            </span>
             {delayShouldShow && (
               <span data-countdown className={`text-[0.625rem] font-bold ${delayColor}`}>
                 +{delayMinutes}
@@ -303,6 +309,7 @@ interface ScheduleRowProps {
 
 function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: ScheduleRowProps) {
   const dep = departure;
+  const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
   const isRealTime = Boolean(dep.predictedTime);
   const isDeparted = minutes < 0;
   const delaySeconds = dep.delaySeconds ?? 0;
@@ -345,8 +352,11 @@ function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: Schedu
   } else if (minutes < 0) {
     countdownLabel = `${Math.abs(minutes)} ${t("time.min_ago", "min ago")}`;
   } else {
-    countdownLabel = `${minutes} ${t("time.min", "min")}`;
+    countdownLabel = waitClock(minutes, minutesOnly) ?? `${minutes} ${t("time.min", "min")}`;
   }
+  const countdownSpoken = minutes > 0 && waitClock(minutes, minutesOnly)
+    ? waitSpoken(minutes, formattingLocale)
+    : null;
 
   const serviceEdge = marker?.lastOfServiceDay
     ? t("schedule.lastOfServiceDay", "Last trip of the day")
@@ -402,9 +412,16 @@ function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: Schedu
           <span className="w-1.5 h-1.5 bg-success rounded-full" />
         )}
 
-        {/* Countdown — always in minutes */}
-        <span data-countdown className={`font-semibold ${timeColor}`}>
-          {countdownLabel}
+        {/* Countdown: minutes, or h:mm from an hour */}
+        <span data-countdown className={`font-semibold tabular-nums ${timeColor}`}>
+          {countdownSpoken ? (
+            <>
+              <span aria-hidden="true">{countdownLabel}</span>
+              <span className="sr-only">{countdownSpoken}</span>
+            </>
+          ) : (
+            countdownLabel
+          )}
         </span>
       </div>
     </div>
