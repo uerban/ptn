@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
+import type {PtAddressIndexHandle} from "../addressIndexWasm.ts";
 import { db, type AddressSearchArtifactRecord } from "../../db/index.ts";
 import {
   AddressSearchGeocoderAdapter,
@@ -14,20 +15,19 @@ import {
 // provider/tier, that scoring and ordering are applied, and that the wasm index
 // is built once per corpus. So the wasm boundary is mocked, not the search.
 const searchSpy = vi.fn();
-const buildSpy = vi.fn();
+const buildSpy = vi.fn<(bytes: ArrayBuffer) => Promise<PtAddressIndexHandle>>();
 vi.mock("../addressIndexWasm.ts", () => ({
-  buildAddressIndex: (bytes: ArrayBuffer) => {
-    buildSpy(bytes);
-    return Promise.resolve({
-      search: (query: string, limit: number) => searchSpy(query, limit),
-      rowCount: () => 2,
-      keyCount: () => 4,
-      fstSizeBytes: () => 1024,
-      cityId: () => "vilnius",
-      free: () => {},
-    });
-  },
+  buildAddressIndex: (bytes: ArrayBuffer) => buildSpy(bytes),
 }));
+function indexHandle(search = (query: string, limit: number) => searchSpy(query, limit)): PtAddressIndexHandle {
+  return {search, rowCount: () => 2, keyCount: () => 4, fstSizeBytes: () => 1024,
+    cityId: () => "vilnius", free: () => {}};
+}
+function deferred<T>() {
+  let resolve!: (value: T) => void, reject!: (error: Error) => void;
+  const promise = new Promise<T>((ok, fail) => {resolve = ok; reject = fail;});
+  return {promise, resolve, reject};
+}
 
 const KUDIRKA_HIT = {
   label: "V. Kudirkos aikštė 1",
@@ -56,7 +56,7 @@ describe("AddressSearchGeocoderAdapter", () => {
     __clearAddressSearchAdapterCacheForTests();
     await db.addressSearchArtifacts.clear();
     searchSpy.mockReset();
-    buildSpy.mockReset();
+    buildSpy.mockReset().mockImplementation(async () => indexHandle());
     searchSpy.mockReturnValue([KUDIRKA_HIT]);
   });
 
@@ -133,6 +133,98 @@ describe("AddressSearchGeocoderAdapter", () => {
     await localAddressCandidates("vilnius", "gedimino", null, signal);
 
     expect(buildSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares a pending index build across concurrent queries for one corpus", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    const pending = deferred<PtAddressIndexHandle>();
+    buildSpy.mockReturnValue(pending.promise);
+    const signal = new AbortController().signal;
+    const a = localAddressCandidates("vilnius", "kudirk", null, signal);
+    const b = localAddressCandidates("vilnius", "gedimino", null, signal);
+    await vi.waitFor(() => expect(buildSpy).toHaveBeenCalled());
+    pending.resolve(indexHandle());
+    await Promise.all([a,b]);
+    expect(buildSpy).toHaveBeenCalledTimes(1);
+    expect(searchSpy.mock.calls.map(call=>call[0]).sort()).toEqual(["gedimino","kudirk"]);
+  });
+
+  it("does not let a late old corpus build replace the newer cached index", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    const pending = deferred<PtAddressIndexHandle>();
+    const oldIndex = indexHandle(() => [{...KUDIRKA_HIT,label:"Old corpus"}]);
+    const newIndex = indexHandle(() => [{...KUDIRKA_HIT,label:"New corpus"}]);
+    buildSpy.mockReturnValueOnce(pending.promise).mockResolvedValue(newIndex);
+    const signal = new AbortController().signal;
+    const old = localAddressCandidates("vilnius", "kudirk", null, signal);
+    await vi.waitFor(() => expect(buildSpy).toHaveBeenCalledTimes(1));
+    await db.addressSearchArtifacts.put({...addressRecord(),sha256:"b".repeat(64)});
+    expect((await localAddressCandidates("vilnius", "kudirk", null, signal))[0]!.label).toBe("New corpus");
+    pending.resolve(oldIndex);
+    expect((await old)[0]!.label).toBe("Old corpus");
+    expect((await localAddressCandidates("vilnius", "kudirk", null, signal))[0]!.label).toBe("New corpus");
+    expect(buildSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares build failure and retries instead of caching a rejected promise", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    const pending = deferred<PtAddressIndexHandle>();
+    buildSpy.mockReturnValueOnce(pending.promise).mockReturnValueOnce(pending.promise);
+    const signal = new AbortController().signal;
+    const settled = Promise.allSettled([
+      localAddressCandidates("vilnius", "kudirk", null, signal),
+      localAddressCandidates("vilnius", "gedimino", null, signal),
+    ]);
+    await vi.waitFor(() => expect(buildSpy).toHaveBeenCalled());
+    pending.reject(new Error("index unavailable"));
+    expect((await settled).map(result=>result.status)).toEqual(["rejected","rejected"]);
+    expect(buildSpy).toHaveBeenCalledTimes(1);
+    buildSpy.mockReset().mockResolvedValue(indexHandle());
+    expect(await localAddressCandidates("vilnius", "kudirk", null, signal)).toHaveLength(1);
+    expect(buildSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not evict a newer successful corpus when an older build fails", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    const pending = deferred<PtAddressIndexHandle>();
+    buildSpy.mockReturnValueOnce(pending.promise).mockResolvedValue(indexHandle());
+    const signal = new AbortController().signal;
+    const old = localAddressCandidates("vilnius", "kudirk", null, signal).catch(error=>error);
+    await vi.waitFor(() => expect(buildSpy).toHaveBeenCalledTimes(1));
+    await db.addressSearchArtifacts.put({...addressRecord(),sha256:"b".repeat(64)});
+    await localAddressCandidates("vilnius", "kudirk", null, signal);
+    pending.reject(new Error("old build failed"));
+    expect(await old).toBeInstanceOf(Error);
+    await localAddressCandidates("vilnius", "kudirk", null, signal);
+    expect(buildSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a shared index build usable when one waiting query aborts", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    const pending = deferred<PtAddressIndexHandle>();
+    buildSpy.mockReturnValue(pending.promise);
+    const controller = new AbortController();
+    const a = localAddressCandidates("vilnius", "kudirk", null, controller.signal).catch(error=>error);
+    const b = localAddressCandidates("vilnius", "gedimino", null, new AbortController().signal);
+    await vi.waitFor(() => expect(buildSpy).toHaveBeenCalled());
+    controller.abort();pending.resolve(indexHandle());
+    expect(await a).toMatchObject({name:"AbortError"});
+    expect(await b).toHaveLength(1);
+    expect(buildSpy).toHaveBeenCalledTimes(1);
+    expect(searchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps city cache entries independent even when artifact hashes match", async () => {
+    await db.addressSearchArtifacts.bulkPut([addressRecord(), {...addressRecord(),cityId:"gdansk"}]);
+    const signal = new AbortController().signal;
+    await Promise.all([
+      localAddressCandidates("vilnius", "kudirk", null, signal),
+      localAddressCandidates("gdansk", "kudirk", null, signal),
+    ]);
+    await localAddressCandidates("vilnius", "gedimino", null, signal);
+    await localAddressCandidates("gdansk", "gedimino", null, signal);
+    expect(buildSpy).toHaveBeenCalledTimes(2);
+    expect(searchSpy).toHaveBeenCalledTimes(4);
   });
 
   it("rebuilds when the corpus sha changes", async () => {

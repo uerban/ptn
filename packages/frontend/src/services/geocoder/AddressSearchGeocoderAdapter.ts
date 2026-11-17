@@ -19,7 +19,7 @@ export interface AddressSearchCandidate extends GeocoderCandidate {
 
 interface CachedAddressIndex {
   sha256: string;
-  index: PtAddressIndexHandle;
+  index: Promise<PtAddressIndexHandle>;
 }
 
 const cacheByCity = new Map<string, CachedAddressIndex>();
@@ -33,17 +33,24 @@ function throwIfAborted(signal: AbortSignal): void {
  *
  * Hands the packed PTAS schema-1 bytes to wasm, which reads the FST in
  * place — no JS-side parse or rebuild. Keyed on sha256 so a corpus swap
- * rebuilds and a re-query does not.
+ * rebuilds and a re-query does not. Retain the pending promise too, so
+ * concurrent queries share construction without tying it to one query's abort.
  */
 async function indexForRecord(
   record: AddressSearchArtifactRecord,
-): Promise<CachedAddressIndex> {
+): Promise<PtAddressIndexHandle> {
   const cached = cacheByCity.get(record.cityId);
-  if (cached?.sha256 === record.sha256) return cached;
-  const index = await buildAddressIndex(record.bytes);
-  const next = { sha256: record.sha256, index };
+  if (cached?.sha256 === record.sha256) return cached.index;
+  const next = { sha256: record.sha256, index: buildAddressIndex(record.bytes) };
   cacheByCity.set(record.cityId, next);
-  return next;
+  try {
+    return await next.index;
+  } catch (error) {
+    // A transient failure must remain retryable. An older pending build must
+    // not evict a newer corpus (or a replacement installed after cache clear).
+    if (cacheByCity.get(record.cityId) === next) cacheByCity.delete(record.cityId);
+    throw error;
+  }
 }
 
 function scoreMatch(
@@ -101,7 +108,7 @@ export async function localAddressCandidates(
   const record = await db.addressSearchArtifacts.get(cityId);
   throwIfAborted(signal);
   if (!record || record.rowCount === 0 || record.keyCount === 0) return [];
-  const { index } = await indexForRecord(record);
+  const index = await indexForRecord(record);
   throwIfAborted(signal);
   return toCandidates(index.search(query, limit), hint);
 }
