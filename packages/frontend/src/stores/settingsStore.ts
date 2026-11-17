@@ -130,6 +130,8 @@ interface SettingsState {
   walkSpeedMps: number;
   maxWalkSecs: number;
   runToCatch: boolean;
+  /** Show waits of an hour or more in minutes instead of h:mm. */
+  waitMinutesOnly: boolean;
   /** Pre-stop buffer override in seconds. null = use PROFILE_DEFAULT_BUFFER_SECS[mobilityProfile]. 0 = explicit "no buffer". */
   leaveBufferOverrideSeconds: number | null;
   routeSearchVariant: RouteSearchVariant;
@@ -197,6 +199,7 @@ interface SettingsState {
   setWalkSpeedMps: (speed: number) => void;
   setMaxWalkSecs: (secs: number) => void;
   setRunToCatch: (enabled: boolean) => void;
+  setWaitMinutesOnly: (enabled: boolean) => void;
   setLeaveBufferOverrideSeconds: (seconds: number | null) => void;
   setRouteSearchVariant: (variant: RouteSearchVariant) => void;
   setMapDetailMode: (mode: MapDetailMode) => void;
@@ -383,6 +386,7 @@ export const useSettingsStore = create<SettingsState>()(
       walkSpeedMps: DEFAULT_WALK_SPEED_MPS,
       maxWalkSecs: DEFAULT_MAX_WALK_SECS,
       runToCatch: false,
+      waitMinutesOnly: false,
       leaveBufferOverrideSeconds: null,
       routeSearchVariant: "consumer" satisfies RouteSearchVariant,
       mapDetailMode: "detailed" satisfies MapDetailMode,
@@ -504,6 +508,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setMaxWalkSecs: (secs) => set({ maxWalkSecs: clamp(secs, 60, 3600) }),
       setRunToCatch: (enabled) => set({ runToCatch: enabled }),
+      setWaitMinutesOnly: (enabled) => set({ waitMinutesOnly: enabled }),
       setLeaveBufferOverrideSeconds: (seconds) => {
         if (seconds === null) {
           set({ leaveBufferOverrideSeconds: null });
@@ -684,6 +689,7 @@ export const useSettingsStore = create<SettingsState>()(
             ? clamp(stored.maxWalkSecs, 60, 3600)
             : current.maxWalkSecs,
           runToCatch: coerceBool(stored?.runToCatch, current.runToCatch),
+          waitMinutesOnly: coerceBool(stored?.waitMinutesOnly, current.waitMinutesOnly),
           leaveBufferOverrideSeconds:
             stored?.leaveBufferOverrideSeconds === null
               ? null

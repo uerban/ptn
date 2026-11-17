@@ -279,6 +279,19 @@ describe("Home dispatcher – Text mode", () => {
     expect(screen.getByTestId("location").textContent).toBe("/");
     expect(settingsState.scheduleMode).toBe(true);
   });
+
+  it("Switch to Map mode on the temporary map makes Map mode the starting view and drops ?view=map", async () => {
+    const view = await renderDispatcher("/?view=map");
+    expect(await screen.findByTestId("transit-map")).toBeTruthy();
+    act(() => screen.getByTestId("switch-to-map-btn").click());
+    expect(settingsState.scheduleMode).toBe(false);
+    view.rerenderDispatcher();
+    expect(await screen.findByTestId("transit-map")).toBeTruthy();
+    expect(screen.getByTestId("location").textContent).toBe("/");
+    expect(screen.queryByTestId("back-to-text-btn")).toBeNull();
+    expect(screen.queryByTestId("switch-to-map-btn")).toBeNull();
+    expect(screen.getByTestId("show-schedule-btn")).toBeTruthy();
+  });
 });
 
 describe("Home dispatcher – switching to Text mode disables bike-share polling", () => {

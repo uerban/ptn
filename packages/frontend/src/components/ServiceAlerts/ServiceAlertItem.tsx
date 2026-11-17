@@ -96,7 +96,7 @@ export function ServiceAlertItem({
       data-testid="service-alert"
       data-alert-id={alert.id}
       data-severity={alert.severity}
-      className="flex flex-col gap-1 px-3 py-2 rounded-lg border border-divider bg-surface-overlay"
+      className="font-sans not-italic flex flex-col gap-1 px-3 py-2 rounded-lg border border-divider bg-surface-overlay"
     >
       <span className="flex flex-wrap items-center gap-2">
         <SeverityLabel severity={alert.severity} />
@@ -164,7 +164,7 @@ export function ServiceAlertNote({ alert, line }: { alert: Alert; line?: string 
     <span
       data-testid="service-alert-note"
       data-severity={alert.severity}
-      className="flex items-start gap-1.5 text-xs text-fg"
+      className="font-sans not-italic flex items-start gap-1.5 text-xs text-fg"
     >
       <SeverityLabel severity={alert.severity} />
       {line && <span className="font-semibold shrink-0">{line}</span>}

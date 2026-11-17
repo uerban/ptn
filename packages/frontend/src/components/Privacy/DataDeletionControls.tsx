@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import {
   clearDownloadedData,
   deletePersonalHistory,
@@ -22,6 +22,7 @@ export function DataDeletionControls({
   resetPtn,
 }: DataDeletionControlsProps) {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   const [busy, setBusy] = useState<DeletionAction | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
