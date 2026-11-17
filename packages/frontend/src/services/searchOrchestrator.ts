@@ -181,18 +181,18 @@ export class SearchOrchestrator {
    */
   async resolveDeparture(
     departureTime: Date,
-    feedTz: string | undefined,
+    feedTz: string | undefined, trace?: SearchPipelineCapture,
   ): Promise<{ serviceDate: string; departureSecs: number }> {
     const unix = Math.floor(departureTime.getTime() / 1000);
     if (this.config.stopPlanner) {
       const tz = feedTz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
       const serviceDate = unixToServiceDate(unix, tz);
-      return {
-        serviceDate: String(serviceDate),
-        departureSecs: unixToGtfsSecs(unix, serviceDate, tz),
-      };
+      const result = {serviceDate: String(serviceDate), departureSecs: unixToGtfsSecs(unix, serviceDate, tz)};
+      trace?.timeFrame({kind: "timezone", timeZone: tz, departureUnix: unix, timeOriginUnix: unix - result.departureSecs, ...result});
+      return result;
     }
     const resolved = await resolveDepartureOnDevice(unix, this.onDeviceContext());
+    trace?.timeFrame({kind: "engine", departureUnix: unix, ...resolved});
     return { serviceDate: resolved.serviceDate, departureSecs: resolved.departureSecs };
   }
 
@@ -296,7 +296,11 @@ export class SearchOrchestrator {
       ? await optionalPedestrianRoute(() => this.config.directWalkRoute!(query.origin, query.destination)) : null;
     trace?.direct(pedestrianRoute);
     if (entryStops.length === 0 || exitStops.length === 0) {
-      const frame = serviceDayFrame(Math.floor(query.departureTime.getTime() / 1000), this.config.feedTz);
+      const departureUnix = Math.floor(query.departureTime.getTime() / 1000);
+      const timeZone = this.config.feedTz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const frame = serviceDayFrame(departureUnix, timeZone);
+      trace?.timeFrame({kind: "timezone", timeZone, departureUnix, serviceDate: frame.todayYmd,
+        departureSecs: frame.nowSecs, timeOriginUnix: departureUnix - frame.nowSecs});
       const direct = directWalkCandidate(query.origin, query.destination, pedestrianRoute,
         frame.nowSecs, riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps));
       return this.compose([], entryStops, exitStops, frame.nowSecs, direct, query.ranking, undefined, trace);
@@ -308,7 +312,7 @@ export class SearchOrchestrator {
     // It also scans every service date its horizon reaches, so there is no
     // v1-style overnight pass or early-morning empty-day short-circuit here.
     const feedTz = this.config.feedTz;
-    const { serviceDate, departureSecs } = await this.resolveDeparture(query.departureTime, feedTz);
+    const { serviceDate, departureSecs } = await this.resolveDeparture(query.departureTime, feedTz, trace);
     const activeServiceIds = resolveActiveServices(raptorIndex.services, query.departureTime, feedTz);
 
     const walking = directWalkCandidate(query.origin, query.destination, pedestrianRoute,

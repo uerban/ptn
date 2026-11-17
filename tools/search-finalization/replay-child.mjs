@@ -26,12 +26,19 @@ if(config) {
     router=new pkg.PtRouter(bytes.plannerPtb,config.patternMode);
     if(typeof router.temporalDirectObjective==="function"&&router.temporalDirectObjective()!==null)throw new Error("Experimental planner objective is unsupported");
     if(config.transfers)await router.setTransfers(bytes.plannerTransfers);
+    let timeFrame=null;
+    if(record.timeFrame?.kind==="engine") {
+      const resolved=await router.resolveTime(record.timeFrame.departureUnix);
+      timeFrame={kind:"engine",departureUnix:record.timeFrame.departureUnix,...resolved};
+      const expected=record.timeFrame;
+      if(timeFrame.serviceDate!==expected.serviceDate||timeFrame.departureSecs!==expected.departureSecs||timeFrame.timeOriginUnix!==expected.timeOriginUnix)throw new Error("Engine time frame differs from observation");
+    }
     const query=module.toWasmQuery(record.planner.query,record.planner.serviceDate);
     const observedQuery=JSON.parse(JSON.stringify(query));
     const actual=await router.plan(query);
     const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
     if(!Array.isArray(actual)||JSON.stringify(canonical(actual))!==JSON.stringify(canonical(record.planner.output)))throw new Error("Planner output differs from observation");
-    planner={query:observedQuery,output:actual,artifacts,patternMode:config.patternMode};
+    planner={query:observedQuery,output:actual,artifacts,patternMode:config.patternMode,timeFrame};
   }finally{router?.free();}
 }
 let walking=null;

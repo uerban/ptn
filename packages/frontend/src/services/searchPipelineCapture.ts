@@ -5,12 +5,15 @@ import type {WalkRoute} from "./walkGraphClient.ts";
 import {directWalkCandidate} from "./directWalkCandidate.ts";
 import {replayReachableStops, type ReachCapture} from "./searchReachCapture.ts";
 import {replaySearchComposition, type CompositionCapture} from "./searchComposition.ts";
+import {unixToServiceDate, unixToGtfsSecs} from "@pt/shared/time";
 import {wire, same, freeze} from "./searchEvidenceWire.ts";
 
 type Query = Omit<SearchQuery, "departureTime"> & {departureTimeMs: number};
 type Planner = {source: "on-device" | "injected"; query: RaptorQuery; serviceDate: string; output: RaptorItinerary[]};
-const MISSING = ["endpoint selection and readiness wait before reach", "planner/time-frame/service eligibility execution and artifacts",
+const MISSING = ["endpoint selection and readiness wait before reach", "original planner/service eligibility execution and artifacts",
   "raw pedestrian graphs and provider execution", "raw RT feeds before lookup", "original producer module/runtime identity"];
+export type CapturedTimeFrame = {departureUnix: number; serviceDate: string; departureSecs: number; timeOriginUnix: number} & (
+  {kind: "timezone"; timeZone: string} | {kind: "engine"});
 export interface PipelineCapture {
   format: "ptn-search-pipeline";
   version: 1;
@@ -18,6 +21,8 @@ export interface PipelineCapture {
   classification: "partial capture";
   normalization: "finite-json-wire-v1";
   query: Query;
+  /** Absent in legacy v1 observations, whose clock conversion is unverified. */
+  timeFrame?: CapturedTimeFrame;
   reach: {entry: ReachCapture; exit: ReachCapture};
   directRoute: WalkRoute | null;
   /** Null means no planner invocation because an endpoint had no reachable stops. */
@@ -31,6 +36,7 @@ export interface PipelineCapture {
  * shared orchestrator configuration. */
 export class SearchPipelineCapture {
   private query: Query;
+  private frame?: CapturedTimeFrame;
   private entry?: ReachCapture;
   private exit?: ReachCapture;
   private route: WalkRoute | null = null;
@@ -40,6 +46,7 @@ export class SearchPipelineCapture {
     const {departureTime, ...rest} = query;
     this.query = wire({...rest, departureTimeMs: departureTime.getTime()});
   }
+  timeFrame(frame: CapturedTimeFrame) {this.frame = wire(frame);}
   reach(side: "entry" | "exit", record: ReachCapture) { this[side] = record; }
   direct(route: WalkRoute | null) { this.route = wire(route); }
   planStart(query: RaptorQuery, serviceDate: string, source: Planner["source"]) {
@@ -51,16 +58,16 @@ export class SearchPipelineCapture {
   }
   composition(record: CompositionCapture) { this.composed = record; }
   finish(output: CompositionCapture["output"]) {
-    if (!this.entry || !this.exit || !this.composed) throw new Error("Incomplete search stage observations");
+    if (!this.entry || !this.exit || !this.composed || !this.frame) throw new Error("Incomplete search stage observations");
     this.emit(freeze(wire({format: "ptn-search-pipeline", version: 1, scope: "frontend linked stages with observed planner",
-      classification: "partial capture", normalization: "finite-json-wire-v1", query: this.query,
+      classification: "partial capture", normalization: "finite-json-wire-v1", query: this.query, timeFrame: this.frame,
       reach: {entry: this.entry, exit: this.exit}, directRoute: this.route, planner: this.planner,
       composition: this.composed, output, missingDependencies: MISSING})));
   }
 }
 
-/** Checks stage continuity with observed provider/planner responses. Planner
- * execution, service eligibility and its time frame are not independently rerun. */
+/** Planner execution and service eligibility remain observed here. Captured
+ * timezone frames are recomputed; engine frames need supplied-state replay. */
 export async function replaySearchPipeline(record: PipelineCapture): Promise<CompositionCapture["output"]> {
   record = wire(record);
   if (record.format !== "ptn-search-pipeline" || record.version !== 1 || record.scope !== "frontend linked stages with observed planner"
@@ -70,6 +77,22 @@ export async function replaySearchPipeline(record: PipelineCapture): Promise<Com
   const {query, reach, composition, planner} = record;
   const [entry, exit] = await Promise.all([replayReachableStops(reach.entry), replayReachableStops(reach.exit)]);
   const input = composition.input;
+  if (record.timeFrame !== undefined) {
+    const frame = record.timeFrame;
+    if (!frame || !Number.isFinite(frame.departureUnix) || !Number.isFinite(frame.timeOriginUnix) || !Number.isFinite(frame.departureSecs)
+      || typeof frame.serviceDate !== "string" || !/^\d{8}$/.test(frame.serviceDate)) throw new Error("Unsupported time frame");
+    check(frame.departureUnix, Math.floor(query.departureTimeMs / 1000), "query clock");
+    check(frame.departureUnix, frame.timeOriginUnix + frame.departureSecs, "time origin");
+    check(frame.departureSecs, input.departureSecs, "composition time frame");
+    check(frame.kind, planner?.source === "on-device" ? "engine" : "timezone", "time resolver source");
+    if (planner) check(frame.serviceDate, planner.serviceDate, "planner service date");
+    if (frame.kind === "timezone") {
+      if (typeof frame.timeZone !== "string" || !frame.timeZone) throw new Error("Missing captured time zone");
+      const date = unixToServiceDate(frame.departureUnix, frame.timeZone);
+      check(String(date), frame.serviceDate, "timezone service date");
+      check(unixToGtfsSecs(frame.departureUnix, date, frame.timeZone), frame.departureSecs, "timezone departure");
+    } else if (frame.kind !== "engine" || !/^\d{8}$/.test(frame.serviceDate)) throw new Error("Unsupported time frame");
+  }
   check(reach.entry.input.origin, query.origin, "origin");
   check(reach.exit.input.origin, query.destination, "destination");
   check(reach.entry.input.options.role, "origin", "entry direction");

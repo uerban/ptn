@@ -150,3 +150,21 @@ of supplied decoded graph state for declared calls. It does not replay OSRM
 endpoint duration tables, graph discovery/cache/worker lifecycle, decompression,
 original city-scale graph state, or pre-lookup RT feeds. Use OS network denial
 for an offline verification; the process deadline is not a security sandbox.
+
+## Captured service-time conversion
+
+New linked v1 observations may contain a `timeFrame` extension. Their module must
+declare `ptn-time-frame-v1` support; an older module cannot silently ignore it.
+The frame binds absolute query time to service date, origin and departure seconds.
+Timezone conversions rerun from the captured explicit IANA zone, including a
+resolved device zone when no feed zone was configured. Engine conversions remain
+observed with arithmetic/clock checks until planner state is attached. Attached
+planner replay calls supplied `PtRouter.resolveTime` and compares its complete
+frame before planning. The parent requires that frame proof too.
+
+Verification output distinguishes timezone recomputation, observed engine
+conversion with arithmetic checks, and supplied engine conversion re-execution.
+Legacy linked records without the extension keep their original contract; their
+proof has no verified time frame. No stored record is rewritten or promoted.
+Active-service computation and original live browser/router identity remain
+outside this verification.

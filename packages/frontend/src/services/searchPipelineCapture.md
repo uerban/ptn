@@ -28,8 +28,10 @@ output. Nested stage replays check provider lookup argument order and exhaustion
 The capsule CLI in `tools/search-finalization` supports retention and replay.
 
 Planner execution and its timetable/feed/module artifacts are still missing.
-The observed service-date/time-frame resolution and active services are retained
-as planner inputs, not independently recomputed. Upstream endpoint selection,
+New observations also retain the actual time-frame conversion. Timezone-based
+conversion is recomputed from captured absolute clock and IANA zone; engine
+conversion is checked arithmetically until supplied planner artifacts rerun it.
+Active services remain an observed planner input. Upstream endpoint selection,
 readiness waiting, raw pedestrian graphs/provider execution, pre-lookup RT feeds,
 and original application bytes/runtime are also outside this boundary. A linked
 record proves stage continuity under observed responses; it does not establish
@@ -43,3 +45,19 @@ transfer/pattern state to a new immutable run. Replay then re-executes the
 planner through the production query adapter and checks its output against this
 observation. This is supplied-state compatibility, not verification of the
 original live handle or application identity. The original capture stays partial.
+
+New v1 observations contain an optional `timeFrame` extension: absolute Unix
+seconds, service date, departure seconds and origin Unix time, plus either an
+explicit timezone or an engine-resolver tag. It binds the received query clock
+to both composition and planner frames. Empty-reach direct walking uses timezone
+resolution; on-device planning uses the engine resolver. A change to the clock,
+time origin, date, conversion source or composition departure fails replay.
+Timezone controls cover spring and repeated autumn hours in the retained runtime.
+
+A module must declare `ptn-time-frame-v1` capability to retain/replay records with
+this extension. Older v1 observations without it remain readable and explicitly
+lack clock-conversion verification. New timezone observations rerun the retained
+conversion functions. New engine observations check clock/frame arithmetic;
+`attach-planner` additionally calls supplied `PtRouter.resolveTime` and requires
+exact frame equality before checking the plan. Original live-handle identity
+remains unverified even when that supplied-state check passes.

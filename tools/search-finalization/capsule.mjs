@@ -24,6 +24,9 @@ function checkModule(manifest) {
   if(manifest.recordFormats!==undefined&&(!Array.isArray(manifest.recordFormats)||!manifest.recordFormats.length||manifest.recordFormats.some(format=>!Object.hasOwn(SCOPES,format))))throw new Error("Invalid module formats");
 }
 
+function checkTimeFrameSupport(record,build) {
+  if(record.format==="ptn-search-pipeline"&&Object.hasOwn(record,"timeFrame")&&build.timeFrameReplay!=="ptn-time-frame-v1")throw new Error("Module does not support captured time frame");
+}
 function checkRecord(bytes) {
   if(bytes.length>2*1024*1024)throw new Error("Finalization record exceeds limit");
   const record=JSON.parse(bytes);
@@ -41,6 +44,7 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   const recordBytes=readFileSync(recordPath);
   const record=checkRecord(recordBytes);
   const manifestBytes=readFileSync(join(moduleDirectory,"manifest.json")),manifest=JSON.parse(manifestBytes);checkModule(manifest);
+  checkTimeFrameSupport(record,manifest);
   if(!(manifest.recordFormats??["ptn-search-finalization"]).includes(record.format))throw new Error("Module does not support capture format");
   const module=readFileSync(join(moduleDirectory,"module.mjs"));
   if(sha(module)!==manifest.moduleSha256)throw new Error("Module integrity mismatch");
@@ -69,7 +73,7 @@ function readCapsule(store,id) {
   const observed=Object.fromEntries(Object.entries(capsule.artifacts).map(([name,hash])=>[name,readArtifact(store,hash)]));
   for(const name of ["module","record","moduleBuild","replayChild"])if(!observed[name])throw new Error(`Missing capsule artifact: ${name}`);
   const record=checkRecord(observed.record);
-  const build=JSON.parse(observed.moduleBuild);checkModule(build);
+  const build=JSON.parse(observed.moduleBuild);checkModule(build);checkTimeFrameSupport(record,build);
   if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||scopeOf(record)!==capsule.scope)throw new Error("Capsule scope mismatch");
   if(build.moduleSha256!==capsule.artifacts.module||build.sources.some((row,index)=>capsule.artifacts[`source${index}`]!==row.sha256))throw new Error("Capsule module provenance mismatch");
   if(!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
@@ -163,6 +167,7 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
       ||!same(result.output,record.output))throw new Error("Replay proof mismatch");
       if(plannerInput&&(!same(result.planner?.output,record.planner.output)||result.planner?.patternMode!==plannerInput.patternMode
         ||!same(result.planner?.artifacts,Object.fromEntries(Object.entries(plannerInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Planner replay proof mismatch");
+      if(plannerInput&&record.timeFrame?.kind==="engine"&&!same(result.planner?.timeFrame,record.timeFrame))throw new Error("Engine time frame replay proof mismatch");
       if(walkingInput&&(!same(result.walking?.calls,walkingRequests(record,walkingInput.profile))||result.walking?.cityId!==walkingInput.cityId||result.walking?.profile!==walkingInput.profile
         ||!same(result.walking?.artifacts,Object.fromEntries(Object.entries(walkingInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Walking replay proof mismatch");}
     catch {completion="error";}
@@ -170,6 +175,7 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
   const proof={format:"ptn-search-finalization-replay",version:1,scope:capsule.scope,classification:capsule.classification,recordProducerIdentity:capsule.recordProducerIdentity,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
     planner:completion==="success"?(result.planner??null):null,plannerExecution:capsule.plannerExecution??null,
     walking:completion==="success"?(result.walking??null):null,walkingExecution:capsule.walkingExecution??null,
+    timeFrame:completion==="success"&&record.format==="ptn-search-pipeline"&&record.timeFrame?{observation:record.timeFrame,verification:record.timeFrame.kind==="timezone"?"timezone conversion recomputed":plannerInput?"supplied engine conversion re-executed":"observed engine conversion; arithmetic checked"}:null,
     completion,elapsedMs:performance.now()-started,exitCode:child.status,signal:child.signal,errorCode:child.error?.code??null,
     logCaptureComplete:child.error?.code!=="ENOBUFS",output:completion==="success"?result.output:null};
   writeFileSync(join(destination,"verification.json"),JSON.stringify(proof,null,2)+"\n",{flag:"wx",mode:0o600});

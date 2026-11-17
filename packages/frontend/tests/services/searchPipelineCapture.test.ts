@@ -1,6 +1,7 @@
 import {describe, it, expect, vi} from "vitest";
 import {SearchOrchestrator, type SearchConfig, type SearchQuery} from "../../src/services/searchOrchestrator.ts";
 import {replaySearchPipeline, type PipelineCapture} from "../../src/services/searchPipelineCapture.ts";
+import {planOnDevice, resolveDepartureOnDevice} from "../../src/services/wasmPlanner.ts";
 import type {RaptorIndex} from "../../src/services/raptorIndex.ts";
 vi.mock("../../src/services/wasmPlanner.ts", () => ({planOnDevice: vi.fn(async () => []), resolveDepartureOnDevice: vi.fn()}));
 const stops = [{id: "A", name: "A", lat: 54.68, lon: 25.28}, {id: "B", name: "B", lat: 54.70, lon: 25.28}];
@@ -28,17 +29,46 @@ describe("linked search observations", () => {
     expect(record.planner?.query.entryStops).toEqual([{stopId: "A", walkSecs: 0}]);
     expect(record.planner?.output).toEqual(itineraries);
     expect(record.query.departureTimeMs).toBe(query.departureTime.getTime());
+    expect(record).toHaveProperty("timeFrame");
     expect(Object.isFrozen(record.composition.input)).toBe(true);
     expect(await replaySearchPipeline(record)).toEqual(output);
     expect(reachObserver).toHaveBeenCalledTimes(2);expect(compositionObserver).toHaveBeenCalledTimes(1);expect(finalizationObserver).toHaveBeenCalledTimes(1);
     for (const change of [
       (r: PipelineCapture) => {r.query.origin.lat += 0.01;},
+      (r: PipelineCapture) => {r.query.departureTimeMs += 3600000;},
       (r: PipelineCapture) => {r.planner!.query.entryStops[0].walkSecs++;},
       (r: PipelineCapture) => {r.planner!.output[0].legs[0].arriveSecs++;},
       (r: PipelineCapture) => {r.planner = null;},
       (r: PipelineCapture) => {r.directRoute!.distanceMeters++;},
       (r: PipelineCapture) => {r.query.maxRounds = 9;},
     ]) {const changed = clone(record);change(changed);await expect(replaySearchPipeline(changed)).rejects.toThrow();}
+  });
+  it.each([
+    ["spring DST", "2026-03-29T02:30:00+02:00", "2026-03-29T04:30:00+03:00"],
+    ["repeated autumn hour", "2026-10-25T03:30:00+03:00", "2026-10-25T03:30:00+02:00"],
+  ])("recomputes %s from retained absolute clock and feed zone", async (_label, first, second) => {
+    const records: PipelineCapture[] = [];
+    const search = new SearchOrchestrator({...config(r => records.push(r)), directWalkRoute: undefined, stopPlanner: async () => []});
+    for (const departure of [first, second]) {
+      await search.search({...query, departureTime: new Date(departure)});
+      const record = records.at(-1)!;
+      expect(record.timeFrame?.kind).toBe("timezone");expect(await replaySearchPipeline(record)).toEqual(record.output);
+      const changed = clone(record);if (changed.timeFrame?.kind === "timezone") changed.timeFrame.timeZone = "UTC";
+      await expect(replaySearchPipeline(changed)).rejects.toThrow();
+    }
+    expect(records[1].timeFrame!.departureSecs - records[0].timeFrame!.departureSecs).toBe(3600);
+    expect(records[1].timeFrame!.serviceDate).toBe(records[0].timeFrame!.serviceDate);
+  });
+  it("retains engine resolution separately from arithmetic-only observation replay", async () => {
+    const departureUnix = query.departureTime.getTime() / 1000;
+    vi.mocked(resolveDepartureOnDevice).mockResolvedValueOnce({serviceDate: "20261113", departureSecs: 28800, timeOriginUnix: departureUnix - 28800});
+    vi.mocked(planOnDevice).mockResolvedValueOnce(itineraries);
+    let record!: PipelineCapture;
+    const output = await new SearchOrchestrator({...config(r => {record = r;}), stopPlanner: undefined}).search(query);
+    expect(record.timeFrame).toEqual({kind: "engine", departureUnix, serviceDate: "20261113", departureSecs: 28800, timeOriginUnix: departureUnix - 28800});
+    expect(await replaySearchPipeline(record)).toEqual(output);
+    const changed = clone(record);changed.timeFrame!.timeOriginUnix++;
+    await expect(replaySearchPipeline(changed)).rejects.toThrow("time origin");
   });
   it("records no planner invocation for empty reach while preserving direct walking", async () => {
     let record!: PipelineCapture;

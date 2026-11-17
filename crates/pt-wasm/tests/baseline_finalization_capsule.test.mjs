@@ -109,10 +109,11 @@ test("output buffer exhaustion discloses partial logs and cannot masquerade as s
 test("a valid empty finalization is a successful empty replay",()=>{
  let record;
  compiled.finalizeSearch({composed:[],walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120},()=>null,undefined,value=>{record=value;});
+ record.timeFrame={kind:"timezone",timeZone:"UTC",departureUnix:0,departureSecs:0,timeOriginUnix:0,serviceDate:"19700101"};
  const path=join(root,"empty-record.json"),store=join(root,"empty-store");writeFileSync(path,JSON.stringify(record));
  retainFinalization(store,"empty",path,moduleDir);
  const proof=replayFinalizationCapsule(store,"empty",join(root,"empty-replay"));
- assert.equal(proof.completion,"success");assert.deepEqual(proof.output,[]);
+ assert.equal(proof.completion,"success");assert.deepEqual(proof.output,[]);assert.equal(proof.timeFrame,null);
 });
 
 test("capture never executes a coherently hashed supplied module",()=>{
@@ -348,4 +349,28 @@ test("planner and walking attachments compose in either order with independent W
  assert.throws(()=>attachWalkingReplay(store,"source","wrong-profile",{...walk,profile:"wheelchair"}),/profile differs/);
  const altered=JSON.parse(readFileSync(join(store,"runs/walking-first.json")));altered.walkingExecution.originalGraphIdentity="verified";writeFileSync(join(store,"runs/claimed-graph.json"),JSON.stringify(altered));
  const denied=join(root,"claimed-graph-proof");assert.throws(()=>replayFinalizationCapsule(store,"claimed-graph",denied),/Unsupported walking/);assert.equal(existsSync(denied),false);
+});
+
+test("time frame capability binds captured clock and supplied engine resolveTime",()=>{
+ const source=JSON.parse(readFileSync(join(root,"pipeline-store/runs/linked.json")));
+ const record=JSON.parse(readFileSync(join(root,"pipeline-store/artifacts",source.artifacts.record)));
+ const unix=record.query.departureTimeMs/1000;
+ record.timeFrame={kind:"engine",departureUnix:unix,serviceDate:record.planner.serviceDate,departureSecs:record.planner.query.departureSecs,timeOriginUnix:unix-record.planner.query.departureSecs};
+ record.planner.source="on-device";
+ const path=join(root,"clock-record.json"),store=join(root,"clock-store");writeFileSync(path,JSON.stringify(record));
+ const legacy=join(root,"module-no-clock-support");cpSync(moduleDir,legacy,{recursive:true});
+ const manifest=JSON.parse(readFileSync(join(legacy,"manifest.json")));delete manifest.timeFrameReplay;writeFileSync(join(legacy,"manifest.json"),JSON.stringify(manifest));
+ const refused=join(root,"unsupported-clock-store");assert.throws(()=>retainFinalization(refused,"clock",path,legacy),/time frame/);assert.equal(existsSync(refused),false);
+ retainFinalization(store,"clock",path,moduleDir);
+ const frozen=replayFinalizationCapsule(store,"clock",join(root,"clock-observed-replay"));assert.equal(frozen.completion,"success");assert.match(frozen.timeFrame.verification,/arithmetic/);
+ const glue=join(root,"clock-glue.mjs"),wasm=join(root,"clock.wasm"),ptb=join(root,"clock.ptb");writeFileSync(wasm,"wasm");writeFileSync(ptb,"ptb");
+ const resolved={serviceDate:record.timeFrame.serviceDate,departureSecs:record.timeFrame.departureSecs,timeOriginUnix:record.timeFrame.timeOriginUnix};
+ const code=value=>['export function initSync(){}','export class PtRouter {','free(){}',`resolveTime(unix){if(unix!==${unix})throw new Error("clock argument changed");return ${JSON.stringify(value)};}`,`plan(){return ${JSON.stringify(record.planner.output)};}`,'}'].join("\n");
+ writeFileSync(glue,code(resolved));const options={glue,wasm,ptb,transfers:null,patternMode:"covering-merge"};attachPlannerReplay(store,"clock","clock-with-engine",options);
+ const proof=replayFinalizationCapsule(store,"clock-with-engine",join(root,"clock-engine-replay"));assert.equal(proof.completion,"success");assert.deepEqual(proof.planner.timeFrame,record.timeFrame);assert.match(proof.timeFrame.verification,/re-executed/);
+ writeFileSync(glue,code({...resolved,timeOriginUnix:resolved.timeOriginUnix+3600}));attachPlannerReplay(store,"clock","clock-wrong-engine",options);
+ const wrong=replayFinalizationCapsule(store,"clock-wrong-engine",join(root,"clock-wrong-engine-replay"));assert.equal(wrong.completion,"error");assert.equal(wrong.output,null);
+ assert.match(readFileSync(join(root,"clock-wrong-engine-replay/stderr.txt"),"utf8"),/Engine time frame/);
+ record.query.departureTimeMs+=3600000;writeFileSync(path,JSON.stringify(record));retainFinalization(store,"clock-altered",path,moduleDir);
+ const altered=replayFinalizationCapsule(store,"clock-altered",join(root,"clock-altered-replay"));assert.equal(altered.completion,"error");assert.equal(altered.output,null);
 });
