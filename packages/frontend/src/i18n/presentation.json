@@ -129,5 +129,8 @@
   "update.updating": "Updating…",
   "update.notNow": "Not now",
   "serviceAlerts.offerCityFallback": "this city",
-  "serviceAlerts.lines": "Line {lines}"
+  "serviceAlerts.lines": "Line {lines}",
+  "serviceAlerts.onRoutes": "Alerts on these routes: {count}",
+  "serviceAlerts.affectsLines": "Service alert affects line {lines}",
+  "serviceAlerts.sameAsAbove": "Same alert as above"
 }
