@@ -12,7 +12,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
-import { SETUP_HEADING, openSetupOptions, setupActionName } from "../helpers/setup-step";
+import { SETUP_HEADING, chooseSetupLevel, openSetupOptions, setupActionName } from "../helpers/setup-step";
 import { waitForActiveServiceWorker } from "../helpers/service-worker";
 import {
   disallowedRequests,
@@ -68,6 +68,7 @@ async function finishSetup(page: Page, preset: Preset, mode: StartMode): Promise
   await chooseCity(page);
   await openSetupOptions(page);
   await page.getByRole("radio", { name: new RegExp(`${mode} mode`) }).check();
+  await chooseSetupLevel(page, preset);
   await page
     .getByRole("button", {
       name: setupActionName(preset, mode),
