@@ -115,16 +115,16 @@ export function FlowDisclosure({
       : (recipientName ?? providerId ?? "");
   const fields: readonly PrivacyRequestField[] = flow?.requestFields ?? [];
 
-  const body = (
+  const content = (
     <>
       <h2 id={headingId} className="text-base font-semibold">
         {heading}
       </h2>
-      <div id={bodyId} className="mt-2 space-y-2 text-sm text-fg-secondary">
+      <div className="mt-2 space-y-2 text-sm text-fg-secondary">
         {flow && privacyReady ? (
-          <p>{t(flow.purposeKey, "")}</p>
+          <p id={bodyId}>{t(flow.purposeKey, "")}</p>
         ) : flow ? (
-          <p>{text("flow.loading")}</p>
+          <p id={bodyId}>{text("flow.loading")}</p>
         ) : null}
         {details && <div>{details}</div>}
         <div>
@@ -148,32 +148,37 @@ export function FlowDisclosure({
         </div>
         <p className="text-xs text-fg-muted">{text("flow.changeLater")}</p>
       </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        {decision !== "denied" && (
-          <button
-            type="button"
-            onClick={() => answer("denied")}
-            className="min-h-11 px-4 rounded-lg text-sm text-fg-secondary underline-offset-2 hover:underline"
-          >
-            {text("flow.dontAskAgain")}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => answer("not-now")}
-          className="min-h-11 px-4 rounded-lg border border-divider text-sm"
-        >
-          {text("flow.notNow")}
-        </button>
-        <button
-          type="button"
-          onClick={() => answer("allowed")}
-          className="min-h-11 px-4 rounded-lg bg-accent text-badge-text text-sm font-semibold"
-        >
-          {allowLabel}
-        </button>
-      </div>
     </>
+  );
+
+  // DOM order is the visual order: the main action first. Stacked full
+  // width on narrow screens, one row from sm up; Don't ask again is a link.
+  const actions = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <button
+        type="button"
+        onClick={() => answer("allowed")}
+        className="min-h-11 w-full sm:w-auto px-4 rounded-lg bg-accent text-badge-text text-sm font-semibold"
+      >
+        {allowLabel}
+      </button>
+      <button
+        type="button"
+        onClick={() => answer("not-now")}
+        className="min-h-11 w-full sm:w-auto px-4 rounded-lg border border-divider text-sm"
+      >
+        {text("flow.notNow")}
+      </button>
+      {decision !== "denied" && (
+        <button
+          type="button"
+          onClick={() => answer("denied")}
+          className="min-h-11 self-center sm:ml-auto px-2 text-sm text-fg-secondary underline underline-offset-2"
+        >
+          {text("flow.dontAskAgain")}
+        </button>
+      )}
+    </div>
   );
 
   if (variant === "inline") {
@@ -188,7 +193,8 @@ export function FlowDisclosure({
         data-flow={flowId}
         className="mx-3 my-2 rounded-lg border border-divider bg-surface-raised p-3 text-fg"
       >
-        {body}
+        {content}
+        <div className="mt-4">{actions}</div>
       </section>
     );
   }
@@ -205,16 +211,30 @@ export function FlowDisclosure({
         aria-describedby={bodyId}
         data-testid="flow-disclosure"
         data-flow={flowId}
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface-raised p-4 shadow-2 text-fg"
+        className="flex w-full max-w-md max-h-[90dvh] flex-col overflow-hidden rounded-2xl bg-surface-raised shadow-2 text-fg [@media(max-height:420px)]:overflow-y-auto"
       >
-        {body}
+        {/* The text scrolls; the actions stay on screen below it. On a very
+            short screen the whole dialog scrolls instead, so the text keeps
+            room. The text is a tab stop so the keyboard can scroll it; it
+            has no role or name, so screen readers do not repeat the heading.
+            The dialog's description is the purpose line only. */}
+        <div
+          tabIndex={0}
+          data-testid="flow-disclosure-body"
+          className="min-h-0 flex-1 overflow-y-auto p-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent [@media(max-height:420px)]:flex-none [@media(max-height:420px)]:overflow-visible"
+        >
+          {content}
+        </div>
+        <div className="shrink-0 border-t border-divider px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {actions}
+        </div>
       </div>
     </div>,
     document.body,
   );
 }
 
-const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 /** Wrap Tab and Shift+Tab around the dialog's own controls. */
 function keepFocusInside(container: HTMLElement | null, e: KeyboardEvent): void {
