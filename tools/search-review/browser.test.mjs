@@ -70,7 +70,7 @@ test("local page preserves blind order, drafts and explicit actions through offl
   assert.equal(committed.sessions[0].actions[0].notes,unsafe);
   const markdownDownload=page.waitForEvent("download");await page.locator("#markdown").click();
   const markdown=readFileSync(await (await markdownDownload).path(),"utf8");
-  assert.equal(markdown.includes("<img"),false);assert.ok(markdown.includes("Candidates (A/B order for pairs)"));
+  assert.equal(/(?<!\\)<img/.test(markdown),false);assert.ok(markdown.includes("\\<img"));assert.ok(markdown.includes("Candidates (A/B order for pairs)"));
   assert.equal(await page.locator("#history img").count(),0);
   await page.locator("h1").click();await page.keyboard.press("Control+z");await saved(page);
   const undone=await exported(page);assert.equal(undone.sessions[0].actions.length,2);
