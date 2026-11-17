@@ -613,5 +613,7 @@
   "arriveBy.in_15": "Za 15 min",
   "arriveBy.in_30": "Za 30 min",
   "arriveBy.in_60": "Za 1 godzinę",
-  "arriveBy.pick_time": "Wybierz godzinę"
+  "arriveBy.pick_time": "Wybierz godzinę",
+  "schedule.lastOfServiceDay": "Ostatni kurs dnia",
+  "schedule.firstOfServiceDay": "Pierwszy kurs dnia"
 }

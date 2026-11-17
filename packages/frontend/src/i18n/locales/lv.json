@@ -624,5 +624,7 @@
   "arriveBy.in_15": "Pēc 15 minūtēm",
   "arriveBy.in_30": "Pēc 30 minūtēm",
   "arriveBy.in_60": "Pēc 1 stundas",
-  "arriveBy.pick_time": "Izvēlieties laiku"
+  "arriveBy.pick_time": "Izvēlieties laiku",
+  "schedule.lastOfServiceDay": "Dienas pēdējais reiss",
+  "schedule.firstOfServiceDay": "Dienas pirmais reiss"
 }

@@ -230,6 +230,7 @@ export function bruteForceDepartures(
         delaySeconds,
         tripId: trip.tripId,
         cancelled,
+        serviceDate: baseDateStr,
       });
     }
   }

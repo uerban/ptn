@@ -626,5 +626,7 @@
   "arriveBy.in_15": "Po 15 min.",
   "arriveBy.in_30": "Po 30 min.",
   "arriveBy.in_60": "Po 1 val.",
-  "arriveBy.pick_time": "Pasirinkite laiką"
+  "arriveBy.pick_time": "Pasirinkite laiką",
+  "schedule.lastOfServiceDay": "Paskutinis dienos reisas",
+  "schedule.firstOfServiceDay": "Pirmasis dienos reisas"
 }

@@ -619,5 +619,7 @@
   "arriveBy.in_15": "Om 15 min",
   "arriveBy.in_30": "Om 30 minutter",
   "arriveBy.in_60": "Om 1 time",
-  "arriveBy.pick_time": "Velg tidspunkt"
+  "arriveBy.pick_time": "Velg tidspunkt",
+  "schedule.lastOfServiceDay": "Dagens siste tur",
+  "schedule.firstOfServiceDay": "Dagens første tur"
 }
