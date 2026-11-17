@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { ProtectionPolicy } from "@pt/shared/privacy";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import {
   usePrivacyChoicesStore,
   type OptionalStorageCategory,
@@ -75,6 +75,7 @@ export function OptionalStorageChoice({
   children,
 }: OptionalStorageChoiceProps) {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   const choice = usePrivacyChoicesStore((state) => state.choices[category]);
   const setChoice = usePrivacyChoicesStore((state) => state.setChoice);
   const policy = usePolicy();
