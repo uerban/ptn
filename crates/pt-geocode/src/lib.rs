@@ -580,7 +580,9 @@ impl AddrIndex {
         let mut stream = self.map.range().ge(anchor).into_stream();
         let mut scanned = 0;
         while let Some((encoded_key, value)) = stream.next() {
-            if !encoded_key.starts_with(anchor.as_bytes()) || out.len() >= cap {
+            if !encoded_key.starts_with(anchor.as_bytes())
+                || (out.len() >= cap && out.iter().all(|(exact, _)| *exact))
+            {
                 break;
             }
             scanned += 1;
@@ -620,6 +622,18 @@ impl AddrIndex {
             }
             let exact =
                 !numbers.is_empty() && numbers.iter().all(|q| label_numbers.iter().any(|l| l == q));
+            // Keep looking within SCAN_CAP when the candidate buffer holds
+            // number-prefix matches: a later exact house number outranks them.
+            // Evict the last prefix match so retained FST order stays stable;
+            // neither the candidate buffer nor the shared seen set grows.
+            if out.len() >= cap {
+                if !exact {
+                    continue;
+                }
+                let last_prefix = out.iter().rposition(|(exact, _)| !*exact).unwrap();
+                let (_, removed) = out.remove(last_prefix);
+                seen.remove(&removed.row_id);
+            }
             seen.insert(row_id);
             out.push((
                 exact,

@@ -110,6 +110,19 @@ describe("AddressSearchGeocoderAdapter", () => {
     expect(results[0]!.confidence).toBeGreaterThan(results[1]!.confidence);
   });
 
+  it("preserves native exact-house preference when candidate confidence ties", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    // Token fallback can match an exact house number without the matched key
+    // equalling the full query variant. Both wire exact flags stay false.
+    searchSpy.mockReturnValue([
+      {...KUDIRKA_HIT, label:"Central Square 1", matchedKey:"central square 1", exact:false},
+      {...KUDIRKA_HIT, label:"Central Avenue 100", rowId:1, matchedKey:"central avenue 100", exact:false},
+    ]);
+    const results = await localAddressCandidates("vilnius", "centr 1", null, new AbortController().signal);
+    expect(results.map(r=>r.label)).toEqual(["Central Square 1", "Central Avenue 100"]);
+    expect(results[0]!.confidence).toBe(results[1]!.confidence);
+  });
+
   it("builds the wasm index once per corpus, not once per query", async () => {
     // The index cache is keyed on the corpus sha256, so repeated queries
     // against the same packed corpus must not rebuild it.

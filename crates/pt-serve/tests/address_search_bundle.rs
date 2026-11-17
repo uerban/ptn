@@ -230,3 +230,48 @@ fn absent_corpus_is_404_in_both_branches() {
         );
     }
 }
+
+#[test]
+fn search_keeps_late_exact_house_number_after_prefix_saturation() {
+    let mut rows: Vec<pt_geocode::AddrRow> = (100..150)
+        .map(|number| pt_geocode::AddrRow {
+            label: format!("Central Avenue {number}"),
+            lat: 54.68,
+            lon: 25.28,
+        })
+        .collect();
+    rows.push(pt_geocode::AddrRow {
+        label: "Central Square 1".into(),
+        lat: 54.68,
+        lon: 25.28,
+    });
+    let keys: Vec<pt_geocode::AddrKey> = rows
+        .iter()
+        .enumerate()
+        .map(|(row_id, row)| pt_geocode::AddrKey {
+            key: pt_geocode::normalize_address_search_text(&row.label),
+            row_id,
+        })
+        .collect();
+    let bytes = pt_geocode::AddrIndex::pack(
+        &rows,
+        &keys,
+        &pt_geocode::ArtifactMeta {
+            city_id: Some("vilnius".into()),
+            source: None,
+            generated_at: "2026-11-18T00:00:00Z".into(),
+        },
+    )
+    .unwrap();
+    let (_tmp, generation) = gen_with_corpus(Some(bytes));
+    let response = pt_serve::app::address_search::search("q=centr+1&limit=10", &generation);
+    let Resp::Json { status, body } = response else {
+        panic!("expected JSON search response")
+    };
+    assert_eq!(status, 200);
+    let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let data = value["data"].as_array().unwrap();
+    assert_eq!(data.len(), 10);
+    assert_eq!(data[0]["label"], "Central Square 1");
+    assert_eq!(data[1]["label"], "Central Avenue 100");
+}

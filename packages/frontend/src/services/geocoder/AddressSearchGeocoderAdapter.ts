@@ -83,7 +83,10 @@ function toCandidates(
     rowId: hit.rowId,
     matchedKey: hit.matchedKey,
   }));
-  out.sort((a, b) => b.confidence - a.confidence || a.label.localeCompare(b.label));
+  // Native order carries token-match preferences (including exact house
+  // numbers) that the full-key `exact` flag cannot express. Preserve those
+  // preferences when confidence ties rather than replacing them alphabetically.
+  out.sort((a, b) => b.confidence - a.confidence);
   return out;
 }
 

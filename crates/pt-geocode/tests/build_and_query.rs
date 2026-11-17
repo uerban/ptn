@@ -325,3 +325,83 @@ fn multi_word_names_match_by_any_word_part() {
     // Every word must match: Vinciūniškių has no Kudirkos.
     assert!(!labels("vinc kudirk").contains(&"Vinciūniškių g. 1".to_string()));
 }
+
+#[test]
+fn exact_house_number_survives_token_candidate_saturation() {
+    // An unfinished street name plus omitted street mark exercises token
+    // fallback, not an exact FST prefix. Earlier streets fill the old buffer
+    // with house-number prefixes before the exact number's street is visited.
+    let mut rows: Vec<AddrRow> = (100..150)
+        .map(|number| row(&format!("Central Avenue {number}"), 54.68, 25.28))
+        .collect();
+    rows.push(row("Central Square 1", 54.69, 25.29));
+    let keys: Vec<AddrKey> = rows
+        .iter()
+        .enumerate()
+        .map(|(id, r)| key(&normalize_address_search_text(&r.label), id))
+        .collect();
+    let index = AddrIndex::build(&rows, &keys).unwrap();
+    for limit in [1, 3, 10] {
+        let matches = index.search_variants(&address_search_query_variants("centr 1"), limit);
+        assert_eq!(matches.len(), limit);
+        assert_eq!(matches[0].label, "Central Square 1");
+        assert!(matches.iter().all(|m| m.label.starts_with("Central")));
+    }
+}
+
+#[test]
+fn token_buffer_replacement_preserves_exact_and_prefix_order() {
+    let mut rows: Vec<AddrRow> = (100..150)
+        .map(|number| row(&format!("Central Avenue {number}"), 54.68, 25.28))
+        .collect();
+    rows.push(row("Central Square 1", 54.68, 25.28));
+    rows.push(row("Central Terrace 1", 54.68, 25.28));
+    // Multiple matching aliases must not duplicate a retained row, including
+    // prefix rows evicted from the bounded buffer by exact-number matches.
+    let keys: Vec<AddrKey> = rows
+        .iter()
+        .enumerate()
+        .flat_map(|(id, r)| {
+            [
+                key(&normalize_address_search_text(&r.label), id),
+                key(&format!("central z alias {id}"), id),
+            ]
+        })
+        .collect();
+    let index = AddrIndex::build(&rows, &keys).unwrap();
+    let matches = index.search_variants(&address_search_query_variants("centr 1"), 10);
+    assert_eq!(matches.len(), 10);
+    assert_eq!(matches[0].label, "Central Square 1");
+    assert_eq!(matches[1].label, "Central Terrace 1");
+    assert_eq!(matches[2].label, "Central Avenue 100");
+    assert_eq!(matches[9].label, "Central Avenue 107");
+    let unique: std::collections::HashSet<_> = matches.iter().map(|m| m.row_id).collect();
+    assert_eq!(unique.len(), matches.len());
+    assert!(index
+        .search_variants(&address_search_query_variants("centr 1"), 0)
+        .is_empty());
+    assert!(index
+        .search_variants(&address_search_query_variants("centr 9"), 10)
+        .is_empty());
+}
+
+#[test]
+fn saturated_token_scan_remains_bounded_and_retains_earliest_prefix_matches() {
+    // The exact number lies beyond the existing 16,384-key scan ceiling.
+    // Recovery within that ceiling must not silently turn into a corpus scan.
+    let mut rows: Vec<AddrRow> = (100_000..116_384)
+        .map(|number| row(&format!("Central Avenue {number}"), 54.68, 25.28))
+        .collect();
+    rows.push(row("Central Square 1", 54.68, 25.28));
+    let keys: Vec<AddrKey> = rows
+        .iter()
+        .enumerate()
+        .map(|(id, r)| key(&normalize_address_search_text(&r.label), id))
+        .collect();
+    let index = AddrIndex::build(&rows, &keys).unwrap();
+    let matches = index.search_variants(&address_search_query_variants("centr 1"), 10);
+    assert_eq!(matches.len(), 10);
+    assert_eq!(matches[0].label, "Central Avenue 100000");
+    assert_eq!(matches[9].label, "Central Avenue 100009");
+    assert!(!matches.iter().any(|m| m.label == "Central Square 1"));
+}

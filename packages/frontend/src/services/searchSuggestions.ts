@@ -423,6 +423,10 @@ export async function searchSuggestionsStream(
   // Retained sorted best-N (geocoded + stop/group) from the prior emit. Re-emits
   // merge newly-landed scored rows into THIS, not a full corpus re-score.
   let bestN: SearchSuggestion[] = [];
+  // Preserve native address preferences within equal scores through the final
+  // merge and later tile emissions. These keys are query-local, not identities.
+  const addressTieKeys = new Map<string, string>();
+  const tieKey = (s: SearchSuggestion) => addressTieKeys.get(suggestionIdentity(s)) ?? suggestionIdentity(s);
   // Pre-slice settled local-POI count, stashed by finalize() before its
   // MAX_RESULTS truncation. The augmentation sparsity GATE reads THIS (not a count
   // over the sliced bestN) so a stop-heavy city whose local-POI are pushed below
@@ -449,12 +453,14 @@ export async function searchSuggestionsStream(
       }
     }
     let merged = [...byId.values()];
-    merged.sort((a, b) => b.score - a.score || (suggestionIdentity(a) < suggestionIdentity(b) ? -1 : 1));
+    merged.sort((a, b) => b.score - a.score
+      || (tieKey(a) < tieKey(b) ? -1 : tieKey(a) > tieKey(b) ? 1 : 0)
+      || (suggestionIdentity(a) < suggestionIdentity(b) ? -1 : suggestionIdentity(a) > suggestionIdentity(b) ? 1 : 0));
     if (pinnedTopIdentity !== null && merged.length > 0) {
       const pinnedIdx = merged.findIndex((s) => suggestionIdentity(s) === pinnedTopIdentity);
       // Keep the pin at index 0 unless a STRICTLY higher-scoring DIFFERENT POI
       // exists at index 0. A same-identity rescore never demotes below a
-      // lower-scoring item; an equal-score tie is stable by id (the sort above).
+      // lower-scoring item; equal scores follow the deterministic tie order above.
       if (pinnedIdx > 0 && merged[pinnedIdx].score >= merged[0].score) {
         const [pinned] = merged.splice(pinnedIdx, 1);
         merged.unshift(pinned);
@@ -503,6 +509,8 @@ export async function searchSuggestionsStream(
         ? Promise.resolve([])
         : self.searchLocalAddresses(query, cityId, hint, signal),
     ]);
+    addressResults.forEach((result, rank) => addressTieKeys.set(suggestionIdentity(result),
+      `poi:addr:${cityId}:${String(rank).padStart(8, "0")}`));
     const recents = await recentCandidates(nq, hint);
     const live = [...stopResults, ...poiResults, ...addressResults];
     return finalize(mergeRecentsIntoCandidates(live, recents, Date.now()), false);

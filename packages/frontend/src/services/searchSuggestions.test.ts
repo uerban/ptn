@@ -15,6 +15,10 @@ import * as poiLoader from "./poiLoader.ts";
 import type { LatLon } from "@pt/shared";
 import { readFileSync } from "node:fs";
 
+const addressHits = vi.hoisted(() => ({current: null as null | Array<{
+  label:string;lat:number;lon:number;rowId:number;matchedKey:string;exact:boolean;
+}>}));
+
 // The local address index is Rust behind wasm (`pt_geocode` via pt-wasm), and
 // this suite is about SUGGESTION assembly, not about the FST. Mock the wasm
 // boundary so the fixture record can carry placeholder bytes; index behaviour
@@ -22,7 +26,7 @@ import { readFileSync } from "node:fs";
 vi.mock("./addressIndexWasm.ts", () => ({
   buildAddressIndex: () =>
     Promise.resolve({
-      search: () => [
+      search: () => addressHits.current ?? [
         {
           label: "V. Kudirkos aikštė 1",
           lat: 54.6872,
@@ -122,6 +126,7 @@ function makeStop(id: string, name: string, lat = 54.35, lon = 18.65): Stop {
 
 describe("searchSuggestions", () => {
   beforeEach(async () => {
+    addressHits.current = null;
     await db.poiIndex.clear();
     await db.poiSyncMeta.clear();
     await clearPersonal("personalUsage");
@@ -247,6 +252,25 @@ describe("searchSuggestions", () => {
     const stops = results.filter((r) => r.kind === "stop");
     expect(stops.length).toBe(1);
     expect(stops[0].kind === "stop" && stops[0].name).toBe("Gerosios vilties");
+  });
+
+  it("preserves native address preference through the final suggestion merge", async () => {
+    await db.addressSearchArtifacts.put(addressRecord());
+    addressHits.current = [
+      {label:"Central Square 1",lat:54.68,lon:25.28,rowId:50,matchedKey:"central square 1",exact:false},
+      {label:"Central Avenue 100",lat:54.68,lon:25.28,rowId:0,matchedKey:"central avenue 100",exact:false},
+    ];
+    const frames: import("./searchSuggestions.ts").SearchSuggestion[][] = [];
+    await searchSuggestionsStream("centr 1", "vilnius", null, new AbortController().signal, "local", {
+      onResults: rows => {frames.push(rows);},
+      driver: async landed => {await landed([]);},
+    });
+    expect(frames.length).toBeGreaterThan(1);
+    for (const out of frames) {
+      expect(out.filter(s=>s.kind==="geocoded").map(s=>s.label)).toEqual(["Central Square 1","Central Avenue 100"]);
+      expect(out[0]).toMatchObject({poiIdentity:"addr:vilnius:50"});
+      expect(out[1]).toMatchObject({poiIdentity:"addr:vilnius:0"});
+    }
   });
 
   it("returns local address-bundle results offline", async () => {
