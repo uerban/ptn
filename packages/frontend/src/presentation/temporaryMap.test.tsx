@@ -118,10 +118,14 @@ describe("useShowMapAction", () => {
     renderShowMap(false);
     fireEvent.click(screen.getByText("Show map"));
     await screen.findByTestId("map-download-disclosure");
-    act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    // The dialog's key listener is attached in an effect that can run after
+    // it first appears, so press Escape until it is handled.
+    await waitFor(() => {
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      });
+      expect(screen.queryByTestId("map-download-disclosure")).toBeNull();
     });
-    expect(screen.queryByTestId("map-download-disclosure")).toBeNull();
     expect(screen.getByTestId("url").textContent).toBe("/");
     expect(document.activeElement).toBe(screen.getByText("Show map"));
   });
