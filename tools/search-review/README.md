@@ -35,3 +35,28 @@ Run the contract/export tests with:
 ```sh
 node --test crates/pt-wasm/tests/baseline_review.test.mjs
 ```
+
+## Review actions
+
+`state.mjs` defines the separate `ptn-search-review-actions` version 1 format.
+Each session has a reviewer identifier, a random seed and a retained blind
+candidate assignment. Committed judgments include confidence, area familiarity,
+reason codes and plain-text notes. Pairwise choices retain the displayed A/B
+candidate identities, including equivalent, neither and cannot-judge answers.
+An explicit skip is separate from a judgment. Unfinished form drafts are not
+actions.
+
+Sessions append actions rather than modifying them. Undo appends a reference
+to an earlier action; exports preserve both records. Imports preserve separate
+reviewer opinions without voting or replacing disagreement. Repeated imports
+are idempotent. Divergent edits of the same session are rejected so neither
+branch silently overwrites the other. Bundle and candidate changes invalidate
+old actions instead of silently applying them to recomputed journeys.
+
+The module provides creation, append, validation, effective-action and merge
+functions. It performs no storage or network access. Browser persistence and
+the interactive reviewer are separate consumers of this format.
+
+```sh
+node --test crates/pt-wasm/tests/baseline_review_state.test.mjs
+```
