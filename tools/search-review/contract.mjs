@@ -16,6 +16,21 @@ const fail = message => { throw new Error(`Invalid review bundle: ${message}`); 
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const strings = value => Array.isArray(value) && value.every(item => typeof item === "string");
 
+export function validateReviewStopContext(context,ptbSha256) {
+  if(context?.format!=="ptn-search-review-stop-context" || context.version!==1
+      || context.derivation!=="pt-core-reader-e7-name-v1" || context.ptbSha256!==ptbSha256
+      || !Array.isArray(context.stops) || context.stops.length>50000) fail("invalid stop context provenance");
+  const ids=new Set();
+  for(const stop of context.stops) {
+    if(!stop || typeof stop.stopId!=="string" || !stop.stopId || stop.stopId.length>1000 || ids.has(stop.stopId)
+        || typeof stop.name!=="string" || stop.name.length>1000
+        || !Number.isInteger(stop.latE7) || Math.abs(stop.latE7)>900000000
+        || !Number.isInteger(stop.lonE7) || Math.abs(stop.lonE7)>1800000000) fail("invalid stop context row");
+    ids.add(stop.stopId);
+  }
+  return context;
+}
+
 export async function validateReviewBundle(bundle) {
   if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
       || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
@@ -26,6 +41,10 @@ export async function validateReviewBundle(bundle) {
       || !strings(p.missingDependencies) || !strings(p.unsupported)) fail("missing provenance");
   if (!p.artifacts || !Object.values(p.artifacts).every(digest)
       || !["ptb","queryTuples","glue","wasm"].every(name => digest(p.artifacts[name]))) fail("missing artifact hashes");
+  if(bundle.stopContext!==undefined) {
+    if(!digest(p.artifacts.reviewStopContext)) fail("missing stop context artifact");
+    validateReviewStopContext(bundle.stopContext,p.artifacts.ptb);
+  }
   if (!["node","v8","platform","arch","release"].every(name => typeof p.runtime?.[name] === "string" && p.runtime[name].trim())) fail("missing runtime");
   const s = p.settings;
   if (s?.patternMode !== "covering-merge" || !["plan","r3","m4"].includes(s.objective)) fail("unsupported planning settings");

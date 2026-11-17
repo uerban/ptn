@@ -11,6 +11,20 @@ does not overwrite existing exports, execute planner code, upload data or copy
 raw artifacts into the bundle. Query and itinerary data can still contain
 private locations and identifiers. Review the file before sharing it.
 
+For readable stop names, `pt-core-emit review-stop-context <bundle.ptb>` exports
+names and E7 coordinates through the compiled timetable reader, without building
+a routing index or expanding services. Retain this JSON as `reviewStopContext`
+using the baseline store APIs in a new immutable run, together with the extractor
+executable/source provenance. Preserve the old run. The exporter verifies the
+context artifact, its schema and its PTB hash, and includes only stops referenced
+by query endpoints or leg endpoints. Labels are display context, not additional
+engine results, pedestrian geometry or an independent correctness oracle.
+
+Context is optional for version 1 bundles. The viewer shows `name (stop ID)` when
+available and the original ID otherwise. Names render as plain text offline.
+Enrichment changes bundle identity, so actions from the older bundle stay bound
+to that older context. It does not upgrade capture or replay-verification labels.
+
 Version 1 (`ptn-search-review-bundle`) preserves the query, complete captured
 candidate ordering, duplicate candidates, capture truncation, input/build hash
 references, runtime, planning settings and the original reproducibility labels.

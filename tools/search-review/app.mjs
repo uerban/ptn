@@ -13,6 +13,16 @@ const tell=(message,error=false)=>{$("status").textContent=message;$("status").c
 const clock=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.abs(seconds);return `${seconds<0?"−":""}${String(Math.floor(value/3600)).padStart(2,"0")}:${String(Math.floor(value%3600/60)).padStart(2,"0")}:${String(Math.floor(value%60)).padStart(2,"0")}`;};
 const minutes=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.ceil(seconds),mins=Math.floor(value/60),secs=value%60;return mins?`${mins} min${secs?` ${secs} s`:""}`:`${secs} s`;};
 
+let labeledBundle=null,stopLabels=new Map();
+function stopLabel(id) {
+  if(labeledBundle!==model.bundle) {
+    labeledBundle=model.bundle;
+    stopLabels=new Map((model.bundle?.stopContext?.stops??[]).map(stop=>[stop.stopId,stop.name]));
+  }
+  const name=stopLabels.get(id);
+  return name?.trim()?`${name} (${id})`:id??"Unknown stop";
+}
+
 function persist() {
   try {
     const storageKey=key(model.bundle.bundleId);
@@ -75,7 +85,7 @@ function drawCandidates(ordered) {
     for(const leg of legs) {
       const item=element("li","");if(leg.type==="walk")item.className="walk";
       item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
-      item.append(element("p",`${leg.fromStopId??"Unknown stop"} → ${leg.toStopId??"Unknown stop"}`));
+      item.append(element("p",`${stopLabel(leg.fromStopId)} → ${stopLabel(leg.toStopId)}`));
       const estimated=leg.type==="transit"&&leg.approximate===true;
       const marker=estimated?"~":"";
       item.append(element("p",`${marker}${clock(leg.departSecs)}–${marker}${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
@@ -115,6 +125,9 @@ function render() {
   $("query-title").textContent=current?`Query ${model.index+1} of ${model.bundle.cases.length}`:"Bundle has no queries";
   $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
   $("limits").textContent=`Stop-level schematic; no pedestrian geometry or applied real-time composition. ${current?.capture.truncated?"Capture is truncated; additional candidates may exist.":"Shows the complete captured candidate array, not proof of all possible journeys."}`;
+  if(current?.query.entryStops&&current.query.exitStops) {
+    $("query-summary").textContent+=` · From ${current.query.entryStops.map(stop=>stopLabel(stop.stopId)).join(", ")} → ${current.query.exitStops.map(stop=>stopLabel(stop.stopId)).join(", ")}`;
+  }
   $("query-settings").textContent=JSON.stringify({query:current?.query??{},settings:model.bundle.provenance.settings},null,2);
   $("provenance-data").textContent=JSON.stringify(model.bundle.provenance,null,2);
   const ordered=candidateOrder();drawCandidates(ordered);renderForm(ordered);

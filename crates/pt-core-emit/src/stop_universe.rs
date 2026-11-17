@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 #[serde(rename_all = "camelCase")]
 struct Stop<'a> {
     stop_id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<&'a str>,
     lat_e7: i32,
     lon_e7: i32,
 }
@@ -13,8 +15,21 @@ struct Stop<'a> {
 /// Export the compiled stop population without building an index, planning a
 /// query, or expanding the timetable. Coordinates remain exact E7 integers.
 pub fn run(args: &[String]) -> Result<String, String> {
+    export(args, false)
+}
+
+pub fn review_context(args: &[String]) -> Result<String, String> {
+    export(args, true)
+}
+
+fn export(args: &[String], names: bool) -> Result<String, String> {
     if args.len() != 1 {
-        return Err("stop-universe: usage: stop-universe <ptb-path>".into());
+        let command = if names {
+            "review-stop-context"
+        } else {
+            "stop-universe"
+        };
+        return Err(format!("usage: {command} <ptb-path>"));
     }
     let bytes = std::fs::read(&args[0]).map_err(|e| format!("read PTB: {e}"))?;
     let digest = format!("{:x}", Sha256::digest(&bytes));
@@ -38,6 +53,15 @@ pub fn run(args: &[String]) -> Result<String, String> {
         }
         stops.push(Stop {
             stop_id,
+            name: if names {
+                Some(
+                    reader
+                        .stop_name(index)
+                        .map_err(|e| format!("stop name: {e:?}"))?,
+                )
+            } else {
+                None
+            },
             lat_e7,
             lon_e7,
         });
@@ -50,9 +74,9 @@ pub fn run(args: &[String]) -> Result<String, String> {
         return Err("duplicate compiled stop id".into());
     }
     let value = serde_json::json!({
-        "format": "ptn-search-stop-universe", "version": 1,
+        "format": if names { "ptn-search-review-stop-context" } else { "ptn-search-stop-universe" }, "version": 1,
         "ptbSha256": digest, "ordering": "utf8-stop-id",
-        "derivation": "pt-core-reader-e7-v1", "stops": stops,
+        "derivation": if names { "pt-core-reader-e7-name-v1" } else { "pt-core-reader-e7-v1" }, "stops": stops,
     });
     serde_json::to_string(&value).map_err(|e| e.to_string())
 }

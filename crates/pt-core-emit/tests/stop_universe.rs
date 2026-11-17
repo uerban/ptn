@@ -87,3 +87,31 @@ fn corrupt_ptb_does_not_become_an_empty_valid_universe() {
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
 }
+
+#[test]
+fn review_context_adds_compiled_names_without_changing_sampling_export() {
+    let run = |command: &str| {
+        Command::new(env!("CARGO_BIN_EXE_pt-core-emit"))
+            .arg(command)
+            .arg(fixture())
+            .output()
+            .unwrap()
+    };
+    let output = run("review-stop-context");
+    assert!(output.status.success());
+    assert_eq!(output.stdout, run("review-stop-context").stdout);
+    let context: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let universe: serde_json::Value = serde_json::from_slice(&run("stop-universe").stdout).unwrap();
+    assert_eq!(context["format"], "ptn-search-review-stop-context");
+    assert_eq!(context["ptbSha256"], universe["ptbSha256"]);
+    let reader = pt_core::Reader::from_bytes(std::fs::read(fixture()).unwrap()).unwrap();
+    for stop in context["stops"].as_array().unwrap() {
+        let index = (0..reader.num_stops())
+            .find(|&i| reader.stop_id(i).unwrap() == stop["stopId"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(stop["name"], reader.stop_name(index).unwrap());
+    }
+    for stop in universe["stops"].as_array().unwrap() {
+        assert!(stop.get("name").is_none());
+    }
+}

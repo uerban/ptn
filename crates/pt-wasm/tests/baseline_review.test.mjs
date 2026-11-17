@@ -84,3 +84,34 @@ test("normalization ignores property order only, retaining all finite candidate 
  assert.notEqual(await fingerprint({a:1}),await fingerprint({a:1,unknown:2}));
  for(const value of [NaN,Infinity,undefined,{a:undefined}]) assert.throws(()=>canonical(value),/finite JSON/);
 });
+
+test("optional compiled stop context is PTB-bound and exports only used stop labels",async()=>{
+ const {root,record}=fixture();
+ try {
+  const context={format:"ptn-search-review-stop-context",version:1,derivation:"pt-core-reader-e7-name-v1",ptbSha256:record.artifacts.ptb,
+   stops:[{stopId:"S1",name:"<img src=x onerror=alert(1)>",latE7:540000000,lonE7:250000000},
+    {stopId:"S2",name:"Station",latE7:540000001,lonE7:250000001},
+    {stopId:"unused",name:"Unneeded location",latE7:0,lonE7:0}]};
+  for(const tuple of record.report.tuples) {
+   tuple.query.entryStops=[{stopId:"S1",walkSecs:0}];tuple.query.exitStops=[{stopId:"S2",walkSecs:0}];
+   for(const itinerary of tuple.candidates) for(const leg of itinerary.legs) {leg.fromStopId="S1";leg.toStopId="S2";}
+  }
+  record.artifacts.reviewStopContext=retainArtifact(root,Buffer.from(JSON.stringify(context)));
+  retainRun(root,"named",record);
+  const bundle=await exportReviewBundle(root,"named",join(root,"named.json"));
+  assert.deepEqual(bundle.stopContext.stops,context.stops.slice(0,2));
+  assert.equal(JSON.stringify(bundle).includes("Unneeded location"),false);
+  assert.equal((await validateReviewBundle(bundle)).stopContext.stops[0].name,context.stops[0].name);
+  const changed=structuredClone(bundle);changed.stopContext.stops[0].name="Changed";
+  await assert.rejects(validateReviewBundle(changed),/identity mismatch/);
+  for(const [index,mutate] of [c=>{c.ptbSha256="c".repeat(64);},c=>{c.stops.push(c.stops[0]);},c=>{c.stops[0].latE7=900000001;}].entries()) {
+   const bad=structuredClone(context);mutate(bad);
+   record.artifacts.reviewStopContext=retainArtifact(root,Buffer.from(JSON.stringify(bad)));
+   const name=`bad-context-${index}`;
+   retainRun(root,name,record);
+   const destination=join(root,`${name}.json`);
+   await assert.rejects(exportReviewBundle(root,name,destination),/stop context/);
+   assert.equal(existsSync(destination),false);
+  }
+ } finally {rmSync(root,{recursive:true,force:true});}
+});

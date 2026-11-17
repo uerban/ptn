@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-J5o6lct6BhBxtI96M0xJYAG7ZeGCeqJlfKq0P0NYmO4='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-aDTNT8PITe7np1d50SiI+6+Lu5RhHUMxC1yk6/Sr47Y='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <title>PTN journey review</title>
 <style>
 :root{font:16px/1.5 system-ui,sans-serif;color:#172235;background:#f3f5f8;color-scheme:light}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:1320px;margin:auto;padding:24px}h1{margin:0;font-size:1.8rem}h2{font-size:1.2rem;margin:0 0 12px}h3{font-size:1rem}p{margin:8px 0}header{margin-bottom:20px}.muted,small{color:#536174}.toolbar,.navigation,.context{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.panel,.candidate{background:white;border:1px solid #d6dde7;border-radius:12px;padding:18px;margin:14px 0}.toolbar label{min-width:170px}label{display:block;font-weight:600}input,select,textarea,button{font:inherit}input,select,textarea{display:block;max-width:100%;padding:7px;border:1px solid #9ba9bc;border-radius:5px;background:white;color:inherit}textarea{width:100%;min-height:90px}button{cursor:pointer;padding:8px 14px;border:1px solid #8b9ab0;border-radius:6px;background:#fff;color:inherit}button.primary{background:#235edf;border-color:#235edf;color:white}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #f2b600;outline-offset:2px}#status{min-height:1.5em;padding:8px 0}#status.error{color:#a02020;font-weight:600}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:16px}.candidate{margin:0}.timeline{padding-left:20px;list-style:circle}.timeline li{border-left:3px solid #235edf;margin:12px 0;padding-left:12px;overflow-wrap:anywhere}.timeline li.walk{border-color:#218546}.metric{font-variant-numeric:tabular-nums}.reasons{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0}.reasons label{font-weight:400}.reasons input{display:inline}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,monospace;background:#f3f5f8;padding:12px}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.history li{margin:10px 0;overflow-wrap:anywhere}.badge{background:#edf2ff;color:#183b80;border-radius:4px;padding:2px 7px}#workspace[hidden]{display:none}.review-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.review-grid .panel{margin-top:0}fieldset{border:0;padding:0;margin:0}legend{font-weight:600;margin-bottom:8px}@media(max-width:800px){main{padding:14px}.review-grid{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar label{flex:1}button{min-height:44px}}@media(prefers-color-scheme:dark){:root{color:#e5ebf4;background:#101723;color-scheme:dark}.panel,.candidate,input,select,textarea,button{background:#192333;color:inherit;border-color:#50627a}.muted,small{color:#b0bdd0}pre{background:#101723}.badge{background:#243c65;color:#d3e0ff}#status.error{color:#ffb1a8}}
@@ -46,6 +46,21 @@ const fail = message => { throw new Error(`Invalid review bundle: ${message}`); 
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const strings = value => Array.isArray(value) && value.every(item => typeof item === "string");
 
+function validateReviewStopContext(context,ptbSha256) {
+  if(context?.format!=="ptn-search-review-stop-context" || context.version!==1
+      || context.derivation!=="pt-core-reader-e7-name-v1" || context.ptbSha256!==ptbSha256
+      || !Array.isArray(context.stops) || context.stops.length>50000) fail("invalid stop context provenance");
+  const ids=new Set();
+  for(const stop of context.stops) {
+    if(!stop || typeof stop.stopId!=="string" || !stop.stopId || stop.stopId.length>1000 || ids.has(stop.stopId)
+        || typeof stop.name!=="string" || stop.name.length>1000
+        || !Number.isInteger(stop.latE7) || Math.abs(stop.latE7)>900000000
+        || !Number.isInteger(stop.lonE7) || Math.abs(stop.lonE7)>1800000000) fail("invalid stop context row");
+    ids.add(stop.stopId);
+  }
+  return context;
+}
+
 async function validateReviewBundle(bundle) {
   if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
       || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
@@ -56,6 +71,10 @@ async function validateReviewBundle(bundle) {
       || !strings(p.missingDependencies) || !strings(p.unsupported)) fail("missing provenance");
   if (!p.artifacts || !Object.values(p.artifacts).every(digest)
       || !["ptb","queryTuples","glue","wasm"].every(name => digest(p.artifacts[name]))) fail("missing artifact hashes");
+  if(bundle.stopContext!==undefined) {
+    if(!digest(p.artifacts.reviewStopContext)) fail("missing stop context artifact");
+    validateReviewStopContext(bundle.stopContext,p.artifacts.ptb);
+  }
   if (!["node","v8","platform","arch","release"].every(name => typeof p.runtime?.[name] === "string" && p.runtime[name].trim())) fail("missing runtime");
   const s = p.settings;
   if (s?.patternMode !== "covering-merge" || !["plan","r3","m4"].includes(s.objective)) fail("unsupported planning settings");
@@ -224,6 +243,16 @@ const tell=(message,error=false)=>{$("status").textContent=message;$("status").c
 const clock=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.abs(seconds);return `${seconds<0?"−":""}${String(Math.floor(value/3600)).padStart(2,"0")}:${String(Math.floor(value%3600/60)).padStart(2,"0")}:${String(Math.floor(value%60)).padStart(2,"0")}`;};
 const minutes=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.ceil(seconds),mins=Math.floor(value/60),secs=value%60;return mins?`${mins} min${secs?` ${secs} s`:""}`:`${secs} s`;};
 
+let labeledBundle=null,stopLabels=new Map();
+function stopLabel(id) {
+  if(labeledBundle!==model.bundle) {
+    labeledBundle=model.bundle;
+    stopLabels=new Map((model.bundle?.stopContext?.stops??[]).map(stop=>[stop.stopId,stop.name]));
+  }
+  const name=stopLabels.get(id);
+  return name?.trim()?`${name} (${id})`:id??"Unknown stop";
+}
+
 function persist() {
   try {
     const storageKey=key(model.bundle.bundleId);
@@ -286,7 +315,7 @@ function drawCandidates(ordered) {
     for(const leg of legs) {
       const item=element("li","");if(leg.type==="walk")item.className="walk";
       item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
-      item.append(element("p",`${leg.fromStopId??"Unknown stop"} → ${leg.toStopId??"Unknown stop"}`));
+      item.append(element("p",`${stopLabel(leg.fromStopId)} → ${stopLabel(leg.toStopId)}`));
       const estimated=leg.type==="transit"&&leg.approximate===true;
       const marker=estimated?"~":"";
       item.append(element("p",`${marker}${clock(leg.departSecs)}–${marker}${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
@@ -326,6 +355,9 @@ function render() {
   $("query-title").textContent=current?`Query ${model.index+1} of ${model.bundle.cases.length}`:"Bundle has no queries";
   $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
   $("limits").textContent=`Stop-level schematic; no pedestrian geometry or applied real-time composition. ${current?.capture.truncated?"Capture is truncated; additional candidates may exist.":"Shows the complete captured candidate array, not proof of all possible journeys."}`;
+  if(current?.query.entryStops&&current.query.exitStops) {
+    $("query-summary").textContent+=` · From ${current.query.entryStops.map(stop=>stopLabel(stop.stopId)).join(", ")} → ${current.query.exitStops.map(stop=>stopLabel(stop.stopId)).join(", ")}`;
+  }
   $("query-settings").textContent=JSON.stringify({query:current?.query??{},settings:model.bundle.provenance.settings},null,2);
   $("provenance-data").textContent=JSON.stringify(model.bundle.provenance,null,2);
   const ordered=candidateOrder();drawCandidates(ordered);renderForm(ordered);

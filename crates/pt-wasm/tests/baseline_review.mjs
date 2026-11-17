@@ -4,7 +4,7 @@ import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import {readArtifact} from "./baseline_store.mjs";
 import {diffBaselines} from "./baseline_diff.mjs";
-import {fingerprint,validateReviewBundle} from "../../../tools/search-review/contract.mjs";
+import {fingerprint,validateReviewBundle,validateReviewStopContext} from "../../../tools/search-review/contract.mjs";
 
 /** Explicit local export only. Raw input artifacts and machine paths stay in
  * the store. Query/candidate data may still be private; sharing is separate. */
@@ -33,6 +33,17 @@ export async function exportReviewBundle(store,runId,destination) {
     cases.push({id,query:tuple.query,capture:tuple.capture,candidates});
   }
   const content = {format:"ptn-search-review-bundle",version:1,scope:record.scope,provenance,cases};
+  if(record.artifacts.reviewStopContext) {
+    const context=validateReviewStopContext(JSON.parse(readArtifact(store,record.artifacts.reviewStopContext)),record.artifacts.ptb);
+    const used=new Set();
+    for(const row of cases) {
+      for(const stop of [...(row.query.entryStops??[]),...(row.query.exitStops??[])]) used.add(stop.stopId);
+      for(const candidate of row.candidates) for(const leg of candidate.itinerary.legs) {
+        used.add(leg.fromStopId);used.add(leg.toStopId);
+      }
+    }
+    content.stopContext={...context,stops:context.stops.filter(stop=>used.has(stop.stopId))};
+  }
   const bundle = {...content,bundleId:await fingerprint(content)};
   await validateReviewBundle(bundle);
   writeFileSync(destination,`${JSON.stringify(bundle,null,2)}\n`,{flag:"wx"});

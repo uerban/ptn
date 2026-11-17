@@ -18,6 +18,9 @@ before(async()=>{
  const root=mkdtempSync(join(tmpdir(),"review-browser-"));
  try {
   const artifacts=Object.fromEntries(["ptb","queryTuples","glue","wasm"].map(name=>[name,retainArtifact(root,Buffer.from(name))]));
+  artifacts.reviewStopContext=retainArtifact(root,Buffer.from(JSON.stringify({format:"ptn-search-review-stop-context",version:1,
+   derivation:"pt-core-reader-e7-name-v1",ptbSha256:artifacts.ptb,
+   stops:[{stopId:"A",name:unsafe,latE7:540000000,lonE7:250000000}]})));
   const candidates=[0,1,2].map(index=>({legs:[{type:"transit",routeShortName:index===0?unsafe:String(index),tripId:"hidden-engine-trip",
    fromStopId:"A",toStopId:"B",approximate:index===0,departSecs:3660,arriveSecs:3900+index*60,boardStopIdx:0,alightStopIdx:1}],boardSecs:3660,alightSecs:3900+index*60,transfers:0}));
   const capture={boundary:"stop-level engine",equivalence:"exact",truncated:false};
@@ -72,6 +75,9 @@ test("local page preserves blind order, drafts and explicit actions through offl
   assert.deepEqual(await page.locator(".candidate").evaluateAll(nodes=>nodes.map(node=>node.dataset.candidateId)),order);
   assert.equal(await page.locator("#notes").inputValue(),unsafe);
   await page.locator("#notes").press("Control+Enter");await saved(page);
+  assert.ok((await page.locator("#query-summary").textContent()).includes(`${unsafe} (A) → B`));
+  assert.ok((await page.locator(".timeline").first().textContent()).includes(`${unsafe} (A) → B`));
+  assert.equal(await page.locator("#workspace img").count(),0);
   const committed=await exported(page);await validateReviewActions(committed,bundle);
   assert.equal(committed.sessions[0].actions[0].notes,unsafe);
   const markdownDownload=page.waitForEvent("download");await page.locator("#markdown").click();
