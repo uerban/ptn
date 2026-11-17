@@ -1,0 +1,23 @@
+# Transit server for one city. Adjust the two paths, then:
+#   systemctl enable --now ptn-serve.service ptn-refresh.service
+# The archive is read-only for the service; only the state directory named in
+# the configuration is written.
+[Unit]
+Description=PTN transit server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ptn
+Group=ptn
+ExecStart=/usr/bin/python3 /opt/ptn/examples/native/host.py --config /etc/ptn/config.json serve
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ptn
+
+[Install]
+WantedBy=multi-user.target

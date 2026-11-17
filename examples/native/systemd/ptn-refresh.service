@@ -1,0 +1,22 @@
+# Feed and OSM artifact updater. It polls on the configured interval
+# (refreshIntervalSeconds, hourly by default); a failed attempt keeps the
+# serving generation and is retried. Java 21 must be on PATH for validation.
+[Unit]
+Description=PTN feed refresh loop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ptn
+Group=ptn
+ExecStart=/usr/bin/python3 /opt/ptn/examples/native/host.py --config /etc/ptn/config.json refresh-loop
+Restart=on-failure
+RestartSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ptn
+
+[Install]
+WantedBy=multi-user.target
