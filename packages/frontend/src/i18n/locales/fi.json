@@ -624,5 +624,9 @@
   "arriveBy.in_60": "1 tunnin kuluttua",
   "arriveBy.pick_time": "Valitse aika",
   "schedule.lastOfServiceDay": "Päivän viimeinen vuoro",
-  "schedule.firstOfServiceDay": "Päivän ensimmäinen vuoro"
+  "schedule.firstOfServiceDay": "Päivän ensimmäinen vuoro",
+  "arriveBy.leave_short": "Lähtö {time}",
+  "arriveBy.by_short": "Saapuminen viimeistään {time}",
+  "arriveBy.done": "Valmis",
+  "arriveBy.not_applied": "Saapumisaikaa ei otettu käyttöön"
 }

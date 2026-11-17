@@ -635,5 +635,9 @@
   "arriveBy.in_60": "Через 1 годину",
   "arriveBy.pick_time": "Вибрати час",
   "schedule.lastOfServiceDay": "Останній рейс дня",
-  "schedule.firstOfServiceDay": "Перший рейс дня"
+  "schedule.firstOfServiceDay": "Перший рейс дня",
+  "arriveBy.leave_short": "Відправлення {time}",
+  "arriveBy.by_short": "Прибути до {time}",
+  "arriveBy.done": "Готово",
+  "arriveBy.not_applied": "Час прибуття не застосовано"
 }

@@ -621,5 +621,9 @@
   "arriveBy.in_60": "Om 1 timme",
   "arriveBy.pick_time": "Välj tid",
   "schedule.lastOfServiceDay": "Dagens sista tur",
-  "schedule.firstOfServiceDay": "Dagens första tur"
+  "schedule.firstOfServiceDay": "Dagens första tur",
+  "arriveBy.leave_short": "Avgång {time}",
+  "arriveBy.by_short": "Ankomst senast {time}",
+  "arriveBy.done": "Klart",
+  "arriveBy.not_applied": "Ankomsttiden tillämpades inte"
 }

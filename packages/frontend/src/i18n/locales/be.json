@@ -638,5 +638,9 @@
   "arriveBy.in_60": "Праз 1 гадзіну",
   "arriveBy.pick_time": "Выберыце час",
   "schedule.lastOfServiceDay": "Апошні рэйс дня",
-  "schedule.firstOfServiceDay": "Першы рэйс дня"
+  "schedule.firstOfServiceDay": "Першы рэйс дня",
+  "arriveBy.leave_short": "Адпраўленне {time}",
+  "arriveBy.by_short": "Прыбыць да {time}",
+  "arriveBy.done": "Гатова",
+  "arriveBy.not_applied": "Час прыбыцця не ўжыты"
 }

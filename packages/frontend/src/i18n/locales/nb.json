@@ -621,5 +621,9 @@
   "arriveBy.in_60": "Om 1 time",
   "arriveBy.pick_time": "Velg tidspunkt",
   "schedule.lastOfServiceDay": "Dagens siste tur",
-  "schedule.firstOfServiceDay": "Dagens første tur"
+  "schedule.firstOfServiceDay": "Dagens første tur",
+  "arriveBy.leave_short": "Avgang {time}",
+  "arriveBy.by_short": "Ankom senest {time}",
+  "arriveBy.done": "Ferdig",
+  "arriveBy.not_applied": "Ankomsttiden ble ikke brukt"
 }

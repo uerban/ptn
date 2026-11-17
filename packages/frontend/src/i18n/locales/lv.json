@@ -626,5 +626,9 @@
   "arriveBy.in_60": "Pēc 1 stundas",
   "arriveBy.pick_time": "Izvēlieties laiku",
   "schedule.lastOfServiceDay": "Dienas pēdējais reiss",
-  "schedule.firstOfServiceDay": "Dienas pirmais reiss"
+  "schedule.firstOfServiceDay": "Dienas pirmais reiss",
+  "arriveBy.leave_short": "Izbraukšana {time}",
+  "arriveBy.by_short": "Ierasties līdz {time}",
+  "arriveBy.done": "Gatavs",
+  "arriveBy.not_applied": "Ierašanās laiks nav piemērots"
 }

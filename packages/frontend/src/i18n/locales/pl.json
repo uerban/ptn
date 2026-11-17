@@ -615,5 +615,9 @@
   "arriveBy.in_60": "Za 1 godzinę",
   "arriveBy.pick_time": "Wybierz godzinę",
   "schedule.lastOfServiceDay": "Ostatni kurs dnia",
-  "schedule.firstOfServiceDay": "Pierwszy kurs dnia"
+  "schedule.firstOfServiceDay": "Pierwszy kurs dnia",
+  "arriveBy.leave_short": "Odjazd {time}",
+  "arriveBy.by_short": "Przyjedź do {time}",
+  "arriveBy.done": "Gotowe",
+  "arriveBy.not_applied": "Nie zastosowano godziny przyjazdu"
 }
