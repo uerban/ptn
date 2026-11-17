@@ -641,5 +641,11 @@
   "settings.micromap_layer_places": "district and place names",
   "settings.trips": "Trips",
   "settings.trip_alerts": "Trip alerts",
-  "settings.offline_load_error": "Could not load offline settings."
+  "settings.offline_load_error": "Could not load offline settings.",
+  "search.recent_actions": "Actions for {label}",
+  "search.recent_save": "Save place",
+  "search.recent_remove": "Remove from recents",
+  "search.recent_saved": "Saved {label}",
+  "search.recent_removed": "Removed {label} from recents",
+  "search.recent_undo": "Undo"
 }

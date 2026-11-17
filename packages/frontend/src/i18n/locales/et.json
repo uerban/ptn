@@ -626,5 +626,11 @@
   "arriveBy.in_15": "15 minuti pärast",
   "arriveBy.in_30": "30 minuti pärast",
   "arriveBy.in_60": "1 tunni pärast",
-  "arriveBy.pick_time": "Vali aeg"
+  "arriveBy.pick_time": "Vali aeg",
+  "search.recent_actions": "Toimingud: {label}",
+  "search.recent_save": "Salvesta koht",
+  "search.recent_remove": "Eemalda hiljutistest",
+  "search.recent_saved": "Salvestatud {label}",
+  "search.recent_removed": "{label} eemaldati hiljutistest",
+  "search.recent_undo": "Tühista"
 }

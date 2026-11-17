@@ -624,5 +624,11 @@
   "arriveBy.in_15": "Om 15 min",
   "arriveBy.in_30": "Om 30 minutter",
   "arriveBy.in_60": "Om 1 time",
-  "arriveBy.pick_time": "Velg tidspunkt"
+  "arriveBy.pick_time": "Velg tidspunkt",
+  "search.recent_actions": "Handlinger for {label}",
+  "search.recent_save": "Lagre sted",
+  "search.recent_remove": "Fjern fra nylige",
+  "search.recent_saved": "Lagret {label}",
+  "search.recent_removed": "{label} fjernet fra nylige",
+  "search.recent_undo": "Angre"
 }

@@ -629,5 +629,11 @@
   "arriveBy.in_15": "Pēc 15 minūtēm",
   "arriveBy.in_30": "Pēc 30 minūtēm",
   "arriveBy.in_60": "Pēc 1 stundas",
-  "arriveBy.pick_time": "Izvēlieties laiku"
+  "arriveBy.pick_time": "Izvēlieties laiku",
+  "search.recent_actions": "Darbības: {label}",
+  "search.recent_save": "Saglabāt vietu",
+  "search.recent_remove": "Noņemt no nesenajiem",
+  "search.recent_saved": "Saglabāts {label}",
+  "search.recent_removed": "{label} noņemta no nesenajiem",
+  "search.recent_undo": "Atcelt"
 }

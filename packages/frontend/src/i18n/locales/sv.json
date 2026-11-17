@@ -624,5 +624,11 @@
   "arriveBy.in_15": "Om 15 min",
   "arriveBy.in_30": "Om 30 min",
   "arriveBy.in_60": "Om 1 timme",
-  "arriveBy.pick_time": "Välj tid"
+  "arriveBy.pick_time": "Välj tid",
+  "search.recent_actions": "Åtgärder för {label}",
+  "search.recent_save": "Spara plats",
+  "search.recent_remove": "Ta bort från senaste",
+  "search.recent_saved": "Sparad {label}",
+  "search.recent_removed": "{label} togs bort från senaste",
+  "search.recent_undo": "Ångra"
 }

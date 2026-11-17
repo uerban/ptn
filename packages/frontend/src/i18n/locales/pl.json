@@ -618,5 +618,11 @@
   "arriveBy.in_15": "Za 15 min",
   "arriveBy.in_30": "Za 30 min",
   "arriveBy.in_60": "Za 1 godzinę",
-  "arriveBy.pick_time": "Wybierz godzinę"
+  "arriveBy.pick_time": "Wybierz godzinę",
+  "search.recent_actions": "Działania: {label}",
+  "search.recent_save": "Zapisz miejsce",
+  "search.recent_remove": "Usuń z ostatnich",
+  "search.recent_saved": "Zapisano {label}",
+  "search.recent_removed": "Usunięto {label} z ostatnich",
+  "search.recent_undo": "Cofnij"
 }

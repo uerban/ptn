@@ -638,5 +638,11 @@
   "arriveBy.in_15": "Через 15 хв",
   "arriveBy.in_30": "Через 30 хв",
   "arriveBy.in_60": "Через 1 годину",
-  "arriveBy.pick_time": "Вибрати час"
+  "arriveBy.pick_time": "Вибрати час",
+  "search.recent_actions": "Дії: {label}",
+  "search.recent_save": "Зберегти місце",
+  "search.recent_remove": "Видалити з нещодавніх",
+  "search.recent_saved": "Збережено {label}",
+  "search.recent_removed": "{label} видалено з нещодавніх",
+  "search.recent_undo": "Скасувати"
 }

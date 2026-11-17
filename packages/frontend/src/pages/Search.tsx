@@ -54,7 +54,10 @@ import { isDeviceOnline } from "../hooks/useConnectivity.ts";
 import { getActiveTileLoader } from "../services/poiSync.ts";
 import { poiCityIds } from "../services/poiLoader.ts";
 import { scheduleIdle } from "../utils/idle.ts";
-import { recordRecent } from "../services/recents.ts";
+import { forgetRecent, recordRecent, type RecentTarget } from "../services/recents.ts";
+import { savePlace } from "../services/saves.ts";
+import { RecentRow } from "../components/Search/RecentRow.tsx";
+import { RecentNotice, type RecentNoticeState } from "../components/Search/RecentNotice.tsx";
 import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByEntry.ts";
 import { resolveTransitLegDisplay } from "../services/legEnrichment.ts";
 
@@ -314,6 +317,42 @@ const vehicleChipClass = (excluded: boolean): string =>
   `min-h-[min(2.5rem,44px)] flex items-center gap-1 px-2.5 rounded-full text-xs font-medium border shrink-0 transition-colors ${excluded
     ? "border-divider bg-surface text-fg-muted line-through opacity-50" : "border-accent/30 bg-accent/10 text-fg"}`;
 
+function suggestionEndpoint(suggestion: SearchSuggestion): { ep: BaseEndpoint; name: string } {
+  let ep: BaseEndpoint;
+  let name: string;
+
+  if (suggestion.kind === "stop") {
+    ep = {
+      kind: "stop",
+      stopId: suggestion.stopId,
+      name: suggestion.name,
+      lat: suggestion.lat,
+      lon: suggestion.lon,
+    };
+    name = suggestion.name;
+  } else if (suggestion.kind === "stopGroup") {
+    ep = {
+      kind: "stopGroup",
+      stopIds: suggestion.stopIds,
+      lat: suggestion.lat,
+      lon: suggestion.lon,
+      label: suggestion.name,
+    };
+    name = suggestion.name;
+  } else {
+    ep = {
+      kind: "geocoded",
+      lat: suggestion.lat,
+      lon: suggestion.lon,
+      label: suggestion.label,
+      provider: "bundled",
+      confidence: suggestion.confidence,
+    };
+    name = suggestion.label;
+  }
+  return { ep, name };
+}
+
 export function SearchPage() {
   const navigate = useNavigate();
   const tripStart = useTripStart(useCallback(() => navigate("/"), [navigate]));
@@ -370,6 +409,9 @@ export function SearchPage() {
   });
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  // Recents hidden by Remove while its Undo is offered, then forgotten.
+  const [hiddenRecents, setHiddenRecents] = useState<ReadonlySet<string>>(() => new Set());
+  const [recentNotice, setRecentNotice] = useState<RecentNoticeState | null>(null);
   // The engine returns up to SEARCH_MAX_RESULTS; show them a page at a time.
   const [visibleSuggestionCount, setVisibleSuggestionCount] = useState(SUGGESTION_PAGE_SIZE);
   const [suggestionStatus, setSuggestionStatus] = useState<"idle" | "searching" | "ready" | "error">("idle");
@@ -1213,41 +1255,35 @@ export function SearchPage() {
     setActiveField(null);
   }
 
+  function saveRecent(suggestion: SearchSuggestion) {
+    const { ep, name } = suggestionEndpoint(suggestion);
+    void savePlace({ endpoint: ep, alias: name })
+      .then(() => setRecentNotice({ kind: "saved", label: name }))
+      .catch(() => {});
+  }
+
+  function removeRecent(key: string, suggestion: SearchSuggestion) {
+    if (suggestion.kind === "stopGroup") return;
+    const target: RecentTarget = suggestion.kind === "stop"
+      ? { stopId: suggestion.stopId, label: suggestion.name, lat: suggestion.lat, lon: suggestion.lon }
+      : { label: suggestion.label, lat: suggestion.lat, lon: suggestion.lon };
+    setHiddenRecents((prev) => new Set(prev).add(key));
+    setRecentNotice({
+      kind: "removed",
+      label: target.label,
+      commit: () => void forgetRecent(target).catch(() => {}),
+      undo: () => setHiddenRecents((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      }),
+    });
+  }
+
   function selectSuggestion(suggestion: SearchSuggestion) {
     searchAbortRef.current?.abort();
     dismissKeyboard();
-    let ep: BaseEndpoint;
-    let name: string;
-
-    if (suggestion.kind === "stop") {
-      ep = {
-        kind: "stop",
-        stopId: suggestion.stopId,
-        name: suggestion.name,
-        lat: suggestion.lat,
-        lon: suggestion.lon,
-      };
-      name = suggestion.name;
-    } else if (suggestion.kind === "stopGroup") {
-      ep = {
-        kind: "stopGroup",
-        stopIds: suggestion.stopIds,
-        lat: suggestion.lat,
-        lon: suggestion.lon,
-        label: suggestion.name,
-      };
-      name = suggestion.name;
-    } else {
-      ep = {
-        kind: "geocoded",
-        lat: suggestion.lat,
-        lon: suggestion.lon,
-        label: suggestion.label,
-        provider: "bundled",
-        confidence: suggestion.confidence,
-      };
-      name = suggestion.label;
-    }
+    const { ep, name } = suggestionEndpoint(suggestion);
 
     if (activeField === "from") {
       setFromText(name);
@@ -1652,6 +1688,8 @@ export function SearchPage() {
                     suggestion.kind === "stop" ? `stop:${suggestion.stopId}` :
                     suggestion.kind === "stopGroup" ? `group:${suggestion.groupId}` :
                     `poi:${suggestion.label}:${suggestion.category}:${suggestion.lat}:${suggestion.lon}`;
+                  const isRecent = suggestion.kind !== "stopGroup" && !!suggestion.recent;
+                  if (isRecent && hiddenRecents.has(key)) return null;
                   const icon =
                     suggestion.kind === "stop" ? "\u{1F68F}" :
                     suggestion.kind === "stopGroup" ? "\u{1F68F}" :
@@ -1678,7 +1716,7 @@ export function SearchPage() {
                     ? `${context} · ${defaultSubtitle}`
                     : context ?? defaultSubtitle;
 
-                  return (
+                  const option = (
                     <button
                       key={key}
                       role="option"
@@ -1715,8 +1753,35 @@ export function SearchPage() {
                       </span>
                     </button>
                   );
+                  if (!isRecent) return option;
+                  return (
+                    <RecentRow
+                      key={key}
+                      label={label}
+                      onSave={() => saveRecent(suggestion)}
+                      onRemove={() => removeRecent(key, suggestion)}
+                      text={{
+                        actions: t("search.recent_actions", "Actions for {label}"),
+                        save: t("search.recent_save", "Save place"),
+                        remove: t("search.recent_remove", "Remove from recents"),
+                      }}
+                    >
+                      {option}
+                    </RecentRow>
+                  );
                 })}
               </div>
+            )}
+            {recentNotice && (
+              <RecentNotice
+                notice={recentNotice}
+                onDone={() => setRecentNotice(null)}
+                text={{
+                  saved: t("search.recent_saved", "Saved {label}"),
+                  removed: t("search.recent_removed", "Removed {label} from recents"),
+                  undo: t("search.recent_undo", "Undo"),
+                }}
+              />
             )}
             {suggestions.length > visibleSuggestionCount && (
               <button

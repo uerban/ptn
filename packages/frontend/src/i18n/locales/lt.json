@@ -631,5 +631,11 @@
   "arriveBy.in_15": "Po 15 min.",
   "arriveBy.in_30": "Po 30 min.",
   "arriveBy.in_60": "Po 1 val.",
-  "arriveBy.pick_time": "Pasirinkite laiką"
+  "arriveBy.pick_time": "Pasirinkite laiką",
+  "search.recent_actions": "Veiksmai: {label}",
+  "search.recent_save": "Išsaugoti vietą",
+  "search.recent_remove": "Pašalinti iš naujausių",
+  "search.recent_saved": "Išsaugota {label}",
+  "search.recent_removed": "{label} pašalinta iš naujausių",
+  "search.recent_undo": "Atšaukti"
 }
