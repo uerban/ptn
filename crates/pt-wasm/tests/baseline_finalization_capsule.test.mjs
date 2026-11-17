@@ -109,7 +109,7 @@ test("output buffer exhaustion discloses partial logs and cannot masquerade as s
 test("a valid empty finalization is a successful empty replay",()=>{
  let record;
  compiled.finalizeSearch({composed:[],walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120},()=>null,undefined,value=>{record=value;});
- record.timeFrame={kind:"timezone",timeZone:"UTC",departureUnix:0,departureSecs:0,timeOriginUnix:0,serviceDate:"19700101"};
+ record={...record,timeFrame:{kind:"timezone",timeZone:"UTC",departureUnix:0,departureSecs:0,timeOriginUnix:0,serviceDate:"19700101"}};
  const path=join(root,"empty-record.json"),store=join(root,"empty-store");writeFileSync(path,JSON.stringify(record));
  retainFinalization(store,"empty",path,moduleDir);
  const proof=replayFinalizationCapsule(store,"empty",join(root,"empty-replay"));
