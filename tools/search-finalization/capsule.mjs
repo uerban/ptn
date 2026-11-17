@@ -59,11 +59,9 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   retainRun(store,id,capsule);return capsule;
 }
 
-/** Verify every declared byte before materialization. Explicit replay executes
- * retained trusted code with a bounded process; this is not a security sandbox. */
-export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
+const HANDLE_UNVERIFIED="unverified; supplied artifact state is not proof of original live router";
+function readCapsule(store,id) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
-  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000)throw new Error("Invalid replay timeout");
   const manifestBytes=readFileSync(join(store,"runs",`${id}.json`)),capsule=JSON.parse(manifestBytes);
   if(capsule.schemaVersion!==1||capsule.format!=="ptn-search-finalization-capsule"||!Object.values(SCOPES).includes(capsule.scope)||capsule.classification!=="partial capture"||capsule.replayVerification!=="unverified"||capsule.recordProducerIdentity!==PRODUCER_UNVERIFIED||!capsule.artifacts||typeof capsule.artifacts!=="object")throw new Error("Unsupported capsule");
   const observed=Object.fromEntries(Object.entries(capsule.artifacts).map(([name,hash])=>[name,readArtifact(store,hash)]));
@@ -73,12 +71,53 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
   if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||scopeOf(record)!==capsule.scope)throw new Error("Capsule scope mismatch");
   if(build.moduleSha256!==capsule.artifacts.module||build.sources.some((row,index)=>capsule.artifacts[`source${index}`]!==row.sha256))throw new Error("Capsule module provenance mismatch");
   if(!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
+  if(capsule.plannerExecution!==undefined) {
+    const config=capsule.plannerExecution;
+    if(config.version!==1||!["off","unbounded","covering-merge"].includes(config.patternMode)||typeof config.transfers!=="boolean"
+      ||config.originalHandleIdentity!==HANDLE_UNVERIFIED||record.format!=="ptn-search-pipeline"||!record.planner
+      ||build.plannerQueryMapping!=="ptn-wasm-query-v1")throw new Error("Unsupported planner execution capsule");
+    for(const name of ["plannerSourceCapsule","plannerOriginalChild","plannerGlue","plannerWasm","plannerPtb",...(config.transfers?["plannerTransfers"]:[])])if(!observed[name])throw new Error(`Missing planner artifact: ${name}`);
+    if(!config.transfers&&observed.plannerTransfers)throw new Error("Unexpected planner transfer artifact");
+    const source=JSON.parse(observed.plannerSourceCapsule);
+    if(source.plannerExecution!==undefined||source.format!==capsule.format||source.scope!==capsule.scope||!same(source.replayRuntime,capsule.replayRuntime))throw new Error("Planner source capsule mismatch");
+    for(const [name,hash] of Object.entries(source.artifacts??{}))if((name==="replayChild"?capsule.artifacts.plannerOriginalChild:capsule.artifacts[name])!==hash)throw new Error("Planner source artifact mismatch");
+    for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete planner source capsule");
+  }
+  return {manifestBytes,capsule,observed,record,build};
+}
+
+/** Retain supplied router state without executing it. The new immutable run
+ * preserves the original observation and does not verify its live handle. */
+export function attachPlannerReplay(store,sourceId,id,{glue,wasm,ptb,transfers,patternMode}) {
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
+  if(!["off","unbounded","covering-merge"].includes(patternMode)||!(transfers===null||typeof transfers==="string"))throw new Error("Explicit pattern mode and transfers path or null required");
+  const {manifestBytes,capsule,record,build}=readCapsule(store,sourceId);
+  if(capsule.plannerExecution!==undefined||record.format!=="ptn-search-pipeline"||!record.planner||build.plannerQueryMapping!=="ptn-wasm-query-v1")throw new Error("Planner replay requires an unattached pipeline and declared query mapping");
+  const bytes={plannerGlue:readFileSync(glue),plannerWasm:readFileSync(wasm),plannerPtb:readFileSync(ptb),...(transfers!==null?{plannerTransfers:readFileSync(transfers)}:{})};
+  const artifacts={...capsule.artifacts,plannerSourceCapsule:retainArtifact(store,manifestBytes),plannerOriginalChild:capsule.artifacts.replayChild,
+    replayChild:retainArtifact(store,readFileSync(new URL("./replay-child.mjs",import.meta.url)))};
+  for(const [name,value] of Object.entries(bytes))artifacts[name]=retainArtifact(store,value);
+  const attached={...capsule,artifacts,plannerExecution:{version:1,patternMode,transfers:transfers!==null,originalHandleIdentity:HANDLE_UNVERIFIED}};
+  retainRun(store,id,attached);return attached;
+}
+
+/** Verify every declared byte before materialization. Explicit replay executes
+ * retained trusted code with a bounded process; this is not a security sandbox. */
+export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
+  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000)throw new Error("Invalid replay timeout");
+  const {manifestBytes,capsule,observed,record}=readCapsule(store,id);
   mkdirSync(destination,{mode:0o700});
   const modulePath=join(destination,"module.mjs"),recordPath=join(destination,"record.json");
   writeFileSync(modulePath,observed.module,{flag:"wx",mode:0o400});writeFileSync(recordPath,observed.record,{flag:"wx",mode:0o400});
+  const plannerInput=capsule.plannerExecution?{...capsule.plannerExecution,artifacts:{}}:null;
+  if(plannerInput)for(const name of ["plannerGlue","plannerWasm","plannerPtb",...(plannerInput.transfers?["plannerTransfers"]:[])]) {
+    const path=join(destination,name);writeFileSync(path,observed[name],{flag:"wx",mode:0o400});
+    plannerInput.artifacts[name]={path,sha256:capsule.artifacts[name]};
+  }
   const env={...process.env};delete env.NODE_OPTIONS;delete env.NODE_PATH;
   const started=performance.now();
-  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record],
+  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record,JSON.stringify(plannerInput)],
     {env,timeout:timeoutMs,maxBuffer:4*1024*1024,encoding:"utf8",killSignal:"SIGKILL"});
   writeFileSync(join(destination,"stdout.txt"),child.stdout??"",{flag:"wx",mode:0o600});
   writeFileSync(join(destination,"stderr.txt"),child.stderr??"",{flag:"wx",mode:0o600});
@@ -86,10 +125,13 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
   let result=null;
   if(completion==="success") {
     try {result=JSON.parse(child.stdout);if(result.completion!=="success"||result.moduleHash!==capsule.artifacts.module||result.recordHash!==capsule.artifacts.record
-      ||!same(result.output,record.output))throw new Error("Replay proof mismatch");}
+      ||!same(result.output,record.output))throw new Error("Replay proof mismatch");
+      if(plannerInput&&(!same(result.planner?.output,record.planner.output)||result.planner?.patternMode!==plannerInput.patternMode
+        ||!same(result.planner?.artifacts,Object.fromEntries(Object.entries(plannerInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Planner replay proof mismatch");}
     catch {completion="error";}
   }
   const proof={format:"ptn-search-finalization-replay",version:1,scope:capsule.scope,classification:capsule.classification,recordProducerIdentity:capsule.recordProducerIdentity,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
+    planner:completion==="success"?(result.planner??null):null,plannerExecution:capsule.plannerExecution??null,
     completion,elapsedMs:performance.now()-started,exitCode:child.status,signal:child.signal,errorCode:child.error?.code??null,
     logCaptureComplete:child.error?.code!=="ENOBUFS",output:completion==="success"?result.output:null};
   writeFileSync(join(destination,"verification.json"),JSON.stringify(proof,null,2)+"\n",{flag:"wx",mode:0o600});

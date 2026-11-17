@@ -1,4 +1,4 @@
-# Retained local finalization replay
+# Retained local search replay
 
 The replay module supports `ptn-search-finalization`, `ptn-search-composition`,
 `ptn-search-reach` and `ptn-search-pipeline` version 1 records. Pipeline records
@@ -76,3 +76,39 @@ not full search reproducibility, independent feasibility or human usefulness.
 Precise locations and trip IDs can be present in records. All operations are
 explicit local commands; production searches never call this tool and nothing
 is uploaded automatically.
+
+## Supplied planner artifacts
+
+A pipeline capsule can be extended into a **new** immutable run with explicit
+router state. This reads and retains bytes without executing them:
+
+```sh
+node tools/search-finalization/cli.mjs attach-planner <store> <source-id> <new-id> <glue.js> <wasm> <ptb> <transfers-path-or-none> <pattern-mode>
+```
+
+Use `none` to explicitly declare no separate transfer overlay. Pattern mode must
+be `off`, `unbounded` or `covering-merge`; there is no inferred default. The
+original capsule is retained as a hashed artifact, along with its original
+replay child. Its record/module/source bytes and runtime contract remain linked.
+The module must declare `ptn-wasm-query-v1` mapping support. Existing modules
+without that declaration cannot silently gain planner replay support.
+
+Replay first checks the linked frontend stages, then initializes the supplied
+WASM from retained bytes, constructs its router with the PTB and explicit pattern
+mode, installs the transfer overlay if supplied, and plans the query through the
+same pure adapter used by production `planWithWasm`. Its complete ordered output
+must equal the observed planner output. The parent separately checks this output
+and artifact digests. A missing planner proof, mismatch, initialization/query
+error or timeout cannot become a successful empty result. Planner files are
+verified before materialization and checked again by the retained child. The
+existing process deadline and output-buffer limit cover the entire replay.
+
+The proof includes mapped engine query, exact supplied artifact hashes and planner
+output. This verifies compatibility of the supplied state, **not** identity of the
+original live router handle or its producer. Both identities remain explicitly
+unverified, and capture classification/scope do not change. Original missing
+fields remain documented in the source capsule. This does not rebuild the feed,
+rerun endpoint selection or raw walking graphs, resolve the original time frame,
+or establish original browser/worker lifecycle equivalence. No runtime package
+or compiler installation is required for replay. Generated glue must be usable
+from its retained data URL; external module/file dependencies are not captured.

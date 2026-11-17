@@ -5,7 +5,7 @@ import {spawnSync} from "node:child_process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildFinalizationModule,sha,sourceRoot} from "../../../tools/search-finalization/module.mjs";
-import {retainFinalization,replayFinalizationCapsule} from "../../../tools/search-finalization/capsule.mjs";
+import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay} from "../../../tools/search-finalization/capsule.mjs";
 import {retainArtifact} from "./baseline_store.mjs";
 let root,moduleDir,recordPath,expected,compiled,moduleManifest;
 before(async()=>{
@@ -229,4 +229,44 @@ test("linked stage capsule replays and rejects an individually valid but disconn
  const failed=replayFinalizationCapsule(store,"disconnected",join(root,"pipeline-disconnected-replay"));
  assert.equal(failed.completion,"error");assert.equal(failed.output,null);
  assert.match(readFileSync(join(root,"pipeline-disconnected-replay/stderr.txt"),"utf8"),/planner entry/);
+});
+
+test("supplied planner artifacts execute only on replay and preserve source observations",()=>{
+ const store=join(root,"pipeline-store"),sourcePath=join(store,"runs/linked.json"),sourceBytes=readFileSync(sourcePath);
+ const source=JSON.parse(sourceBytes),record=JSON.parse(readFileSync(join(store,"artifacts",source.artifacts.record)));
+ const glue=join(root,"planner-glue.mjs"),wasm=join(root,"planner.wasm"),ptb=join(root,"planner.ptb"),transfers=join(root,"planner.transfers");
+ writeFileSync(wasm,"wasm");writeFileSync(ptb,"ptb");writeFileSync(transfers,"transfers");
+ const artifactOptions={glue,wasm,ptb,transfers,patternMode:"covering-merge"};
+ const prefix=`export function initSync({module}){if(module.toString()!=="wasm")throw new Error("WASM bytes changed")}export class PtRouter{constructor(bytes,mode){if(bytes.toString()!=="ptb"||mode!=="covering-merge")throw new Error("state mismatch")}setTransfers(bytes){if(bytes.toString()!=="transfers")throw new Error("transfer bytes changed");this.set=true}free(){}`;
+ const successful=prefix+`plan(query){if(!this.set)throw new Error("missing transfers");if(query.date!=="20261113"||query.departureSecs!==28800||query.entryStops[0].walkSecs!==0||"activeServiceIds" in query)throw new Error("query mapping changed");return ${JSON.stringify(record.planner.output)}}}`;
+ writeFileSync(glue,successful);
+ const attached=attachPlannerReplay(store,"linked","with-engine",artifactOptions);
+ assert.deepEqual(readFileSync(sourcePath),sourceBytes);assert.equal(attached.replayVerification,"unverified");
+ const moved=join(root,"attached-planner-moved");cpSync(store,moved,{recursive:true});
+ const proof=replayFinalizationCapsule(moved,"with-engine",join(root,"attached-planner-replay"));
+ assert.equal(proof.completion,"success",readFileSync(join(root,"attached-planner-replay/stderr.txt"),"utf8"));assert.deepEqual(proof.output,record.output);assert.deepEqual(proof.planner.output,record.planner.output);
+ assert.equal(proof.planner.query.date,"20261113");assert.equal(proof.planner.patternMode,"covering-merge");assert.equal(Object.hasOwn(proof.planner.query,"activeServiceIds"),false);
+ assert.match(proof.plannerExecution.originalHandleIdentity,/unverified/);
+ assert.throws(()=>attachPlannerReplay(store,"linked","with-engine",artifactOptions),/EEXIST/);
+ assert.throws(()=>attachPlannerReplay(store,"with-engine","reattach",artifactOptions),/unattached/);
+ for(const [name,hash] of Object.entries(attached.artifacts).filter(([name])=>name.startsWith("planner"))) {
+  const path=join(store,"artifacts",hash),original=readFileSync(path);writeFileSync(path,"corrupt");
+  const destination=join(root,`planner-corrupt-${name}`);assert.throws(()=>replayFinalizationCapsule(store,"with-engine",destination),/integrity/);assert.equal(existsSync(destination),false);writeFileSync(path,original);
+ }
+ for(const [name,code] of [["wrong",prefix+"plan(){return []}}"],["throw","throw new Error('no implicit execution')"],["timeout",prefix+"plan(){while(true){}}}"]]) {
+  writeFileSync(glue,code);attachPlannerReplay(store,"linked",`engine-${name}`,artifactOptions);
+  const failed=replayFinalizationCapsule(store,`engine-${name}`,join(root,`engine-${name}-out`),name==="timeout"?150:5000);
+  assert.equal(failed.completion,name==="timeout"?"timeout":"error");assert.equal(failed.output,null);assert.equal(failed.planner,null);
+ }
+ writeFileSync(glue,prefix+`plan(){if(this.set)throw new Error("unexpected transfers");return ${JSON.stringify(record.planner.output)}}}`);
+ attachPlannerReplay(store,"linked","engine-no-transfers",{...artifactOptions,transfers:null});
+ const none=replayFinalizationCapsule(store,"engine-no-transfers",join(root,"engine-none-out"));assert.equal(none.completion,"success");assert.equal(Object.hasOwn(none.planner.artifacts,"plannerTransfers"),false);
+ assert.throws(()=>attachPlannerReplay(store,"linked","implicit-transfers",{...artifactOptions,transfers:undefined}),/Explicit/);
+ assert.throws(()=>attachPlannerReplay(store,"linked","invalid-pattern",{...artifactOptions,patternMode:"default"}),/Explicit/);
+ const ignored=JSON.parse(readFileSync(join(store,"runs/with-engine.json")));
+ ignored.artifacts.replayChild=retainArtifact(store,Buffer.from('import {readFileSync} from "node:fs";process.stdout.write(JSON.stringify({completion:"success",moduleHash:process.argv[3],recordHash:process.argv[4],output:JSON.parse(readFileSync(process.argv[2])).output}));'));
+ writeFileSync(join(store,"runs/ignored-planner.json"),JSON.stringify(ignored));
+ const unproved=replayFinalizationCapsule(store,"ignored-planner",join(root,"ignored-planner-proof"));assert.equal(unproved.completion,"error");assert.equal(unproved.output,null);
+ const manifest=JSON.parse(readFileSync(join(store,"runs/with-engine.json")));manifest.plannerExecution.originalHandleIdentity="verified";writeFileSync(join(store,"runs/with-engine.json"),JSON.stringify(manifest));
+ const refused=join(root,"planner-identity-upgrade");assert.throws(()=>replayFinalizationCapsule(store,"with-engine",refused),/Unsupported planner/);assert.equal(existsSync(refused),false);
 });

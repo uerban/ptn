@@ -37,3 +37,9 @@ full search reproducibility, independent physical feasibility or human quality.
 
 Precise coordinates and trip IDs can be present. Keep these diagnostics local
 unless a user explicitly authorizes export. Nothing uploads records automatically.
+
+The capsule toolkit can separately attach supplied PTB/WASM/glue and explicit
+transfer/pattern state to a new immutable run. Replay then re-executes the
+planner through the production query adapter and checks its output against this
+observation. This is supplied-state compatibility, not verification of the
+original live handle or application identity. The original capture stays partial.
