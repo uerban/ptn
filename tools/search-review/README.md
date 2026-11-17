@@ -106,3 +106,28 @@ The browser tests use the frontend's existing Playwright installation and
 installed Chromium. They cover actual offline reload, drafts, stable blind
 order, explicit actions, undo, export/reimport, neutral/disagreeing opinions,
 stale imports, safe text, storage failure and concurrent-tab recovery.
+
+## Report imported review coverage
+
+```sh
+node tools/search-review/report.mjs <bundle.json> <new-report.json> [actions.json ...]
+```
+
+This local report validates the bundle and every action journal, merges repeated
+or extended exports idempotently, and rejects stale identities or session forks.
+It writes a fresh file with private permissions. With no feedback, evidence stays
+`not-evaluated`; unreviewed cases never become neutral judgments.
+
+Coverage distinguishes explicit opinions, substantive assessments (excluding
+cannot-judge), skipped-only cases and unreviewed cases. Empty and truncated
+captures remain in the denominator. The latest non-undone opinion for each
+session and candidate/pair is shown; full history remains in the original action
+exports. Skips do not erase opinions. Pair comparisons resolve A/B to candidate
+identity before detecting different responses across blind assignments.
+
+Individual opinions, confidence, familiarity, reasons and notes remain separate.
+Session and alias counts do not prove independent human reviewers. Counts apply
+only to the imported bundle; they are neither citywide satisfaction estimates
+nor correctness verdicts. No overall quality score or baseline promotion is
+produced. Reports can contain private notes and identifiers; sharing remains
+an explicit separate action.
