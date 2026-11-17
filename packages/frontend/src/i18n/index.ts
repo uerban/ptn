@@ -46,13 +46,18 @@ export function useTranslation() {
  * Most `privacy.*` keys are reached by template interpolation
  * (`privacy.axis.${axis}.title`) and so carry no inline English fallback —
  * they render as the raw key until the namespace lands. Components that show
- * such keys must gate their render on the returned flag.
+ * such keys must gate their render on the returned flag. Keys shown with an
+ * inline English fallback still need this call: without it the namespace is
+ * never fetched and the fallback is what every locale sees.
+ *
+ * `enabled: false` defers the fetch, for components that usually render
+ * nothing (a hook cannot sit after their early return).
  */
-export function usePrivacyNamespace(): boolean {
+export function usePrivacyNamespace(enabled = true): boolean {
   const { privacyReady, ensurePrivacyNamespace } = useContext(I18nContext);
   useEffect(() => {
-    ensurePrivacyNamespace();
-  }, [ensurePrivacyNamespace]);
+    if (enabled) ensurePrivacyNamespace();
+  }, [enabled, ensurePrivacyNamespace]);
   return privacyReady;
 }
 

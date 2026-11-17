@@ -61,6 +61,9 @@ export interface CommitSetupInput {
   storageChoices?: OptionalStorageChoiceUpdate;
   /** Highest What's new entry id shipped with this build. */
   seenWhatsNew?: number;
+  /** Provider-scoped choices made in setup itself (e.g. detailed maps), by
+   * decision key. Recorded with source `setup`, after the preset's flows. */
+  extraFlows?: Readonly<Record<string, NetworkDecision["value"]>>;
 }
 
 interface OnboardingState {
@@ -213,6 +216,9 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
       presetDecisions(input.presetId, input.guidedChoice),
     )) {
       if (value) flows[flowId] = { value, source: "setup", decidedAt: now };
+    }
+    for (const [key, value] of Object.entries(input.extraFlows ?? {})) {
+      flows[key] = { value, source: "setup", decidedAt: now };
     }
     const journal: OnboardingRecord = {
       ...base,
