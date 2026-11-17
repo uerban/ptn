@@ -70,7 +70,9 @@ until requested. Alternatives use a retained randomized order, rather than
 engine result order.
 
 The page shows a stop sequence and exact service-day times (including hours
-above 24), access/egress, waiting and transfers. It declares missing physical
+above 24), access/egress, waiting and transfers. Headway estimates retain
+`~` markers on affected leg times and estimated journey totals, with an explicit
+uncertainty explanation; scheduled-service times remain unmarked. It declares missing physical
 walking totals and geometry. This is a schematic of the captured boundary, not
 an inferred geographic route. Query constraints and settings are available
 alongside the alternatives.

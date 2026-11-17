@@ -19,7 +19,7 @@ before(async()=>{
  try {
   const artifacts=Object.fromEntries(["ptb","queryTuples","glue","wasm"].map(name=>[name,retainArtifact(root,Buffer.from(name))]));
   const candidates=[0,1,2].map(index=>({legs:[{type:"transit",routeShortName:index===0?unsafe:String(index),tripId:"hidden-engine-trip",
-   fromStopId:"A",toStopId:"B",departSecs:3660,arriveSecs:3900+index*60,boardStopIdx:0,alightStopIdx:1}],boardSecs:3660,alightSecs:3900+index*60,transfers:0}));
+   fromStopId:"A",toStopId:"B",approximate:index===0,departSecs:3660,arriveSecs:3900+index*60,boardStopIdx:0,alightStopIdx:1}],boardSecs:3660,alightSecs:3900+index*60,transfers:0}));
   const capture={boundary:"stop-level engine",equivalence:"exact",truncated:false};
   retainRun(root,"fixture",{schemaVersion:1,completion:"success",scope:"stop-level compiled engine",classification:"partial capture",replayVerification:"unverified",
    missingDependencies:["fixture"],unsupported:["pedestrian geometry","real-time composition"],artifacts,
@@ -59,6 +59,12 @@ test("local page preserves blind order, drafts and explicit actions through offl
   assert.equal(await page.locator("#provenance").getAttribute("open"),null);
   assert.equal((await page.locator("body").innerText()).includes("hidden-engine-trip"),false);
   assert.equal(await page.locator("img").count(),0);
+  assert.equal(await page.getByText("Headway estimate: departure and arrival are approximate.",{exact:true}).count(),1);
+  assert.equal(await page.getByText("~01:01:00–~01:05:00 · 4 min",{exact:true}).count(),1);
+  const estimated=page.locator(".candidate").filter({hasText:"Includes approximate headway service"});
+  assert.match(await estimated.textContent(),/Arrival ~01:05:20 · Full duration ~5 min 20 s/);
+  assert.match(await estimated.textContent(),/Waiting ~50 s/);
+  assert.equal(await page.getByText("01:01:00–01:06:00 · 5 min",{exact:true}).count(),1);
   const order=await page.locator(".candidate").evaluateAll(nodes=>nodes.map(node=>node.dataset.candidateId));
   await page.locator("#notes").fill(unsafe);
   assert.equal((await exported(page)).sessions[0].actions.length,0,"draft is not an exported opinion");

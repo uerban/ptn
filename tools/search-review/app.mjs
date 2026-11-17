@@ -58,21 +58,28 @@ function drawCandidates(ordered) {
     const card=element("article","");card.className="candidate";card.dataset.candidateId=candidate.id;
     card.append(element("h2",label(index)));
     const itinerary=candidate.itinerary,legs=itinerary.legs;
+    const estimatedJourney=legs.some(leg=>leg.type==="transit"&&leg.approximate===true),journeyMarker=estimatedJourney?"~":"";
+    if(estimatedJourney) {
+      const note=element("p","Includes approximate headway service; journey totals use estimated times.");note.className="badge";card.append(note);
+    }
     const access=row().query.entryStops?.find(stop=>stop.stopId===legs[0]?.fromStopId)?.walkSecs;
     const egress=row().query.exitStops?.find(stop=>stop.stopId===legs.at(-1)?.toStopId)?.walkSecs;
     const total=Number.isFinite(egress)?itinerary.alightSecs+egress-row().query.departureSecs:NaN;
-    card.append(element("p",`Arrival ${clock(Number.isFinite(egress)?itinerary.alightSecs+egress:NaN)} · Full duration ${minutes(total)} · Transfers ${itinerary.transfers??"Unknown"}`));
+    card.append(element("p",`Arrival ${journeyMarker}${clock(Number.isFinite(egress)?itinerary.alightSecs+egress:NaN)} · Full duration ${journeyMarker}${minutes(total)} · Transfers ${itinerary.transfers??"Unknown"}`));
     const transferWalk=legs.filter(leg=>leg.type==="walk").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
     const riding=legs.filter(leg=>leg.type==="transit").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
     const walking=access+egress+transferWalk,waiting=total-riding-walking;
-    card.append(element("p",`Walking ${minutes(walking)} · Waiting ${minutes(waiting)} · Access ${minutes(access)} · Egress ${minutes(egress)}`));
+    card.append(element("p",`Walking ${minutes(walking)} · Waiting ${journeyMarker}${minutes(waiting)} · Access ${minutes(access)} · Egress ${minutes(egress)}`));
     card.append(element("small","Total walking distance unavailable at this boundary"));
     const timeline=element("ol","");timeline.className="timeline";
     for(const leg of legs) {
       const item=element("li","");if(leg.type==="walk")item.className="walk";
       item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
       item.append(element("p",`${leg.fromStopId??"Unknown stop"} → ${leg.toStopId??"Unknown stop"}`));
-      item.append(element("p",`${clock(leg.departSecs)}–${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+      const estimated=leg.type==="transit"&&leg.approximate===true;
+      const marker=estimated?"~":"";
+      item.append(element("p",`${marker}${clock(leg.departSecs)}–${marker}${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+      if(estimated)item.append(element("p","Headway estimate: departure and arrival are approximate."));
       if(leg.type==="walk") item.append(element("small",Number.isFinite(leg.distanceMeters)?`${leg.distanceMeters} m`:"Physical distance unknown"));
       else item.append(element("small",`Stop occurrences ${leg.boardStopIdx??"?"} → ${leg.alightStopIdx??"?"}`));
       timeline.append(item);

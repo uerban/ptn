@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4qKTdBeTmsHl2OrD6OTM/Oi6Mje8KodC/P/lFjI7do4='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-J5o6lct6BhBxtI96M0xJYAG7ZeGCeqJlfKq0P0NYmO4='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <title>PTN journey review</title>
 <style>
 :root{font:16px/1.5 system-ui,sans-serif;color:#172235;background:#f3f5f8;color-scheme:light}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:1320px;margin:auto;padding:24px}h1{margin:0;font-size:1.8rem}h2{font-size:1.2rem;margin:0 0 12px}h3{font-size:1rem}p{margin:8px 0}header{margin-bottom:20px}.muted,small{color:#536174}.toolbar,.navigation,.context{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.panel,.candidate{background:white;border:1px solid #d6dde7;border-radius:12px;padding:18px;margin:14px 0}.toolbar label{min-width:170px}label{display:block;font-weight:600}input,select,textarea,button{font:inherit}input,select,textarea{display:block;max-width:100%;padding:7px;border:1px solid #9ba9bc;border-radius:5px;background:white;color:inherit}textarea{width:100%;min-height:90px}button{cursor:pointer;padding:8px 14px;border:1px solid #8b9ab0;border-radius:6px;background:#fff;color:inherit}button.primary{background:#235edf;border-color:#235edf;color:white}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #f2b600;outline-offset:2px}#status{min-height:1.5em;padding:8px 0}#status.error{color:#a02020;font-weight:600}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:16px}.candidate{margin:0}.timeline{padding-left:20px;list-style:circle}.timeline li{border-left:3px solid #235edf;margin:12px 0;padding-left:12px;overflow-wrap:anywhere}.timeline li.walk{border-color:#218546}.metric{font-variant-numeric:tabular-nums}.reasons{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0}.reasons label{font-weight:400}.reasons input{display:inline}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,monospace;background:#f3f5f8;padding:12px}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.history li{margin:10px 0;overflow-wrap:anywhere}.badge{background:#edf2ff;color:#183b80;border-radius:4px;padding:2px 7px}#workspace[hidden]{display:none}.review-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.review-grid .panel{margin-top:0}fieldset{border:0;padding:0;margin:0}legend{font-weight:600;margin-bottom:8px}@media(max-width:800px){main{padding:14px}.review-grid{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar label{flex:1}button{min-height:44px}}@media(prefers-color-scheme:dark){:root{color:#e5ebf4;background:#101723;color-scheme:dark}.panel,.candidate,input,select,textarea,button{background:#192333;color:inherit;border-color:#50627a}.muted,small{color:#b0bdd0}pre{background:#101723}.badge{background:#243c65;color:#d3e0ff}#status.error{color:#ffb1a8}}
@@ -269,21 +269,28 @@ function drawCandidates(ordered) {
     const card=element("article","");card.className="candidate";card.dataset.candidateId=candidate.id;
     card.append(element("h2",label(index)));
     const itinerary=candidate.itinerary,legs=itinerary.legs;
+    const estimatedJourney=legs.some(leg=>leg.type==="transit"&&leg.approximate===true),journeyMarker=estimatedJourney?"~":"";
+    if(estimatedJourney) {
+      const note=element("p","Includes approximate headway service; journey totals use estimated times.");note.className="badge";card.append(note);
+    }
     const access=row().query.entryStops?.find(stop=>stop.stopId===legs[0]?.fromStopId)?.walkSecs;
     const egress=row().query.exitStops?.find(stop=>stop.stopId===legs.at(-1)?.toStopId)?.walkSecs;
     const total=Number.isFinite(egress)?itinerary.alightSecs+egress-row().query.departureSecs:NaN;
-    card.append(element("p",`Arrival ${clock(Number.isFinite(egress)?itinerary.alightSecs+egress:NaN)} · Full duration ${minutes(total)} · Transfers ${itinerary.transfers??"Unknown"}`));
+    card.append(element("p",`Arrival ${journeyMarker}${clock(Number.isFinite(egress)?itinerary.alightSecs+egress:NaN)} · Full duration ${journeyMarker}${minutes(total)} · Transfers ${itinerary.transfers??"Unknown"}`));
     const transferWalk=legs.filter(leg=>leg.type==="walk").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
     const riding=legs.filter(leg=>leg.type==="transit").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
     const walking=access+egress+transferWalk,waiting=total-riding-walking;
-    card.append(element("p",`Walking ${minutes(walking)} · Waiting ${minutes(waiting)} · Access ${minutes(access)} · Egress ${minutes(egress)}`));
+    card.append(element("p",`Walking ${minutes(walking)} · Waiting ${journeyMarker}${minutes(waiting)} · Access ${minutes(access)} · Egress ${minutes(egress)}`));
     card.append(element("small","Total walking distance unavailable at this boundary"));
     const timeline=element("ol","");timeline.className="timeline";
     for(const leg of legs) {
       const item=element("li","");if(leg.type==="walk")item.className="walk";
       item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
       item.append(element("p",`${leg.fromStopId??"Unknown stop"} → ${leg.toStopId??"Unknown stop"}`));
-      item.append(element("p",`${clock(leg.departSecs)}–${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+      const estimated=leg.type==="transit"&&leg.approximate===true;
+      const marker=estimated?"~":"";
+      item.append(element("p",`${marker}${clock(leg.departSecs)}–${marker}${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+      if(estimated)item.append(element("p","Headway estimate: departure and arrival are approximate."));
       if(leg.type==="walk") item.append(element("small",Number.isFinite(leg.distanceMeters)?`${leg.distanceMeters} m`:"Physical distance unknown"));
       else item.append(element("small",`Stop occurrences ${leg.boardStopIdx??"?"} → ${leg.alightStopIdx??"?"}`));
       timeline.append(item);
