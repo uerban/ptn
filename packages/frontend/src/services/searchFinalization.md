@@ -45,3 +45,16 @@ user-facing export and sharing are separate responsibilities. Records can contai
 precise locations and trip identifiers. Keep them local unless sharing is
 explicitly requested. The format does not promote baselines or turn replay
 equality into a usefulness judgment.
+
+When a floor provider and explicit state getter are supplied, capture records the
+applied stop/route/trip rule maps immediately before synchronous finalization.
+`floorRules` is an optional v1 extension. Entries retain opaque keys, raw values,
+insertion order, and absent versus empty maps. Orchestrator diagnostic capture
+supplies this getter; ordinary searches do not copy rule maps.
+
+Replay restores the tables and recomputes every observed floor answer through
+production `effectiveTransferFloor`, including null/zero/fallback semantics. It
+rejects a state/answer mismatch, malformed or duplicate entries, and rules without
+a floor provider. Legacy observations without the extension keep transcript-only
+behavior. The full record still obeys the 2 MiB finite-wire limit. Applied table
+capture does not prove original GTFS/bundle/index provenance or browser identity.

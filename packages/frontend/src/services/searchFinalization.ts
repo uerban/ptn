@@ -1,3 +1,5 @@
+import {effectiveTransferFloor} from "./effectiveTransferRule.ts";
+import {restoreTransferFloorState, type TransferFloorState} from "./transferFloorState.ts";
 import {wire, same, freeze} from "./searchEvidenceWire.ts";
 import type { RankingCriteria, RaptorTransitLeg } from "@pt/shared";
 import { rankResults } from "./raptorComposer.ts";
@@ -25,6 +27,7 @@ export interface FinalizationCapture {
   input: FinalizationInput;
   reads: Read[];
   hasTransferFloor: boolean;
+  floorRules?: TransferFloorState;
   output: RtComposedItinerary[];
   missingDependencies: string[];
 }
@@ -46,11 +49,12 @@ function validateInput(input: FinalizationInput): void {
 /** Capture is off by default. The observer receives an immutable local record;
  * no persistence, upload, provider request or baseline promotion occurs here. */
 export function finalizeSearch(input: FinalizationInput, delay: DelayLookup, floor?: Floor,
-  capture?: (record: FinalizationCapture) => void): RtComposedItinerary[] {
+  capture?: (record: FinalizationCapture) => void, floorState?: () => TransferFloorState): RtComposedItinerary[] {
   const nowMs = Date.now();
   if (!capture) return run(input, delay, floor, nowMs);
   validateInput(input);
   const retained = wire(input), reads: Read[] = [];
+  const floorRules = floor && floorState ? floorState() : undefined;
   const observedDelay: DelayLookup = tripId => {
     const value = wire(delay(tripId)); reads.push({kind: "delay", tripId, value}); return value;
   };
@@ -60,7 +64,7 @@ export function finalizeSearch(input: FinalizationInput, delay: DelayLookup, flo
   const output = run(input, observedDelay, observedFloor, nowMs);
   capture(freeze(wire<FinalizationCapture>({format: "ptn-search-finalization", version: 1,
     scope: "frontend RT feasibility and ranking", classification: "partial capture", normalization: "finite-json-wire-v1",
-    nowMs, input: retained, reads, hasTransferFloor: !!floor, output,
+    nowMs, input: retained, reads, hasTransferFloor: !!floor, ...(floorRules ? {floorRules} : {}), output,
     missingDependencies: MISSING})));
   return output;
 }
@@ -74,6 +78,8 @@ export function replayFinalization(source: FinalizationCapture): RtComposedItine
       || !Number.isFinite(record.nowMs) || !Array.isArray(record.reads) || typeof record.hasTransferFloor !== "boolean"
       || !same(record.missingDependencies, MISSING)) throw new Error("Unsupported finalization capture");
   validateInput(record.input);
+  const rules = record.floorRules !== undefined ? restoreTransferFloorState(record.floorRules) : undefined;
+  if (rules && !record.hasTransferFloor) throw new Error("Transfer rules without a floor provider");
   let index = 0;
   const take = (expected: Omit<Extract<Read, {kind: "delay"}>, "value"> | Omit<Extract<Read, {kind: "floor"}>, "value">): Read => {
     const read = record.reads[index++];
@@ -83,7 +89,15 @@ export function replayFinalization(source: FinalizationCapture): RtComposedItine
     return read;
   };
   const delay: DelayLookup = tripId => (take({kind: "delay", tripId}) as Extract<Read, {kind: "delay"}>).value;
-  const floor: Floor | undefined = record.hasTransferFloor ? (from, to) => (take({kind: "floor", from, to}) as Extract<Read, {kind: "floor"}>).value : undefined;
+  const floor: Floor | undefined = record.hasTransferFloor ? (from, to) => {
+    const value = (take({kind: "floor", from, to}) as Extract<Read, {kind: "floor"}>).value;
+    if (rules) {
+      const actual = effectiveTransferFloor(rules, from, to, record.input.minTransferSecs);
+      if (!same(actual, value)) throw new Error("Transfer floor differs from captured rule state");
+      return actual;
+    }
+    return value;
+  } : undefined;
   const output = run(record.input, delay, floor, record.nowMs);
   if (index !== record.reads.length || !same(wire(output), record.output)) throw new Error("Finalization output or lookup count changed");
   return output;

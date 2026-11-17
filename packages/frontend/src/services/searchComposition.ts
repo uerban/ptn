@@ -1,3 +1,4 @@
+import type {TransferFloorState} from "./transferFloorState.ts";
 import type {LatLon, RaptorItinerary, RankingCriteria} from "@pt/shared";
 import type {WalkRoute} from "./walkGraphClient.ts";
 import {WalkGraphUnavailableError} from "./walkGraphAvailability.ts";
@@ -52,7 +53,7 @@ async function composed(input: CompositionInput, routeFor?: RouteFor) {
  * Route responses are observations, not proof of an independently valid graph. */
 export async function composeSearchResults(input: CompositionInput, routeFor: RouteFor | undefined,
   delay: Parameters<typeof finalizeSearch>[1], floor: Parameters<typeof finalizeSearch>[2],
-  capture?: (record: CompositionCapture) => void, finalizationCapture?: (record: FinalizationCapture) => void,
+  capture?: (record: CompositionCapture) => void, finalizationCapture?: (record: FinalizationCapture) => void, floorState?: () => TransferFloorState,
 ): Promise<RtComposedItinerary[]> {
   const consumed = capture ? wire(input) : input, reads: PedestrianRead[] = [];
   const observed: RouteFor | undefined = routeFor && capture ? async (from, to) => {
@@ -69,7 +70,7 @@ export async function composeSearchResults(input: CompositionInput, routeFor: Ro
   let retained: FinalizationCapture | undefined;
   const observer = capture ? (record: FinalizationCapture) => { retained = record; finalizationCapture?.(record); } : finalizationCapture;
   const output = finalizeSearch({composed: candidates, walking: consumed.walking, ranking: consumed.ranking,
-    maxResults: consumed.maxResults, minTransferSecs: consumed.minTransferSecs}, delay, floor, observer);
+    maxResults: consumed.maxResults, minTransferSecs: consumed.minTransferSecs}, delay, floor, observer, floorState);
   if (capture && retained) capture(freeze(wire<CompositionCapture>({format: "ptn-search-composition", version: 1,
     scope: "frontend post-planner walking composition", classification: "partial capture", normalization: "finite-json-wire-v1",
     nowMs: retained.nowMs, input: consumed, hasPedestrianProvider: !!routeFor, reads, finalization: retained,

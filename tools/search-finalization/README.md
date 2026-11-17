@@ -231,8 +231,8 @@ and lookup transcripts. Pipeline pins root query/reach inputs/settings and the
 captured clock. Without supplied state it requires matching provider observations.
 With supplied state it instead pins PTB/transfer/pattern data, decoded graph/city/
 profile, or RT envelope history/receipt times; executable module/WASM versions may
-differ and are reported separately. Floor lookups remain observed, with their
-ordering pinned. Legacy clock conversion remains unverified. Different dependency
+differ and are reported separately. Legacy floor lookups remain observed, with their ordering pinned; captured
+applied rule tables instead define that input state. Legacy clock conversion remains unverified. Different dependency
 coverage, clocks, datasets or settings make comparisons incomparable. Unsupported
 capture extensions are rejected from comparability rather than silently ignored.
 
@@ -247,3 +247,24 @@ For a minimal copied toolkit, replay still needs only the tool directory plus
 `baseline_diff.mjs` and `baseline_glue.mjs` in that directory. Diff loads lazily;
 normal replay does not acquire those extra dependencies. No frontend/compiler
 installation is needed for either command.
+
+## Captured applied transfer-floor rules
+
+New orchestrator observations may contain `floorRules` in their finalization
+record. An explicit getter captures all three applied JS maps after asynchronous
+walking evidence and immediately before synchronous RT/finalization reads. It
+retains exact stop-, route- and trip-scoped entries; no rules are inferred from
+observed answers. Normal searches with diagnostic observers absent make no copy.
+
+A module must declare `ptn-floor-rules-v1` capability for this optional v1 field.
+Replay restores the tables and uses the retained production rule/key functions
+for every floor lookup. Different calculated answers fail replay. Forbidden
+transfers, timed/in-seat zero floors and fallback/minimum values stay distinct;
+a zero floor still cannot permit boarding before physical arrival. The existing
+finite-wire/2 MiB limit applies. Original GTFS/index generation is not established.
+
+Proof distinguishes recomputed applied rules, captured rules with no actual floor
+lookups, legacy observed answers, and an unused provider. Legacy records remain
+readable. Diff pins captured rule tables while permitting code-driven answer
+changes; without tables it keeps strict floor observations/interleaving instead.
+Changes of table data are incomparable, never automatically a quality improvement.

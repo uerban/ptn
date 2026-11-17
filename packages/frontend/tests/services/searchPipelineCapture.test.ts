@@ -30,6 +30,7 @@ describe("linked search observations", () => {
     expect(record.planner?.output).toEqual(itineraries);
     expect(record.query.departureTimeMs).toBe(query.departureTime.getTime());
     expect(record).toHaveProperty("timeFrame");
+    expect(record.composition.finalization).toHaveProperty("floorRules");
     expect(Object.isFrozen(record.composition.input)).toBe(true);
     expect(await replaySearchPipeline(record)).toEqual(output);
     expect(reachObserver).toHaveBeenCalledTimes(2);expect(compositionObserver).toHaveBeenCalledTimes(1);expect(finalizationObserver).toHaveBeenCalledTimes(1);

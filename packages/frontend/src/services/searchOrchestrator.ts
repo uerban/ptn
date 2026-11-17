@@ -1,3 +1,4 @@
+import {captureTransferFloorState} from "./transferFloorState.ts";
 import {SearchPipelineCapture, type PipelineCapture} from "./searchPipelineCapture.ts";
 import { effectiveTransferFloor } from "./effectiveTransferRule.ts";
 import type { RaptorTransitLeg } from "@pt/shared";
@@ -274,7 +275,8 @@ export class SearchOrchestrator {
       departureSecs, stops: this.config.allStops, walking, ranking,
       walkSpeedMps: riderWalkSpeedMps(this.config.mobilityProfile, this.config.walkSpeedMps),
       maxResults: this.config.maxResults, minTransferSecs: minTransferSecsFor(this.config.mobilityProfile)},
-      this.config.directWalkRoute, this.config.getDelay, floor, trace ? record => {trace.composition(record); this.config.compositionCapture?.(record);} : this.config.compositionCapture, this.config.finalizationCapture);
+      this.config.directWalkRoute, this.config.getDelay, floor, trace ? record => {trace.composition(record); this.config.compositionCapture?.(record);} : this.config.compositionCapture, this.config.finalizationCapture,
+      floor && (trace || this.config.compositionCapture || this.config.finalizationCapture) ? () => captureTransferFloorState(this.config.raptorIndex) : undefined);
   }
 
   async search(query: SearchQuery): Promise<RtComposedItinerary[]> {

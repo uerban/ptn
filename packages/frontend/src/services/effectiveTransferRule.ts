@@ -1,9 +1,10 @@
 import type { RaptorTransitLeg } from "@pt/shared";
-import { transferRuleKey, transferTripScopedKey, transferRouteScopedKey, type RaptorIndex } from "./raptorIndex.ts";
+import type {RaptorIndex} from "./raptorIndex.ts";
+import {transferRuleKey, transferTripScopedKey, transferRouteScopedKey} from "./transferRuleKeys.ts";
 
 /** Mirrors same-stop trip → route → stop precedence; cross-stop footpaths use only unscoped rules. Null forbids
  * transfer; zero waives the floor but never permits boarding before arrival. */
-export function effectiveTransferFloor(index: RaptorIndex, from: RaptorTransitLeg, to: RaptorTransitLeg, fallback: number): number | null {
+export function effectiveTransferFloor(index: Pick<RaptorIndex, "transferRules" | "transferRulesTripScoped" | "transferRulesRouteScoped">, from: RaptorTransitLeg, to: RaptorTransitLeg, fallback: number): number | null {
   const sameStop = from.toStopId === to.fromStopId;
   const scoped = sameStop ? index.transferRulesTripScoped?.get(transferTripScopedKey(from.toStopId, to.fromStopId, from.tripId, to.tripId))
     ?? index.transferRulesRouteScoped?.get(transferRouteScopedKey(from.toStopId, to.fromStopId, from.routeId, to.routeId))

@@ -8,7 +8,7 @@ function known(value,keys,path) {
 }
 function validate(record,path="record") {
   const fields={
-    "ptn-search-finalization":["nowMs","input","reads","hasTransferFloor"],
+    "ptn-search-finalization":["nowMs","input","reads","hasTransferFloor","floorRules"],
     "ptn-search-reach":["input","hasTransferLookup","reads"],
     "ptn-search-composition":["nowMs","input","reads","hasPedestrianProvider","finalization"],
     "ptn-search-pipeline":["query","timeFrame","reach","directRoute","planner","composition"],
@@ -53,8 +53,9 @@ function contract(snapshot) {
   const rt=capsule.rtExecution?{mode:"supplied frontend envelopes",version:capsule.rtExecution.version,events:rtEvents}
     :{mode:"observed delay transcript",reads:finalization?.reads.filter(read=>read.kind==="delay")};
   // Floor lookups are still external observations, even with planner state.
-  const floor={present:finalization?.hasTransferFloor,reads:finalization?.reads.filter(read=>read.kind==="floor"),
-    ...(finalization?.hasTransferFloor?{lookupOrder:finalization.reads.map(read=>read.kind)}:{})};
+  const floor=finalization?.floorRules?{mode:"captured transfer rules",state:finalization.floorRules}
+    :{mode:"observed floor transcript",present:finalization?.hasTransferFloor,reads:finalization?.reads.filter(read=>read.kind==="floor"),
+      ...(finalization?.hasTransferFloor?{lookupOrder:finalization.reads.map(read=>read.kind)}:{})};
   const walk=capsule.walkingExecution?{mode:"supplied decoded graph",version:capsule.walkingExecution.version,graph:capsule.artifacts.walkingGraph,
     city:capsule.walkingExecution.cityId,profile:capsule.walkingExecution.profile}
     :{mode:"observed pedestrian transcript",present:composition?.hasPedestrianProvider,reads:composition?.reads,...(record.format==="ptn-search-pipeline"?{directRoute:record.directRoute}:{})};

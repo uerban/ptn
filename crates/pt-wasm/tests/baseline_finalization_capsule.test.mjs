@@ -449,3 +449,23 @@ test("frontend capsule diff keeps complete fields, duplicate counts, order and c
  const isolated=spawnSync(process.execPath,[join(stage,"tools/search-finalization/cli.mjs"),"diff",store,"before",store,"different-code"],{encoding:"utf8"});assert.equal(isolated.status,0,isolated.stderr);assert.equal(JSON.parse(isolated.stdout).status,"unchanged");assert.equal(existsSync(join(stage,"packages")),false);
  const recordFile=join(store,"artifacts",before.artifacts.record),original=readFileSync(recordFile);writeFileSync(recordFile,"corrupt");assert.throws(()=>diffFinalizationCapsules(store,"before",store,"different-code"),/integrity/);writeFileSync(recordFile,original);
 });
+
+test("captured applied transfer rules re-execute floor lookups and require module capability",()=>{
+ const first={type:"transit",tripId:"T1",routeId:"R1",fromStopId:"A",toStopId:"B",departSecs:100,arriveSecs:300,boardStopIdx:0,alightStopIdx:1};
+ const second={type:"transit",tripId:"T2",routeId:"R2",fromStopId:"B",toStopId:"C",departSecs:350,arriveSecs:800,boardStopIdx:0,alightStopIdx:1};
+ const index={transferRules:new Map([["B\tB",{type:3}]]),transferRulesRouteScoped:new Map([["B\tB\tR1\tR2",{type:2,minSecs:30}]]),transferRulesTripScoped:new Map([["B\tB\tT1\tT2",{type:1}]])};
+ let record;compiled.finalizeSearch({composed:[{sourceWalkSecs:0,destWalkSecs:0,departureSecs:0,arrivalSecs:800,totalSecs:800,totalWalkSecs:0,totalWalkMeters:0,transfers:1,legs:[first,second]}],
+  walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120},()=>null,(a,b)=>compiled.effectiveTransferFloor(index,a,b,120),r=>{record=r;},()=>compiled.captureTransferFloorState(index));
+ assert.equal(record.output.length,1);assert.equal(record.floorRules.trip[0][1].type,1);
+ const path=join(root,"floor-record.json"),store=join(root,"floor-store");writeFileSync(path,JSON.stringify(record));retainFinalization(store,"floor",path,moduleDir);
+ const proof=replayFinalizationCapsule(store,"floor",join(root,"floor-replay"));assert.equal(proof.completion,"success");assert.deepEqual(proof.output,record.output);assert.ok(proof.transferFloor.lookups>0);assert.match(proof.transferFloor.verification,/recomputed/);
+ const legacy=join(root,"module-without-floor-capability");cpSync(moduleDir,legacy,{recursive:true});
+ const manifest=JSON.parse(readFileSync(join(legacy,"manifest.json")));delete manifest.transferFloorReplay;writeFileSync(join(legacy,"manifest.json"),JSON.stringify(manifest));
+ const refused=join(root,"floor-unsupported-store");assert.throws(()=>retainFinalization(refused,"floor",path,legacy),/transfer rules/);assert.equal(existsSync(refused),false);
+ record=JSON.parse(JSON.stringify(record));record.floorRules.trip[0][1].type=3;writeFileSync(path,JSON.stringify(record));retainFinalization(store,"wrong-rules",path,moduleDir);
+ const failed=replayFinalizationCapsule(store,"wrong-rules",join(root,"floor-wrong-replay"));assert.equal(failed.completion,"error");assert.equal(failed.output,null);
+ assert.match(readFileSync(join(root,"floor-wrong-replay/stderr.txt"),"utf8"),/floor differs/);
+ const malformed=JSON.parse(JSON.stringify(record));malformed.reads=[null];writeFileSync(path,JSON.stringify(malformed));retainFinalization(store,"invalid-reads",path,moduleDir);
+ const invalid=replayFinalizationCapsule(store,"invalid-reads",join(root,"floor-invalid-read-replay"));assert.equal(invalid.completion,"error");assert.equal(invalid.output,null);assert.equal(invalid.transferFloor,null);assert.ok(existsSync(join(root,"floor-invalid-read-replay/verification.json")));
+ const diff=diffFinalizationCapsules(store,"floor",store,"wrong-rules");assert.equal(diff.status,"incomparable");assert.ok(diff.inputChanges.some(change=>change.path.includes("floor")));
+});
