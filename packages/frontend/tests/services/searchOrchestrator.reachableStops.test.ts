@@ -1,6 +1,7 @@
 // `reachableStops` is the entry/exit resolution `search` plans from, exposed
 // for the opt-in arrive-by experiment. Both must give the same stops.
 import { describe, it, expect, vi } from "vitest";
+import {replayReachableStops, type ReachCapture} from "../../src/services/searchReachCapture.ts";
 import type { RaptorQuery } from "@pt/shared";
 import { SearchOrchestrator, type SearchConfig } from "../../src/services/searchOrchestrator.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
@@ -27,7 +28,9 @@ describe("SearchOrchestrator.reachableStops", () => {
   it("returns the stops search plans from, after the same OSRM wait", async () => {
     let planned: RaptorQuery | null = null;
     const osrm = { isReady: () => false, table: vi.fn(), init: vi.fn(async () => { throw new Error("no osrm"); }) };
+    const captures: ReachCapture[] = [];
     const config: SearchConfig = {
+      reachCapture: record => captures.push(record),
       raptorIndex: index, allStops, getDelay: () => null, cityId: "vilnius", feedTz: "Europe/Vilnius",
       osrm: osrm as never, runToCatch: true,
       stopPlanner: async (q) => { planned = q; return []; },
@@ -35,6 +38,9 @@ describe("SearchOrchestrator.reachableStops", () => {
     const orchestrator = new SearchOrchestrator(config);
     const { entryStops, exitStops } = await orchestrator.reachableStops(query);
     expect(osrm.init).toHaveBeenCalledTimes(1);
+    expect(captures).toHaveLength(2);
+    expect(await replayReachableStops(captures[0])).toEqual(entryStops);
+    expect(await replayReachableStops(captures[1])).toEqual(exitStops);
     await orchestrator.search({ ...query, departureTime: new Date("2026-10-12T08:00:00+03:00"), ranking: "fastest" });
     expect(osrm.init).toHaveBeenCalledTimes(2);
     expect(planned).not.toBeNull();

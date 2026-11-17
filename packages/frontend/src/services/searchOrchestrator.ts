@@ -35,7 +35,7 @@ import { resolveActiveServices } from "./serviceDay.ts";
 import { planOnDevice, resolveDepartureOnDevice, type WasmPlanContext } from "./wasmPlanner.ts";
 import { useGtfsDataStore } from "../stores/gtfsDataStore.ts";
 import { type RtComposedItinerary } from "./rtOverlay.ts";
-import { findReachableStops } from "./isochrone.ts";
+import {captureReachableStops, type ReachCapture} from "./searchReachCapture.ts";
 import type { ReachableStop } from "./stopFinder.ts";
 import type { StopPlanner } from "./routingSource.ts";
 
@@ -56,6 +56,8 @@ export interface SearchConfig {
   /** Explicit local diagnostic observer; absent by default. */
   finalizationCapture?: (record: FinalizationCapture) => void;
   compositionCapture?: (record: CompositionCapture) => void;
+  /** Local, opt-in directed endpoint reach observations, before planner execution. */
+  reachCapture?: (record: ReachCapture) => void;
   allStops: StopLocation[];
   getDelay: (tripId: string) => {
     delaySeconds: number;
@@ -140,7 +142,7 @@ export interface EndpointStops {
  * 7. Rank and return top results
  */
 export class SearchOrchestrator {
-  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture">;
+  private config: Required<Omit<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture">> & Pick<SearchConfig, "backendAssist" | "stopPlanner" | "cityId" | "feedTz" | "runToCatch" | "mobilityProfile" | "routingPreference" | "excludedModes" | "excludedRouteIds" | "directWalkRoute" | "finalizationCapture" | "compositionCapture" | "reachCapture">;
 
   constructor(config: SearchConfig) {
     this.config = {
@@ -230,10 +232,10 @@ export class SearchOrchestrator {
       osmLookup,
     };
     const [entryStops, exitStops] = await Promise.all([
-      findReachableStops(
+      captureReachableStops(
         query.origin, allStops,
         { ...baseIsoOptions, originStopId: query.originStopId, originStopIds: query.originStopIds, role: "origin" },
-        osrm, this.config.mobilityProfile,
+        osrm, this.config.mobilityProfile, this.config.reachCapture,
       ),
       // Exit walk goes "candidate stop → destination" — pass destStopId
       // and role="destination" so both the transfer-table lookup and the
@@ -241,10 +243,10 @@ export class SearchOrchestrator {
       // originStopId / origin-role here would read "destination → candidate",
       // which is only equivalent when the routing engine is symmetric
       // (Dijkstra is; OSRM with its foot profile may not be).
-      findReachableStops(
+      captureReachableStops(
         query.destination, allStops,
         { ...baseIsoOptions, destStopId: query.destStopId, destStopIds: query.destStopIds, role: "destination" },
-        osrm, this.config.mobilityProfile,
+        osrm, this.config.mobilityProfile, this.config.reachCapture,
       ),
     ]);
     return { entryStops, exitStops };

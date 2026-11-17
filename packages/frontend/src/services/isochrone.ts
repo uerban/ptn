@@ -18,7 +18,7 @@ interface StopLocation {
   lon: number;
 }
 
-interface IsochroneOptions {
+export interface IsochroneOptions {
   maxWalkSecs: number;
   walkSpeedMps: number;
   radiusMeters: number;
