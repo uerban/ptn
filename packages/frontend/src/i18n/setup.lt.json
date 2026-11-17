@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Tęsti: Rekomenduojama",
   "setup.level.continueStrict": "Tęsti: Griežta",
   "setup.level.continueCustom": "Tęsti: Pagal užsakymą",
-  "setup.level.customPending": "Pasirinkite vieną iš aukščiau pateiktų atsakymų, kad galėtumėte tęsti."
+  "setup.level.customPending": "Pasirinkite vieną iš aukščiau pateiktų atsakymų, kad galėtumėte tęsti.",
+  "setup.map.whyBody": "{provider} teikia gatvių, pastatų ir vietovių pavadinimus. Jums judant žemėlapiu, programa prašo pateikti ekrane matomos srities žemėlapio fragmentus, todėl {provider} sužino, kurias sritis jūs peržiūrite. Išsamūs žemėlapiai naudoja daugiau duomenų nei minimalus žemėlapis, priklausomai nuo to, kiek jūs judate. Jūsų peržiūrėti fragmentai kurį laiką saugomi šio naršyklės talpykloje.",
+  "setup.map.legend": "Žemėlapis",
+  "setup.map.minimal": "Minimalistinis žemėlapis",
+  "setup.map.minimalLine": "Neprisijungus. Niekas nesiunčiama.",
+  "setup.map.detailed": "Išsamus žemėlapis",
+  "setup.map.detailedLine": "Gatvės ir pavadinimai; siunčia jūsų peržiūrimas vietoves į {provider}.",
+  "setup.map.strictLine": "Žemėlapis: minimalus, veikia be interneto. „Griežta“ laiko žemėlapį šiame įrenginyje.",
+  "setup.map.why": "Kodėl svarbus žemėlapio pasirinkimas"
 }

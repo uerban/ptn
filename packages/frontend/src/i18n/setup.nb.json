@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Fortsett: Anbefalt",
   "setup.level.continueStrict": "Fortsett: Strengt",
   "setup.level.continueCustom": "Fortsett: Tilpasset",
-  "setup.level.customPending": "Velg et svar ovenfor for å fortsette."
+  "setup.level.customPending": "Velg et svar ovenfor for å fortsette.",
+  "setup.map.whyBody": "{provider} leverer gatenavn, bygningsnavn og stedsnavn. Når du beveger kartet, henter den kartdelene for området som vises på skjermen, slik at {provider} lærer hvilke områder du ser på. Detaljerte kart bruker mer data enn det minimale kartet, avhengig av hvor mye du beveger deg rundt. Delene du har sett, lagres i nettleserens cache en stund.",
+  "setup.map.legend": "Kart",
+  "setup.map.minimal": "Minimalistisk kart",
+  "setup.map.minimalLine": "Frakoblet. Ingenting sendes.",
+  "setup.map.detailed": "Detaljert kart",
+  "setup.map.detailedLine": "Gater og navn; sender områdene du ser til {provider}.",
+  "setup.map.strictLine": "Kart: minimalt, fungerer frakoblet. Strengt holder kartet på denne enheten.",
+  "setup.map.why": "Hvorfor valg av kart er viktig"
 }

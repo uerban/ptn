@@ -9,6 +9,8 @@ import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import { findDataFlow } from "../../privacy/dataFlowRegistry.ts";
 import type { StartMode } from "../../services/onboardingRecord.ts";
 import type { SetupStringKey, SetupText } from "../../setup/setupStrings.ts";
+import { getBasemapProvider } from "../../config/basemapProviders.ts";
+import { SETUP_DETAILED_MAP, setupAsksMap } from "../../setup/setupMapChoice.ts";
 
 /** The flows Recommended turns on, with their shared descriptions. */
 const RECOMMENDED_FLOWS = Object.entries(
@@ -21,6 +23,8 @@ const RECOMMENDED_FLOWS = Object.entries(
 export interface QuickSetupChoice {
   readonly presetId: OnboardingPresetId;
   readonly guidedChoice?: GuidedNetworkChoice;
+  /** Answer to the map choice; absent when it was not shown. */
+  readonly detailedMap?: boolean;
 }
 
 export interface QuickSetupProps {
@@ -93,7 +97,13 @@ export function QuickSetup(props: QuickSetupProps) {
     customPending: useId(),
     live: useId(),
     ask: useId(),
+    minimal: useId(),
+    detailed: useId(),
   };
+  // Kept while Strict hides the map choice, so switching back restores it.
+  const [mapPick, setMapPick] = useState<"minimal" | "detailed">("minimal");
+  const providerName =
+    getBasemapProvider(SETUP_DETAILED_MAP.providerId)?.name ?? SETUP_DETAILED_MAP.providerId;
   const [level, setLevel] = useState<SetupLevel>("recommended");
   const [guided, setGuided] = useState<GuidedNetworkChoice | null>(null);
   const pending = level === "customize" && guided === null;
@@ -103,12 +113,14 @@ export function QuickSetup(props: QuickSetupProps) {
       ? text(recommendedSummaryKey(props.realtimeKinds), { city: cityName })
       : text(value === "strict" ? "setup.level.strictLine" : "setup.level.customLine");
 
+  const asksMap = setupAsksMap(level, startMode);
   const proceed = () => {
+    const map = asksMap ? { detailedMap: mapPick === "detailed" } : {};
     if (level === "customize") {
-      if (guided) props.onChoose({ presetId: "customize", guidedChoice: guided });
+      if (guided) props.onChoose({ presetId: "customize", guidedChoice: guided, ...map });
       return;
     }
-    props.onChoose({ presetId: level });
+    props.onChoose({ presetId: level, ...map });
   };
 
   return (
@@ -255,6 +267,50 @@ export function QuickSetup(props: QuickSetupProps) {
           <p>{text("setup.personalEncrypted")}</p>
         </div>
       </details>
+
+      {/* Map choice: Map mode only. Under Strict it is one line, not a
+          disabled option: Strict keeps the map on this device. */}
+      {startMode === "map" && !asksMap && (
+        <p className="text-sm text-fg-secondary">{text("setup.map.strictLine")}</p>
+      )}
+      {asksMap && (
+        <>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-base font-medium text-fg">
+              {text("setup.map.legend")}
+            </legend>
+            {(["minimal", "detailed"] as const).map((value) => (
+              <label key={value} className={choiceCard}>
+                <input
+                  type="radio"
+                  name="setup-map"
+                  value={value}
+                  checked={mapPick === value}
+                  onChange={() => setMapPick(value)}
+                  aria-describedby={ids[value]}
+                  className="mt-1 shrink-0 accent-accent"
+                />
+                <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
+                  <span className="text-base font-medium text-fg">
+                    {text(value === "minimal" ? "setup.map.minimal" : "setup.map.detailed")}
+                  </span>
+                  <span id={ids[value]} className="text-sm text-fg-secondary">
+                    {value === "minimal"
+                      ? text("setup.map.minimalLine")
+                      : text("setup.map.detailedLine", { provider: providerName })}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <details className="text-sm text-fg-secondary">
+            <summary className={whySummary}>{text("setup.map.why")}</summary>
+            <div className="max-h-[40dvh] overflow-y-auto pb-1">
+              <p>{text("setup.map.whyBody", { provider: providerName })}</p>
+            </div>
+          </details>
+        </>
+      )}
 
       {/* Only Continue and its messages stick, so large text keeps room to read. */}
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">

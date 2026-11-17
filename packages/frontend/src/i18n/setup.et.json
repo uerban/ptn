@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Jätka: Soovitatav",
   "setup.level.continueStrict": "Jätka: Range",
   "setup.level.continueCustom": "Jätka: Kohandatud",
-  "setup.level.customPending": "Jätkamiseks vali üks ülaltoodud vastustest."
+  "setup.level.customPending": "Jätkamiseks vali üks ülaltoodud vastustest.",
+  "setup.map.whyBody": "{provider} pakub tänava-, hoone- ja kohanimesid. Kui liigutad kaarti, taotleb rakendus ekraanil olevat ala hõlmavaid kaardilõike, nii et {provider} saab teada, milliseid alasid vaatad. Detailkaardid kasutavad rohkem andmeid kui lihtkaardid, sõltuvalt sellest, kui palju sa ringi liigud. Juba vaadatud kaardilõigud säilitatakse mõnda aega selle brauseri vahemälus.",
+  "setup.map.legend": "Kaart",
+  "setup.map.minimal": "Minimaalne kaart",
+  "setup.map.minimalLine": "Võrguühenduseta režiim. Midagi ei saadeta.",
+  "setup.map.detailed": "Üksikasjalik kaart",
+  "setup.map.detailedLine": "Tänavad ja nimed; saadab vaadatud piirkonnad teenusepakkujale {provider}.",
+  "setup.map.strictLine": "Kaart: minimaalne, töötab võrguühenduseta. „Range” hoiab kaardi selles seadmes.",
+  "setup.map.why": "Miks kaardi valik on oluline"
 }

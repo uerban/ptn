@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Jatka: Suositeltava",
   "setup.level.continueStrict": "Jatka: Tiukka",
   "setup.level.continueCustom": "Jatka: Mukautettu",
-  "setup.level.customPending": "Valitse yksi yllä olevista vastauksista jatkaaksesi."
+  "setup.level.customPending": "Valitse yksi yllä olevista vastauksista jatkaaksesi.",
+  "setup.map.whyBody": "{provider} toimittaa katu-, rakennus- ja paikkanimiä. Kun siirrät karttaa, sovellus pyytää näytöllä näkyvän alueen karttapalasia, jolloin {provider} oppii, mitä alueita katsot. Yksityiskohtaiset kartat kuluttavat enemmän dataa kuin yksinkertaistettu kartta, riippuen siitä, kuinka paljon liikut kartalla. Jo katsomasi karttapalasi säilytetään jonkin aikaa tämän selaimen välimuistissa.",
+  "setup.map.legend": "Kartta",
+  "setup.map.minimal": "Minimaalinen kartta",
+  "setup.map.minimalLine": "Ilman verkkoa. Mitään ei lähetetä.",
+  "setup.map.detailed": "Yksityiskohtainen kartta",
+  "setup.map.detailedLine": "Kadut ja nimet; lähettää katsomasi alueet palveluntarjoajalle {provider}.",
+  "setup.map.strictLine": "Kartta: minimaalinen, toimii ilman verkkoa. Tiukka pitää kartan tällä laitteella.",
+  "setup.map.why": "Miksi kartan valinta on tärkeää"
 }

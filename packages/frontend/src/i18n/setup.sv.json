@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Fortsätt: Rekommenderat",
   "setup.level.continueStrict": "Fortsätt: Strikt",
   "setup.level.continueCustom": "Fortsätt: Anpassad",
-  "setup.level.customPending": "Välj ett svar ovan för att fortsätta."
+  "setup.level.customPending": "Välj ett svar ovan för att fortsätta.",
+  "setup.map.whyBody": "{provider} tillhandahåller gatunamn, byggnadsnamn och platsnamn. När du flyttar kartan hämtar den kartdelarna för det område som visas på skärmen, så att {provider} lär sig vilka områden du tittar på. Detaljerade kartor använder mer data än den minimala kartan, beroende på hur mycket du rör dig runt. Kartdelar som du har sett sparas i webbläsarens cache ett tag.",
+  "setup.map.legend": "Karta",
+  "setup.map.minimal": "Minimal karta",
+  "setup.map.minimalLine": "Offline. Ingenting skickas.",
+  "setup.map.detailed": "Detaljerad karta",
+  "setup.map.detailedLine": "Gator och namn; skickar de områden du visar till {provider}.",
+  "setup.map.strictLine": "Karta: minimal, fungerar offline. Strikt behåller kartan på den här enheten.",
+  "setup.map.why": "Varför valet av karta är viktigt"
 }

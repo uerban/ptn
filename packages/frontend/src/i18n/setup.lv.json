@@ -69,5 +69,13 @@
   "setup.level.continueRecommended": "Turpināt: Ieteicams",
   "setup.level.continueStrict": "Turpināt: Stingri",
   "setup.level.continueCustom": "Turpināt: Pielāgots",
-  "setup.level.customPending": "Lai turpinātu, izvēlieties vienu no augstāk minētajām atbildēm."
+  "setup.level.customPending": "Lai turpinātu, izvēlieties vienu no augstāk minētajām atbildēm.",
+  "setup.map.whyBody": "{provider} nodrošina ielu, ēku un vietu nosaukumus. Kad jūs pārvietojat karti, tiek pieprasīti kartes fragmenti par ekrānā redzamo apgabalu, tādējādi {provider} uzzina, kurus apgabalus jūs apskatāt. Detalizētās kartes patērē vairāk datu nekā minimālā karte, atkarībā no tā, cik daudz jūs pārvietojaties. Fragmenti, kurus esat redzējuši, uz laiku tiek saglabāti šīs pārlūkas kešatmiņā.",
+  "setup.map.legend": "Karte",
+  "setup.map.minimal": "Minimāla karte",
+  "setup.map.minimalLine": "Bezsaistē. Nekas netiek nosūtīts.",
+  "setup.map.detailed": "Detalizēta karte",
+  "setup.map.detailedLine": "Ielas un nosaukumi; nosūta apskatītās teritorijas uz {provider}.",
+  "setup.map.strictLine": "Karte: minimāla, darbojas bezsaistē. “Stingri” atstāj karti šajā ierīcē.",
+  "setup.map.why": "Kāpēc kartes izvēle ir svarīga"
 }
