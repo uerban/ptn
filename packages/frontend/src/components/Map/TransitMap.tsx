@@ -13,6 +13,7 @@ import {
 import maplibregl from "../../map/maplibre.ts";
 import { StopFade } from "./stopFade.ts";
 import { LocateControl } from "./LocateControl.ts";
+import { CompassControl } from "./CompassControl.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { createRoot } from "react-dom/client";
 import type { StopWithLines, LatLon, LabelAnchor } from "@pt/shared";
@@ -864,6 +865,10 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         typeof localStorage !== "undefined" ? localStorage : undefined,
       );
 
+      map.addControl(
+        new CompassControl((key, fallback) => translateRef.current(key, fallback)),
+        "bottom-right"
+      );
       map.addControl(
         new maplibregl.NavigationControl({ showCompass: false }),
         "bottom-right"

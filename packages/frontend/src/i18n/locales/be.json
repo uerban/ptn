@@ -641,5 +641,6 @@
   "arriveBy.in_15": "Праз 15 хв",
   "arriveBy.in_30": "Праз 30 хвілін",
   "arriveBy.in_60": "Праз 1 гадзіну",
-  "arriveBy.pick_time": "Выберыце час"
+  "arriveBy.pick_time": "Выберыце час",
+  "map.compass_reset": "Павярнуць карту на поўнач"
 }

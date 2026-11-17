@@ -638,5 +638,6 @@
   "arriveBy.in_15": "Через 15 хв",
   "arriveBy.in_30": "Через 30 хв",
   "arriveBy.in_60": "Через 1 годину",
-  "arriveBy.pick_time": "Вибрати час"
+  "arriveBy.pick_time": "Вибрати час",
+  "map.compass_reset": "Повернути карту на північ"
 }

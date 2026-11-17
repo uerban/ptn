@@ -624,5 +624,6 @@
   "arriveBy.in_15": "Om 15 min",
   "arriveBy.in_30": "Om 30 min",
   "arriveBy.in_60": "Om 1 timme",
-  "arriveBy.pick_time": "Välj tid"
+  "arriveBy.pick_time": "Välj tid",
+  "map.compass_reset": "Vänd kartan mot norr"
 }
