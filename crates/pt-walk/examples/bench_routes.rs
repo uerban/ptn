@@ -64,6 +64,9 @@ static ALLOC: Counting = Counting;
 // because cities differ in size: one absolute budget either fails the big
 // cities or says nothing about the small ones. Measured at PTWG v2 (B/point):
 // heap 26.8-27.8, peak 33.8-35.6, brotli 4.90-5.23.
+// These are retained city-graph gates, not topology-independent guarantees.
+// Report junction/interior counts and graph/grid bytes to diagnose a failure;
+// do not relax a gate to make a synthetic topology pass.
 //
 // The peak covers the file buffer, which is live during decode. Decode is
 // two-pass (count, then fill exactly sized arrays) to keep that peak down;
@@ -145,8 +148,8 @@ fn main() {
     times.sort_by(f64::total_cmp);
     let pct = |p: f64| times[((times.len() as f64 - 1.0) * p).round() as usize];
     println!(
-        "{{\"city\":\"{}\",\"nodes\":{},\"edges\":{},\"junctions\":{},\"chains\":{},\"raw_bytes\":{},\"brotli_bytes\":{},\"decode_ms\":{:.1},\"index_ms\":{:.1},\"heap_bytes\":{},\"live_alloc_bytes\":{},\"peak_alloc_bytes\":{},\"routes\":{},\"found\":{},\"p50_ms\":{:.3},\"p95_ms\":{:.3},\"max_ms\":{:.3}}}",
-        g.meta().city_id, g.point_count(), g.segment_count(), g.junction_count(), g.chain_count(), raw_bytes,
+        "{{\"city\":\"{}\",\"nodes\":{},\"edges\":{},\"junctions\":{},\"chains\":{},\"interior_points\":{},\"graph_heap_bytes\":{},\"grid_heap_bytes\":{},\"raw_bytes\":{},\"brotli_bytes\":{},\"decode_ms\":{:.1},\"index_ms\":{:.1},\"heap_bytes\":{},\"live_alloc_bytes\":{},\"peak_alloc_bytes\":{},\"routes\":{},\"found\":{},\"p50_ms\":{:.3},\"p95_ms\":{:.3},\"max_ms\":{:.3}}}",
+        g.meta().city_id, g.point_count(), g.segment_count(), g.junction_count(), g.chain_count(), g.interior_count(), g.heap_bytes(), index.heap_bytes() - g.heap_bytes(), raw_bytes,
         br_bytes.map_or("null".to_string(), |b| b.to_string()),
         decode_ms, index_ms, index.heap_bytes(), live_alloc, peak_alloc,
         times.len(), found, pct(0.5), pct(0.95), pct(1.0)
