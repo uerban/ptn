@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import sqlite3
 import os
@@ -164,6 +165,72 @@ sys.stdin.read()
         job = self.ledger.claim(token, 0, 0)
         with self.assertRaisesRegex(ValueError, 'must match'):
             self.ledger.complete(job['token'], 'success', {'completion': 'timeout'})
+
+    def test_backoff_is_durable_exponential_and_does_not_starve_fresh_jobs(self):
+        config = plan()
+        config['limits'].update({'retryBackoffMs': 100, 'maxAttemptsPerJob': 3})
+        path = Path(self.directory.name) / 'backoff.sqlite'
+        pilot.create_ledger(path, config)
+        ledger = pilot.Ledger(path)
+        try:
+            worker = ledger.acquire('worker', 0, 10000)
+            failed = ledger.claim(worker, 0, 0)
+            ledger.complete(failed['token'], 'error', {'completion': 'error'}, recorded_at_ms=10)
+            fresh = ledger.claim(worker, 20, 0)
+            self.assertNotEqual(fresh['jobId'], failed['jobId'])
+            ledger.complete(fresh['token'], 'success', {'completion': 'success'}, recorded_at_ms=21)
+            ledger.release(worker)
+            ledger.close()
+            ledger = pilot.Ledger(path)
+            worker = ledger.acquire('resumed', 100, 10000)
+            before = ledger.records()
+            self.assertEqual(ledger.claim(worker, 109, 0), {'state': 'retry-backoff', 'retryAtMs': 110, 'retryAfterMs': 1})
+            self.assertEqual(ledger.records(), before)
+            retry = ledger.claim(worker, 110, 0)
+            self.assertEqual(retry['attempt'], 2)
+            ledger.complete(retry['token'], 'timeout', {'completion': 'timeout'}, recorded_at_ms=120)
+            self.assertEqual(ledger.claim(worker, 319, 0)['retryAtMs'], 320)
+            final = ledger.claim(worker, 320, 0)
+            self.assertEqual(final['attempt'], 3)
+            ledger.complete(final['token'], 'error', {'completion': 'error'}, recorded_at_ms=330)
+            self.assertEqual(ledger.claim(worker, 330, 0)['state'], 'finished')
+            self.assertEqual(len(ledger.records()), 4)
+        finally:
+            ledger.close()
+
+    def test_abandoned_attempt_backoff_uses_recorded_observation_without_fake_completion(self):
+        config = plan()
+        config['limits']['retryBackoffMs'] = 100
+        path = Path(self.directory.name) / 'abandoned-backoff.sqlite'
+        pilot.create_ledger(path, config)
+        ledger = pilot.Ledger(path)
+        try:
+            old = ledger.acquire('old', 0, 10)
+            first = ledger.claim(old, 0, 0)
+            new = ledger.acquire('new', 10, 10000)
+            fresh = ledger.claim(new, 100, 0)
+            self.assertNotEqual(first['jobId'], fresh['jobId'])
+            evidence = json.loads(ledger.records()[0]['result'])
+            self.assertEqual(evidence['observedAtMs'], 100)
+            self.assertNotIn('recordedAtMs', evidence)
+            ledger.complete(fresh['token'], 'success', {'completion': 'success'}, recorded_at_ms=101)
+            self.assertEqual(ledger.claim(new, 199, 0)['retryAtMs'], 200)
+            self.assertEqual(ledger.claim(new, 200, 0)['attempt'], 2)
+        finally:
+            ledger.close()
+
+    def test_backoff_caps_and_optional_legacy_policy_are_explicit(self):
+        attempt = {'number': 1, 'expires_ms': 100}
+        result = {'completion': 'error', 'recordedAtMs': 10}
+        self.assertIsNone(pilot.retry_not_before(attempt, result, {}))
+        self.assertEqual(pilot.retry_not_before(attempt, result, {'retryBackoffMs': 40000}), 40010)
+        self.assertEqual(pilot.retry_not_before({**attempt, 'number': 2}, result, {'retryBackoffMs': 40000}), 60010)
+        self.assertEqual(pilot.retry_not_before({**attempt, 'number': 1000000000}, result, {'retryBackoffMs': 1}), 60010)
+        for value in (-1, True, 1.5, 60001):
+            invalid = plan()
+            invalid['limits']['retryBackoffMs'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                pilot.validate_plan(invalid)
 
 
 if __name__ == '__main__':

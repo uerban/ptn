@@ -58,6 +58,8 @@ def runtime(node):
 def settings_check(plan):
     if plan['settings'] != {'objective': 'plan', 'patternMode': 'covering-merge', 'glueExecution': 'snapshot', 'iterations': 2, 'warmup': 0}:
         raise ValueError('Pilot initially supports exact repeated plan captures with snapshot glue only')
+    if 'retryBackoffMs' in plan['limits'] and plan['limits']['retryBackoffMs'] < 1:
+        raise ValueError('New runner pilots require a positive retryBackoffMs')
     size = plan['limits'].get('attemptFileBytes')
     if type(size) is not int or not 65536 <= size <= 16 * 1024 * 1024:
         raise ValueError('attemptFileBytes must be between 64 KiB and 16 MiB')
@@ -83,6 +85,7 @@ def initialize(root, source_store, source_run_id, plan, node='node'):
         values[f'runner:{name}'] = (SOURCE / name).read_bytes()
     execution, _ = runtime(node)
     frozen = json.loads(canonical(plan))
+    frozen['limits'].setdefault('retryBackoffMs', 1000)
     frozen['artifacts'] = {name: sha(data) for name, data in values.items()}
     frozen['execution'] = execution
     spec = json.loads(values['producerRebuildSpec']) if 'producerRebuildSpec' in values else None

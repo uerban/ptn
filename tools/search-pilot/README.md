@@ -26,8 +26,8 @@ completion cannot overwrite that observation.
 The ledger enforces at most 50 materialized jobs and three attempts per job,
 with conservative execution-time reservations including finalization grace.
 The ledger alone does not enforce a planner deadline or inspect retained files.
-The runner implements those boundaries below. Automatic retry backoff and a representative stratified corpus remain
-separate work. Read-only reporting is described below. No
+The runner implements those boundaries below. A representative stratified corpus remains separate work. Retry scheduling is
+described below. Read-only reporting is described below. No
 city-scale acceptance follows from ledger tests.
 
 ```sh
@@ -134,3 +134,27 @@ Reports retain the partial reproducibility classification. They do not certify
 network isolation, authenticate a producer with signatures, replay the engine
 or upload data. Exports are private by default and may contain identifying
 sampling labels or error paths; sharing remains an explicit separate action.
+
+## Durable retry scheduling
+
+New runner pilots default to `limits.retryBackoffMs: 1000`. An explicit value
+must be between 1 and 60,000 milliseconds. After a failed, timed-out or cancelled
+attempt, the delay doubles with the attempt number, capped at 60 seconds. The
+anchor is when the ledger recorded the result, not the query's departure clock
+or an invented engine completion time. An abandoned attempt uses its recorded
+expiry observation. Older ledger records without a timestamp use their declared
+attempt deadline as a conservative fallback.
+
+A deferred retry does not block a fresh eligible job. When only deferred jobs
+remain, `step` returns `retry-backoff`, `retryAtMs` and `retryAfterMs`, without
+sleeping, reserving another attempt or starting another capture. Reopen/resume
+uses the same persisted timestamps and policy. Backoff wait is outside the
+execution-time reservation; retries still obey their original count and
+execution limits. No automatic background loop is introduced.
+
+Version 1 manifests predating this field retain their original immediate-retry
+policy when the field is absent or zero. New runner initialization requires a
+positive policy; it never rewrites an old manifest. Existing execution runtime
+pins still apply. Old ledgers remain readable by the report, which distinguishes
+`retry-backoff` from `retryable` using the same policy function as the scheduler.
+Raw failed attempts remain visible after a later successful retry.

@@ -31,7 +31,7 @@ class PilotRunnerTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
-    def initialize(self, body='return [];', timeout=1000, storage=64 * 1024 * 1024):
+    def initialize(self, body='return [];', timeout=1000, storage=64 * 1024 * 1024, backoff=None):
         # Controlled glue exercises the real supervisor/capture contract, not
         # GTFS routing correctness. Real-feed execution is separate evidence.
         values = {'ptb': b'fixture', 'wasm': b'fixture-wasm', 'glue': (
@@ -48,6 +48,8 @@ class PilotRunnerTests(unittest.TestCase):
                            'maxStorageBytes': storage, 'attemptFileBytes': 65536},
                 'jobs': [{'query': {'entryStops': [{'stopId': 'A', 'walkSecs': 0}], 'exitStops': [{'stopId': 'B', 'walkSecs': 0}],
                                     'date': '20261113', 'departureSecs': 0}, 'stratum': 'fixture', 'partition': 'synthetic'}]}
+        if backoff is not None:
+            plan['limits']['retryBackoffMs'] = backoff
         return runner.initialize(self.root, self.source, 'test', plan)
 
     def records(self):
@@ -74,7 +76,7 @@ class PilotRunnerTests(unittest.TestCase):
         for body, expected in [('throw new Error("fixture failure");', 'error'), ('while(true){}', 'timeout')]:
             with self.subTest(expected=expected):
                 self.root = self.base / expected
-                self.initialize(body, timeout=1000 if expected == 'error' else 500)
+                self.initialize(body, timeout=1000 if expected == 'error' else 500, backoff=1)
                 first = runner.run_step(self.root)
                 self.assertEqual(first['completion'], expected)
                 self.assertIsNone(first['candidateCount'])
@@ -120,6 +122,25 @@ class PilotRunnerTests(unittest.TestCase):
         self.initialize(storage=2 * 1024 * 1024)
         self.assertEqual(runner.run_step(self.root)['state'], 'storage-budget-exhausted')
         self.assertEqual(self.records(), [])
+
+    def test_failed_capture_backoff_returns_without_consuming_another_attempt(self):
+        plan = self.initialize('throw new Error("controlled failure");', backoff=60000)
+        first = runner.run_step(self.root)
+        self.assertEqual(first['completion'], 'error')
+        before = self.records()
+        waiting = runner.run_step(self.root)
+        self.assertEqual(waiting['state'], 'retry-backoff')
+        self.assertGreater(waiting['retryAfterMs'], 0)
+        self.assertLessEqual(waiting['retryAfterMs'], 60000)
+        self.assertEqual(self.records(), before)
+        self.assertEqual(plan['limits']['retryBackoffMs'], 60000)
+
+    def test_new_pilots_default_to_backoff_and_reject_explicit_zero(self):
+        with self.assertRaisesRegex(ValueError, 'positive retryBackoffMs'):
+            self.initialize(backoff=0)
+        self.assertFalse(self.root.exists())
+        plan = self.initialize()
+        self.assertEqual(plan['limits']['retryBackoffMs'], 1000)
 
     def test_per_file_limit_leaves_failure_evidence_instead_of_empty_success(self):
         self.initialize('console.log("x".repeat(100000)); return [];')

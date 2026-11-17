@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import time
 import uuid
 from contextlib import contextmanager
 
@@ -38,6 +39,8 @@ def validate_plan(plan):
                            ('maxStorageBytes', 1024 * 1024 * 1024)]:
         if type(limits.get(field)) is not int or not 1 <= limits[field] <= maximum:
             raise ValueError(f'Invalid pilot limit: {field}')
+    if 'retryBackoffMs' in limits and (type(limits['retryBackoffMs']) is not int or not 0 <= limits['retryBackoffMs'] <= 60000):
+        raise ValueError('Invalid pilot limit: retryBackoffMs')
     jobs = plan.get('jobs')
     if not isinstance(jobs, list) or not jobs or len(jobs) > limits['maxJobs']:
         raise ValueError('Empty corpus or job budget exceeded')
@@ -53,6 +56,18 @@ def validate_plan(plan):
         ids.add(identity)
     canonical(plan)
     return plan
+
+
+def retry_not_before(attempt, evidence, limits):
+    """Optional v1 field: absent/zero preserves original ledger semantics."""
+    base = limits.get('retryBackoffMs', 0)
+    if not base or not evidence or evidence.get('completion') == 'success':
+        return None
+    delay = min(60000, base * 2 ** min(16, max(0, attempt['number'] - 1)))
+    anchor = evidence.get('recordedAtMs', evidence.get('observedAtMs', attempt['expires_ms']))
+    if type(anchor) is not int or anchor < 0:
+        anchor = attempt['expires_ms']
+    return anchor + delay
 
 
 def create_ledger(path, plan):
@@ -151,11 +166,19 @@ class Ledger:
                 self.db.execute('INSERT INTO results VALUES (?,?,?)', (attempt['token'], 'abandoned', canonical({
                     'completion': 'abandoned', 'reason': 'attempt lease expired without a recorded ledger result', 'observedAtMs': now_ms})))
             reserved = self.db.execute('SELECT COALESCE(SUM(reservation_ms),0) FROM attempts').fetchone()[0]
+            deferred = []
             for job in self.db.execute('SELECT * FROM jobs ORDER BY ordinal').fetchall():
                 success = self.db.execute("SELECT 1 FROM attempts a JOIN results r USING(token) WHERE a.job_id=? AND r.completion='success'", (job['id'],)).fetchone()
                 count = self.db.execute('SELECT COUNT(*) FROM attempts WHERE job_id=?', (job['id'],)).fetchone()[0]
                 if success or count >= limits['maxAttemptsPerJob']:
                     continue
+                if count:
+                    last = self.db.execute('''SELECT a.*,r.data FROM attempts a JOIN results r USING(token)
+                        WHERE a.job_id=? ORDER BY a.number DESC LIMIT 1''', (job['id'],)).fetchone()
+                    ready = retry_not_before(last, json.loads(last['data']), limits)
+                    if ready is not None and ready > now_ms:
+                        deferred.append(ready)
+                        continue
                 if admission_state:
                     return {'state': admission_state}
                 reservation = limits['attemptTimeoutMs'] + grace_ms
@@ -166,16 +189,22 @@ class Ledger:
                                 (token, job['id'], count + 1, now_ms, now_ms + reservation, reservation))
                 return {'state': 'claimed', 'token': token, 'jobId': job['id'], 'attempt': count + 1,
                         'expiresAtMs': now_ms + reservation, 'job': json.loads(job['data'])}
+            if deferred:
+                return {'state': 'retry-backoff', 'retryAtMs': min(deferred), 'retryAfterMs': min(deferred) - now_ms}
             return {'state': 'finished'}
 
-    def complete(self, attempt_token, completion, evidence):
+    def complete(self, attempt_token, completion, evidence, recorded_at_ms=None):
         if completion not in ('success', 'error', 'timeout', 'cancelled'):
             raise ValueError('Unknown attempt completion')
         if not isinstance(evidence, dict) or evidence.get('completion') != completion:
             raise ValueError('Evidence completion must match its recorded outcome')
         # The runner must provide capture references. The ledger preserves
         # their declared status; it does not certify engine equivalence.
-        self.db.execute('INSERT INTO results VALUES (?,?,?)', (attempt_token, completion, canonical(evidence)))
+        recorded = time.time_ns() // 1000000 if recorded_at_ms is None else recorded_at_ms
+        if type(recorded) is not int or recorded < 0:
+            raise ValueError('Invalid ledger recording time')
+        self.db.execute('INSERT INTO results VALUES (?,?,?)',
+                        (attempt_token, completion, canonical({**evidence, 'recordedAtMs': recorded})))
 
     def records(self):
         return [dict(row) for row in self.db.execute('''SELECT a.*,r.completion,r.data AS result

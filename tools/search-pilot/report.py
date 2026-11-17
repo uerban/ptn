@@ -9,7 +9,7 @@ import sqlite3
 
 import ledger as ledger_contract
 import runner as capture_inspector
-from ledger import canonical, fingerprint, validate_plan
+from ledger import canonical, fingerprint, retry_not_before, validate_plan
 from runner import artifact, capture_result, now_ms, sha, storage_bytes
 
 
@@ -153,12 +153,13 @@ def build_report(root, observed_at_ms=None):
         except (ValueError, OSError, KeyError, TypeError, IndexError, AttributeError) as error:
             issues.append(f'capture inspection: {error}')
         verified = completion == 'success' and captured is not None and not issues and not snapshot_issues
+        ready = retry_not_before(record, evidence, plan['limits']) if completion and record['number'] < plan['limits']['maxAttemptsPerJob'] else None
         state = completion or ('expired-pending' if record['expires_ms'] <= observed else 'pending')
         by_job[record['job_id']].append({'token': record['token'], 'number': record['number'], 'state': state,
             'verifiedCapture': verified, 'candidateCount': captured['candidateCount'] if verified else None,
             'recoveryCaptureAvailable': completion is None and captured is not None,
             'lateCaptureAvailable': completion == 'abandoned' and captured is not None,
-            'elapsedMs': duration if finite(duration) and duration >= 0 else None,
+            'elapsedMs': duration if finite(duration) and duration >= 0 else None, 'retryAtMs': ready,
             'evidenceIssues': issues, 'candidateDiagnostics': diagnostics,
             'captureManifestSha256': captured['captureManifestSha256'] if captured else None})
     job_rows, coverage = [], defaultdict(lambda: Counter())
@@ -174,6 +175,8 @@ def build_report(root, observed_at_ms=None):
             status = 'evidence-invalid'
         elif len(attempts) >= plan['limits']['maxAttemptsPerJob']:
             status = 'attempts-exhausted'
+        elif attempts and attempts[-1]['retryAtMs'] is not None and attempts[-1]['retryAtMs'] > observed:
+            status = 'retry-backoff'
         else:
             status = 'retryable' if attempts else 'not-started'
         for dimension, value in [('partition', job['partition']), ('stratum', job['stratum']),
@@ -203,7 +206,7 @@ def build_report(root, observed_at_ms=None):
         'cost': {'knownAttemptElapsedMsTotal': round(sum(elapsed), 3), 'attemptsWithUnknownElapsed': unknown_elapsed,
                  'executionReservationMs': sum(record['reservation_ms'] for record in records),
                  'retainedBytesBeforeReportExport': storage_bytes(root), 'limits': plan['limits'],
-                 'excludes': ['initialization and verification overhead', 'operator wait time', 'unknown interrupted attempt time']},
+                 'excludes': ['initialization and verification overhead', 'operator wait time', 'retry backoff wait', 'unknown interrupted attempt time']},
         'coverage': [{'dimension': dimension, 'value': value, 'jobCounts': dict(counts)} for (dimension, value), counts in sorted(coverage.items())],
         'samplingRepresentativeness': 'not established; manifest partitions and strata are declarations',
         'candidateDiagnostics': {'version': 1, 'candidatesInspected': len(findings),

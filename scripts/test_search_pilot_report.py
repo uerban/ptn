@@ -56,6 +56,7 @@ class PilotReportTests(unittest.TestCase):
         third['query']['departureSecs'] = 100
         plan['jobs'] = [first, second, third]
         plan['limits']['maxJobs'] = 3
+        plan['limits']['retryBackoffMs'] = 0  # Explicit legacy schedule for this outcome fixture.
         root = self.fixture.base / 'mixed'
         root.mkdir()
         shutil.copytree(self.fixture.root / 'artifacts', root / 'artifacts')
@@ -98,6 +99,28 @@ class PilotReportTests(unittest.TestCase):
         self.assertEqual(recovered['jobCounts'], {'verified-empty': 1})
         self.assertEqual(recovered['cost']['attemptsWithUnknownElapsed'], 1)
         self.assertEqual(recovered['cost']['knownAttemptElapsedMsTotal'], 0)
+
+    def test_retry_eligibility_uses_the_same_policy_without_claiming_an_attempt(self):
+        plan = self.fixture.initialize()
+        plan['limits']['retryBackoffMs'] = 100
+        root = self.fixture.base / 'backoff-report'
+        root.mkdir()
+        shutil.copytree(self.fixture.root / 'artifacts', root / 'artifacts')
+        fixtures.runner.create_ledger(root / 'pilot.sqlite', plan)
+        ledger = fixtures.runner.Ledger(root / 'pilot.sqlite')
+        try:
+            worker = ledger.acquire('worker', 0, 10000)
+            claim = ledger.claim(worker, 0, 0)
+            ledger.complete(claim['token'], 'error', {'completion': 'error'}, recorded_at_ms=10)
+        finally:
+            ledger.close()
+        before = (root / 'pilot.sqlite').read_bytes()
+        waiting = report.build_report(root, 109)
+        self.assertEqual(waiting['jobCounts'], {'retry-backoff': 1})
+        self.assertEqual(waiting['attemptCounts'], {'error': 1})
+        self.assertEqual(waiting['jobs'][0]['attempts'][0]['retryAtMs'], 110)
+        self.assertEqual(report.build_report(root, 110)['jobCounts'], {'retryable': 1})
+        self.assertEqual((root / 'pilot.sqlite').read_bytes(), before)
 
     def test_missing_changed_or_corrupt_evidence_cannot_count_as_verified_success(self):
         self.fixture.initialize()
