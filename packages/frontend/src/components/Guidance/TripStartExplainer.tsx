@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Itinerary } from "@pt/shared";
 import { usePresentationText } from "../../i18n/presentationStrings.ts";
 import {
@@ -93,6 +93,16 @@ export function useTripStart(
 ): TripStart {
   const [open, setOpen] = useState<{ itinerary: Itinerary; prompts: TripStartPrompts } | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const restoreFocusRef = useRef(false);
+
+  // Restore after React removes the dialog and finishes commit-time focus
+  // handling. Focusing inside the click callback can be undone by that commit.
+  useLayoutEffect(() => {
+    if (!open && restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      openerRef.current?.focus();
+    }
+  }, [open]);
 
   const start = useCallback(
     (itinerary: Itinerary) => {
@@ -120,8 +130,8 @@ export function useTripStart(
   }, [open, start]);
 
   const cancel = useCallback(() => {
+    restoreFocusRef.current = true;
     setOpen(null);
-    openerRef.current?.focus();
   }, []);
 
   return {

@@ -132,6 +132,26 @@ describe("useTripStart", () => {
     expect(screen.getByTestId("trip-start-notifications")).toBeTruthy();
   });
 
+  it.each(["Cancel", "Escape"])("returns focus after the dialog is removed on %s", async action => {
+    render(<Harness onStarted={vi.fn()} pending={async () => ({ location: true, notifications: false })} />);
+    const opener = screen.getByText("choose");
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByTestId("trip-start-explainer");
+    const originalFocus = opener.focus.bind(opener);
+    const dialogPresentAtRestore: boolean[] = [];
+    const focus = vi.spyOn(opener, "focus").mockImplementation(() => {
+      dialogPresentAtRestore.push(screen.queryByTestId("trip-start-explainer") !== null);
+      originalFocus();
+    });
+    try {
+      if (action === "Cancel") fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      else act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+      expect(dialogPresentAtRestore).toEqual([false]);
+      expect(document.activeElement).toBe(opener);
+    } finally { focus.mockRestore(); }
+  });
+
   it("Cancel and Escape start nothing and return focus to the choice", async () => {
     const onStarted = vi.fn();
     render(<Harness onStarted={onStarted} pending={async () => ({ location: true, notifications: false })} />);
