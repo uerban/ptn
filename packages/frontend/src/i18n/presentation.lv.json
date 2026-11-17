@@ -8,6 +8,7 @@
   "presentation.switchToText": "Pāriet uz teksta režīmu",
   "presentation.showMap": "Rādīt karti",
   "presentation.backToText": "Atgriezties pie teksta",
+  "presentation.switchToMap": "Pāriet uz kartes režīmu",
   "presentation.mapDisclosureHeading": "Rādīt karti?",
   "presentation.mapDisclosureBody": "Kartes faili tiek lejupielādēti vienreiz no šīs lietotnes servera un saglabāti šajā ierīcē, tādējādi karte vēlāk darbojas arī bezsaistē. Sākuma skats paliek teksta režīmā.",
   "presentation.mapDisclosureConfirm": "Lejupielādēt un parādīt karti",

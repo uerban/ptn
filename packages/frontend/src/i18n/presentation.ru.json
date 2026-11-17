@@ -8,6 +8,7 @@
   "presentation.switchToText": "Перейти в текстовый режим",
   "presentation.showMap": "Показать карту",
   "presentation.backToText": "Вернуться к тексту",
+  "presentation.switchToMap": "Переключиться в режим карты",
   "presentation.mapDisclosureHeading": "Показать карту?",
   "presentation.mapDisclosureBody": "Файлы карт загружаются один раз с сервера этого приложения и сохраняются на данном устройстве, поэтому карта впоследствии работает офлайн. Начальный вид остается в текстовом режиме.",
   "presentation.mapDisclosureConfirm": "Загрузить и отобразить карту",

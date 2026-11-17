@@ -63,12 +63,14 @@ import {
 export interface HomePageProps {
   /** Set when the map is a temporary view opened from Text mode. */
   onBackToText?: () => void;
+  /** Set with `onBackToText`: makes Map mode the starting view. */
+  onSwitchToMap?: () => void;
   /** The stop Text mode was showing: the map opens centred on it, with its
    * departures. */
   contextStop?: Stop | null;
 }
 
-export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
+export function HomePage({ onBackToText, onSwitchToMap, contextStop }: HomePageProps = {}) {
   const navigate = useNavigate();
 
   // The same foreground position feeds the map, nearby stops, and guidance.
@@ -412,7 +414,7 @@ export function HomePage({ onBackToText, contextStop }: HomePageProps = {}) {
         <div className="flex min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0">
           <BikeShareToggle />
           <ModeToggle />
-          <TextModeButton onBackToText={onBackToText} />
+          <TextModeButton onBackToText={onBackToText} onSwitchToMap={onSwitchToMap} />
         </div>
       </MapObstacle>
 

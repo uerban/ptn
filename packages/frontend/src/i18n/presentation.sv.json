@@ -8,6 +8,7 @@
   "presentation.switchToText": "Växla till textläge",
   "presentation.showMap": "Visa karta",
   "presentation.backToText": "Tillbaka till texten",
+  "presentation.switchToMap": "Växla till kartläge",
   "presentation.mapDisclosureHeading": "Visa en karta?",
   "presentation.mapDisclosureBody": "Kartfilerna laddas ner en gång från appens server och sparas på enheten, så att kartan även fungerar offline senare. Startvyn förblir i textläge.",
   "presentation.mapDisclosureConfirm": "Ladda ner och visa karta",
