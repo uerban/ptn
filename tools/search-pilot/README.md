@@ -26,7 +26,8 @@ completion cannot overwrite that observation.
 The ledger enforces at most 50 materialized jobs and three attempts per job,
 with conservative execution-time reservations including finalization grace.
 The ledger alone does not enforce a planner deadline or inspect retained files.
-The runner implements those boundaries below. A representative stratified corpus remains separate work. Retry scheduling is
+The runner implements those boundaries below. Sampling of a bounded declared stop population is described below; representative
+city coverage remains unestablished. Retry scheduling is
 described below. Read-only reporting is described below. No
 city-scale acceptance follows from ledger tests.
 
@@ -158,3 +159,48 @@ positive policy; it never rewrites an old manifest. Existing execution runtime
 pins still apply. Old ledgers remain readable by the report, which distinguishes
 `retry-backoff` from `retryable` using the same policy function as the scheduler.
 Raw failed attempts remain visible after a later successful retry.
+
+## Materialize a bounded stop-level corpus
+
+`pt-core-emit stop-universe <bundle.ptb>` exports the compiled stop IDs and exact
+E7 coordinates through the existing reader. It hashes the observed PTB bytes,
+builds no routing index and does not expand the timetable. Retain the JSON and
+extractor executable/source provenance alongside the original capture.
+
+The sampler consumes retained artifacts named `samplingStopUniverse`,
+`samplingSpec`, `samplingGeneratorSource` and `samplingGeneratorLedger` in a
+successful immutable source run. The last two must match the sampler and ledger
+source files. Attach them using the existing content-addressed baseline store
+APIs; the sampler itself never edits the store.
+
+```sh
+python3 tools/search-pilot/sample.py <capture-store> <source-run-id> <new-plan.json>
+```
+
+The sampling spec uses format `ptn-search-sampling-spec`, version 1, and declares
+`seed`, `timezone`, finite `bounds` (`south`, `west`, `north`, `east`), optional
+`reportedTupleIndices`, the runner `settings`/`limits`, and explicit `strata`.
+Each stratum has a unique `id`, valid `date` (`YYYYMMDD`), `departureSecs`, engine
+`mobilityProfile`, `maxRounds` within 1–4, and integer `random`/`holdout` counts.
+At least one random and one holdout query are required across the corpus. The
+entire plan stays within 50 jobs and its declared lower job cap.
+
+Population rows are validated before selection; malformed/duplicate IDs or E7
+coordinates fail. Generated origins/destinations are distinct compiled stops
+inside the rectangle, with zero endpoint walking. Retained controls are preserved
+separately and may fall outside the generated population. Date/time/mobility
+strata are supplied explicitly, not inferred from the current clock.
+
+The versioned SHA-256 counter stream uses rejection for bounded integer draws,
+then rank selection without replacement. It never materializes the full stop
+Cartesian product. Exact controls and previously drawn queries are excluded.
+Holdouts are exact-query-disjoint, not geographically disjoint or a demand
+holdout. Sampling is uniform over eligible ordered distinct stop pairs within
+each declared stratum, not uniform over geography, residents or rider demand.
+Changing holdout counts does not reshuffle ordinary random queries.
+
+The output records the input/spec/population hashes, rectangle, stratum counts,
+algorithm version and Python version. Identical retained inputs/runtime produce
+identical plans. Over-capacity quotas fail instead of truncating. This does not
+establish door-to-door access, physical pedestrian connectivity, complete city
+coverage or journey usefulness. Those remain separate evaluations.

@@ -33,6 +33,7 @@
 
 mod bench;
 mod gen_fixtures;
+mod stop_universe;
 
 use std::io::Read;
 use std::num::NonZeroU32;
@@ -76,6 +77,7 @@ fn main() -> ExitCode {
         Some("pattern-routes-at-stop") => cmd_pattern_routes_at_stop(&args[2..]),
         Some("pattern-stats") => cmd_pattern_stats(&args[2..]),
         Some("band-stats") => cmd_band_stats(&args[2..]),
+        Some("stop-universe") => stop_universe::run(&args[2..]),
         _ => {
             eprintln!(
                 concat!(
@@ -97,6 +99,7 @@ fn main() -> ExitCode {
                     "    bench-trip-portfolio: [--setup-profile off|phases] adds diagnostic setup markers with --owner-lifecycle fresh; profiler-on times are not latency qualification; [--owner-binding recompute|retained] opts into immutable owner digests for ordinary owned-session shared/fresh winner queries\n",
                     "  pt-core-emit pattern-routes-at-stop <ptb-path> [--pattern-mode off|unbounded|covering-merge]\n",
                     "  pt-core-emit pattern-stats <ptb-path>\n",
+                    "  pt-core-emit stop-universe <ptb-path>\n",
                     "  pt-core-emit band-stats <ptb-path>"
                 )
             );
