@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4qKTdBeTmsHl2OrD6OTM/Oi6Mje8KodC/P/lFjI7do4='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>PTN journey review</title>
+<style>
+:root{font:16px/1.5 system-ui,sans-serif;color:#172235;background:#f3f5f8;color-scheme:light}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:1320px;margin:auto;padding:24px}h1{margin:0;font-size:1.8rem}h2{font-size:1.2rem;margin:0 0 12px}h3{font-size:1rem}p{margin:8px 0}header{margin-bottom:20px}.muted,small{color:#536174}.toolbar,.navigation,.context{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.panel,.candidate{background:white;border:1px solid #d6dde7;border-radius:12px;padding:18px;margin:14px 0}.toolbar label{min-width:170px}label{display:block;font-weight:600}input,select,textarea,button{font:inherit}input,select,textarea{display:block;max-width:100%;padding:7px;border:1px solid #9ba9bc;border-radius:5px;background:white;color:inherit}textarea{width:100%;min-height:90px}button{cursor:pointer;padding:8px 14px;border:1px solid #8b9ab0;border-radius:6px;background:#fff;color:inherit}button.primary{background:#235edf;border-color:#235edf;color:white}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #f2b600;outline-offset:2px}#status{min-height:1.5em;padding:8px 0}#status.error{color:#a02020;font-weight:600}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:16px}.candidate{margin:0}.timeline{padding-left:20px;list-style:circle}.timeline li{border-left:3px solid #235edf;margin:12px 0;padding-left:12px;overflow-wrap:anywhere}.timeline li.walk{border-color:#218546}.metric{font-variant-numeric:tabular-nums}.reasons{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0}.reasons label{font-weight:400}.reasons input{display:inline}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,monospace;background:#f3f5f8;padding:12px}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.history li{margin:10px 0;overflow-wrap:anywhere}.badge{background:#edf2ff;color:#183b80;border-radius:4px;padding:2px 7px}#workspace[hidden]{display:none}.review-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.review-grid .panel{margin-top:0}fieldset{border:0;padding:0;margin:0}legend{font-weight:600;margin-bottom:8px}@media(max-width:800px){main{padding:14px}.review-grid{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar label{flex:1}button{min-height:44px}}@media(prefers-color-scheme:dark){:root{color:#e5ebf4;background:#101723;color-scheme:dark}.panel,.candidate,input,select,textarea,button{background:#192333;color:inherit;border-color:#50627a}.muted,small{color:#b0bdd0}pre{background:#101723}.badge{background:#243c65;color:#d3e0ff}#status.error{color:#ffb1a8}}
+</style>
+<main>
+<header><h1>Journey review</h1><p class="muted">Local, offline review. No accounts, uploads or external maps.</p></header>
+<div class="toolbar panel">
+<label>Import journey bundle<input id="bundle-file" class="mutable" type="file" accept=".json,application/json"></label>
+<label>Import review actions<input id="actions-file" class="mutable" type="file" accept=".json,application/json" disabled></label>
+<button id="export" class="mutable" disabled>Export reviews</button><button id="markdown" class="mutable" disabled>Export Markdown</button>
+</div>
+<p id="status" role="status" aria-live="polite">Import a bundle to begin. Saved progress stays in this browser.</p>
+<section id="workspace" hidden>
+<div class="toolbar panel"><label>Reviewer identifier<input id="reviewer" class="mutable" maxlength="200" placeholder="Your name or alias"></label><button id="start" class="mutable">Start / resume reviewer</button><p id="session-status"></p></div>
+<nav class="navigation" aria-label="Query navigation"><button id="previous" class="mutable">Previous query</button><label>Query<select id="case" class="mutable"></select></label><button id="next" class="mutable">Next query</button><span id="progress"></span></nav>
+<section class="panel"><h2 id="query-title"></h2><p id="query-summary" class="metric"></p><p id="limits" class="muted"></p><details><summary>Query constraints and settings</summary><pre id="query-settings"></pre></details><details id="provenance"><summary>Reveal provenance</summary><pre id="provenance-data"></pre></details></section>
+<div id="candidates" class="candidates"></div>
+<div class="review-grid">
+<form id="review-form" class="panel"><h2>Record an opinion</h2><p class="muted">Draft fields are saved locally. Only Save judgment or Skip commits a review action.</p>
+<fieldset id="judgment-fields"><div class="context"><label>Review mode<select id="mode"><option value="judge">Single option</option><option value="compare">Compare a pair</option></select></label><label id="target-label">Option<select id="target"></select></label><label id="pair-label" hidden>Pair<select id="pair"></select></label><label>Judgment<select id="verdict"></select></label></div>
+<div class="context"><label>Confidence<select id="confidence"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label><label>Area familiarity<select id="familiarity"><option value="unknown">Unspecified</option><option value="visitor">Visitor</option><option value="local">Local knowledge</option></select></label></div>
+<fieldset><legend>Reasons (optional)</legend><div id="reasons" class="reasons"></div></fieldset><label>Notes<textarea id="notes" maxlength="10000"></textarea></label>
+</fieldset><div class="toolbar"><button id="save" class="primary mutable" type="submit">Save judgment</button><button id="skip" class="mutable" type="button">Skip query</button><button id="undo" class="mutable" type="button">Undo last action</button></div>
+<p><small>Keyboard: Alt+Left/Right changes query; Ctrl/⌘+Enter saves; Ctrl/⌘+Z outside a text field undoes the last action.</small></p></form>
+<section class="panel"><h2>Saved opinions</h2><p class="muted">Each reviewer’s opinion is kept separately. These are subjective judgments, not correctness results.</p><ol id="history" class="history"></ol></section>
+</div></section>
+</main><script type="module">const contract=(()=>{// Portable contract shared by the local exporter and browser reviewer.
+function canonical(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  }
+  throw new Error("Review data must contain only finite JSON values");
+}
+async function fingerprint(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(canonical(value))));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2,"0")).join("");
+}
+const fail = message => { throw new Error(`Invalid review bundle: ${message}`); };
+const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const strings = value => Array.isArray(value) && value.every(item => typeof item === "string");
+
+async function validateReviewBundle(bundle) {
+  if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
+      || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
+  const p = bundle.provenance;
+  if (!p || !digest(p.snapshotId) || !digest(p.runManifestSha256)
+      || !["controlled snapshot","partial capture"].includes(p.classification)
+      || typeof p.replayVerification !== "string"
+      || !strings(p.missingDependencies) || !strings(p.unsupported)) fail("missing provenance");
+  if (!p.artifacts || !Object.values(p.artifacts).every(digest)
+      || !["ptb","queryTuples","glue","wasm"].every(name => digest(p.artifacts[name]))) fail("missing artifact hashes");
+  if (!["node","v8","platform","arch","release"].every(name => typeof p.runtime?.[name] === "string" && p.runtime[name].trim())) fail("missing runtime");
+  const s = p.settings;
+  if (s?.patternMode !== "covering-merge" || !["plan","r3","m4"].includes(s.objective)) fail("unsupported planning settings");
+  if (s.objective === "plan" ? s.windowStart !== null || s.windowEnd !== null
+      : !Number.isSafeInteger(s.windowStart) || s.windowStart < 0 || !Number.isSafeInteger(s.windowEnd) || s.windowEnd <= s.windowStart) fail("invalid planning window");
+  if (p.snapshotId !== await fingerprint({artifacts:p.artifacts,runtime:p.runtime,settings:p.settings})) fail("snapshot identity mismatch");
+  if (!Array.isArray(bundle.cases)) fail("missing cases");
+  for (const [index, row] of bundle.cases.entries()) {
+    if (!row || !row.query || typeof row.query !== "object" || Array.isArray(row.query)
+        || !Array.isArray(row.candidates) || row.capture?.boundary !== "stop-level engine"
+        || row.capture.equivalence !== "exact" || typeof row.capture.truncated !== "boolean") fail("invalid case");
+    if (row.id !== await fingerprint({snapshotId:p.snapshotId,query:row.query,index})) fail("case identity mismatch");
+    for (const candidate of row.candidates) {
+      if (!candidate?.itinerary || !Array.isArray(candidate.itinerary.legs)) fail("invalid itinerary");
+      if (candidate.id !== await fingerprint({caseId:row.id,itinerary:candidate.itinerary})) fail("candidate identity mismatch");
+    }
+  }
+  const {bundleId,...content} = bundle;
+  if (!digest(bundleId) || bundleId !== await fingerprint(content)) fail("bundle identity mismatch");
+  return bundle;
+}
+
+return {canonical,fingerprint,validateReviewBundle};})();
+const state=(()=>{const {canonical,fingerprint,validateReviewBundle}=contract;
+const VERDICTS = ["would-take","acceptable","feels-off","would-avoid","cannot-judge"];
+const CHOICES = ["A","B","equivalent","neither","cannot-judge"];
+const REASONS = ["walking-away-back","unnecessary-loop","excessive-walk","awkward-crossing","fragile-connection","long-wait","confusing-boarding","safety-accessibility","other"];
+const fail = message => {throw new Error(`Invalid review actions: ${message}`);};
+const same = (a,b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+const text = (value,max) => typeof value === "string" && value.length <= max;
+const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const keys = (object,names) => object && typeof object === "object" && !Array.isArray(object)
+  && Object.keys(object).length === names.length && names.every(name=>Object.hasOwn(object,name));
+
+async function assignmentsFor(bundle,seed) {
+  const assignments=[];
+  for(const row of bundle.cases) {
+    const scored=await Promise.all(row.candidates.map(async(candidate,index)=>({
+      id:candidate.id,index,score:await fingerprint({seed,caseId:row.id,candidateId:candidate.id,index}),
+    })));
+    scored.sort((a,b)=>(a.score<b.score?-1:a.score>b.score?1:0)||a.index-b.index);
+    assignments.push({caseId:row.id,candidateIds:scored.map(candidate=>candidate.id)});
+  }
+  return assignments;
+}
+
+async function createReviewSession(bundle,reviewerId,seed=crypto.randomUUID()) {
+  await validateReviewBundle(bundle);
+  if (!text(reviewerId,200) || !reviewerId.trim() || !text(seed,200) || !seed.trim()) fail("reviewer and seed required");
+  return {id:await fingerprint({bundleId:bundle.bundleId,reviewerId,seed}),reviewerId,seed,
+    assignments:await assignmentsFor(bundle,seed),actions:[]};
+}
+
+function validateAction(action,row,previous) {
+  if (!digest(action.id) || !text(action.at,40) || !Number.isFinite(Date.parse(action.at))) fail("invalid action identity or time");
+  if (action.kind === "undo") {
+    if (!keys(action,["id","kind","at","targetActionId"])) fail("invalid undo fields");
+    const target=previous.find(item=>item.id===action.targetActionId);
+    if (!target || target.kind === "undo" || previous.some(item=>item.kind==="undo"&&item.targetActionId===target.id)) fail("undo target missing or already undone");
+    return;
+  }
+  if (!row) fail("stale or unknown case");
+  if (action.kind === "skip") {
+    if (!keys(action,["id","kind","at","caseId"])) fail("invalid skip fields");
+    return;
+  }
+  const common=["id","kind","at","caseId","confidence","familiarity","reasons","notes"];
+  if (!["low","medium","high"].includes(action.confidence)
+      || !["unknown","visitor","local"].includes(action.familiarity)
+      || !Array.isArray(action.reasons) || !action.reasons.every(reason=>REASONS.includes(reason))
+      || new Set(action.reasons).size!==action.reasons.length || !text(action.notes,10000)) fail("invalid judgment context");
+  const candidates=new Set(row.candidates.map(candidate=>candidate.id));
+  if (action.kind === "judge") {
+    if (!keys(action,[...common,"candidateId","verdict"]) || !candidates.has(action.candidateId)
+        || !VERDICTS.includes(action.verdict)) fail("stale candidate or invalid judgment");
+  } else if (action.kind === "compare") {
+    if (!keys(action,[...common,"candidateIds","choice"]) || !Array.isArray(action.candidateIds)
+        || action.candidateIds.length!==2 || action.candidateIds[0]===action.candidateIds[1]
+        || !action.candidateIds.every(id=>candidates.has(id)) || !CHOICES.includes(action.choice)) fail("stale pair or invalid choice");
+  } else fail("unsupported action kind");
+}
+
+async function validateSession(session,bundle) {
+  if (!keys(session,["id","reviewerId","seed","assignments","actions"])
+      || !text(session.reviewerId,200) || !session.reviewerId.trim()
+      || !text(session.seed,200) || !session.seed.trim() || !Array.isArray(session.actions)) fail("invalid session");
+  if (session.id !== await fingerprint({bundleId:bundle.bundleId,reviewerId:session.reviewerId,seed:session.seed})) fail("stale session identity");
+  if (!same(session.assignments,await assignmentsFor(bundle,session.seed))) fail("blind assignment changed");
+  const rows=new Map(bundle.cases.map(row=>[row.id,row]));
+  const previous=[];
+  for(const [index,action] of session.actions.entries()) {
+    validateAction(action,rows.get(action.caseId),previous);
+    const {id,...content}=action;
+    if (id!==await fingerprint({sessionId:session.id,index,action:content})) fail("action identity mismatch");
+    if (action.kind === "compare") {
+      const order=session.assignments.find(item=>item.caseId===action.caseId).candidateIds;
+      if (order.indexOf(action.candidateIds[0])>=order.indexOf(action.candidateIds[1])) fail("pair does not match blind order");
+    }
+    previous.push(action);
+  }
+  return session;
+}
+
+async function appendReviewAction(bundle,session,input,at=new Date().toISOString()) {
+  await validateReviewBundle(bundle);
+  await validateSession(session,bundle);
+  // Clone data so later form edits cannot mutate a committed action.
+  const content=canonical({...input,at});
+  const action={...content,id:await fingerprint({sessionId:session.id,index:session.actions.length,action:content})};
+  const next={...structuredClone(session),actions:[...structuredClone(session.actions),action]};
+  await validateSession(next,bundle);
+  return next;
+}
+
+function effectiveReviewActions(session) {
+  const undone=new Set(session.actions.filter(action=>action.kind==="undo").map(action=>action.targetActionId));
+  return session.actions.filter(action=>action.kind!=="undo"&&!undone.has(action.id));
+}
+
+async function reviewActionsFile(bundle,sessions) {
+  const file={format:"ptn-search-review-actions",version:1,bundleId:bundle.bundleId,sessions:structuredClone(sessions)};
+  return validateReviewActions(file,bundle);
+}
+
+async function validateReviewActions(file,bundle) {
+  await validateReviewBundle(bundle);
+  if (!keys(file,["format","version","bundleId","sessions"]) || file.format!=="ptn-search-review-actions"
+      || file.version!==1 || file.bundleId!==bundle.bundleId || !Array.isArray(file.sessions)) fail("unsupported or stale bundle");
+  const ids=new Set();
+  for(const session of file.sessions) {
+    await validateSession(session,bundle);
+    if(ids.has(session.id)) fail("duplicate session");
+    ids.add(session.id);
+  }
+  return file;
+}
+
+/** Idempotent import; independent reviewers stay separate. A fork of one
+ * session must be resolved explicitly, never by replacing an opinion. */
+async function mergeReviewActions(left,right,bundle) {
+  await validateReviewActions(left,bundle);
+  await validateReviewActions(right,bundle);
+  const sessions=structuredClone(left.sessions);
+  for(const incoming of right.sessions) {
+    const index=sessions.findIndex(session=>session.id===incoming.id);
+    if(index<0) {sessions.push(structuredClone(incoming));continue;}
+    const existing=sessions[index];
+    const common=Math.min(existing.actions.length,incoming.actions.length);
+    if(!same(existing.actions.slice(0,common),incoming.actions.slice(0,common))) fail("conflicting session branches; neither was overwritten");
+    if(incoming.actions.length>existing.actions.length) sessions[index]=structuredClone(incoming);
+  }
+  return reviewActionsFile(bundle,sessions);
+}
+
+return {VERDICTS,CHOICES,REASONS,createReviewSession,appendReviewAction,effectiveReviewActions,reviewActionsFile,validateReviewActions,mergeReviewActions};})();
+(()=>{const {validateReviewBundle}=contract;const {VERDICTS,CHOICES,REASONS,createReviewSession,appendReviewAction,effectiveReviewActions,reviewActionsFile,validateReviewActions,mergeReviewActions}=state;
+const $=id=>document.getElementById(id);
+const LAST="ptn-search-review-last-v1",key=id=>`ptn-search-review-v1:${id}`;
+let model={bundle:null,actions:null,activeId:null,index:0,drafts:{}},diskValue=null,busy=false,pairs=[];
+const session=()=>model.actions?.sessions.find(item=>item.id===model.activeId);
+const row=()=>model.bundle?.cases[model.index];
+const label=index=>index<0?"Unshown option":`Option ${index+1}`;
+const readable=value=>String(value).replaceAll("-"," ");
+const element=(tag,text)=>{const node=document.createElement(tag);node.textContent=text;return node;};
+const tell=(message,error=false)=>{$("status").textContent=message;$("status").classList.toggle("error",error);};
+const clock=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.abs(seconds);return `${seconds<0?"−":""}${String(Math.floor(value/3600)).padStart(2,"0")}:${String(Math.floor(value%3600/60)).padStart(2,"0")}:${String(Math.floor(value%60)).padStart(2,"0")}`;};
+const minutes=seconds=>{if(!Number.isFinite(seconds))return "Unknown";const value=Math.ceil(seconds),mins=Math.floor(value/60),secs=value%60;return mins?`${mins} min${secs?` ${secs} s`:""}`:`${secs} s`;};
+
+function persist() {
+  try {
+    const storageKey=key(model.bundle.bundleId);
+    if(localStorage.getItem(storageKey)!==diskValue) throw new Error("Progress changed in another tab. Reload to recover it; export this tab’s reviews first.");
+    const next=JSON.stringify(model);
+    localStorage.setItem(storageKey,next);diskValue=next;localStorage.setItem(LAST,model.bundle.bundleId);
+    return true;
+  } catch(error) {tell(`Progress is in memory only. Export reviews before closing. ${error.message}`,true);return false;}
+}
+async function perform(work) {
+  if(busy)return;
+  busy=true;updateDisabled();
+  try {await work();}catch(error){tell(error.message,true);}
+  finally{busy=false;updateDisabled();}
+}
+function updateDisabled() {
+  const loaded=!!model.bundle,active=!!session(),hasCandidates=!!row()?.candidates.length;
+  for(const node of document.querySelectorAll(".mutable")) node.disabled=busy;
+  for(const id of ["actions-file","export","markdown","previous","next","start","case"]) $(id).disabled=busy||!loaded;
+  $("previous").disabled||=model.index===0;$("next").disabled||=model.index>=((model.bundle?.cases.length??0)-1);
+  $("judgment-fields").disabled=busy||!active||!hasCandidates;
+  $("save").disabled=busy||!active||!hasCandidates||($("mode").value==="compare"&&pairs.length===0);
+  $("skip").disabled=busy||!active||!row();
+  $("undo").disabled=busy||!active||!effectiveReviewActions(session()).length;
+}
+function options(select,values,selected) {
+  select.replaceChildren();
+  for(const [value,text] of values) {const option=element("option",text);option.value=value;select.append(option);}
+  if(values.some(([value])=>value===selected))select.value=selected;
+}
+function candidateOrder() {
+  const current=row();if(!current)return [];
+  const ids=session()?.assignments.find(item=>item.caseId===current.id)?.candidateIds;
+  // Without a reviewer no source order is exposed; starting creates a blind order.
+  return ids?.map(id=>current.candidates.find(candidate=>candidate.id===id))??[];
+}
+function drawCandidates(ordered) {
+  $("candidates").replaceChildren();
+  if(!row())return;
+  if(!row().candidates.length){$("candidates").append(element("p","No captured candidates for this query. You may record an explicit skip."));return;}
+  if(!session()){$("candidates").append(element("p","Start a reviewer session to show the alternatives in blind order."));return;}
+  for(const [index,candidate] of ordered.entries()) {
+    const card=element("article","");card.className="candidate";card.dataset.candidateId=candidate.id;
+    card.append(element("h2",label(index)));
+    const itinerary=candidate.itinerary,legs=itinerary.legs;
+    const access=row().query.entryStops?.find(stop=>stop.stopId===legs[0]?.fromStopId)?.walkSecs;
+    const egress=row().query.exitStops?.find(stop=>stop.stopId===legs.at(-1)?.toStopId)?.walkSecs;
+    const total=Number.isFinite(egress)?itinerary.alightSecs+egress-row().query.departureSecs:NaN;
+    card.append(element("p",`Arrival ${clock(Number.isFinite(egress)?itinerary.alightSecs+egress:NaN)} · Full duration ${minutes(total)} · Transfers ${itinerary.transfers??"Unknown"}`));
+    const transferWalk=legs.filter(leg=>leg.type==="walk").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
+    const riding=legs.filter(leg=>leg.type==="transit").reduce((sum,leg)=>sum+leg.arriveSecs-leg.departSecs,0);
+    const walking=access+egress+transferWalk,waiting=total-riding-walking;
+    card.append(element("p",`Walking ${minutes(walking)} · Waiting ${minutes(waiting)} · Access ${minutes(access)} · Egress ${minutes(egress)}`));
+    card.append(element("small","Total walking distance unavailable at this boundary"));
+    const timeline=element("ol","");timeline.className="timeline";
+    for(const leg of legs) {
+      const item=element("li","");if(leg.type==="walk")item.className="walk";
+      item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
+      item.append(element("p",`${leg.fromStopId??"Unknown stop"} → ${leg.toStopId??"Unknown stop"}`));
+      item.append(element("p",`${clock(leg.departSecs)}–${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+      if(leg.type==="walk") item.append(element("small",Number.isFinite(leg.distanceMeters)?`${leg.distanceMeters} m`:"Physical distance unknown"));
+      else item.append(element("small",`Stop occurrences ${leg.boardStopIdx??"?"} → ${leg.alightStopIdx??"?"}`));
+      timeline.append(item);
+    }
+    card.append(timeline);$("candidates").append(card);
+  }
+}
+function renderForm(ordered) {
+  const draft=model.drafts[row()?.id]??{};
+  $("mode").value=draft.mode==="compare"?"compare":"judge";
+  options($("target"),ordered.map((candidate,index)=>[candidate.id,label(index)]),draft.target);
+  pairs=[];
+  for(let a=0;a<ordered.length;a++)for(let b=a+1;b<ordered.length;b++)if(ordered[a].id!==ordered[b].id)
+    pairs.push({id:`${a}:${b}`,candidateIds:[ordered[a].id,ordered[b].id],a:label(a),b:label(b)});
+  options($("pair"),pairs.map(pair=>[pair.id,`${pair.a} vs ${pair.b}`]),draft.pair);
+  renderVerdicts(draft.verdict);
+  $("confidence").value=["low","medium","high"].includes(draft.confidence)?draft.confidence:"medium";
+  $("familiarity").value=["unknown","visitor","local"].includes(draft.familiarity)?draft.familiarity:"unknown";
+  $("notes").value=typeof draft.notes==="string"?draft.notes:"";
+  for(const box of $("reasons").querySelectorAll("input"))box.checked=draft.reasons?.includes(box.value)??false;
+}
+function renderVerdicts(selected) {
+  const compare=$("mode").value==="compare",pair=pairs.find(pair=>pair.id===$("pair").value);
+  $("target-label").hidden=compare;$("pair-label").hidden=!compare;
+  options($("verdict"),(compare?CHOICES:VERDICTS).map(value=>[value,value==="A"?`Prefer ${pair?.a??"first option"}`:value==="B"?`Prefer ${pair?.b??"second option"}`:readable(value)]),selected??"cannot-judge");
+}
+function render() {
+  $("workspace").hidden=!model.bundle;if(!model.bundle)return;
+  options($("case"),model.bundle.cases.map((_,index)=>[String(index),`Query ${index+1}`]),String(model.index));
+  const current=row(),active=session();
+  $("session-status").textContent=active?`Reviewing as ${active.reviewerId}. Blind order saved.`:"No reviewer selected.";
+  if(active)$("reviewer").value=active.reviewerId;
+  $("query-title").textContent=current?`Query ${model.index+1} of ${model.bundle.cases.length}`:"Bundle has no queries";
+  $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
+  $("limits").textContent=`Stop-level schematic; no pedestrian geometry or applied real-time composition. ${current?.capture.truncated?"Capture is truncated; additional candidates may exist.":"Shows the complete captured candidate array, not proof of all possible journeys."}`;
+  $("query-settings").textContent=JSON.stringify({query:current?.query??{},settings:model.bundle.provenance.settings},null,2);
+  $("provenance-data").textContent=JSON.stringify(model.bundle.provenance,null,2);
+  const ordered=candidateOrder();drawCandidates(ordered);renderForm(ordered);
+  $("history").replaceChildren();
+  let count=0;
+  for(const owner of model.actions.sessions)for(const action of effectiveReviewActions(owner)) {
+    count++;
+    const targets=action.candidateIds??(action.candidateId?[action.candidateId]:[]);
+    const targetText=targets.map(id=>label(ordered.findIndex(candidate=>candidate.id===id))).join(" vs ");
+    const verdict=action.choice==="A"?`prefer ${label(ordered.findIndex(candidate=>candidate.id===targets[0]))}`:action.choice==="B"?`prefer ${label(ordered.findIndex(candidate=>candidate.id===targets[1]))}`:readable(action.verdict??action.choice??action.kind);
+    if(action.caseId===current?.id)$("history").append(element("li",`${owner.reviewerId}: ${targetText?targetText+" · ":""}${verdict}${action.confidence?` · ${action.confidence} confidence · ${action.familiarity}`:""}${action.reasons?.length?` · ${action.reasons.map(readable).join(", ")}`:""}${action.notes?` — ${action.notes}`:""}`));
+  }
+  $("progress").textContent=`${count} active explicit actions across ${model.actions.sessions.length} reviewer sessions`;
+  updateDisabled();
+}
+function draft() {
+  if(!row())return;
+  model.drafts[row().id]={mode:$("mode").value,target:$("target").value,pair:$("pair").value,verdict:$("verdict").value,
+    confidence:$("confidence").value,familiarity:$("familiarity").value,notes:$("notes").value,
+    reasons:[...$("reasons").querySelectorAll("input:checked")].map(input=>input.value)};
+  persist();
+}
+async function commit(input) {
+  if(!session())throw new Error("Start a reviewer session first.");
+  const next=await appendReviewAction(model.bundle,session(),input);
+  model.actions.sessions=model.actions.sessions.map(item=>item.id===next.id?next:item);
+  delete model.drafts[row()?.id];render();if(persist())tell("Review action saved locally.");
+}
+async function saveJudgment() {
+  const input={kind:$("mode").value,caseId:row().id,confidence:$("confidence").value,familiarity:$("familiarity").value,
+    notes:$("notes").value,reasons:[...$("reasons").querySelectorAll("input:checked")].map(input=>input.value)};
+  if(input.kind==="compare") {input.candidateIds=pairs.find(pair=>pair.id===$("pair").value)?.candidateIds;input.choice=$("verdict").value;}
+  else {input.candidateId=$("target").value;input.verdict=$("verdict").value;}
+  await commit(input);
+}
+async function undo() {
+  const last=session()&&effectiveReviewActions(session()).at(-1);if(!last)return;
+  await commit({kind:"undo",targetActionId:last.id});
+}
+function move(index) {
+  if(busy||!model.bundle)return;
+  model.index=Math.max(0,Math.min(model.bundle.cases.length-1,index));render();persist();
+}
+async function readJson(file) {
+  if(!file||file.size>10*1024*1024)throw new Error("Import requires a JSON file no larger than 10 MiB.");
+  return JSON.parse(await file.text());
+}
+async function load(bundle) {
+  await validateReviewBundle(bundle);
+  if(bundle.cases.length>1000||bundle.cases.some(item=>item.candidates.length>200)||bundle.cases.reduce((sum,item)=>sum+item.candidates.length,0)>5000)
+    throw new Error("This local viewer supports up to 1,000 queries, 200 options per query and 5,000 options total. Nothing was truncated.");
+  let saved=null;try{saved=localStorage.getItem(key(bundle.bundleId));}catch{/* Memory-only operation remains available. */}
+  let next={bundle,actions:await reviewActionsFile(bundle,[]),activeId:null,index:0,drafts:{}};
+  if(saved) {
+    const stored=JSON.parse(saved);await validateReviewBundle(stored.bundle);await validateReviewActions(stored.actions,bundle);
+    if(stored.bundle.bundleId!==bundle.bundleId)throw new Error("Saved bundle identity mismatch.");
+    next={...next,actions:stored.actions,activeId:stored.activeId,index:Math.max(0,Math.min(bundle.cases.length-1,Number.isSafeInteger(stored.index)?stored.index:0)),drafts:stored.drafts??{}};
+  }
+  model=next;diskValue=saved;$("provenance").open=false;render();
+  if(persist())tell(saved?"Saved bundle, blind order, reviews and drafts restored locally.":"Bundle imported. Start a reviewer session to begin.");
+}
+function download(name,text,type="application/json") {
+  const url=URL.createObjectURL(new Blob([text],{type})),link=document.createElement("a");link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function markdown() {
+  const escape=value=>String(value).replace(/[\\`*_{}[\]()#+.!<>|~-]/g,"\\$&");
+  const lines=["# Journey review opinions","",`Bundle: ${model.bundle.bundleId}`,"","Subjective opinions; not correctness verdicts. Undo history is retained in the JSON export.",""];
+  for(const owner of model.actions.sessions)for(const action of effectiveReviewActions(owner)) {
+    lines.push(`- ${escape(owner.reviewerId)} · ${escape(action.verdict??action.choice??action.kind)} · case ${action.caseId}`);
+    const targets=action.candidateIds??(action.candidateId?[action.candidateId]:[]);
+    if(targets.length)lines.push(`  Candidates (A/B order for pairs): ${targets.join(", ")}`);
+    if(action.notes)lines.push(`  ${escape(action.notes).replaceAll("\n","\n  ")}`);
+  }
+  return lines.join("\n")+"\n";
+}
+for(const reason of REASONS) {
+  const label=element("label",""),box=document.createElement("input");box.type="checkbox";box.value=reason;label.append(box,document.createTextNode(` ${readable(reason)}`));$("reasons").append(label);
+}
+$("bundle-file").onchange=event=>{const file=event.target.files[0];event.target.value="";perform(async()=>load(await readJson(file)));};
+$("actions-file").onchange=event=>{const file=event.target.files[0];event.target.value="";perform(async()=>{
+  model.actions=await mergeReviewActions(model.actions,await readJson(file),model.bundle);render();if(persist())tell("Review actions imported; separate opinions preserved.");
+});};
+$("start").onclick=()=>perform(async()=>{
+  const reviewerId=$("reviewer").value.trim();if(!reviewerId)throw new Error("Enter a reviewer name or alias.");
+  let active=model.actions.sessions.find(item=>item.reviewerId===reviewerId);
+  if(!active){active=await createReviewSession(model.bundle,reviewerId);model.actions.sessions.push(active);}
+  model.activeId=active.id;render();if(persist())tell("Reviewer ready; blind order saved locally.");
+});
+$("review-form").onsubmit=event=>{event.preventDefault();perform(saveJudgment);};
+$("skip").onclick=()=>perform(()=>commit({kind:"skip",caseId:row().id}));
+$("undo").onclick=()=>perform(undo);
+$("previous").onclick=()=>move(model.index-1);$("next").onclick=()=>move(model.index+1);$("case").onchange=()=>move(Number($("case").value));
+$("mode").onchange=()=>{renderVerdicts();draft();updateDisabled();};$("pair").onchange=()=>{renderVerdicts();draft();};
+for(const id of ["target","verdict","confidence","familiarity","reasons","notes"])$(id).addEventListener("input",draft);
+$("export").onclick=()=>perform(async()=>download("journey-review-actions.json",JSON.stringify(await reviewActionsFile(model.bundle,model.actions.sessions),null,2)+"\n"));
+$("markdown").onclick=()=>download("journey-review-opinions.md",markdown(),"text/markdown");
+document.addEventListener("keydown",event=>{
+  if(event.altKey&&["ArrowLeft","ArrowRight"].includes(event.key)){event.preventDefault();move(model.index+(event.key==="ArrowLeft"?-1:1));}
+  if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&!$("save").disabled){event.preventDefault();perform(saveJudgment);}
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z"&&!event.target.matches("input,textarea,[contenteditable=true]")){event.preventDefault();perform(undo);}
+});
+perform(async()=>{
+  let id;try{id=localStorage.getItem(LAST);}catch{return;}
+  if(id){const saved=localStorage.getItem(key(id));if(saved)await load(JSON.parse(saved).bundle);}
+});
+
+})();</script>
+</html>

@@ -22,7 +22,7 @@ pedestrian geometry and applied real-time composition are outside this scope.
 The bundle carries the capture's missing dependencies and unsupported fields.
 It contains no map tiles or external map references.
 
-`contract.mjs` is a portable validation module for the exporter and a future
+`contract.mjs` is a portable validation module for the exporter and the
 local browser reviewer. SHA-256 identities bind the snapshot, query occurrence,
 full candidate fields and ordered bundle contents. Object property order is
 ignored; array order and unknown candidate fields are retained. These hashes
@@ -60,3 +60,47 @@ the interactive reviewer are separate consumers of this format.
 ```sh
 node --test crates/pt-wasm/tests/baseline_review_state.test.mjs
 ```
+
+## Open the reviewer
+
+Open `index.html` directly in Chromium, then import a bundle and enter a
+reviewer name or alias. The file includes its scripts and styles; it needs no
+server, installation, map service or internet connection. Provenance is hidden
+until requested. Alternatives use a retained randomized order, rather than
+engine result order.
+
+The page shows a stop sequence and exact service-day times (including hours
+above 24), access/egress, waiting and transfers. It declares missing physical
+walking totals and geometry. This is a schematic of the captured boundary, not
+an inferred geographic route. Query constraints and settings are available
+alongside the alternatives.
+
+Draft fields and committed actions are saved separately in browser storage,
+keyed by bundle identity. Export reviews to transfer committed actions between
+browsers or recover them before moving the HTML file or clearing browser data.
+Imports preserve independent opinions. Conflicting tabs or unavailable storage
+leave in-memory reviews exportable and display a recovery message.
+
+Use single-option judgments or pair comparisons. Save judgment commits an
+opinion; Skip commits a separate action; Undo appends an undo event. JSON exports
+retain the action history and blind assignments. Markdown exports contain the
+active opinions and candidate references. Drafts are excluded from both.
+
+Keyboard shortcuts are shown on the page. Imported text is rendered as text,
+never HTML. A content security policy blocks external resources. Imports larger
+than 10 MiB, 1,000 queries, 200 candidates per query or 5,000 total candidates
+are rejected rather than silently truncated. These bounds are viewer limits,
+not city-scale performance acceptance.
+
+Rebuild the self-contained file after editing its sources:
+
+```sh
+node tools/search-review/build.mjs
+node tools/search-review/build.mjs --check
+node --test tools/search-review/browser.test.mjs
+```
+
+The browser tests use the frontend's existing Playwright installation and
+installed Chromium. They cover actual offline reload, drafts, stable blind
+order, explicit actions, undo, export/reimport, neutral/disagreeing opinions,
+stale imports, safe text, storage failure and concurrent-tab recovery.

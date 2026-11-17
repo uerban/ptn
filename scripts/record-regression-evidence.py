@@ -13,7 +13,7 @@ BASELINE = Path(__file__).resolve().parent / 'regression' / 'baseline.json'
 NOTABLE_PERCENT = 15
 NOTABLE_FLOOR = {'ms': 20, 'MB': 5}
 
-REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')
+REQUIRED = ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch', 'reviewer')
 LABELS = {
     'identity': 'Exact source revision',
     'build': 'Browser bindings and native reference build',
@@ -23,6 +23,7 @@ LABELS = {
     'index': 'Index-build p99 budget',
     'bundle': 'Browser bundle size',
     'browser': 'Chromium installation',
+    'reviewer': 'Local reviewer offline workflow',
     'measurement': 'Browser measurement hooks build',
     'heap': 'Browser JS heap budget',
     'coldstart': 'WASM cold-start p95 budgets',

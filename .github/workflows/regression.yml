@@ -104,6 +104,14 @@ jobs:
         id: browser
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm --filter @pt/frontend exec playwright install --with-deps chromium
+      - name: Local reviewer offline workflow
+        id: reviewer
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        env:
+          REVIEW_SCREENSHOTS: ${{ github.workspace }}/source/evidence/reviewer
+        run: |
+          set -o pipefail
+          node --test tools/search-review/browser.test.mjs 2>&1 | tee evidence/reviewer-browser.log
       - name: Build browser measurement hooks
         id: measurement
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
