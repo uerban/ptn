@@ -211,3 +211,39 @@ entries without receipt stamps are not reconstructed. Upstream GTFS-RT,
 polling/consent/network scheduling, original provenance and unobserved fields
 remain outside scope. RT may coexist with planner/walking attachments. Nothing
 uploads data or enables capture for normal product searches.
+
+## Read-only captured-output comparison
+
+```sh
+node tools/search-finalization/cli.mjs diff <before-store> <before-id> <after-store> <after-id>
+```
+
+Diff verifies every declared artifact/provenance link without executing retained
+modules or requiring the current machine to match the old replay host. Recorded
+runtimes must match each other. It reuses the baseline normalizer and field/multiset
+diff: only object-key order is ignored. All candidate fields, array ordering and
+duplicate counts remain visible. It never rewrites/promotes runs or assigns a
+usefulness verdict. Replay verification is explicitly not evaluated by diff.
+
+Comparability follows the declared boundary. Pure finalization pins composed
+inputs; composition pins raw planner input; reach pins coordinates/stops/options
+and lookup transcripts. Pipeline pins root query/reach inputs/settings and the
+captured clock. Without supplied state it requires matching provider observations.
+With supplied state it instead pins PTB/transfer/pattern data, decoded graph/city/
+profile, or RT envelope history/receipt times; executable module/WASM versions may
+differ and are reported separately. Floor lookups remain observed, with their
+ordering pinned. Legacy clock conversion remains unverified. Different dependency
+coverage, clocks, datasets or settings make comparisons incomparable. Unsupported
+capture extensions are rejected from comparability rather than silently ignored.
+
+Outputs remain fully visible even when inputs differ: added/removed rows,
+ordering-only flag, positional field changes and input-change paths. Such changes
+are confounded and carry no quality grade. An input-matched change is labelled
+`changed/unreviewed`; equal captured outputs are `unchanged`. Neither status proves
+successful replay, original live-state identity, feasibility or human usefulness.
+
+For a minimal copied toolkit, replay still needs only the tool directory plus
+`crates/pt-wasm/tests/baseline_store.mjs`. Diff additionally needs
+`baseline_diff.mjs` and `baseline_glue.mjs` in that directory. Diff loads lazily;
+normal replay does not acquire those extra dependencies. No frontend/compiler
+installation is needed for either command.

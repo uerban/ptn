@@ -68,7 +68,7 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
 const RT_UNVERIFIED="unverified; supplied RouteUpdate history is not proof of original live RT state";
 const GRAPH_UNVERIFIED="unverified; supplied graph state is not proof of original live graph";
 const HANDLE_UNVERIFIED="unverified; supplied artifact state is not proof of original live router";
-function readCapsule(store,id) {
+function readCapsule(store,id,verifyRuntime=true) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
   const manifestBytes=readFileSync(join(store,"runs",`${id}.json`)),capsule=JSON.parse(manifestBytes);
   if(capsule.schemaVersion!==1||capsule.format!=="ptn-search-finalization-capsule"||!Object.values(SCOPES).includes(capsule.scope)||capsule.classification!=="partial capture"||capsule.replayVerification!=="unverified"||capsule.recordProducerIdentity!==PRODUCER_UNVERIFIED||!capsule.artifacts||typeof capsule.artifacts!=="object")throw new Error("Unsupported capsule");
@@ -78,7 +78,7 @@ function readCapsule(store,id) {
   const build=JSON.parse(observed.moduleBuild);checkModule(build);checkTimeFrameSupport(record,build);
   if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||scopeOf(record)!==capsule.scope)throw new Error("Capsule scope mismatch");
   if(build.moduleSha256!==capsule.artifacts.module||build.sources.some((row,index)=>capsule.artifacts[`source${index}`]!==row.sha256))throw new Error("Capsule module provenance mismatch");
-  if(!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
+  if(verifyRuntime&&!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
   if(capsule.plannerExecution!==undefined) {
     const config=capsule.plannerExecution;
     if(config.version!==1||!["off","unbounded","covering-merge"].includes(config.patternMode)||typeof config.transfers!=="boolean"
@@ -121,6 +121,14 @@ function readCapsule(store,id) {
     for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete RT source capsule");
   }
   return {manifestBytes,capsule,observed,record,build};
+}
+
+/** Read-only inspection verifies all bytes and provenance, without executing
+ * retained code or requiring this machine to be the recorded replay host. */
+export function inspectFinalizationCapsule(store,id) {
+  const {manifestBytes,capsule,record,build,observed}=readCapsule(store,id,false);
+  return {manifestSha256:sha(manifestBytes),capsule,record,build,
+    rtEvents:observed.rtEvents?JSON.parse(observed.rtEvents):null};
 }
 
 /** Retain supplied router state without executing it. The new immutable run

@@ -11,7 +11,7 @@ export function normalize(value) {
   return value;
 }
 const key = value => JSON.stringify(normalize(value));
-function difference(left, right) {
+export function difference(left, right) {
   const remaining = right.map(key);
   return left.filter(candidate => {
     const index = remaining.indexOf(key(candidate));

@@ -6,7 +6,8 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildFinalizationModule,sha,sourceRoot} from "../../../tools/search-finalization/module.mjs";
 import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay,attachWalkingReplay,attachRtReplay} from "../../../tools/search-finalization/capsule.mjs";
-import {buildRtModule} from "../../../tools/search-finalization/rt-module.mjs";
+import {diffFinalizationCapsules} from "../../../tools/search-finalization/diff.mjs";
+import {buildRtModule,rtCompilerInputName} from "../../../tools/search-finalization/rt-module.mjs";
 import {retainArtifact} from "./baseline_store.mjs";
 let root,moduleDir,recordPath,expected,compiled,moduleManifest;
 before(async()=>{
@@ -376,6 +377,14 @@ test("time frame capability binds captured clock and supplied engine resolveTime
  const altered=replayFinalizationCapsule(store,"clock-altered",join(root,"clock-altered-replay"));assert.equal(altered.completion,"error");assert.equal(altered.output,null);
 });
 
+test("RT compiler dependency provenance is independent of pnpm store placement",()=>{
+ const checkout=join(root,"checkout"),internal=join(checkout,"node_modules/.pnpm"),external=join(root,"external-store");
+ assert.equal(rtCompilerInputName(checkout,internal,join(internal,"protobufjs@1/node_modules/protobufjs/light.js")),"dependencies/protobufjs@1/node_modules/protobufjs/light.js");
+ assert.equal(rtCompilerInputName(checkout,external,join(external,"protobufjs@1/node_modules/protobufjs/light.js")),"dependencies/protobufjs@1/node_modules/protobufjs/light.js");
+ assert.equal(rtCompilerInputName(checkout,internal,join(checkout,"packages/shared/src/proto/route-update.ts")),"packages/shared/src/proto/route-update.ts");
+ assert.equal(rtCompilerInputName(checkout,internal,join(root,"unrelated/private.json")),null);
+});
+
 test("frontend binary RT history replays decoding/store lookup without runtime packages",async()=>{
  const module=join(root,"rt-module"),build=await buildRtModule(module),repeat=await buildRtModule(join(root,"rt-module-repeat"));assert.deepEqual(build,repeat);
  assert.ok(build.sources.some(row=>row.path.startsWith("dependencies/")));assert.ok(build.sources.some(row=>row.path==="virtual/browser-fs.js"));
@@ -410,4 +419,33 @@ test("frontend binary RT history replays decoding/store lookup without runtime p
  const unproved=JSON.parse(readFileSync(join(store,"runs/with-rt.json")));unproved.artifacts.replayChild=retainArtifact(store,Buffer.from('import {readFileSync} from "node:fs";process.stdout.write(JSON.stringify({completion:"success",moduleHash:process.argv[3],recordHash:process.argv[4],output:JSON.parse(readFileSync(process.argv[2])).output}));'));
  writeFileSync(join(store,"runs/rt-unproved.json"),JSON.stringify(unproved));assert.equal(replayFinalizationCapsule(store,"rt-unproved",join(root,"rt-unproved-out")).completion,"error");
  const claimed=JSON.parse(readFileSync(join(store,"runs/with-rt.json")));claimed.rtExecution.originalRtIdentity="verified";writeFileSync(join(store,"runs/claimed.json"),JSON.stringify(claimed));const denied=join(root,"rt-claimed-out");assert.throws(()=>replayFinalizationCapsule(store,"claimed",denied),/Unsupported RT/);assert.equal(existsSync(denied),false);
+});
+
+test("frontend capsule diff keeps complete fields, duplicate counts, order and confounded inputs visible without execution",()=>{
+ const store=join(root,"diff-store"),base=JSON.parse(readFileSync(recordPath)),file=join(root,"diff-record.json");
+ const capture=(id,value)=>{writeFileSync(file,JSON.stringify(value));return retainFinalization(store,id,file,moduleDir);};
+ const before=capture("before",base),bytes=readFileSync(join(store,"runs/before.json"));capture("same",base);
+ let diff=diffFinalizationCapsules(store,"before",store,"same");assert.equal(diff.status,"unchanged");assert.equal(diff.qualityVerdict,null);assert.equal(diff.replayVerification,"not evaluated by diff");
+ const changed=structuredClone(base);changed.output[0].arrivalSecs++;changed.output[0].unknownField={stillVisible:true};capture("changed",changed);
+ diff=diffFinalizationCapsules(store,"before",store,"changed");assert.equal(diff.status,"changed/unreviewed");assert.ok(diff.fieldChanges.some(row=>row.path.includes("unknownField")));assert.equal(diff.added.length,1);assert.equal(diff.removed.length,1);
+ const duplicate=structuredClone(base);duplicate.output.push(structuredClone(base.output[0]));capture("duplicates",duplicate);
+ diff=diffFinalizationCapsules(store,"before",store,"duplicates");assert.equal(diff.added.length,1);assert.equal(diff.removed.length,0);
+ const ordered=structuredClone(changed);ordered.output=[base.output[0],changed.output[0]];capture("order-a",ordered);ordered.output.reverse();capture("order-b",ordered);
+ diff=diffFinalizationCapsules(store,"order-a",store,"order-b");assert.equal(diff.status,"changed/unreviewed");assert.equal(diff.orderingOnly,true);assert.equal(diff.added.length,0);assert.equal(diff.removed.length,0);
+ const clock=structuredClone(changed);clock.nowMs++;capture("other-clock",clock);
+ diff=diffFinalizationCapsules(store,"before",store,"other-clock");assert.equal(diff.status,"incomparable");assert.ok(diff.inputChanges.some(row=>row.path.includes("nowMs")));assert.ok(diff.fieldChanges.length>0);
+ const unsupported=structuredClone(base);unsupported.unknownInput={value:1};capture("unsupported",unsupported);
+ assert.match(diffFinalizationCapsules(store,"before",store,"unsupported").reason,/Unsupported capture fields/);
+ // Comparing old records does not require this machine's runtime, but the two
+ // recorded runtimes still must match each other.
+ const old=JSON.parse(readFileSync(join(store,"runs/same.json")));old.replayRuntime.node="other-runtime";writeFileSync(join(store,"runs/same.json"),JSON.stringify(old));
+ diff=diffFinalizationCapsules(store,"before",store,"same");assert.equal(diff.status,"incomparable");assert.ok(diff.inputChanges.some(row=>row.path.includes("runtime")));
+ assert.deepEqual(readFileSync(join(store,"runs/before.json")),bytes);
+ const throwing=join(root,"diff-throwing-module");cpSync(moduleDir,throwing,{recursive:true});rmSync(join(throwing,"module.mjs"));const code=Buffer.from("throw new Error('diff must never execute')");writeFileSync(join(throwing,"module.mjs"),code);
+ const manifest=JSON.parse(readFileSync(join(throwing,"manifest.json")));manifest.moduleSha256=sha(code);writeFileSync(join(throwing,"manifest.json"),JSON.stringify(manifest));writeFileSync(file,JSON.stringify(base));retainFinalization(store,"different-code",file,throwing);
+ diff=diffFinalizationCapsules(store,"before",store,"different-code");assert.equal(diff.status,"unchanged");assert.ok(diff.codeChanges.length>0);
+ const stage=join(root,"diff-isolated-toolkit");mkdirSync(join(stage,"tools"),{recursive:true});mkdirSync(join(stage,"crates/pt-wasm/tests"),{recursive:true});cpSync(join(sourceRoot,"tools/search-finalization"),join(stage,"tools/search-finalization"),{recursive:true});
+ for(const name of ["baseline_store.mjs","baseline_diff.mjs","baseline_glue.mjs"])cpSync(join(sourceRoot,"crates/pt-wasm/tests",name),join(stage,"crates/pt-wasm/tests",name));
+ const isolated=spawnSync(process.execPath,[join(stage,"tools/search-finalization/cli.mjs"),"diff",store,"before",store,"different-code"],{encoding:"utf8"});assert.equal(isolated.status,0,isolated.stderr);assert.equal(JSON.parse(isolated.stdout).status,"unchanged");assert.equal(existsSync(join(stage,"packages")),false);
+ const recordFile=join(store,"artifacts",before.artifacts.record),original=readFileSync(recordFile);writeFileSync(recordFile,"corrupt");assert.throws(()=>diffFinalizationCapsules(store,"before",store,"different-code"),/integrity/);writeFileSync(recordFile,original);
 });
