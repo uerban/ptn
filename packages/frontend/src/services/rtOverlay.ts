@@ -72,7 +72,7 @@ export function applyRtOverlay(
   const rides = (itin: ComposedItinerary) =>
     itin.legs.every((leg) => leg.type !== "transit" || !leg.tripId || getDelay(leg.tripId)?.deleted !== true);
 
-  return itineraries.filter(rides).map((itin) => {
+  return itineraries.filter(rides).flatMap((itin): RtComposedItinerary[] => {
     let anyCancelled = false;
     const shiftedLegs: RaptorLeg[] = itin.legs.map((leg) => {
       if (leg.type !== "transit" || !leg.tripId) return leg;
@@ -103,6 +103,12 @@ export function applyRtOverlay(
       };
     });
 
+    // Validate access against effective boarding before any scheduled-time
+    // display fallback can conceal an early departure.
+    const firstLeg = shiftedLegs[0];
+    if (firstLeg?.type === "transit"
+      && itin.departureSecs + itin.sourceWalkSecs > firstLeg.departSecs) return [];
+
     // Detect chain breaks: if a shifted leg arrives so late that the next
     // transit leg's (shifted) board is no longer reachable with the
     // minimum transfer buffer, the itinerary is no longer viable. Walk
@@ -123,17 +129,21 @@ export function applyRtOverlay(
     // `timingUnreliable` carries the signal without mutating individual
     // leg times into impossibilities.
     const adjustedLegs = brokenByDelay ? itin.legs : shiftedLegs;
+    // The fallback must not display boarding before the access walk ends.
+    const displayedFirst = adjustedLegs[0];
+    if (displayedFirst?.type === "transit"
+      && itin.departureSecs + itin.sourceWalkSecs > displayedFirst.departSecs) return [];
     const lastLeg = adjustedLegs[adjustedLegs.length - 1];
     const arrivalSecs = lastLeg.arriveSecs + itin.destWalkSecs;
     const totalSecs = arrivalSecs - itin.departureSecs;
 
-    return {
+    return [{
       ...itin,
       legs: adjustedLegs,
       arrivalSecs,
       totalSecs,
       ...(anyCancelled ? { cancelled: true } : {}),
       ...(brokenByDelay ? { timingUnreliable: true } : {}),
-    };
+    }];
   });
 }
