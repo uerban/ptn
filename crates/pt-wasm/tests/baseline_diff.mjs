@@ -34,6 +34,21 @@ export function changedFields(before, after, path = []) {
 }
 export function diffBaselines(before, after) {
   if (before.schemaVersion !== 1 || after.schemaVersion !== 1) throw new Error("Unsupported baseline schema");
+  const completeContract = run => {
+    const report = run.report;
+    const input = report?.input;
+    const digest = value => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+    if (!digest(run.artifacts?.ptb) || !digest(run.artifacts?.queryTuples)
+        || report?.patternMode !== "covering-merge" || !["plan","r3","m4"].includes(report?.objective)
+        || !input) return false;
+    return report.objective === "plan"
+      ? input.windowStart === null && input.windowEnd === null
+      : Number.isSafeInteger(input.windowStart) && input.windowStart >= 0
+        && Number.isSafeInteger(input.windowEnd) && input.windowEnd > input.windowStart;
+  };
+  if (!completeContract(before) || !completeContract(after)) {
+    return { schemaVersion: 1, normalizerVersion: 1, status: "incomparable", reason: "missing or unsupported input contract" };
+  }
   try {
     glueExecutionMode(before.report.glueExecution);
     glueExecutionMode(after.report.glueExecution);
