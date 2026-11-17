@@ -38,6 +38,7 @@
  * can only free the graph. Routing failures are reported once per city per
  * session.
  */
+import { WalkGraphUnavailableError } from "./walkGraphAvailability.ts";
 import type { LatLon, LonLat, MobilityProfile } from "@pt/shared";
 import { reportError } from "./errorReporter.ts";
 import {registerEvictor} from "./storagePolicy.ts";
@@ -135,15 +136,7 @@ export type WalkGraphLoadStatus = "ready" | "missing" | "bad" | "transient" | "s
 
 /** `routeFor` could not answer now, but may later: do not cache this as
  *  "no walk route". */
-export class WalkGraphUnavailableError extends Error {
-  constructor(
-    readonly cityId: string,
-    readonly reason: "transient" | "superseded",
-  ) {
-    super(`walk graph for ${cityId} unavailable (${reason})`);
-    this.name = "WalkGraphUnavailableError";
-  }
-}
+export { WalkGraphUnavailableError } from "./walkGraphAvailability.ts";
 
 const RETRY_FIRST_MS = 15_000;
 const RETRY_MAX_MS = 5 * 60_000;

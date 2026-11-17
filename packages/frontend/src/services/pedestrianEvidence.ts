@@ -1,4 +1,4 @@
-import { WalkGraphUnavailableError } from "./walkGraphClient.ts";
+import { WalkGraphUnavailableError } from "./walkGraphAvailability.ts";
 import type { WalkRoute } from "./walkGraphClient.ts";
 
 /** Geometry and physical distance must both be usable before route evidence

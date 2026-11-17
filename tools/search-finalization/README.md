@@ -1,5 +1,13 @@
 # Retained local finalization replay
 
+The replay module supports both `ptn-search-finalization` and
+`ptn-search-composition` version 1 records. Composition records re-run post-planner
+transfer walking evidence and itinerary composition before frozen RT/ranking;
+they retain raw planner results and pedestrian responses rather than rebuilding
+a graph or executing the planner. The module manifest declares supported formats.
+Older manifests without this declaration support finalization records only;
+existing retained finalization capsules remain readable without rewriting them.
+
 Build a standalone replay module, retain an explicitly supplied finalization
 record and module, then replay from content-addressed bytes:
 
@@ -15,6 +23,12 @@ directory; the module manifest lists their names and SHA-256 digests. External
 runtime imports reject the build. Compiler version/options are recorded, but
 the compiler/resolver installation is not fully retained. The compiled module
 bytes are the replay authority, not a promise of future source recompilation.
+
+Shared constants/time/util imports resolve explicitly to workspace TypeScript
+sources, with compiler settings recorded. They do not require generated
+`shared/dist` files or consume stale copies from a previous build. New shared
+runtime imports need an explicit source mapping. A clean source-only-tree test
+checks this before the shared package build runs in CI.
 
 Capture verifies the supplied module and every source digest before retaining
 anything. It reads the record without executing the module. Record, module,

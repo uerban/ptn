@@ -7,10 +7,10 @@ import {join} from "node:path";
 import {buildFinalizationModule,sha,sourceRoot} from "../../../tools/search-finalization/module.mjs";
 import {retainFinalization,replayFinalizationCapsule} from "../../../tools/search-finalization/capsule.mjs";
 import {retainArtifact} from "./baseline_store.mjs";
-let root,moduleDir,recordPath,expected,compiled;
+let root,moduleDir,recordPath,expected,compiled,moduleManifest;
 before(async()=>{
  root=mkdtempSync(join(tmpdir(),"finalization-capsules-"));moduleDir=join(root,"module");
- const build=await buildFinalizationModule(moduleDir);assert.ok(build.sources.length>1);
+ const build=await buildFinalizationModule(moduleDir);moduleManifest=build;assert.ok(build.sources.length>1);
  const repeat=await buildFinalizationModule(join(root,"repeat-module"));assert.deepEqual(repeat,build);
  const bytes=readFileSync(join(moduleDir,"module.mjs"));assert.equal(sha(bytes),build.moduleSha256);
  const module=await import(`data:text/javascript;base64,${bytes.toString("base64")}`);compiled=module;
@@ -136,4 +136,41 @@ test("replay CLI works in an isolated toolkit without frontend/compiler dependen
  const child=spawnSync(process.execPath,[join(stage,"tools/search-finalization/cli.mjs"),"replay",store,"observed",out],{encoding:"utf8"});
  assert.equal(child.status,0,child.stderr);assert.deepEqual(JSON.parse(child.stdout).output,expected);
  assert.equal(existsSync(join(stage,"packages/frontend/node_modules")),false);
+});
+
+test("post-planner walking composition retains raw planner output and replays routed evidence",async()=>{
+ let record;
+ const input={itineraries:[{boardSecs:100,alightSecs:900,transfers:1,legs:[
+  {type:"transit",tripId:"T1",routeId:"R",fromStopId:"A",toStopId:"B",departSecs:100,arriveSecs:300,boardStopIdx:0,alightStopIdx:1},
+  {type:"walk",fromStopId:"B",toStopId:"C",departSecs:300,arriveSecs:420},
+  {type:"transit",tripId:"T2",routeId:"R",fromStopId:"C",toStopId:"D",departSecs:600,arriveSecs:900,boardStopIdx:0,alightStopIdx:1}]}],
+  entryWalks:[{stopId:"A",walkSecs:0,distanceMeters:0}],exitWalks:[{stopId:"D",walkSecs:0,distanceMeters:0}],departureSecs:0,
+  stops:[{id:"B",lat:54,lon:25},{id:"C",lat:54,lon:25.001}],walkSpeedMps:1.25,walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120};
+ const output=await compiled.composeSearchResults(input,async()=>({coords:[[25,54],[25.001,54]],distanceMeters:400,steps:[]}),
+  id=>id==="T2"?{delaySeconds:120,cancelled:false}:null,()=>120,value=>{record=value;});
+ assert.equal(output.length,1);assert.equal(output[0].totalWalkMeters,400);
+ assert.equal(record.input.itineraries[0].legs[1].arriveSecs,420);
+ const path=join(root,"composition.json"),store=join(root,"composition-store");writeFileSync(path,JSON.stringify(record));
+ const capsule=retainFinalization(store,"composition",path,moduleDir);
+ assert.equal(capsule.scope,"frontend post-planner walking composition");
+ const proof=replayFinalizationCapsule(store,"composition",join(root,"composition-output"));
+ assert.equal(proof.completion,"success");assert.deepEqual(proof.output,output);
+ const build=JSON.parse(readFileSync(join(store,"artifacts",capsule.artifacts.moduleBuild)));
+ delete build.recordFormats;capsule.artifacts.moduleBuild=retainArtifact(store,Buffer.from(JSON.stringify(build)));
+ writeFileSync(join(store,"runs/composition.json"),JSON.stringify(capsule));
+ const refused=join(root,"unsupported-composition-output");
+ assert.throws(()=>replayFinalizationCapsule(store,"composition",refused),/scope mismatch/);assert.equal(existsSync(refused),false);
+});
+
+test("module build uses workspace TS sources in a clean tree without shared dist",async()=>{
+ assert.ok(moduleManifest.sources.some(row=>row.path==="packages/shared/src/constants/index.ts"));
+ assert.equal(moduleManifest.sources.some(row=>row.path.includes("/dist/")),false);
+ const tree=join(root,"source-only");
+ mkdirSync(join(tree,"packages/frontend/src"),{recursive:true});mkdirSync(join(tree,"packages/shared"),{recursive:true});
+ cpSync(join(sourceRoot,"packages/frontend/src/services"),join(tree,"packages/frontend/src/services"),{recursive:true});
+ cpSync(join(sourceRoot,"packages/shared/src"),join(tree,"packages/shared/src"),{recursive:true});
+ const clean=await buildFinalizationModule(join(root,"clean-module"),tree);
+ assert.deepEqual(clean,moduleManifest);
+ assert.equal(existsSync(join(tree,"packages/shared/dist")),false);
+ assert.equal(existsSync(join(tree,"node_modules")),false);
 });

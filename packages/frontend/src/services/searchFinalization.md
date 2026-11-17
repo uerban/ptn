@@ -27,7 +27,8 @@ Version 1 compares finite JSON-wire values, ignoring object property order;
 optional undefined object fields are absent, while array holes, executable
 values and non-finite numbers reject. A complete serialized record is limited to
 2 MiB and is rejected rather than truncated. This is a record-size limit, not a
-process-memory quota. Requested capture/observer failures propagate to the
+process-memory quota. Observers are synchronous; collect the record and perform
+asynchronous persistence separately. Requested synchronous capture/observer failures propagate to the
 requesting caller rather than claiming that evidence was saved.
 
 This is explicitly a **partial capture** of `frontend RT feasibility and ranking`.

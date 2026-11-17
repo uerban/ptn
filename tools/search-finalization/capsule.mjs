@@ -13,17 +13,19 @@ function runtime() {
 }
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
 const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+const SCOPES={"ptn-search-finalization":"frontend RT feasibility and ranking","ptn-search-composition":"frontend post-planner walking composition"};
 const PRODUCER_UNVERIFIED="unverified; imported observation is not proof of original application bytes/runtime";
 const digest=value=>typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
 function checkModule(manifest) {
   if(manifest?.format!=="ptn-search-finalization-module"||manifest.version!==1||!digest(manifest.moduleSha256)
     ||!Array.isArray(manifest.sources)||!manifest.sources.length||manifest.sources.some(row=>!digest(row.sha256)||typeof row.path!=="string"))throw new Error("Invalid module manifest");
+  if(manifest.recordFormats!==undefined&&(!Array.isArray(manifest.recordFormats)||!manifest.recordFormats.length||manifest.recordFormats.some(format=>!Object.hasOwn(SCOPES,format))))throw new Error("Invalid module formats");
 }
 
 function checkRecord(bytes) {
   if(bytes.length>2*1024*1024)throw new Error("Finalization record exceeds limit");
   const record=JSON.parse(bytes);
-  if(record?.format!=="ptn-search-finalization"||record.version!==1||record.scope!=="frontend RT feasibility and ranking"
+  if(!Object.hasOwn(SCOPES,record?.format)||record.version!==1||record.scope!==SCOPES[record.format]
     ||record.classification!=="partial capture"||record.normalization!=="finite-json-wire-v1"
     ||!Number.isFinite(record.nowMs)||!record.input||!Array.isArray(record.reads)||!Array.isArray(record.output))throw new Error("Unsupported finalization record");
   const finite=value=>{if(typeof value==="number"&&!Number.isFinite(value))throw new Error("Non-finite finalization value");if(value&&typeof value==="object")Object.values(value).forEach(finite);};
@@ -36,6 +38,7 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   const recordBytes=readFileSync(recordPath);
   const record=checkRecord(recordBytes);
   const manifestBytes=readFileSync(join(moduleDirectory,"manifest.json")),manifest=JSON.parse(manifestBytes);checkModule(manifest);
+  if(!(manifest.recordFormats??["ptn-search-finalization"]).includes(record.format))throw new Error("Module does not support capture format");
   const module=readFileSync(join(moduleDirectory,"module.mjs"));
   if(sha(module)!==manifest.moduleSha256)throw new Error("Module integrity mismatch");
   const sources=manifest.sources.map(row=>{const bytes=readFileSync(join(moduleDirectory,"sources",row.sha256));if(sha(bytes)!==row.sha256)throw new Error("Source integrity mismatch");return bytes;});
@@ -56,11 +59,12 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
   if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000)throw new Error("Invalid replay timeout");
   const manifestBytes=readFileSync(join(store,"runs",`${id}.json`)),capsule=JSON.parse(manifestBytes);
-  if(capsule.schemaVersion!==1||capsule.format!=="ptn-search-finalization-capsule"||capsule.scope!=="frontend RT feasibility and ranking"||capsule.classification!=="partial capture"||capsule.replayVerification!=="unverified"||capsule.recordProducerIdentity!==PRODUCER_UNVERIFIED||!capsule.artifacts||typeof capsule.artifacts!=="object")throw new Error("Unsupported capsule");
+  if(capsule.schemaVersion!==1||capsule.format!=="ptn-search-finalization-capsule"||!Object.values(SCOPES).includes(capsule.scope)||capsule.classification!=="partial capture"||capsule.replayVerification!=="unverified"||capsule.recordProducerIdentity!==PRODUCER_UNVERIFIED||!capsule.artifacts||typeof capsule.artifacts!=="object")throw new Error("Unsupported capsule");
   const observed=Object.fromEntries(Object.entries(capsule.artifacts).map(([name,hash])=>[name,readArtifact(store,hash)]));
   for(const name of ["module","record","moduleBuild","replayChild"])if(!observed[name])throw new Error(`Missing capsule artifact: ${name}`);
   const record=checkRecord(observed.record);
   const build=JSON.parse(observed.moduleBuild);checkModule(build);
+  if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||record.scope!==capsule.scope)throw new Error("Capsule scope mismatch");
   if(build.moduleSha256!==capsule.artifacts.module||build.sources.some((row,index)=>capsule.artifacts[`source${index}`]!==row.sha256))throw new Error("Capsule module provenance mismatch");
   if(!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
   mkdirSync(destination,{mode:0o700});
@@ -79,7 +83,7 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
       ||!same(result.output,record.output))throw new Error("Replay proof mismatch");}
     catch {completion="error";}
   }
-  const proof={format:"ptn-search-finalization-replay",version:1,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
+  const proof={format:"ptn-search-finalization-replay",version:1,scope:capsule.scope,classification:capsule.classification,recordProducerIdentity:capsule.recordProducerIdentity,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
     completion,elapsedMs:performance.now()-started,exitCode:child.status,signal:child.signal,errorCode:child.error?.code??null,
     logCaptureComplete:child.error?.code!=="ENOBUFS",output:completion==="success"?result.output:null};
   writeFileSync(join(destination,"verification.json"),JSON.stringify(proof,null,2)+"\n",{flag:"wx",mode:0o600});

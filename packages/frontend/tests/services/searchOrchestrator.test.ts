@@ -1,3 +1,4 @@
+import {replaySearchComposition, type CompositionCapture} from "../../src/services/searchComposition.ts";
 import {replayFinalization, type FinalizationCapture} from "../../src/services/searchFinalization.ts";
 import { describe, it, expect, vi } from "vitest";
 
@@ -89,11 +90,13 @@ describe("SearchOrchestrator", () => {
 
   it("captures the actual finalization boundary for transit and empty reachable sets", async () => {
     const records: FinalizationCapture[] = [];
+    const compositions: CompositionCapture[] = [];
     const config: SearchConfig = {
       raptorIndex: usePlannerOver(buildMinimalIndex()), allStops,
       getDelay: () => ({delaySeconds: 120, cancelled: false}),
       osrm: {isReady: () => false, table: vi.fn(), init: vi.fn()},
       finalizationCapture: record => records.push(record),
+      compositionCapture: record => compositions.push(record),
     };
     const orchestrator = new SearchOrchestrator(config);
     const query = {origin: {lat: 54.6800, lon: 25.2797}, destination: {lat: 54.7200, lon: 25.2797},
@@ -103,6 +106,10 @@ describe("SearchOrchestrator", () => {
     expect(JSON.stringify(replayFinalization(JSON.parse(JSON.stringify(records[0]))))).toBe(JSON.stringify(result));
     const empty = await orchestrator.search({...query, origin: {lat: 0, lon: 0}, destination: {lat: 1, lon: 1}});
     expect(empty).toEqual([]);expect(records).toHaveLength(2);
+    expect(compositions).toHaveLength(2);
+    expect(compositions[0].input.itineraries.length).toBeGreaterThan(0);
+    expect(JSON.stringify(await replaySearchComposition(JSON.parse(JSON.stringify(compositions[0]))))).toBe(JSON.stringify(result));
+    expect(await replaySearchComposition(compositions[1])).toEqual([]);
     expect(replayFinalization(records[1])).toEqual([]);
   });
 

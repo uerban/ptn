@@ -1,4 +1,4 @@
-import { WalkGraphUnavailableError } from "./walkGraphClient.ts";
+import { WalkGraphUnavailableError } from "./walkGraphAvailability.ts";
 import { validPedestrianRoute } from "./pedestrianEvidence.ts";
 import type { LatLon, RaptorItinerary } from "@pt/shared";
 import type { WalkRoute } from "./walkGraphClient.ts";
