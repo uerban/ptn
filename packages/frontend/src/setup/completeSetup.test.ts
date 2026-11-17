@@ -8,7 +8,9 @@ import { useNetworkDecisionsStore } from "../stores/networkDecisionsStore.ts";
 import { useOnboardingStore } from "../stores/onboardingStore.ts";
 import { getCurrentLevel, usePrivacyStore } from "../stores/privacyStore.ts";
 import { useSettingsStore } from "../stores/settingsStore.ts";
-import { completeSetup, setupPresentation } from "./completeSetup.ts";
+import { completeSetup, setupPresentation, SETUP_DETAILED_MAP } from "./completeSetup.ts";
+import { DEFAULT_BASEMAP_PROVIDER, DETAILED_BASEMAP_FLOW } from "../services/basemapPrivacy.ts";
+import { readMapDetailAsked } from "../map/mapDetailAsked.ts";
 
 vi.mock("./mapAssets.ts", () => ({ warmMapAssets: vi.fn(async () => {}) }));
 
@@ -25,6 +27,36 @@ describe("completing setup", () => {
   it("uses the minimal offline map and nearby cards for both presentations", () => {
     expect(setupPresentation("text")).toEqual({ startMode: "text", mapDetail: "micromap", nearbyCards: true });
     expect(setupPresentation("map").mapDetail).toBe("micromap");
+    expect(setupPresentation("map", true).mapDetail).toBe("detailed");
+  });
+
+  it("offers the same detailed-map flow and provider as the map", () => {
+    expect(SETUP_DETAILED_MAP).toEqual({ flowId: DETAILED_BASEMAP_FLOW, providerId: DEFAULT_BASEMAP_PROVIDER });
+  });
+
+  it("records a detailed-map choice from setup with source setup, and the map does not ask again", async () => {
+    await completeSetup({ presetId: "recommended", startMode: "map", detailedMap: true });
+    expect(canUse("external.detailed-basemap", "carto")).toBe(true);
+    const decisions = useNetworkDecisionsStore.getState().decisions as Record<string, { source: string }>;
+    expect(decisions["external.detailed-basemap@carto"]?.source).toBe("setup");
+    expect(useSettingsStore.getState().mapDetailMode).toBe("detailed");
+    expect(readMapDetailAsked()).toBe(true);
+  });
+
+  it("the minimal map answer grants nothing but still counts as answered", async () => {
+    await completeSetup({ presetId: "recommended", startMode: "map", detailedMap: false });
+    expect(canUse("external.detailed-basemap", "carto")).toBe(false);
+    expect(useSettingsStore.getState().mapDetailMode).toBe("micromap");
+    expect(readMapDetailAsked()).toBe(true);
+  });
+
+  it("Text mode and Strict never saw the map choice: nothing granted, the map still asks", async () => {
+    await completeSetup({ presetId: "strict", startMode: "map", detailedMap: true });
+    expect(canUse("external.detailed-basemap", "carto")).toBe(false);
+    expect(readMapDetailAsked()).toBe(false);
+    await completeSetup({ presetId: "recommended", startMode: "text", detailedMap: true });
+    expect(canUse("external.detailed-basemap", "carto")).toBe(false);
+    expect(readMapDetailAsked()).toBe(false);
   });
 
   it("commits the journal, applies it, and marks What's new seen", async () => {

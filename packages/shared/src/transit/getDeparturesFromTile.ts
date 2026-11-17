@@ -280,6 +280,7 @@ export function getDeparturesFromTile(
         delaySeconds,
         tripId,
         cancelled,
+        serviceDate: String(ymd),
       });
     }
   }

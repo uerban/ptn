@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
 import { isAllowedBeforeSetup } from "../helpers/request-allowlist";
-import { SETUP_HEADING, START_MAP_ACTION, openSetupOptions } from "../helpers/setup-step";
+import { SETUP_HEADING, START_MAP_ACTION, openSetupOptions, startWithLevel, chooseSetupLevel } from "../helpers/setup-step";
 
 // A fresh profile must never be prompted for location by setup itself.
 test.use({ permissions: [] });
@@ -38,7 +38,7 @@ test.describe("first-run setup @mock-api", () => {
     await expect(page.getByLabel("Find a city")).toHaveCount(0);
     // Map is the disclosed initial selection; Text comes first.
     await chooseCity(page);
-    // One big action first; the choices are behind "More options".
+    // Every choice is on the page; Continue names the preselected level.
     await expect(page.getByRole("button", { name: START_MAP_ACTION })).toBeVisible();
     await openSetupOptions(page);
     const modes = page
@@ -58,7 +58,7 @@ test.describe("first-run setup @mock-api", () => {
     expect(requests.some(({ url }) => /\/gtfs\/manifest$/.test(url))).toBe(true);
 
     await page.getByRole("radio", { name: /Text mode/ }).check();
-    await page.getByRole("button", { name: "Start with recommended settings" }).click();
+    await startWithLevel(page, "recommended");
     await expectInApp(page);
 
     const onboarding = (await readStorage(page, "ptn-onboarding")) as {
@@ -93,7 +93,7 @@ test.describe("first-run setup @mock-api", () => {
     await openSetupOptions(page);
     await page.getByText("What strict privacy changes").click();
     await expect(page.getByText("History is kept for 7 days.")).toBeVisible();
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expectInApp(page);
     const privacy = (await readStorage(page, "ptn-privacy")) as { state: { level: string } };
     expect(privacy.state.level).toBe("strict");
@@ -109,8 +109,8 @@ test.describe("first-run setup @mock-api", () => {
     await page.goto("/");
     await chooseCity(page);
     await openSetupOptions(page);
-    await page.getByRole("button", { name: "Customize" }).click();
-    const proceed = page.getByRole("button", { name: "Continue", exact: true });
+    await chooseSetupLevel(page, "customize");
+    const proceed = page.getByRole("button", { name: "Continue with Custom" });
     await expect(proceed).toBeDisabled();
     await page.getByRole("radio", { name: /Ask before connecting/ }).check();
     await proceed.click();
@@ -185,7 +185,7 @@ test.describe("first-run setup @mock-api", () => {
     await chooseCity(page);
     await expect(page.getByText("The link you followed opens after this step.")).toBeVisible();
     await openSetupOptions(page);
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expect(page).toHaveURL(/\/search\?toLat=54\.6872&toLon=25\.2797&toName=Cathedral$/);
     await expect(page.getByTestId("setup-shell")).toHaveCount(0);
     const decisions = (await readStorage(page, "ptn-network-decisions")) as {
@@ -241,7 +241,7 @@ test.describe("compact city choice @mock-api", () => {
     await chooseCity(page);
 
     await openSetupOptions(page);
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expectInApp(page);
     const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
     expect(stored.state.currentCityId).toBe("vilnius");
@@ -257,7 +257,7 @@ test.describe("compact city choice @mock-api", () => {
     await page.goto("/");
     await expect(page.getByText("City: Krakow")).toBeVisible();
     await openSetupOptions(page);
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expectInApp(page);
     const stored = (await readStorage(page, "ptn-city")) as { state: { currentCityId: string } };
     expect(stored.state.currentCityId).toBe("krakow");

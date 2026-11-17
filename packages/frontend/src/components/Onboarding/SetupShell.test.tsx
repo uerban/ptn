@@ -99,7 +99,8 @@ describe("SetupShell", () => {
     expect(screen.getByText(/downloads the timetables, stops and lines of Vilnius/)).toBeTruthy();
     expect(setup.activateSetupCity).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start with strict privacy" }));
+      fireEvent.click(screen.getByRole("radio", { name: /^Strict/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Continue with Strict" }));
     });
     expect(setup.activateSetupCity).toHaveBeenCalledWith(expect.objectContaining({ id: "vilnius" }));
     expect(setup.completeSetup).toHaveBeenCalledOnce();
