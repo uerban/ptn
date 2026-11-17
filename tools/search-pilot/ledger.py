@@ -131,9 +131,11 @@ class Ledger:
     def release(self, token):
         return self.db.execute('DELETE FROM worker_lease WHERE id=1 AND token=?', (token,)).rowcount == 1
 
-    def claim(self, worker_token, now_ms, grace_ms=2000):
+    def claim(self, worker_token, now_ms, grace_ms=2000, admission_state=None):
         if type(grace_ms) is not int or grace_ms < 0:
             raise ValueError('Invalid finalization grace')
+        if admission_state not in (None, 'storage-budget-exhausted'):
+            raise ValueError('Unsupported admission state')
         limits = self.plan['limits']
         with self.transaction():
             lease = self.db.execute('SELECT * FROM worker_lease WHERE id=1 AND token=? AND expires_ms>?',
@@ -154,6 +156,8 @@ class Ledger:
                 count = self.db.execute('SELECT COUNT(*) FROM attempts WHERE job_id=?', (job['id'],)).fetchone()[0]
                 if success or count >= limits['maxAttemptsPerJob']:
                     continue
+                if admission_state:
+                    return {'state': admission_state}
                 reservation = limits['attemptTimeoutMs'] + grace_ms
                 if reserved + reservation > limits['totalExecutionMs']:
                     return {'state': 'execution-budget-exhausted'}

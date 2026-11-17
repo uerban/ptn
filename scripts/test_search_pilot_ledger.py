@@ -61,7 +61,7 @@ class PilotLedgerTests(unittest.TestCase):
         self.assertNotEqual(first['jobId'], second['jobId'])
         self.assertEqual(second['attempt'], 1)
         self.ledger.complete(second['token'], 'success', {'completion': 'success', 'candidateCount': 2})
-        self.assertEqual(self.ledger.claim(other, 20, 0)['state'], 'finished')
+        self.assertEqual(self.ledger.claim(other, 20, 0, admission_state='storage-budget-exhausted')['state'], 'finished')
 
     def test_expired_worker_waits_for_bounded_child_and_retains_abandoned_attempt(self):
         old = self.ledger.acquire('old', 0, 10)
