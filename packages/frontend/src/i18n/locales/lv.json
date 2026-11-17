@@ -627,11 +627,6 @@
   "arriveBy.pick_time": "Izvēlieties laiku",
   "schedule.lastOfServiceDay": "Dienas pēdējais reiss",
   "schedule.firstOfServiceDay": "Dienas pirmais reiss",
-  "search.where_to": "Kurp jūs dodaties?",
-  "schedule.plan_trip": "Plānot braucienu",
-  "schedule.dismiss_hint": "Sapratu",
-  "schedule.search": "Meklēt",
-  "schedule.hint": "Meklējat maršrutu? Pieskarieties “Plānot braucienu” augšpusē.",
   "arriveBy.leave_short": "Izbraukšana {time}",
   "arriveBy.by_short": "Ierasties līdz {time}"
 }

@@ -624,11 +624,6 @@
   "arriveBy.pick_time": "Vali aeg",
   "schedule.lastOfServiceDay": "Päeva viimane reis",
   "schedule.firstOfServiceDay": "Päeva esimene reis",
-  "search.where_to": "Kuhu sa lähed?",
-  "schedule.plan_trip": "Reisi planeerimine",
-  "schedule.dismiss_hint": "Selge",
-  "schedule.search": "Otsing",
-  "schedule.hint": "Otsite marsruuti? Puudutage üleval „Planeeri reis“.",
   "arriveBy.leave_short": "Väljumine {time}",
   "arriveBy.by_short": "Saabumine kell {time}"
 }

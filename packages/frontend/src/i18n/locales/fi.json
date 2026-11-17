@@ -625,11 +625,6 @@
   "arriveBy.pick_time": "Valitse aika",
   "schedule.lastOfServiceDay": "Päivän viimeinen vuoro",
   "schedule.firstOfServiceDay": "Päivän ensimmäinen vuoro",
-  "search.where_to": "Minne olet menossa?",
-  "schedule.plan_trip": "Suunnittele matka",
-  "schedule.dismiss_hint": "Selvä",
-  "schedule.search": "Haku",
-  "schedule.hint": "Etsitkö reittiä? Napauta ylhäältä ”Suunnittele matka”.",
   "arriveBy.leave_short": "Lähtö {time}",
   "arriveBy.by_short": "Saapuminen viimeistään {time}"
 }

@@ -636,11 +636,6 @@
   "arriveBy.pick_time": "Вибрати час",
   "schedule.lastOfServiceDay": "Останній рейс дня",
   "schedule.firstOfServiceDay": "Перший рейс дня",
-  "search.where_to": "Куди їдете?",
-  "schedule.plan_trip": "Спланувати поїздку",
-  "schedule.dismiss_hint": "Зрозуміло",
-  "schedule.search": "Пошук",
-  "schedule.hint": "Шукаєте маршрут? Натисніть «Спланувати поїздку» вище.",
   "arriveBy.leave_short": "Відправлення {time}",
   "arriveBy.by_short": "Прибути до {time}"
 }

@@ -629,11 +629,6 @@
   "arriveBy.pick_time": "Pasirinkite laiką",
   "schedule.lastOfServiceDay": "Paskutinis dienos reisas",
   "schedule.firstOfServiceDay": "Pirmasis dienos reisas",
-  "search.where_to": "Kur vykstate?",
-  "schedule.plan_trip": "Planuoti kelionę",
-  "schedule.dismiss_hint": "Supratau",
-  "schedule.search": "Paieška",
-  "schedule.hint": "Ieškote maršruto? Bakstelėkite „Planuoti kelionę“ viršuje.",
   "arriveBy.leave_short": "Išvykimas {time}",
   "arriveBy.by_short": "Atvykti iki {time}"
 }

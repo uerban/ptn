@@ -639,11 +639,6 @@
   "arriveBy.pick_time": "Выберыце час",
   "schedule.lastOfServiceDay": "Апошні рэйс дня",
   "schedule.firstOfServiceDay": "Першы рэйс дня",
-  "search.where_to": "Куды едзеце?",
-  "schedule.plan_trip": "Спланаваць паездку",
-  "schedule.dismiss_hint": "Зразумела",
-  "schedule.search": "Пошук",
-  "schedule.hint": "Шукаеце маршрут? Націсніце «Спланаваць паездку» вышэй.",
   "arriveBy.leave_short": "Адпраўленне {time}",
   "arriveBy.by_short": "Прыбыць да {time}"
 }

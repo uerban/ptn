@@ -622,11 +622,6 @@
   "arriveBy.pick_time": "Välj tid",
   "schedule.lastOfServiceDay": "Dagens sista tur",
   "schedule.firstOfServiceDay": "Dagens första tur",
-  "search.where_to": "Vart ska du?",
-  "schedule.plan_trip": "Planera resa",
-  "schedule.dismiss_hint": "Okej",
-  "schedule.search": "Sök",
-  "schedule.hint": "Letar du efter en rutt? Tryck på ”Planera resa” ovan.",
   "arriveBy.leave_short": "Avgång {time}",
   "arriveBy.by_short": "Ankomst senast {time}"
 }

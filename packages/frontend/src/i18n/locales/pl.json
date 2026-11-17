@@ -616,11 +616,6 @@
   "arriveBy.pick_time": "Wybierz godzinę",
   "schedule.lastOfServiceDay": "Ostatni kurs dnia",
   "schedule.firstOfServiceDay": "Pierwszy kurs dnia",
-  "search.where_to": "Dokąd jedziesz?",
-  "schedule.plan_trip": "Zaplanuj podróż",
-  "schedule.dismiss_hint": "Rozumiem",
-  "schedule.search": "Wyszukiwanie",
-  "schedule.hint": "Szukasz trasy? Dotknij „Zaplanuj podróż” powyżej.",
   "arriveBy.leave_short": "Odjazd {time}",
   "arriveBy.by_short": "Przyjedź do {time}"
 }
