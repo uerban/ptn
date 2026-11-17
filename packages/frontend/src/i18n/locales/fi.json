@@ -625,6 +625,10 @@
   "arriveBy.pick_time": "Valitse aika",
   "schedule.lastOfServiceDay": "Päivän viimeinen vuoro",
   "schedule.firstOfServiceDay": "Päivän ensimmäinen vuoro",
+  "arriveBy.leave_short": "Lähtö {time}",
+  "arriveBy.by_short": "Saapuminen viimeistään {time}",
+  "arriveBy.done": "Valmis",
+  "arriveBy.not_applied": "Saapumisaikaa ei otettu käyttöön",
   "settings.wait_format": "Odotusaikat",
   "settings.wait_minutes_only": "Näytä odotusaika vain minuutteina",
   "settings.wait_minutes_only_desc": "Muutoin tunnin tai pidemmän odotuksen kesto näkyy tunteina ja minuutteina, esimerkiksi 1:05."

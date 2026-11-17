@@ -624,6 +624,10 @@
   "arriveBy.pick_time": "Vali aeg",
   "schedule.lastOfServiceDay": "Päeva viimane reis",
   "schedule.firstOfServiceDay": "Päeva esimene reis",
+  "arriveBy.leave_short": "Väljumine {time}",
+  "arriveBy.by_short": "Saabumine kell {time}",
+  "arriveBy.done": "Valmis",
+  "arriveBy.not_applied": "Saabumisaega ei rakendatud",
   "settings.wait_format": "Ooteajad",
   "settings.wait_minutes_only": "Näita ooteaegu ainult minutites",
   "settings.wait_minutes_only_desc": "Muudel juhtudel kuvatakse ooteaeg, mis on tund või rohkem, tundide ja minutitena, näiteks 1:05."

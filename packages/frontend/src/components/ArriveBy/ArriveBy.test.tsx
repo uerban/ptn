@@ -211,7 +211,7 @@ describe("Arrive-by toolbar", () => {
     render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial
       filters={<button type="button">Bus</button>} /></MemoryRouter>);
     const summary = screen.getByTestId("when-summary");
-    expect(summary).toHaveTextContent("Leave: Now");
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
     expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Bus" }));
     expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
@@ -229,13 +229,13 @@ describe("Arrive-by toolbar", () => {
     fireEvent.click(summary);
     fireEvent.click(screen.getByTestId("leave-in15"));
     expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
-    expect(summary.textContent).toMatch(/^Leave (\S+ )?\d\d:\d\d$/);
+    expect(summary.textContent).toMatch(/^When: Leave (\S+ )?\d\d:\d\d$/);
     expect(onDepartAt).toHaveBeenCalledTimes(1);
     fireEvent.click(summary);
     fireEvent.click(screen.getByTestId("leave-custom"));
     expect(screen.getByTestId("leave-time")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("leave-now"));
-    expect(summary).toHaveTextContent("Leave: Now");
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -245,8 +245,60 @@ describe("Arrive-by toolbar", () => {
     expect(useArriveByUi.getState().mode).toBe("arrive-by");
     fireEvent.click(screen.getByTestId("when-summary"));
     expect(useArriveByUi.getState().mode).toBe("leave");
-    expect(screen.getByTestId("when-summary")).toHaveTextContent("Leave: Now");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
     expect(screen.queryByTestId("arrive-by-apply")).not.toBeInTheDocument();
+  });
+
+  it("opens a modal When sheet outside the header, so the results do not move", () => {
+    render(<Page />);
+    const toolbar = screen.getByTestId("arrive-by-toolbar");
+    const summary = screen.getByTestId("when-summary");
+    expect(summary).toHaveAttribute("aria-haspopup", "dialog");
+    fireEvent.click(summary);
+    const sheet = screen.getByRole("dialog", { name: "When" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(toolbar).not.toContainElement(sheet);
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it("closes on Esc, backdrop and Close, returning focus to the chip and falling back to Leave", () => {
+    render(<Page />);
+    const summary = screen.getByTestId("when-summary");
+    for (const how of ["esc", "backdrop", "close"] as const) {
+      summary.focus();
+      chooseArriveBy();
+      expect(useArriveByUi.getState().mode).toBe("arrive-by");
+      if (how === "esc") fireEvent.keyDown(document, { key: "Escape" });
+      else fireEvent.click(screen.getByTestId(how === "backdrop" ? "when-backdrop" : "when-close"));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(useArriveByUi.getState().mode).toBe("leave");
+      expect(document.activeElement).toBe(summary);
+      expect(screen.getByTestId("when-status")).toHaveTextContent("Arrive by not applied");
+    }
+  });
+
+  it("keeps Pick time as a draft until Done", () => {
+    const onDepartAt = vi.fn();
+    render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial onDepartAt={onDepartAt} /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId("when-summary"));
+    fireEvent.click(screen.getByTestId("leave-custom"));
+    fireEvent.change(screen.getByTestId("leave-date"), { target: { value: "2026-10-12" } });
+    fireEvent.change(screen.getByTestId("leave-time"), { target: { value: "09:30" } });
+    expect(onDepartAt).not.toHaveBeenCalled();
+    expect(useArriveByUi.getState().leaveAtMs).toBeNull();
+    fireEvent.click(screen.getByTestId("leave-done"));
+    expect(onDepartAt).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("09:30");
+    expect(screen.getByTestId("when-status")).toHaveTextContent("When: Leave");
+  });
+
+  it("never opens by itself: a restored unapplied Arrive by starts closed, as Leave", () => {
+    useArriveByUi.setState({ mode: "arrive-by", draftMs: Date.parse("2026-10-12T07:13:00Z"), appliedMs: null });
+    render(<Page />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(useArriveByUi.getState().mode).toBe("leave");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
   });
 
   it("resets to Leave now when the city changes", async () => {

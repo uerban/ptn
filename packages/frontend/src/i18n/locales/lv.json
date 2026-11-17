@@ -627,6 +627,10 @@
   "arriveBy.pick_time": "Izvēlieties laiku",
   "schedule.lastOfServiceDay": "Dienas pēdējais reiss",
   "schedule.firstOfServiceDay": "Dienas pirmais reiss",
+  "arriveBy.leave_short": "Izbraukšana {time}",
+  "arriveBy.by_short": "Ierasties līdz {time}",
+  "arriveBy.done": "Gatavs",
+  "arriveBy.not_applied": "Ierašanās laiks nav piemērots",
   "settings.wait_format": "Gaidīšanas laiki",
   "settings.wait_minutes_only": "Rādīt gaidīšanas laiku tikai minūtēs",
   "settings.wait_minutes_only_desc": "Pārējos gadījumos gaidīšanas laiks, kas ir viena stunda vai ilgāks, tiek parādīts stundās un minūtēs, piemēram, 1:05."
