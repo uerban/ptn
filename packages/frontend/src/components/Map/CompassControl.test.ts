@@ -51,6 +51,22 @@ describe("CompassControl", () => {
     vi.useRealTimers();
   });
 
+  it("still fades after a tap left focus on the button", () => {
+    vi.useFakeTimers();
+    const map = fakeMap(30);
+    const el = new CompassControl((_k, f) => f ?? "").onAdd(map as never);
+    document.body.appendChild(el);
+    const button = el.querySelector("button")!;
+    button.focus();
+    vi.spyOn(button, "matches").mockReturnValue(false); // pointer focus, not :focus-visible
+    map.bearing = 0;
+    map.fire("rotate");
+    vi.advanceTimersByTime(2000);
+    expect(el.hidden).toBe(true);
+    el.remove();
+    vi.useRealTimers();
+  });
+
   it("shows when only tilted", () => {
     const map = fakeMap(0, 30);
     const el = new CompassControl((_k, f) => f ?? "").onAdd(map as never);

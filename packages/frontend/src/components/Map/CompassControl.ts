@@ -75,6 +75,19 @@ export class CompassControl implements maplibregl.IControl {
     this.lingerTimer = this.fadeTimer = null;
   }
 
+  /**
+   * Only keyboard focus keeps the compass up: a tap also focuses the button
+   * on mobile browsers, and that must not stop the fade.
+   */
+  private keyboardFocused(): boolean {
+    if (document.activeElement !== this.button) return false;
+    try {
+      return this.button.matches(":focus-visible");
+    } catch {
+      return true;
+    }
+  }
+
   update = () => {
     if (!this.map) return;
     const bearing = this.map.getBearing();
@@ -84,7 +97,7 @@ export class CompassControl implements maplibregl.IControl {
     this.button.title = label;
     this.button.setAttribute("aria-label", label);
 
-    if (!atNorth || document.activeElement === this.button) {
+    if (!atNorth || this.keyboardFocused()) {
       // Rotated (or focused): show at once, cancel any pending fade.
       this.clearTimers();
       this.container.hidden = false;
