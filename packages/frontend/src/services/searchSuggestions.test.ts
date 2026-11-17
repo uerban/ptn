@@ -1,3 +1,4 @@
+import { invalidateCityData } from "./cityData.ts";
 import { seedLegacyCityProjection } from "../test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { clearPersonal, putPersonal } from "./personalStorage.ts";
@@ -1294,6 +1295,54 @@ describe("server-side POI search wiring (AC-2/3/4/7/16, AC-1c)", () => {
     ]);
   }
 
+  it.each(["unchanged", "generation", "city"])("binds delayed geocoder output to the starting city snapshot (%s)", async change => {
+    setSearchModeAccessor(() => "server-side");
+    const mod = await import("./searchSuggestions.ts");
+    const original = mod.searchStopsWithGroups;
+    let stopDone!: () => void;
+    const stopped = new Promise<void>(resolve => { stopDone = resolve; });
+    vi.spyOn(mod, "searchStopsWithGroups").mockImplementation(async (...args) => {
+      const result = await original(...args);
+      stopDone();
+      return result;
+    });
+    let release!: (rows: GeocoderCandidate[]) => void;
+    const delayed = new Promise<GeocoderCandidate[]>(resolve => { release = resolve; });
+    vi.spyOn(geocoderRegistry, "forward").mockReturnValue(delayed);
+    const onResults = vi.fn();
+    const request = mod.searchSuggestionsStream("central", "gdansk", HINT, new AbortController().signal, "remote", {onResults});
+    await stopped; // The stop read already passed its own snapshot check.
+    const startingCity = useCityStore.getState().activeCity;
+    if (change === "generation") invalidateCityData();
+    if (change === "city") useCityStore.setState({activeCity: {...startingCity, id: startingCity.id === "vilnius" ? "gdansk" : "vilnius"}});
+    release([{label: "Central", lat: 54.35, lon: 18.65, confidence: 0.9, provider: "self-hosted", privacyTier: "self-hosted"}]);
+    try {
+      if (change !== "unchanged") {
+        await expect(request).rejects.toMatchObject({name: "AbortError"});
+        expect(onResults).not.toHaveBeenCalled();
+      } else {
+        await request;
+        expect(onResults).toHaveBeenCalledTimes(1);
+        expect(onResults.mock.calls[0][0][0]).toMatchObject({label: "Central"});
+      }
+    } finally { useCityStore.setState({activeCity: startingCity}); }
+  });
+
+  it("does not re-emit a stale list after a tile driver outlives the city generation", async () => {
+    setSearchModeAccessor(() => "lazy-tile");
+    setGeocoderPresentAccessor(() => false);
+    const emits = vi.fn();
+    const request = searchSuggestionsStream("central", "gdansk", HINT, new AbortController().signal, "remote", {
+      onResults: emits,
+      driver: async landed => {
+        invalidateCityData();
+        await landed([]);
+      },
+    });
+    await expect(request).rejects.toMatchObject({name: "AbortError"});
+    expect(emits).toHaveBeenCalledTimes(1); // Only the pre-invalidation initial frame.
+  });
+
   it("AC-2: searchServerSidePoi calls registry.forward once with (query, hint, signal) and maps results in order", async () => {
     const forward = vi.spyOn(geocoderRegistry, "forward").mockResolvedValue([
       { label: "A", lat: 1, lon: 2, confidence: 0.9, provider: "self-hosted", privacyTier: "self-hosted" },
@@ -1760,6 +1809,15 @@ describe("address augmentation gate + two-emit flow", () => {
     expect(labels).toContain("Gedimino Cafe");
     expect(labels).toContain(valid.label);
     expect(labels).not.toContain("Gedimino invalid");
+  });
+
+  it("does not start augmentation once the initial frame's city snapshot is invalidated", async () => {
+    const forward = vi.spyOn(geocoderRegistry, "forwardSelfHosted").mockResolvedValue([]);
+    const onResults = vi.fn(() => invalidateCityData());
+    const request = searchSuggestionsStream("gedimino", "gdansk", null, new AbortController().signal, "local", {onResults});
+    await expect(request).rejects.toMatchObject({name: "AbortError"});
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(forward).not.toHaveBeenCalled();
   });
 
   it("Gate (no geocoder present): geocoder-present accessor false → no second call", async () => {

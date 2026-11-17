@@ -1,3 +1,4 @@
+import { invalidateCityData } from "./cityData.ts";
 import { seedLegacyCityProjection } from "../test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "fake-indexeddb/auto";
@@ -124,6 +125,17 @@ describe("searchSuggestionsStream — recents integration", () => {
     const out = await searchSuggestions(query, "vilnius", null, sig(), "local");
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({kind: "stop", stopId: "good-stop", lat: 0, lon: 0});
+  });
+
+  it("does not publish delayed empty-query recents after city data changes", async () => {
+    let release!: (rows: RecentRef[]) => void;
+    vi.mocked(listRecents).mockReturnValue(new Promise(resolve => { release = resolve; }));
+    const onResults = vi.fn();
+    const request = searchSuggestionsStream("", "vilnius", null, sig(), "local", {onResults});
+    invalidateCityData();
+    release([stopRecent("S1", "Stoties")]);
+    await expect(request).rejects.toMatchObject({name: "AbortError"});
+    expect(onResults).not.toHaveBeenCalled();
   });
 
   it("empty query returns the recents group (a stop recent → one badged row)", async () => {

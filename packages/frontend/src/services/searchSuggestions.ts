@@ -396,11 +396,15 @@ export async function searchSuggestionsStream(
   provider: SearchProvider,
   cb: SearchStreamCallbacks,
 ): Promise<void> {
+  // Pin the selected city and catalog generation for the whole stream, including
+  // time spent awaiting providers/recents after the stop read has completed.
+  const snapshot = captureCityData();
   const nq = normalizeQuery(query);
   if (!nq) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
     const recents = await recentCandidates("", hint);
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    snapshot.assertCurrent();
     // recents are fingerprint-deduped upstream by listRecents, so no finalize() identity-dedup is needed here.
     cb.onResults(recents.sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS), { done: true, emitSeq: 0 });
     return;
@@ -528,6 +532,7 @@ export async function searchSuggestionsStream(
   }
 
   function emit(partial: SearchSuggestion[], done: boolean): void {
+    snapshot.assertCurrent();
     bestN = partial;
     cb.onResults(partial, { done, emitSeq: emitSeq++ });
   }
@@ -550,6 +555,7 @@ export async function searchSuggestionsStream(
   // thrown AbortError (forwardSelfHosted re-throws); any non-abort failure already
   // degraded to [] inside the registry.
   async function augment(): Promise<GeocodedSuggestion[]> {
+    snapshot.assertCurrent();
     if (!augmentArmed) return [];
     // Sparsity gate over the PRE-SLICE settled local-POI count (must-fix — egress
     // correctness; NOT a count over the sliced bestN). lastPreSliceLocalPoiCount was
