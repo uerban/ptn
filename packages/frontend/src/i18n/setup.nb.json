@@ -35,7 +35,7 @@
   "setup.presentation.text": "Tekstmodus",
   "setup.presentation.textDescription": "Planlegg reiser, sjekk avganger og følg trinnvise instruksjoner uten kart.",
   "setup.presentation.map": "Kartmodus",
-  "setup.presentation.mapDescription": "Planlegg reiser og sjekk avganger med et minimalt frakoblet kart.",
+  "setup.presentation.mapDescription": "Planlegg reiser og sjekk avganger på et kart.",
   "setup.recommended.generic": "LIVE-avganger og varsler om tjenesten, der dette er tilgjengelig i {city}.",
   "setup.recommended.both": "LIVE-avganger og varsler om tjenesten for {city}.",
   "setup.recommended.departuresOnly": "Aktuelle avgangstider for {city}. {city} publiserer ikke driftsvarsler her.",

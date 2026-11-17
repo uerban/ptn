@@ -35,7 +35,7 @@
   "setup.presentation.text": "Teksta režīms",
   "setup.presentation.textDescription": "Plānojiet braucienus, pārbaudiet atiešanas laikus un izpildiet soli pa solim sniegtās instrukcijas bez kartes.",
   "setup.presentation.map": "Kartes režīms",
-  "setup.presentation.mapDescription": "Plānojiet braucienus un pārbaudiet atiešanas laikus, izmantojot minimālu karti bezsaistē.",
+  "setup.presentation.mapDescription": "Plānojiet braucienus un pārbaudiet atiešanas laikus kartē.",
   "setup.recommended.generic": "LIVE informācija par atiešanas laikiem un pakalpojumu paziņojumi, ja tādi ir pieejami {city}.",
   "setup.recommended.both": "LIVE atiešanas laiki un pakalpojumu paziņojumi par {city}.",
   "setup.recommended.departuresOnly": "LIVE atiešanas laiki {city}. {city} šeit nepublicē paziņojumus par pakalpojumiem.",

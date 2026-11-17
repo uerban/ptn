@@ -35,7 +35,7 @@
   "setup.presentation.text": "Tekstinis režimas",
   "setup.presentation.textDescription": "Planuokite keliones, tikrinkite išvykimo laikus ir sekite žingsnis po žingsnio pateikiamas instrukcijas be žemėlapio.",
   "setup.presentation.map": "Žemėlapio režimas",
-  "setup.presentation.mapDescription": "Planuokite keliones ir tikrinkite išvykimus naudodamiesi minimaliu žemėlapiu, veikiančiu neprisijungus prie interneto.",
+  "setup.presentation.mapDescription": "Planuokite keliones ir tikrinkite išvykimo laikus žemėlapyje.",
   "setup.recommended.generic": "LIVE išvykimų ir paslaugų pranešimai, jei jie prieinami {city} mieste.",
   "setup.recommended.both": "LIVE išvykimų ir paslaugų pranešimai {city} mieste.",
   "setup.recommended.departuresOnly": "LIVE išvykimai iš {city}. {city} čia neskelbia pranešimų apie paslaugas.",

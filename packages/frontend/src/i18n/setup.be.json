@@ -35,7 +35,7 @@
   "setup.presentation.text": "Тэкставы рэжым",
   "setup.presentation.textDescription": "Плануйце паездкі, правярайце адпраўленні і выконвайце пакрокавыя інструкцыі без карты.",
   "setup.presentation.map": "Рэжым карты",
-  "setup.presentation.mapDescription": "Плануйце паездкі і правярайце адпраўленні з дапамогай мінімальнай папярэдленай карты.",
+  "setup.presentation.mapDescription": "Плануйце паездкі і правярайце адпраўленні на карце.",
   "setup.recommended.generic": "Інфармацыя пра адпраўленні ў рэжыме рэальнага часу і абвесткі аб сэрвісе, дзе даступна ў г.{city}.",
   "setup.recommended.both": "Інфармацыя пра адпраўленні ў рэальным часе і абвесткі аб сэрвісе для г.{city}.",
   "setup.recommended.departuresOnly": "Актуальныя адпраўленні з г. {city}. Г. {city} не публікуе тут абвесткі аб збоях у працы.",

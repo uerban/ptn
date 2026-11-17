@@ -35,7 +35,7 @@
   "setup.presentation.text": "Tekstimuoto",
   "setup.presentation.textDescription": "Suunnittele matkoja, tarkista lähtöajat ja seuraa vaiheittaisia ohjeita ilman karttaa.",
   "setup.presentation.map": "Karttatila",
-  "setup.presentation.mapDescription": "Suunnittele matkoja ja tarkista lähtöajat minimalistisen offline-kartan avulla.",
+  "setup.presentation.mapDescription": "Suunnittele matkoja ja tarkista lähtöajat kartalta.",
   "setup.recommended.generic": "LIVE-lähtö- ja liikenneilmoitukset, mikäli saatavilla {city}:ssa.",
   "setup.recommended.both": "{city} LIVE lähtöajat ja liikenneilmoitukset.",
   "setup.recommended.departuresOnly": "{city} LIVE lähtöajat. {city} ei julkaise liikenneilmoituksia tässä.",

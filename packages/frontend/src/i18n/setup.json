@@ -35,7 +35,7 @@
   "setup.presentation.text": "Text mode",
   "setup.presentation.textDescription": "Plan journeys, check departures, and follow step-by-step instructions without a map.",
   "setup.presentation.map": "Map mode",
-  "setup.presentation.mapDescription": "Plan journeys and check departures with a minimal offline map.",
+  "setup.presentation.mapDescription": "Plan journeys and check departures on a map.",
   "setup.recommended.generic": "Live departures and service alerts, where available in {city}.",
   "setup.recommended.both": "Live departures and service alerts for {city}.",
   "setup.recommended.departuresOnly": "Live departures for {city}. {city} does not publish service alerts here.",

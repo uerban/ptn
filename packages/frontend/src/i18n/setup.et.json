@@ -35,7 +35,7 @@
   "setup.presentation.text": "Tekstirežiim",
   "setup.presentation.textDescription": "Planeeri reise, vaata väljumisi ja järgi samm-sammult juhiseid ilma kaardita.",
   "setup.presentation.map": "Kaardirežiim",
-  "setup.presentation.mapDescription": "Reiside planeerimine ja väljumiste kontrollimine minimaalse võrguühenduseta kaardi abil.",
+  "setup.presentation.mapDescription": "Planeeri reise ja vaata väljumisi kaardil.",
   "setup.recommended.generic": "LIVE väljumised ja teenuse teated, kui need on {city} saadaval.",
   "setup.recommended.both": "{city} reisi väljumised ja teenuse teated LIVE.",
   "setup.recommended.departuresOnly": "{city} LIVE väljumised. {city} ei avalda siin teenusehäireid.",

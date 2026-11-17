@@ -35,7 +35,7 @@
   "setup.presentation.text": "Textläge",
   "setup.presentation.textDescription": "Planera resor, kolla avgångstider och följ steg-för-steg-instruktioner utan karta.",
   "setup.presentation.map": "Kartläge",
-  "setup.presentation.mapDescription": "Planera resor och kolla avgångar med en minimalistisk offlinekarta.",
+  "setup.presentation.mapDescription": "Planera resor och kolla avgångstider på en karta.",
   "setup.recommended.generic": "Live-information om avgångar och trafikmeddelanden, där sådana finns tillgängliga i {city}.",
   "setup.recommended.both": "Aktuella avgångstider och trafikmeddelanden för {city}.",
   "setup.recommended.departuresOnly": "Aktuella avgångar för {city}. {city} publicerar inga trafikmeddelanden här.",

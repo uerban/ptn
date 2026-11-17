@@ -35,7 +35,7 @@
   "setup.presentation.text": "Tryb tekstowy",
   "setup.presentation.textDescription": "Planuj trasy, sprawdzaj odjazdy i korzystaj z instrukcji krok po kroku bez mapy.",
   "setup.presentation.map": "Tryb mapy",
-  "setup.presentation.mapDescription": "Planuj trasy i sprawdzaj odjazdy, korzystając z minimalistycznej mapy offline.",
+  "setup.presentation.mapDescription": "Planuj trasy i sprawdzaj odjazdy na mapie.",
   "setup.recommended.generic": "Aktualne informacje o odjazdach i powiadomienia o zmianach w rozkładzie, jeśli są dostępne w {city}.",
   "setup.recommended.both": "Aktualne informacje o odjazdach i powiadomienia o zmianach w rozkładzie dla {city}.",
   "setup.recommended.departuresOnly": "Aktualne odjazdy dla {city}. {city} nie publikuje tutaj komunikatów o zmianach w rozkładzie.",

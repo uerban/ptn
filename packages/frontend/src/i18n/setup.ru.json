@@ -35,7 +35,7 @@
   "setup.presentation.text": "Текстовый режим",
   "setup.presentation.textDescription": "Планируйте маршруты, проверяйте расписание отправления и следуйте пошаговым инструкциям без использования карты.",
   "setup.presentation.map": "Режим карты",
-  "setup.presentation.mapDescription": "Планируйте маршруты и проверяйте расписание отправления с помощью минималистичной офлайн-карты.",
+  "setup.presentation.mapDescription": "Планируйте маршруты и проверяйте расписание отправления на карте.",
   "setup.recommended.generic": "LIVE данные о времени отправления и оповещения о работе транспорта, если они доступны в {city}.",
   "setup.recommended.both": "LIVE данные о времени отправления и оповещения о работе транспорта для {city}.",
   "setup.recommended.departuresOnly": "Данные о отправлениях в режиме LIVE для {city}. {city} не публикует здесь оповещения о рейсах.",
