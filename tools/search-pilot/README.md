@@ -26,8 +26,8 @@ completion cannot overwrite that observation.
 The ledger enforces at most 50 materialized jobs and three attempts per job,
 with conservative execution-time reservations including finalization grace.
 The ledger alone does not enforce a planner deadline or inspect retained files.
-The runner implements those boundaries below. Automatic retry backoff, aggregate
-reporting and a representative stratified corpus remain separate work. No
+The runner implements those boundaries below. Automatic retry backoff and a representative stratified corpus remain
+separate work. Read-only reporting is described below. No
 city-scale acceptance follows from ledger tests.
 
 ```sh
@@ -95,3 +95,42 @@ They cover resume, capture-to-ledger interruption, mismatched query rejection,
 empty success versus errors/timeouts (including an early timeout), output and
 storage admission limits, changed runtime/inputs, and actual process-group
 cancellation. The cancellation probe needs local POSIX process inspection.
+
+## Inspect retained evidence
+
+```sh
+python3 tools/search-pilot/report.py <pilot-dir> --out <new-report.json>
+```
+
+The report opens a read-only transactional ledger view and refuses to overwrite
+an export. It verifies the manifest/job table, retained input hashes, capture
+query/settings/runtime contract, immutable manifest references and declared raw
+log digests. A declared success is counted as a verified empty or nonempty
+capture only when those checks pass. Pending, expired-pending, retryable,
+attempts-exhausted, not-started and invalid-evidence jobs remain distinct.
+Reporting does not reconcile or mutate jobs.
+
+Cost includes known attempt elapsed time, unknown-time counts, reserved execution
+budget and current retained bytes. Unknown interrupted durations are not filled
+with zero. Filesystem inspection follows the transactional ledger read and is
+not a globally atomic filesystem snapshot. Storage bytes are observed before
+exporting the report. Initialization, verification and operator wait are outside
+the recorded attempt elapsed time.
+
+Coverage groups the declared partition, stratum, service date and mobility
+request. These labels do not establish representative sampling or prove that
+an engine honors a constraint. Review yield remains not evaluated until review
+actions are supplied; absent reviews are not counted as zero-quality results.
+
+Version 1 candidate diagnostics inspect projected leg chronology, stop
+continuity, mapped entry boarding and available occurrence snapshots. Findings
+require investigation. No findings means only that those fields produced no
+findings; this is not an independent proof of service eligibility, transfer
+rules, physical walking, RT feasibility or overall journey correctness. A
+verified behavioral capture can still have diagnostic findings. Quality verdicts
+remain separate and are never inferred from capture equality.
+
+Reports retain the partial reproducibility classification. They do not certify
+network isolation, authenticate a producer with signatures, replay the engine
+or upload data. Exports are private by default and may contain identifying
+sampling labels or error paths; sharing remains an explicit separate action.
