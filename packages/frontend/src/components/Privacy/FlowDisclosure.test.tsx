@@ -58,14 +58,28 @@ describe("FlowDisclosure dialog", () => {
 
   it("keeps Tab inside the dialog", () => {
     renderDisclosure();
+    // The scrollable text is the first stop, so the keyboard can scroll it.
+    const first = screen.getByTestId("flow-disclosure-body");
     const buttons = screen.getAllByRole("button");
-    const first = buttons[0]!;
     const last = buttons[buttons.length - 1]!;
     last.focus();
     fireEvent.keyDown(last, { key: "Tab" });
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(last);
+  });
+
+  it("puts the main action first and keeps the actions outside the scrolling text", () => {
+    renderDisclosure();
+    const names = screen.getAllByRole("button").map((b) => b.textContent);
+    expect(names).toEqual(["Show detailed map", "Not now", "Don't ask again"]);
+    const body = screen.getByTestId("flow-disclosure-body");
+    expect(body.getAttribute("role")).toBeNull();
+    // Described by the purpose line only, not by the whole text.
+    const describedBy = screen.getByRole("dialog").getAttribute("aria-describedby")!;
+    expect(body.contains(document.getElementById(describedBy))).toBe(true);
+    expect(document.getElementById(describedBy)!.tagName).toBe("P");
+    expect(body.contains(screen.getByRole("button", { name: "Not now" }))).toBe(false);
   });
 
   it("Escape answers Not now and records nothing", () => {

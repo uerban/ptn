@@ -11,6 +11,7 @@ import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { useDelayReportStore } from "../../stores/delayReportStore.ts";
 import { Icon } from "../Icon.tsx";
 import { waitClock, waitSpoken } from "../../utils/waitTime.ts";
+import { dayMarkers, type DayMarker } from "./dayMarkers.ts";
 
 const EMPTY_OVERRIDES: Partial<Record<TransportMode, string>> = {};
 
@@ -141,20 +142,12 @@ export function LineGroup({
       {/* Expanded schedule panel */}
       {expanded && (
         <div className="mx-3 mb-2 border-t border-divider pt-1.5 space-y-1">
-          {departures.map((dep, idx) => {
-            const mins = minutes[idx] ?? 0;
-            if (mins < DEPARTED_CUTOFF_MINUTES) return null;
-
-            return (
-              <ScheduleRow
-                key={`${dep.tripId}_${dep.scheduledTime}`}
-                departure={dep}
-                minutes={mins}
-                formattingLocale={formattingLocale}
-                t={t}
-              />
-            );
-          })}
+          <ExpandedSchedule
+            departures={departures}
+            minutes={minutes}
+            formattingLocale={formattingLocale}
+            t={t}
+          />
         </div>
       )}
     </div>
@@ -253,14 +246,68 @@ function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsP
   );
 }
 
-interface ScheduleRowProps {
-  departure: Departure;
-  minutes: number;
+interface ExpandedScheduleProps {
+  departures: readonly Departure[];
+  minutes: number[];
   formattingLocale: string;
   t: (key: string, fallback?: string) => string;
 }
 
-function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowProps) {
+function ExpandedSchedule({ departures, minutes, formattingLocale, t }: ExpandedScheduleProps) {
+  const rows = departures
+    .map((dep, idx) => ({ dep, mins: minutes[idx] ?? 0 }))
+    .filter((r) => r.mins >= DEPARTED_CUTOFF_MINUTES);
+  const markers = dayMarkers(rows.map((r) => r.dep));
+  return (
+    <>
+      {rows.map(({ dep, mins }, i) => {
+        const marker = markers[i]!;
+        return (
+          <div key={`${dep.tripId}_${dep.scheduledTime}`}>
+            {marker.dateDivider && (
+              <DateDivider date={marker.dateDivider} formattingLocale={formattingLocale} />
+            )}
+            <ScheduleRow
+              departure={dep}
+              minutes={mins}
+              marker={marker}
+              formattingLocale={formattingLocale}
+              t={t}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function DateDivider({ date, formattingLocale }: { date: Date; formattingLocale: string }) {
+  const label = date.toLocaleDateString(formattingLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return (
+    <div
+      data-testid="date-divider"
+      className="flex items-center gap-2 pt-1.5 pb-0.5 text-xs font-semibold text-fg"
+    >
+      <span aria-hidden="true" className="h-px flex-1 bg-fg-muted/60" />
+      <span>{label}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-fg-muted/60" />
+    </div>
+  );
+}
+
+interface ScheduleRowProps {
+  departure: Departure;
+  minutes: number;
+  marker?: DayMarker;
+  formattingLocale: string;
+  t: (key: string, fallback?: string) => string;
+}
+
+function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: ScheduleRowProps) {
   const dep = departure;
   const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
   const isRealTime = Boolean(dep.predictedTime);
@@ -311,6 +358,12 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
     ? waitSpoken(minutes, formattingLocale)
     : null;
 
+  const serviceEdge = marker?.lastOfServiceDay
+    ? t("schedule.lastOfServiceDay", "Last trip of the day")
+    : marker?.firstOfServiceDay
+      ? t("schedule.firstOfServiceDay", "First trip of the day")
+      : null;
+
   const timeColor = isDeparted
     ? "text-fg-muted"
     : isRealTime
@@ -323,8 +376,21 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
       className="flex items-center justify-between"
       style={{ padding: "var(--variant-row-pad)", fontSize: "var(--variant-meta-text-size)" }}
     >
-      {/* Scheduled clock time */}
-      <span data-testid="scheduled-time" data-countdown className="text-fg-muted font-medium">{clockTime}</span>
+      {/* Scheduled clock time, with the service day hand-over named */}
+      <span className="flex items-baseline gap-1.5">
+        <span
+          data-testid="scheduled-time"
+          data-countdown
+          className={serviceEdge ? "text-fg font-bold" : "text-fg-muted font-medium"}
+        >
+          {clockTime}
+        </span>
+        {serviceEdge && (
+          <span data-testid="service-day-edge" className="text-xs font-semibold text-accent">
+            {serviceEdge}
+          </span>
+        )}
+      </span>
 
       <div className="flex items-center gap-2">
         {/* Delay badge — only when real-time and delay >= 60s */}

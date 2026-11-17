@@ -4,7 +4,7 @@
 // both permissions (prompt, denied, granted) still reaches the app.
 import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
-import { SETUP_HEADING, openSetupOptions } from "../helpers/setup-step";
+import { SETUP_HEADING, openSetupOptions, startWithLevel } from "../helpers/setup-step";
 
 type PermissionState = "prompt" | "denied" | "granted";
 
@@ -101,7 +101,7 @@ async function finishRecommendedSetup(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
   await openSetupOptions(page);
   await page.getByRole("radio", { name: /Text mode/ }).check();
-  await page.getByRole("button", { name: "Start with recommended settings" }).click();
+  await startWithLevel(page, "recommended");
   await expect(page.getByTestId("setup-shell")).toHaveCount(0);
   await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 15_000 });
 }

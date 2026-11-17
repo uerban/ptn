@@ -8,6 +8,7 @@
   "presentation.switchToText": "Перейти в текстовий режим",
   "presentation.showMap": "Показати карту",
   "presentation.backToText": "Повернутися до тексту",
+  "presentation.switchToMap": "Перейти в режим «Карта»",
   "presentation.mapDisclosureHeading": "Показати карту?",
   "presentation.mapDisclosureBody": "Файли карт завантажуються один раз із сервера цього додатка та зберігаються на цьому пристрої, тому карта також працює офлайн. Початковий вигляд залишається у текстовому режимі.",
   "presentation.mapDisclosureConfirm": "Завантажити та відобразити карту",
@@ -129,5 +130,8 @@
   "placeSearch.show": "Пошук адрес на сервері",
   "placeSearch.heading": "Пошук адрес на сервері?",
   "placeSearch.details": "Під час введення назви місця додаток надсилає введену інформацію та район, у якому ви здійснюєте пошук, на сервер цього додатка, який шукає відповідні адреси. Зупинки та місця на цьому пристрої все одно шукаються тут.",
+  "serviceAlerts.onRoutes": "Повідомлення щодо цих маршрутів: {count}",
+  "serviceAlerts.affectsLines": "Повідомлення про стан лінії {lines}",
+  "serviceAlerts.sameAsAbove": "Те саме повідомлення, що й вище",
   "nearby.inHours": "за {time}"
 }
