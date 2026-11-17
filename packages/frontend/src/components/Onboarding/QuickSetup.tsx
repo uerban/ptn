@@ -256,7 +256,7 @@ export function QuickSetup(props: QuickSetupProps) {
         </div>
       </details>
 
-      {/* Continue stays on screen at any text size. */}
+      {/* Only Continue and its messages stick, so large text keeps room to read. */}
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
@@ -272,7 +272,6 @@ export function QuickSetup(props: QuickSetupProps) {
             {text("setup.level.customPending")}
           </p>
         )}
-        <p className="text-sm text-fg-muted">{text("setup.changeLater")}</p>
         {props.busy && (
           <p role="status" className="text-sm text-fg">
             {text("setup.starting")}
@@ -284,6 +283,7 @@ export function QuickSetup(props: QuickSetupProps) {
           </p>
         )}
       </div>
+      <p className="text-sm text-fg-muted">{text("setup.changeLater")}</p>
     </section>
   );
 }
