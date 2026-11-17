@@ -71,6 +71,8 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
+          PT_WASM_BASELINE_TEST_PKG="$PWD/crates/pt-wasm/pkg-web/pt_wasm.js" \
+            node --test --test-concurrency=1 crates/pt-wasm/tests/baseline_*.test.mjs crates/pt-wasm/tests/temporal_baseline.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'
           cargo build --release --locked --workspace
           cargo test --workspace --locked
