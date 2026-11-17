@@ -13,6 +13,7 @@ vi.mock("../../src/services/wasmPlanner.ts", () => ({
 }));
 
 import type { RaptorItinerary } from "@pt/shared";
+import { WalkGraphUnavailableError } from "../../src/services/walkGraphClient.ts";
 import { composeItineraries, rankResults } from "../../src/services/raptorComposer.ts";
 import { SearchOrchestrator, type SearchConfig } from "../../src/services/searchOrchestrator.ts";
 import { findReachableStops } from "../../src/services/isochrone.ts";
@@ -299,4 +300,35 @@ it.each([
  if(leg.type!=="transit") throw new Error("expected transit leg");
  expect(leg.alightStopIdx).toBe(position);
  expect(leg.patternStopIds).toEqual(["s0","s1","s2","s0"]);
+});
+
+// Direct origin-to-destination reach says nothing about a transit transfer.
+it.each([
+ {transfer:"short",retained:true,meters:30},
+ {transfer:"long",retained:false},
+ {transfer:"unreachable",retained:false},
+ {transfer:"unavailable",retained:true},
+] as const)("validates $transfer transfer when the whole pedestrian journey is unreachable",async({transfer,retained,...expected})=>{
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"S1",walkSecs:0,distanceMeters:0}])
+  .mockResolvedValueOnce([{stopId:"S4",walkSecs:0,distanceMeters:0}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue([{
+  ...ride,alightSecs:31000,transfers:1,legs:[ride.legs[0],
+   {type:"walk",fromStopId:"S2",toStopId:"S3",departSecs:30000,arriveSecs:30120},
+   {...ride.legs[0],fromStopId:"S3",toStopId:"S4",departSecs:30240,arriveSecs:31000,tripId:"T2"}],
+ }]);
+ const route=vi.fn(async(from:{lat:number;lon:number})=>{
+  if(from.lat!==54.69) return null;
+  if(transfer==="unreachable") return null;
+  if(transfer==="unavailable") throw new WalkGraphUnavailableError("fixture","transient");
+  return {distanceMeters:transfer==="short"?30:181,coords:[[25.28,54.69],[25.28,54.70]] as [number,number][],steps:[]};
+ });
+ const results=await new SearchOrchestrator({raptorIndex:index,walkSpeedMps:1.5,getDelay:()=>null,
+  allStops:[{id:"S2",name:"S2",lat:54.69,lon:25.28},{id:"S3",name:"S3",lat:54.70,lon:25.28}],
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,directWalkRoute:route,
+ }).search({origin:{lat:54.68,lon:25.28},destination:{lat:54.71,lon:25.28},departureTime:new Date(2026,2,30,7,55),ranking:"fastest"});
+ expect(results.some(result=>!!result.directWalk)).toBe(false);
+ expect(results).toHaveLength(retained?1:0);
+ expect(route).toHaveBeenCalledTimes(2);
+ if(retained) expect(results[0].totalWalkMeters).toBe("meters" in expected?expected.meters:undefined);
 });

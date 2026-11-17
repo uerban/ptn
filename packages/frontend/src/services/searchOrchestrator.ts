@@ -339,7 +339,9 @@ export class SearchOrchestrator {
     if (raptorResults.length === 0) return finish([]);
 
     // 5. Compose with walk times
-    const evidenced = walking && this.config.directWalkRoute
+    // Each transfer has its own pedestrian reachability. Failure to walk the
+    // whole journey does not justify skipping those independent checks.
+    const evidenced = this.config.directWalkRoute
       ? await transferWalkEvidence(raptorResults, this.config.allStops, this.config.directWalkRoute,
         riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps))
       : raptorResults;
