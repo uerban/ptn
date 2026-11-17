@@ -145,6 +145,38 @@ describe("searchSuggestions", () => {
       .setChoice("personalization", "enabled");
   });
 
+  it("omits malformed local POIs before ranking without losing valid matching places", async () => {
+    await db.poiIndex.bulkPut([
+      poiRecord("bad", "Central", { lat: 91, lon: 18.65 }),
+      poiRecord("good", "Central Library"),
+    ]);
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    expect(out.filter(s => s.kind === "geocoded").map(s => s.label)).toEqual(["Central Library"]);
+  });
+
+  it("filters malformed local stops before the bounded match limit", async () => {
+    await db.gtfsStops.bulkPut([
+      ...Array.from({length: 25}, (_, i) => gtfsStop(`bad-${i}`, "Central", 91, 18.65)),
+      gtfsStop("good", "Central Library"),
+    ]);
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    expect(out.filter(s => s.kind === "stop").map(s => s.stopId)).toEqual(["good"]);
+  });
+
+  it("invalid group coordinates do not suppress valid matching individual stops", async () => {
+    await db.gtfsStops.bulkPut([gtfsStop("s1", "Central 1"), gtfsStop("s2", "Central 2")]);
+    await db.stopGroups.put({groupId: "bad-group", name: "Central", stopIds: ["s1", "s2"], type: "name_numbered", lat: Number.NaN, lon: 18.65});
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    expect(out.some(s => s.kind === "stopGroup")).toBe(false);
+    expect(out.filter(s => s.kind === "stop").map(s => s.stopId).sort()).toEqual(["s1", "s2"]);
+  });
+
+  it("omits malformed remote stops while preserving valid API neighbors", async () => {
+    mockSearchStops.mockResolvedValue({data: [makeStop("bad", "Central", 54, 181), makeStop("good", "Central Library")]});
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "remote");
+    expect(out.filter(s => s.kind === "stop").map(s => s.stopId)).toEqual(["good"]);
+  });
+
   it("returns empty for empty query", async () => {
     const { searchSuggestions } = await import("./searchSuggestions.ts");
     const results = await searchSuggestions("", "gdansk", null, new AbortController().signal, "local");

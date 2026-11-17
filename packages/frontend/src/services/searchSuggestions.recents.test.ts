@@ -115,6 +115,17 @@ describe("searchSuggestionsStream — recents integration", () => {
     await db.close();
   });
 
+  it.each(["", "central"])("invalid recent endpoints are omitted for query %s", async query => {
+    vi.mocked(listRecents).mockResolvedValue([
+      stopRecent("bad-stop", "Central invalid", Number.NaN, 25),
+      geocodedRecent("Central outside", 54, 181),
+      stopRecent("good-stop", "Central valid", 0, 0),
+    ]);
+    const out = await searchSuggestions(query, "vilnius", null, sig(), "local");
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({kind: "stop", stopId: "good-stop", lat: 0, lon: 0});
+  });
+
   it("empty query returns the recents group (a stop recent → one badged row)", async () => {
     vi.mocked(listRecents).mockResolvedValue([stopRecent("S1", "Stoties")]);
 

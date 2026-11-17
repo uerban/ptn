@@ -383,7 +383,7 @@ async function recentCandidates(nq: string, hint: LatLon | null): Promise<Search
   const out: SearchSuggestion[] = [];
   for (const ref of await listRecents()) {
     const c = recentToCandidate(ref, nq, hint, now);
-    if (c) out.push(c);
+    if (c && hasValidCoordinates(c)) out.push(c);
   }
   return out;
 }
@@ -434,6 +434,7 @@ export async function searchSuggestionsStream(
     // deduplicateRecords; geocoded identity == poiIdentity == the dedup key).
     const byId = new Map<string, SearchSuggestion>();
     for (const s of candidates) {
+      if (!hasValidCoordinates(s)) continue;
       const k = suggestionIdentity(s);
       const prev = byId.get(k);
       // Higher score wins; on an EXACT score tie a bundle row beats a tile row
@@ -692,7 +693,8 @@ export async function searchStopsWithGroups(
 ): Promise<SearchSuggestion[]> {
   const usageCityId = useCityStore.getState().activeCity.id;
   const data = captureCityData(usageCityId);
-  const stops = await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal);
+  const stops = (await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal))
+    .filter(stop => hasValidCoordinates(stop.location));
 
   if (stops.length === 0) return [];
 
@@ -700,7 +702,7 @@ export async function searchStopsWithGroups(
 
   const stopIds = new Set(stops.map((s) => s.id));
   const groups = await data.stopGroups
-    .filter((g) => g.stopIds.some((id) => stopIds.has(id)) && g.stopIds.length > 1)
+    .filter((g) => hasValidCoordinates(g) && g.stopIds.some((id) => stopIds.has(id)) && g.stopIds.length > 1)
     .toArray();
 
   const groupedStopIds = new Set<string>();
@@ -810,6 +812,9 @@ async function searchLocalStops(
     // suggestions with a stale empty array.
     if ((i & 0xff) === 0) throwIfAborted(signal);
     const r = records[i];
+    // Reject before LOCAL_STOP_LIMIT so malformed exact matches cannot hide
+    // a valid lower-ranked stop.
+    if (!hasValidCoordinates(r)) continue;
     const score = nameMatchScore(normalizedQuery, r.name);
     if (score > 0) {
       matches.push({
@@ -919,7 +924,7 @@ export function scorePoiRecord(
   normalizedQuery: string,
   hint: LatLon | null,
 ): SearchSuggestion | null {
-  if (!isPoiCategoryEnabled(rec)) return null;
+  if (!hasValidCoordinates(rec) || !isPoiCategoryEnabled(rec)) return null;
   const aliases = flatAliases(rec.aliases);
   const score = scoreCandidate(
     normalizedQuery,
