@@ -3,6 +3,11 @@ import {readFileSync,writeFileSync,mkdirSync,realpathSync} from "node:fs";
 import {join,relative,dirname,resolve} from "node:path";
 import {sha,sourceRoot} from "./module.mjs";
 
+export function rtCompilerInputName(root,dependencyRoot,actual) {
+  const inSource=relative(root,actual),inDependencies=relative(dependencyRoot,actual);
+  return !inDependencies.startsWith("..")?`dependencies/${inDependencies}`:!inSource.startsWith("..")?inSource:null;
+}
+
 /** Decoder dependencies are compiler inputs too: retain their consumed bytes.
  * Resolver/compiler installation is recorded, not hermetically reconstructible. */
 export async function buildRtModule(destination) {
@@ -22,8 +27,7 @@ export async function buildRtModule(destination) {
       });
       build.onResolve({filter:/^@pt\/shared\/proto$/},()=>({path:join(sourceRoot,"packages/shared/src/proto/route-update.ts")}));
       build.onLoad({filter:/\.(?:m?js|ts|json)$/},args=>{
-        const actual=realpathSync(args.path),inSource=relative(sourceRoot,actual),inDependencies=relative(dependencyRoot,actual);
-        const path=!inSource.startsWith("..")?inSource:!inDependencies.startsWith("..")?`dependencies/${inDependencies}`:null;
+        const actual=realpathSync(args.path),path=rtCompilerInputName(sourceRoot,dependencyRoot,actual);
         if(!path)throw new Error("RT dependency outside declared source/dependency roots");
         const bytes=observed.get(path)??readFileSync(actual);if(!Buffer.from(bytes.toString("utf8")).equals(bytes))throw new Error("Non-UTF8 RT compiler input");
         observed.set(path,bytes);
