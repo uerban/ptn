@@ -1,0 +1,26 @@
+/**
+ * One chip look for the Search header: the time chip, vehicle filters, leave
+ * presets and sort choices. 40 px tall at default text, growing with larger
+ * text (no upper cap), with the tap area padded to at least 44 px.
+ */
+export type SearchChipVariant = "selected" | "idle" | "on" | "off";
+
+const BASE =
+  "relative min-h-10 shrink-0 inline-flex items-center gap-1.5 px-3 rounded-full border " +
+  "text-xs font-semibold leading-tight whitespace-nowrap transition-colors " +
+  // Tap area: at least 44 px tall even while the chip draws 40 px.
+  "before:absolute before:inset-x-0 before:-inset-y-0.5 before:content-[''] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+
+const VARIANT: Record<SearchChipVariant, string> = {
+  selected: "bg-accent text-badge-text border-accent",
+  idle: "bg-input-bg text-fg border-divider hover:border-accent",
+  on: "bg-accent/15 text-fg border-accent/50 hover:border-accent",
+  // Off is said by strike-through and aria-pressed, not by fading: the
+  // label keeps full text contrast.
+  off: "bg-surface text-fg-secondary border-divider line-through decoration-2 hover:border-accent",
+};
+
+export function searchChipClass(variant: SearchChipVariant): string {
+  return `${BASE} ${VARIANT[variant]}`;
+}

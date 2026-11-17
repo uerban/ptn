@@ -58,6 +58,7 @@ import { forgetRecent, recordRecent, type RecentTarget } from "../services/recen
 import { savePlace } from "../services/saves.ts";
 import { RecentRow } from "../components/Search/RecentRow.tsx";
 import { RecentNotice, type RecentNoticeState } from "../components/Search/RecentNotice.tsx";
+import { searchChipClass } from "../components/Search/searchChip.ts";
 import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByEntry.ts";
 import { resolveTransitLegDisplay } from "../services/legEnrichment.ts";
 
@@ -313,9 +314,7 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
   return unixToServiceDate(Math.floor(departureTime.getTime() / 1000), tz);
 }
 
-const vehicleChipClass = (excluded: boolean): string =>
-  `min-h-[min(2.5rem,44px)] flex items-center gap-1 px-2.5 rounded-full text-xs font-medium border shrink-0 transition-colors ${excluded
-    ? "border-divider bg-surface text-fg-muted line-through opacity-50" : "border-accent/30 bg-accent/10 text-fg"}`;
+const vehicleChipClass = (excluded: boolean): string => searchChipClass(excluded ? "off" : "on");
 
 function suggestionEndpoint(suggestion: SearchSuggestion): { ep: BaseEndpoint; name: string } {
   let ep: BaseEndpoint;
@@ -1446,7 +1445,7 @@ export function SearchPage() {
   // arrive-by package they keep a row of their own.
   const vehicleFilters = (availableModes.length >= 2 || availableRouteGroups.length >= 2) ? (
     <div
-      className="flex shrink-0 gap-1.5"
+      className="flex shrink-0 gap-1.5 max-[359px]:flex-wrap max-[359px]:shrink"
       role="group"
       aria-label={t("search.filter_modes", "Filter by vehicle type")}
     >
@@ -1614,7 +1613,7 @@ export function SearchPage() {
 
         {/* Route-only controls return after place picking. */}
         {!activeField && !ArriveByToolbar && vehicleFilters && (
-          <div className="flex overflow-x-auto pt-1 pb-0.5">{vehicleFilters}</div>
+          <div className="flex max-[359px]:flex-wrap overflow-x-auto pt-1 pb-0.5">{vehicleFilters}</div>
         )}
       </div>
 
@@ -1624,9 +1623,10 @@ export function SearchPage() {
 
       {/* Sort chips — pill-style, horizontally scrollable. Never squeezed:
           a scrolling flex item may shrink to nothing when the header is tall. */}
+      {/* Wraps instead of scrolling on narrow screens and at large text. */}
       {!activeField && <div
-        className="flex shrink-0 gap-2 px-3 py-2 overflow-x-auto bg-surface-raised border-b border-divider"
-        role="tablist"
+        className="flex shrink-0 flex-wrap gap-1.5 px-3 py-2 bg-surface-raised border-b border-divider"
+        role="group"
         aria-label={t("search.sort", "Sort")}
       >
         {(["fastest", "fewest_transfers", "least_walking"] as const).map((r) => {
@@ -1634,15 +1634,10 @@ export function SearchPage() {
           return (
             <button
               key={r}
-              role="tab"
-              aria-selected={active}
+              type="button"
+              aria-pressed={active}
               onClick={() => setRanking(r)}
-              className={`shrink-0 px-3.5 py-1.5 text-xs font-semibold rounded-full transition-colors
-                ${
-                  active
-                    ? "bg-accent text-badge-text"
-                    : "bg-surface border border-divider text-fg-muted hover:border-accent"
-                }`}
+              className={searchChipClass(active ? "selected" : "idle")}
             >
               {r === "fastest"
                 ? t("search.fastest", "Fastest")

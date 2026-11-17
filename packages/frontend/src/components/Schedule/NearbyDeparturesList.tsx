@@ -9,6 +9,9 @@ import { bottomStopOf, rowPills, type PillDeparture } from "../../services/nearb
 import { haversineDistance } from "../../utils/geo.ts";
 import { DepartureLineBadge } from "../DepartureLineBadge.tsx";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { useTranslation } from "../../i18n/index.ts";
+import { waitClock, waitSpoken } from "../../utils/waitTime.ts";
 import { useAlertedDepartures } from "../../hooks/useServiceAlertSelection.ts";
 import { ServiceAlertIndicator } from "../ServiceAlerts/ServiceAlertIndicator.tsx";
 
@@ -156,13 +159,21 @@ function DepartureRow({
   onSelectStop: (stop: Stop) => void;
 }) {
   const { departure, minutes, stop } = pill;
-  const when = minutes <= 0 ? text("nearby.due") : text("nearby.inMinutes", { minutes: String(minutes) });
+  const { formattingLocale } = useTranslation();
+  const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
+  const clock = minutes > 0 ? waitClock(minutes, minutesOnly) : null;
+  const when = minutes <= 0
+    ? text("nearby.due")
+    : clock
+      ? text("nearby.inHours", { time: clock })
+      : text("nearby.inMinutes", { minutes: String(minutes) });
+  const whenSpoken = clock ? text("nearby.inHours", { time: waitSpoken(minutes, formattingLocale) }) : when;
   const status = departure.predictedTime ? text("nearby.live") : text("nearby.scheduled");
   const label = `${text("nearby.departureLabel", {
     line: departure.routeShortName,
     headsign: departure.headsign,
     stop: stop.name,
-  })}, ${when}, ${status}${alerted ? `, ${text("serviceAlerts.indicator")}` : ""}`;
+  })}, ${whenSpoken}, ${status}${alerted ? `, ${text("serviceAlerts.indicator")}` : ""}`;
   return (
     <button
       type="button"

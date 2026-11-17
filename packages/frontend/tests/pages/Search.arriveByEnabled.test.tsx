@@ -20,7 +20,7 @@ describe("Search with the arrive-by experiment", () => {
     expect(screen.getByTestId("arrive-by-toolbar")).toBeInTheDocument();
     // Folded by default: one summary button, so the header stays short.
     expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("when-summary")).toHaveTextContent("Leave: Now");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
     fireEvent.click(screen.getByTestId("when-summary"));
     expect(screen.getByRole("button", { name: "Leave" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Arrive by" })).toHaveAttribute("aria-pressed", "false");

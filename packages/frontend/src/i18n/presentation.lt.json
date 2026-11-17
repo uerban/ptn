@@ -132,5 +132,6 @@
   "placeSearch.details": "Kai įvedate vietovės pavadinimą, programėlė siunčia įvestą tekstą ir paieškos vietovę į šios programėlės serverį, kuris suranda atitinkančius adresus. Stotelės ir vietovės šiame įrenginyje vis tiek ieškomos čia.",
   "serviceAlerts.onRoutes": "Įspėjimai apie šiuos maršrutus: {count}",
   "serviceAlerts.affectsLines": "{lines} linijos paslaugos įspėjimas",
-  "serviceAlerts.sameAsAbove": "Toks pat įspėjimas kaip ir aukščiau"
+  "serviceAlerts.sameAsAbove": "Toks pat įspėjimas kaip ir aukščiau",
+  "nearby.inHours": "po {time}"
 }

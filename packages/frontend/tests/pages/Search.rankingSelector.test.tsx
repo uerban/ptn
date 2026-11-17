@@ -31,10 +31,10 @@ describe("Search ranking selector", () => {
   it("highlights the active ranking", () => {
     renderSearch();
     const fastestBtn = screen.getByText("Fastest");
-    expect(fastestBtn).toHaveAttribute("aria-selected", "true");
+    expect(fastestBtn).toHaveAttribute("aria-pressed", "true");
 
     const fewestBtn = screen.getByText("Fewest transfers");
-    expect(fewestBtn).toHaveAttribute("aria-selected", "false");
+    expect(fewestBtn).toHaveAttribute("aria-pressed", "false");
   });
 
   it("updates store when clicking a different ranking", () => {
@@ -53,9 +53,9 @@ describe("Search ranking selector", () => {
     useRoutingStore.setState({ ranking: "least_walking" });
     renderSearch();
     const leastWalkingBtn = screen.getByText("Least walking");
-    expect(leastWalkingBtn).toHaveAttribute("aria-selected", "true");
+    expect(leastWalkingBtn).toHaveAttribute("aria-pressed", "true");
 
     const fastestBtn = screen.getByText("Fastest");
-    expect(fastestBtn).toHaveAttribute("aria-selected", "false");
+    expect(fastestBtn).toHaveAttribute("aria-pressed", "false");
   });
 });
