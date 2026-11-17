@@ -437,6 +437,7 @@ fn main() {
                 let rt_log_format = ctx.config.log_format;
                 let rt_interval = Duration::from_millis(ctx.config.rt_poll_interval_ms);
                 let agent = pt_serve::rt::fetch::rt_agent();
+                let client_name = ctx.config.rt_client_name.clone();
                 let rt_ctx = Arc::clone(&ctx);
                 std::thread::Builder::new()
                     .name("pt-serve-rt-poll".into())
@@ -448,7 +449,7 @@ fn main() {
                             rt_log_format,
                             rt_interval,
                             rt_shutdown,
-                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url),
+                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url, &client_name),
                             move || Some(rt_ctx.current_generation()),
                         )
                     })
@@ -480,6 +481,7 @@ fn main() {
                     Duration::from_millis(ctx.config.rt_service_alerts_poll_interval_ms);
                 let city = ctx.config.city_slug.clone();
                 let agent = pt_serve::rt::fetch::rt_agent();
+                let client_name = ctx.config.rt_client_name.clone();
                 let alerts_ctx = Arc::clone(&ctx);
                 std::thread::Builder::new()
                     .name("pt-serve-alerts-poll".into())
@@ -492,7 +494,7 @@ fn main() {
                             alerts_log_format,
                             alerts_interval,
                             alerts_shutdown,
-                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url),
+                            move |url| pt_serve::rt::fetch::fetch_feed(&agent, url, &client_name),
                             move || Some(alerts_ctx.current_generation()),
                         )
                     })

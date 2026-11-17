@@ -130,6 +130,9 @@ def main():
     alerts = config.get("serviceAlertsURL")
     if alerts:
         serve_args.append(f"--rt-service-alerts-urls={alerts}")
+    client_name = config.get("realtimeClientName")
+    if client_name:
+        serve_args.append(f"--rt-client-name={client_name}")
     if args.command == "serve":
         os.execve(serve_args[0], serve_args, environment)
     # Serialize the entire update, including artifact activation and feed fetch.

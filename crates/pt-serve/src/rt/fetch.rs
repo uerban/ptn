@@ -40,16 +40,37 @@ pub fn rt_agent() -> ureq::Agent {
     builder.build()
 }
 
-/// One feed fetch. `Err` strings land verbatim in `FeedHealth.last_error`
+/// Header carrying [`crate::ops::config::ServerConfig::rt_client_name`].
+/// Entur's convention ("<company>-<application>"); publishers that do not
+/// know it ignore it.
+pub const CLIENT_NAME_HEADER: &str = "ET-Client-Name";
+
+/// Empty (no header) or printable ASCII with no surrounding spaces, so the
+/// value is a valid header field and never smuggles a CR/LF.
+pub fn valid_client_name(name: &str) -> bool {
+    name.is_empty() || (name.bytes().all(|b| (0x20..0x7f).contains(&b)) && name.trim() == name)
+}
+
+/// One feed fetch. `client_name`, when non-empty, is sent as
+/// [`CLIENT_NAME_HEADER`]. `Err` strings land verbatim in `FeedHealth.last_error`
 /// (and therefore in `/health/rt` bodies) — keep them operator-readable.
-pub fn fetch_feed(agent: &ureq::Agent, url: &str) -> Result<Vec<u8>, String> {
-    fetch_feed_capped(agent, url, MAX_FEED_BYTES)
+pub fn fetch_feed(agent: &ureq::Agent, url: &str, client_name: &str) -> Result<Vec<u8>, String> {
+    fetch_feed_capped(agent, url, client_name, MAX_FEED_BYTES)
 }
 
 /// Cap-parameterised inner so tests exercise the cap without allocating
 /// 64 MiB bodies.
-fn fetch_feed_capped(agent: &ureq::Agent, url: &str, cap: u64) -> Result<Vec<u8>, String> {
-    match agent.get(url).call() {
+fn fetch_feed_capped(
+    agent: &ureq::Agent,
+    url: &str,
+    client_name: &str,
+    cap: u64,
+) -> Result<Vec<u8>, String> {
+    let mut request = agent.get(url);
+    if !client_name.is_empty() {
+        request = request.set(CLIENT_NAME_HEADER, client_name);
+    }
+    match request.call() {
         Ok(resp) => {
             let mut bytes = Vec::new();
             match resp.into_reader().take(cap + 1).read_to_end(&mut bytes) {
@@ -77,6 +98,15 @@ mod tests {
     /// imports to `http/` (transport confinement), and that rule stays absolute; same
     /// hand-rolled-HTTP approach as tests/server.rs's raw-TCP helper.
     fn one_shot(status: u16, body: Vec<u8>) -> String {
+        one_shot_capturing(status, body).0
+    }
+
+    /// [`one_shot`] that also hands back the request head it read.
+    fn one_shot_capturing(
+        status: u16,
+        body: Vec<u8>,
+    ) -> (String, std::sync::mpsc::Receiver<String>) {
+        let (tx, rx) = std::sync::mpsc::channel();
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind test server");
         let addr = listener.local_addr().expect("local addr");
         std::thread::spawn(move || {
@@ -90,6 +120,7 @@ mod tests {
                         Ok(n) => head.extend_from_slice(&buf[..n]),
                     }
                 }
+                let _ = tx.send(String::from_utf8_lossy(&head).into_owned());
                 let reason = match status {
                     200 => "OK",
                     503 => "Service Unavailable",
@@ -104,7 +135,7 @@ mod tests {
                 let _ = stream.write_all(&resp);
             }
         });
-        format!("http://{addr}/trip_updates.pb")
+        (format!("http://{addr}/trip_updates.pb"), rx)
     }
 
     fn agent() -> ureq::Agent {
@@ -115,14 +146,39 @@ mod tests {
     fn ok_response_yields_bytes() {
         let payload = include_bytes!("../../tests/fixtures/rt/dated_trip.bin").to_vec();
         let url = one_shot(200, payload.clone());
-        assert_eq!(fetch_feed(&agent(), &url), Ok(payload));
+        assert_eq!(fetch_feed(&agent(), &url, ""), Ok(payload));
+    }
+
+    #[test]
+    fn client_name_is_sent_only_when_configured() {
+        let (url, head) = one_shot_capturing(200, b"x".to_vec());
+        assert_eq!(fetch_feed(&agent(), &url, "acme-ptn"), Ok(b"x".to_vec()));
+        let head = head.recv().unwrap().to_ascii_lowercase();
+        assert!(head.contains("et-client-name: acme-ptn\r\n"), "{head}");
+
+        let (url, head) = one_shot_capturing(200, b"x".to_vec());
+        assert_eq!(fetch_feed(&agent(), &url, ""), Ok(b"x".to_vec()));
+        assert!(!head
+            .recv()
+            .unwrap()
+            .to_ascii_lowercase()
+            .contains("et-client-name"));
+    }
+
+    #[test]
+    fn client_name_validation() {
+        assert!(valid_client_name(""));
+        assert!(valid_client_name("acme-ptn"));
+        assert!(!valid_client_name(" acme"));
+        assert!(!valid_client_name("acme\r\nX: y"));
+        assert!(!valid_client_name("åcme"));
     }
 
     #[test]
     fn http_error_maps_to_http_status_string() {
         // Parity: Node's pollOne sets `HTTP ${response.status}` verbatim.
         let url = one_shot(503, b"upstream sad".to_vec());
-        assert_eq!(fetch_feed(&agent(), &url), Err("HTTP 503".to_string()));
+        assert_eq!(fetch_feed(&agent(), &url, ""), Err("HTTP 503".to_string()));
     }
 
     #[test]
@@ -130,7 +186,7 @@ mod tests {
         // Port 1 is never listening (same trick as health_probe.rs's
         // probe_err_on_no_listener) — no bind-drop-reconnect port-reuse race
         // under parallel test binds.
-        let err = fetch_feed(&agent(), "http://127.0.0.1:1/x.pb").unwrap_err();
+        let err = fetch_feed(&agent(), "http://127.0.0.1:1/x.pb", "").unwrap_err();
         assert!(!err.is_empty());
         assert!(
             !err.starts_with("HTTP "),
@@ -141,7 +197,7 @@ mod tests {
     #[test]
     fn oversized_body_is_a_fetch_failure() {
         let url = one_shot(200, vec![0u8; 16]);
-        let err = fetch_feed_capped(&agent(), &url, 8).unwrap_err();
+        let err = fetch_feed_capped(&agent(), &url, "", 8).unwrap_err();
         assert!(err.contains("cap"), "expected cap error, got: {err}");
     }
 
@@ -150,10 +206,13 @@ mod tests {
         // Locks in the take(cap + 1) / len > cap off-by-one: exactly-cap is
         // a valid feed, cap+1 is a failure.
         let at_cap = one_shot(200, vec![0u8; 8]);
-        assert_eq!(fetch_feed_capped(&agent(), &at_cap, 8), Ok(vec![0u8; 8]));
+        assert_eq!(
+            fetch_feed_capped(&agent(), &at_cap, "", 8),
+            Ok(vec![0u8; 8])
+        );
 
         let over_cap = one_shot(200, vec![0u8; 9]);
-        let err = fetch_feed_capped(&agent(), &over_cap, 8).unwrap_err();
+        let err = fetch_feed_capped(&agent(), &over_cap, "", 8).unwrap_err();
         assert!(err.contains("cap"), "expected cap error, got: {err}");
     }
 }
