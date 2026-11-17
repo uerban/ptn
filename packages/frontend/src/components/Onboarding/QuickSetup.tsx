@@ -186,7 +186,7 @@ export function QuickSetup(props: QuickSetupProps) {
             />
             <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
               <span className="text-base font-medium text-fg">{text(LEVEL_LABEL[value])}</span>
-              <span id={ids[value]} className="text-sm text-fg-secondary">
+              <span id={ids[value]} aria-hidden="true" className="text-sm text-fg-secondary">
                 {levelLine(value)}
               </span>
             </span>
@@ -217,7 +217,7 @@ export function QuickSetup(props: QuickSetupProps) {
               />
               <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
                 <span className="text-base text-fg">{text(label)}</span>
-                <span id={ids[idKey]} className="text-sm text-fg-secondary">
+                <span id={ids[idKey]} aria-hidden="true" className="text-sm text-fg-secondary">
                   {text(description)}
                 </span>
               </span>

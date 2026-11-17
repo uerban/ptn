@@ -49,6 +49,8 @@ describe("QuickSetup", () => {
     expect(levels.map((r) => r.getAttribute("value"))).toEqual(["recommended", "strict", "customize"]);
     expect((levels[0] as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText("More options and details")).toBeNull();
+    // Screen readers say the level once, then its line as the description.
+    expect(screen.getByRole("radio", { name: "Strict" }).getAttribute("aria-describedby")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue with Recommended" }));
     expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended" });
   });
