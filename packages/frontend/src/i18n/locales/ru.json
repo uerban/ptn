@@ -638,5 +638,15 @@
   "arriveBy.leave_short": "Отправление {time}",
   "arriveBy.by_short": "Прибыть к {time}",
   "arriveBy.done": "Готово",
-  "arriveBy.not_applied": "Время прибытия не применено"
+  "arriveBy.not_applied": "Время прибытия не применено",
+  "settings.wait_format": "Время ожидания",
+  "settings.wait_minutes_only": "Отображать время ожидания только в минутах",
+  "settings.wait_minutes_only_desc": "В остальных случаях время ожидания продолжительностью один час или более отображается в формате часов и минут, например 1:05.",
+  "search.recent_actions": "Действия: {label}",
+  "search.recent_save": "Сохранить место",
+  "search.recent_remove": "Удалить из недавних",
+  "search.recent_saved": "Сохранено {label}",
+  "search.recent_removed": "{label} удалено из недавних",
+  "search.recent_undo": "Отменить",
+  "map.compass_reset": "Повернуть карту на север"
 }

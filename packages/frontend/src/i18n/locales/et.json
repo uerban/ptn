@@ -627,5 +627,15 @@
   "arriveBy.leave_short": "Väljumine {time}",
   "arriveBy.by_short": "Saabumine kell {time}",
   "arriveBy.done": "Valmis",
-  "arriveBy.not_applied": "Saabumisaega ei rakendatud"
+  "arriveBy.not_applied": "Saabumisaega ei rakendatud",
+  "settings.wait_format": "Ooteajad",
+  "settings.wait_minutes_only": "Näita ooteaegu ainult minutites",
+  "settings.wait_minutes_only_desc": "Muudel juhtudel kuvatakse ooteaeg, mis on tund või rohkem, tundide ja minutitena, näiteks 1:05.",
+  "search.recent_actions": "Toimingud: {label}",
+  "search.recent_save": "Salvesta koht",
+  "search.recent_remove": "Eemalda hiljutistest",
+  "search.recent_saved": "Salvestatud {label}",
+  "search.recent_removed": "{label} eemaldati hiljutistest",
+  "search.recent_undo": "Tühista",
+  "map.compass_reset": "Pööra kaart põhja poole"
 }

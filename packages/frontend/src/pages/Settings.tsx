@@ -1,5 +1,6 @@
 import { GpsSettings } from "../components/Settings/GpsSettings.tsx";
 import { SearchLayoutSettings } from "../components/Search/SearchLayoutSettings.tsx";
+import { WaitFormatSetting } from "../components/Settings/WaitFormatSetting.tsx";
 import { useState, useRef, useEffect, Suspense, lazy } from "react";
 import {
   useSettingsStore,
@@ -959,6 +960,7 @@ export function SettingsPage() {
                 <PrivacyLevelSection part="details" />
               </Suspense>
             </ErrorBoundary>
+            <WaitFormatSetting />
             <SearchLayoutSettings />
           </>
         )}

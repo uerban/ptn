@@ -619,5 +619,15 @@
   "arriveBy.leave_short": "Odjazd {time}",
   "arriveBy.by_short": "Przyjedź do {time}",
   "arriveBy.done": "Gotowe",
-  "arriveBy.not_applied": "Nie zastosowano godziny przyjazdu"
+  "arriveBy.not_applied": "Nie zastosowano godziny przyjazdu",
+  "settings.wait_format": "Czasy oczekiwania",
+  "settings.wait_minutes_only": "Pokaż czasy oczekiwania tylko w minutach",
+  "settings.wait_minutes_only_desc": "W pozostałych przypadkach czas oczekiwania wynoszący godzinę lub więcej jest wyświetlany w formacie godzin i minut, np. 1:05.",
+  "search.recent_actions": "Działania: {label}",
+  "search.recent_save": "Zapisz miejsce",
+  "search.recent_remove": "Usuń z ostatnich",
+  "search.recent_saved": "Zapisano {label}",
+  "search.recent_removed": "Usunięto {label} z ostatnich",
+  "search.recent_undo": "Cofnij",
+  "map.compass_reset": "Obróć mapę na północ"
 }

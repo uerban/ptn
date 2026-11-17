@@ -132,5 +132,6 @@
   "placeSearch.details": "Kiedy wpisujesz nazwę miejsca, aplikacja wysyła to, co wpisujesz, oraz obszar, w którym szukasz, na serwer tej aplikacji, który wyszukuje pasujące adresy. Przystanki i miejsca na tym urządzeniu są nadal wyszukiwane tutaj.",
   "serviceAlerts.onRoutes": "Powiadomienia dotyczące tych tras: {count}",
   "serviceAlerts.affectsLines": "Powiadomienie serwisowe dotyczące linii {lines}",
-  "serviceAlerts.sameAsAbove": "Ten sam komunikat co powyżej"
+  "serviceAlerts.sameAsAbove": "Ten sam komunikat co powyżej",
+  "nearby.inHours": "za {time}"
 }

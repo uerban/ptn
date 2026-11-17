@@ -132,5 +132,6 @@
   "placeSearch.details": "Kun kirjoitat paikkaa, sovellus lähettää kirjoittamasi tekstin ja hakualueen tämän sovelluksen palvelimelle, joka etsii vastaavia osoitteita. Pysäkit ja paikat tällä laitteella haetaan edelleen täältä.",
   "serviceAlerts.onRoutes": "Ilmoitukset näillä reiteillä: {count}",
   "serviceAlerts.affectsLines": "Linjan {lines} palveluilmoitus",
-  "serviceAlerts.sameAsAbove": "Sama ilmoitus kuin edellä"
+  "serviceAlerts.sameAsAbove": "Sama ilmoitus kuin edellä",
+  "nearby.inHours": "{time} kuluttua"
 }

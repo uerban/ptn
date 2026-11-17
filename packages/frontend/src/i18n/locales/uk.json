@@ -639,5 +639,15 @@
   "arriveBy.leave_short": "Відправлення {time}",
   "arriveBy.by_short": "Прибути до {time}",
   "arriveBy.done": "Готово",
-  "arriveBy.not_applied": "Час прибуття не застосовано"
+  "arriveBy.not_applied": "Час прибуття не застосовано",
+  "settings.wait_format": "Час очікування",
+  "settings.wait_minutes_only": "Показувати час очікування лише у хвилинах",
+  "settings.wait_minutes_only_desc": "В інших випадках час очікування, що становить годину або більше, відображається у форматі годин і хвилин, наприклад 1:05.",
+  "search.recent_actions": "Дії: {label}",
+  "search.recent_save": "Зберегти місце",
+  "search.recent_remove": "Видалити з нещодавніх",
+  "search.recent_saved": "Збережено {label}",
+  "search.recent_removed": "{label} видалено з нещодавніх",
+  "search.recent_undo": "Скасувати",
+  "map.compass_reset": "Повернути карту на північ"
 }

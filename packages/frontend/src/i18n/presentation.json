@@ -27,6 +27,7 @@
   "nearby.oppositeGroup": "Opposite direction, {stop}, {distance}",
   "nearby.departureLabel": "Line {line} toward {headsign}, from {stop}",
   "nearby.inMinutes": "in {minutes} min",
+  "nearby.inHours": "in {time}",
   "nearby.due": "due now",
   "nearby.live": "Live",
   "nearby.scheduled": "Scheduled",

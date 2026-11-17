@@ -642,5 +642,15 @@
   "arriveBy.leave_short": "Адпраўленне {time}",
   "arriveBy.by_short": "Прыбыць да {time}",
   "arriveBy.done": "Гатова",
-  "arriveBy.not_applied": "Час прыбыцця не ўжыты"
+  "arriveBy.not_applied": "Час прыбыцця не ўжыты",
+  "settings.wait_format": "Час чакання",
+  "settings.wait_minutes_only": "Паказваць час чакання толькі ў хвілінах",
+  "settings.wait_minutes_only_desc": "Інакш чаканне ў гадзіну і больш паказваецца ў гадзінах і хвілінах, напрыклад 1:05.",
+  "search.recent_actions": "Дзеянні для {label}",
+  "search.recent_save": "Захаваць месца",
+  "search.recent_remove": "Выдаліць з нядаўніх",
+  "search.recent_saved": "Захаваны {label}",
+  "search.recent_removed": "{label} выдалена з нядаўніх",
+  "search.recent_undo": "Скасаваць",
+  "map.compass_reset": "Павярнуць карту на поўнач"
 }

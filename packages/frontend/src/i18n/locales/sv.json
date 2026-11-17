@@ -625,5 +625,15 @@
   "arriveBy.leave_short": "Avgång {time}",
   "arriveBy.by_short": "Ankomst senast {time}",
   "arriveBy.done": "Klart",
-  "arriveBy.not_applied": "Ankomsttiden tillämpades inte"
+  "arriveBy.not_applied": "Ankomsttiden tillämpades inte",
+  "settings.wait_format": "Väntetider",
+  "settings.wait_minutes_only": "Visa väntetider endast i minuter",
+  "settings.wait_minutes_only_desc": "I övrigt visas en väntetid på en timme eller mer som timmar och minuter, till exempel 1:05.",
+  "search.recent_actions": "Åtgärder för {label}",
+  "search.recent_save": "Spara plats",
+  "search.recent_remove": "Ta bort från senaste",
+  "search.recent_saved": "Sparad {label}",
+  "search.recent_removed": "{label} togs bort från senaste",
+  "search.recent_undo": "Ångra",
+  "map.compass_reset": "Vänd kartan mot norr"
 }
