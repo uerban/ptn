@@ -10,7 +10,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
-import { openSetupOptions } from "../helpers/setup-step";
+import { openSetupOptions, startWithLevel } from "../helpers/setup-step";
 
 test.use({ permissions: [] });
 
@@ -64,7 +64,7 @@ test.describe("resilience @mock-api", () => {
     await page.getByRole("button", { name: /^Vilnius/ }).click();
     await openSetupOptions(page);
     await page.getByRole("radio", { name: /Text mode/ }).check();
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expectInApp(page);
     // Planning in the same session, without a reload that would lose setup.
     await page.getByRole("link", { name: "Settings" }).click();

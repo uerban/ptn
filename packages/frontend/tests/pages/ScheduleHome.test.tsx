@@ -87,7 +87,10 @@ describe("ScheduleHome", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Vilnius")).toBeTruthy();
-    expect(screen.getByTestId("plan-trip-btn")).toBeTruthy();
+    // Search lives in the bottom navigation only: no second or third entry.
+    expect(screen.queryByTestId("plan-trip-btn")).toBeNull();
+    expect(screen.queryByTestId("search-bar")).toBeNull();
+    expect(screen.getByTestId("show-map-btn")).toBeTruthy();
   });
 
   it("keeps the chosen city when a later location fix is in another city", async () => {

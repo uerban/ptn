@@ -3,31 +3,33 @@ import type { Page } from "@playwright/test";
 /** Heading of the second setup step (after the city is chosen). */
 export const SETUP_HEADING = "Ready to start";
 
-/** The one big action of the second step while Map mode is selected. */
-export const START_MAP_ACTION = "Continue to the map";
+/** The Continue action while the preselected Recommended level is chosen. */
+export const START_MAP_ACTION = "Continue with Recommended";
 
 /**
- * Open "More options and details" on the second setup step. The start-mode
- * choice, Strict privacy and Customize live behind it. Safe to call when it
- * is already open; the disclosure closes again on reload.
+ * The second setup step shows every choice on the page now; kept so specs
+ * can wait for the step before picking a choice.
  */
 export async function openSetupOptions(page: Page): Promise<void> {
-  const summary = page.getByText("More options and details", { exact: true });
-  await summary.waitFor();
-  const open = await summary.evaluate(
-    (el) => (el.closest("details") as HTMLDetailsElement | null)?.open ?? false,
-  );
-  if (!open) await summary.click();
+  await page.getByRole("group", { name: "Privacy level" }).waitFor();
 }
 
-/**
- * Accessible name of the button that finishes setup. Recommended reads
- * "Continue to the map" while Map mode is selected.
- */
-export function setupActionName(
-  preset: "recommended" | "strict",
-  mode: "Text" | "Map",
-): string {
-  if (preset === "strict") return "Start with strict privacy";
-  return mode === "Map" ? START_MAP_ACTION : "Start with recommended settings";
+/** Pick a privacy level on the second setup step. */
+export async function chooseSetupLevel(
+  page: Page,
+  preset: "recommended" | "strict" | "customize",
+): Promise<void> {
+  const name = { recommended: /^Recommended/, strict: /^Strict/, customize: /^Custom/ }[preset];
+  await page.getByRole("group", { name: "Privacy level" }).getByRole("radio", { name }).check();
+}
+
+/** Pick a level and press Continue, which names that level. */
+export async function startWithLevel(page: Page, preset: "recommended" | "strict"): Promise<void> {
+  await chooseSetupLevel(page, preset);
+  await page.getByRole("button", { name: setupActionName(preset) }).click();
+}
+
+/** Accessible name of the button that finishes setup for a level. */
+export function setupActionName(preset: "recommended" | "strict", _mode?: "Text" | "Map"): string {
+  return preset === "strict" ? "Continue with Strict" : "Continue with Recommended";
 }

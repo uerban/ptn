@@ -8,6 +8,7 @@
   "presentation.switchToText": "Växla till textläge",
   "presentation.showMap": "Visa karta",
   "presentation.backToText": "Tillbaka till texten",
+  "presentation.switchToMap": "Växla till kartläge",
   "presentation.mapDisclosureHeading": "Visa en karta?",
   "presentation.mapDisclosureBody": "Kartfilerna laddas ner en gång från appens server och sparas på enheten, så att kartan även fungerar offline senare. Startvyn förblir i textläge.",
   "presentation.mapDisclosureConfirm": "Ladda ner och visa karta",
@@ -128,5 +129,8 @@
   "serviceAlerts.lines": "Linje {lines}",
   "placeSearch.show": "Sök adresser på servern",
   "placeSearch.heading": "Söka efter adresser på servern?",
-  "placeSearch.details": "När du skriver in en plats skickar appen det du skriver och det område du söker i till appens server, som söker efter matchande adresser. Hållplatser och platser på den här enheten söks fortfarande här."
+  "placeSearch.details": "När du skriver in en plats skickar appen det du skriver och det område du söker i till appens server, som söker efter matchande adresser. Hållplatser och platser på den här enheten söks fortfarande här.",
+  "serviceAlerts.onRoutes": "Varningar på dessa rutter: {count}",
+  "serviceAlerts.affectsLines": "Tjänstevarning för linje {lines}",
+  "serviceAlerts.sameAsAbove": "Samma meddelande som ovan"
 }

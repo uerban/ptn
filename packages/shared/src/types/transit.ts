@@ -63,6 +63,11 @@ export interface Departure {
   delaySeconds?: number;
   tripId: string;
   cancelled?: boolean;
+  /**
+   * GTFS service date (YYYYMMDD) the trip runs under. A 25:10 trip belongs to
+   * the previous service day although it leaves after midnight.
+   */
+  serviceDate?: string;
 }
 
 /** A single leg of a journey (one segment between transfers) */

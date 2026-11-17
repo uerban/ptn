@@ -8,6 +8,7 @@
   "presentation.switchToText": "Switch to Text mode",
   "presentation.showMap": "Show map",
   "presentation.backToText": "Back to text",
+  "presentation.switchToMap": "Switch to Map mode",
   "presentation.mapDisclosureHeading": "Show a map?",
   "presentation.mapDisclosureBody": "Map files are downloaded once from this app's server and kept on this device, so the map also works offline later. Your starting view stays Text mode.",
   "presentation.mapDisclosureConfirm": "Download and show map",
@@ -128,5 +129,8 @@
   "update.updating": "Updating…",
   "update.notNow": "Not now",
   "serviceAlerts.offerCityFallback": "this city",
-  "serviceAlerts.lines": "Line {lines}"
+  "serviceAlerts.lines": "Line {lines}",
+  "serviceAlerts.onRoutes": "Alerts on these routes: {count}",
+  "serviceAlerts.affectsLines": "Service alert affects line {lines}",
+  "serviceAlerts.sameAsAbove": "Same alert as above"
 }

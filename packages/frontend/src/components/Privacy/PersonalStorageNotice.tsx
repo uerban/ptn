@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import {
   isPersonalStorageSessionOnly,
   usePersonalStorageStatus,
@@ -15,6 +15,7 @@ const ENCRYPTED_SHORT = "Saved places and history are encrypted on this device."
 /** Short line shown after something was saved. */
 export function SavedStorageNote({ durable }: { durable: boolean }) {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   return (
     <p role="status" className="text-xs text-fg-muted" data-testid="saved-storage-note">
       {durable
@@ -30,6 +31,7 @@ export function SavedStorageNote({ durable }: { durable: boolean }) {
 /** What encryption on this device does and does not do (Settings). */
 export function PersonalStorageDetail() {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   return (
     <div className="mb-3 space-y-1 text-xs text-fg-muted" data-testid="personal-storage-detail">
       <p>{t("privacy.storage.encryptedShort", ENCRYPTED_SHORT)}</p>
@@ -66,6 +68,9 @@ export function PersonalStorageNotice({
   const sessionOnly = isPersonalStorageSessionOnly(status);
   const unreadable = status.unreadable > 0 || status.keyMode === "key-unreadable";
   const running = showProgress && status.migration === "running";
+  // Shown in the app shell: fetch the namespace only when there is
+  // something to say, not on every start.
+  usePrivacyNamespace(migrationFailed || sessionOnly || unreadable || running);
   if (!migrationFailed && !sessionOnly && !unreadable && !running) {
     return null;
   }

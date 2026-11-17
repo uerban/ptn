@@ -8,6 +8,7 @@
   "presentation.switchToText": "Bytt til tekstmodus",
   "presentation.showMap": "Vis kart",
   "presentation.backToText": "Tilbake til teksten",
+  "presentation.switchToMap": "Bytt til kartmodus",
   "presentation.mapDisclosureHeading": "Vise et kart?",
   "presentation.mapDisclosureBody": "Kartfilene lastes ned én gang fra appens server og lagres på enheten, slik at kartet også fungerer frakoblet senere. Startvisningen forblir i tekstmodus.",
   "presentation.mapDisclosureConfirm": "Last ned og vis kart",
@@ -128,5 +129,8 @@
   "serviceAlerts.lines": "Linje {lines}",
   "placeSearch.show": "Søk etter adresser på serveren",
   "placeSearch.heading": "Søke etter adresser på serveren?",
-  "placeSearch.details": "Mens du skriver inn et sted, sender appen det du skriver og området du søker i til appens server, som søker etter matchende adresser. Holdeplasser og steder på denne enheten søkes fortsatt her."
+  "placeSearch.details": "Mens du skriver inn et sted, sender appen det du skriver og området du søker i til appens server, som søker etter matchende adresser. Holdeplasser og steder på denne enheten søkes fortsatt her.",
+  "serviceAlerts.onRoutes": "Varsler på disse rutene: {count}",
+  "serviceAlerts.affectsLines": "Tjenestevarsel for linje {lines}",
+  "serviceAlerts.sameAsAbove": "Samme varsel som ovenfor"
 }
