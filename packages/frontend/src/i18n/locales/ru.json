@@ -637,5 +637,7 @@
   "arriveBy.in_15": "Через 15 минут",
   "arriveBy.in_30": "Через 30 минут",
   "arriveBy.in_60": "Через 1 час",
-  "arriveBy.pick_time": "Выбрать время"
+  "arriveBy.pick_time": "Выбрать время",
+  "schedule.lastOfServiceDay": "Последний рейс дня",
+  "schedule.firstOfServiceDay": "Первый рейс дня"
 }

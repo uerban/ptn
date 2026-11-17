@@ -626,5 +626,7 @@
   "arriveBy.in_15": "15 minuti pärast",
   "arriveBy.in_30": "30 minuti pärast",
   "arriveBy.in_60": "1 tunni pärast",
-  "arriveBy.pick_time": "Vali aeg"
+  "arriveBy.pick_time": "Vali aeg",
+  "schedule.lastOfServiceDay": "Päeva viimane reis",
+  "schedule.firstOfServiceDay": "Päeva esimene reis"
 }

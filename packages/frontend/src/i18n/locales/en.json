@@ -641,5 +641,7 @@
   "settings.micromap_layer_places": "district and place names",
   "settings.trips": "Trips",
   "settings.trip_alerts": "Trip alerts",
-  "settings.offline_load_error": "Could not load offline settings."
+  "settings.offline_load_error": "Could not load offline settings.",
+  "schedule.lastOfServiceDay": "Last trip of the day",
+  "schedule.firstOfServiceDay": "First trip of the day"
 }
