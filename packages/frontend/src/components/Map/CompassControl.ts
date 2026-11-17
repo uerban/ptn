@@ -4,6 +4,10 @@ type Translate = (key: string, fallback?: string) => string;
 
 /** Bearings this close to north count as north (float noise after easing). */
 const NORTH_EPSILON_DEG = 0.5;
+/** How long the compass stays after the map is back at north. */
+export const COMPASS_LINGER_MS = 1500;
+/** Matches the fade in index.css. */
+const FADE_MS = 300;
 
 function needleIcon(): SVGSVGElement {
   const ns = "http://www.w3.org/2000/svg";
@@ -32,6 +36,8 @@ export class CompassControl implements maplibregl.IControl {
   private container = document.createElement("div");
   private button = document.createElement("button");
   private needle = needleIcon();
+  private lingerTimer: ReturnType<typeof setTimeout> | null = null;
+  private fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private t: Translate) {
     this.container.className = "maplibregl-ctrl maplibregl-ctrl-group ptn-compass-group";
@@ -48,6 +54,7 @@ export class CompassControl implements maplibregl.IControl {
 
   onAdd(map: maplibregl.Map) {
     this.map = map;
+    this.container.hidden = map.getBearing() === 0 && map.getPitch() === 0;
     map.on("rotate", this.update);
     map.on("pitch", this.update);
     this.update();
@@ -55,21 +62,45 @@ export class CompassControl implements maplibregl.IControl {
   }
 
   onRemove() {
+    this.clearTimers();
     this.map?.off("rotate", this.update);
     this.map?.off("pitch", this.update);
     this.container.remove();
     this.map = null;
   }
 
+  private clearTimers() {
+    if (this.lingerTimer) clearTimeout(this.lingerTimer);
+    if (this.fadeTimer) clearTimeout(this.fadeTimer);
+    this.lingerTimer = this.fadeTimer = null;
+  }
+
   update = () => {
     if (!this.map) return;
     const bearing = this.map.getBearing();
     const atNorth = Math.abs(bearing) < NORTH_EPSILON_DEG && this.map.getPitch() < NORTH_EPSILON_DEG;
-    // Hidden from everyone at north; a focused button keeps focus until moved.
-    this.container.hidden = atNorth && document.activeElement !== this.button;
     this.needle.style.transform = `rotate(${-bearing}deg)`;
     const label = this.t("map.compass_reset", "Turn map to north");
     this.button.title = label;
     this.button.setAttribute("aria-label", label);
+
+    if (!atNorth || document.activeElement === this.button) {
+      // Rotated (or focused): show at once, cancel any pending fade.
+      this.clearTimers();
+      this.container.hidden = false;
+      this.container.classList.remove("ptn-compass-fading");
+      return;
+    }
+    if (this.container.hidden || this.lingerTimer || this.fadeTimer) return;
+    // Back at north: linger, fade, then leave the layout.
+    this.lingerTimer = setTimeout(() => {
+      this.lingerTimer = null;
+      this.container.classList.add("ptn-compass-fading");
+      this.fadeTimer = setTimeout(() => {
+        this.fadeTimer = null;
+        this.container.hidden = true;
+        this.container.classList.remove("ptn-compass-fading");
+      }, FADE_MS);
+    }, COMPASS_LINGER_MS);
   };
 }
