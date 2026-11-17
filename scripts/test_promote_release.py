@@ -84,15 +84,15 @@ class PromotionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'complete artifact set'):
                 promote.verify_downloads(root, release, REV)
 
-    def test_promotion_copies_every_asset_without_workflow_dispatch(self):
+    def promote_with_runs(self, events):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             release = self.files(root)
             release['html_url'] = 'https://github.com/example/ptn/releases/tag/v0.2.0-rc.1'
-            runs = [{'status': 'completed', 'conclusion': 'success', 'event': 'workflow_dispatch',
-                     'head_branch': 'main', 'display_title': f'{title} {REV}',
+            runs = [{'status': 'completed', 'conclusion': 'success', 'event': event,
+                     'head_branch': 'main', 'head_sha': REV, 'display_title': f'{title} {REV}',
                      'path': f'.github/workflows/{workflow}'}
-                    for workflow, title in [('regression.yml', 'Regression gates'), ('release.yml', 'Release validation')]]
+                    for (workflow, title), event in zip([('regression.yml', 'Regression gates'), ('release.yml', 'Release validation')], events)]
             # Inject real complete proof and its original run IDs into the fixture.
             proof = {'schemaVersion': 1, 'revision': REV, 'passed': True, 'sourceDirty': False,
                      'runId': '1', 'runner': 'Linux', 'checks': {name: 'success' for name in
@@ -110,11 +110,20 @@ class PromotionTests(unittest.TestCase):
                 temporary.return_value.__enter__.return_value = directory
                 with patch('sys.argv', ['promote-release.py', 'v0.2.0', '--from-rc', 'v0.2.0-rc.1']):
                     promote.main()
-                calls = [call.args for call in gh.call_args_list]
+                return directory, [call.args for call in gh.call_args_list]
+
+    def test_promotion_copies_every_asset_without_workflow_dispatch(self):
+        for events in (('workflow_dispatch', 'workflow_dispatch'), ('workflow_dispatch', 'push')):
+            with self.subTest(events=events):
+                directory, calls = self.promote_with_runs(events)
                 self.assertEqual([call[:2] for call in calls], [('release', 'download'), ('release', 'create')])
                 uploaded = {Path(arg).name for arg in calls[1] if arg.startswith(directory + '/')}
                 self.assertEqual(uploaded, promote.ARCHIVES | promote.EVIDENCE)
                 self.assertIn('--draft', calls[1])
+
+    def test_regression_proof_from_push_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, 'trusted exact-commit'):
+            self.promote_with_runs(('push', 'workflow_dispatch'))
 
     def test_commit_mismatch_stops_before_download_or_build(self):
         with patch.dict('os.environ', GH_REPO='example/ptn'), patch.object(promote, 'api', side_effect=[

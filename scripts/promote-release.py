@@ -83,14 +83,16 @@ def main():
         draft = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(draft)
         draft.validate_regression_proof(json.loads((directory / 'regression.json').read_text()), revision, evidence['regressionRunId'])
-        for run_id, workflow, title in ((evidence['regressionRunId'], 'regression.yml', 'Regression gates'),
-                                        (evidence['releaseRunId'], 'release.yml', 'Release validation')):
+        # Release validation may come from the push to main (ptn #21), exactly as
+        # the draft accepted it; regression gates are always dispatched.
+        for run_id, workflow, title, main_push in ((evidence['regressionRunId'], 'regression.yml', 'Regression gates', False),
+                                                   (evidence['releaseRunId'], 'release.yml', 'Release validation', True)):
             if not re.fullmatch(r'[1-9][0-9]*', str(run_id)):
                 raise RuntimeError('Invalid evidence run ID')
             run = api(f'repos/{repo}/actions/runs/{run_id}')
             if (run.get('conclusion') != 'success' or run.get('status') != 'completed'
                     or run.get('path') != f'.github/workflows/{workflow}'
-                    or not draft.eligible_run(run, revision, title)):
+                    or not draft.eligible_run(run, revision, title, main_push)):
                 raise RuntimeError('Release evidence must identify successful trusted exact-commit runs')
         if args.check_only:
             print(f'PASS: {args.from_rc} -> {args.tag}, identical assets at {revision}')
