@@ -33,59 +33,54 @@ describe("QuickSetup", () => {
     expect(screen.getByText(/Vilnius does not publish live departures or service alerts/)).toBeTruthy();
   });
 
-  it("offers Text first with descriptions attached to each control", () => {
-    const props = renderQuick();
-    const radios = screen.getAllByRole("radio");
-    expect(radios[0].getAttribute("value")).toBe("text");
-    const text = screen.getByRole("radio", { name: /Text mode/ });
-    const description = document.getElementById(text.getAttribute("aria-describedby")!);
+  it("offers Text first; the start-mode description follows the choice", () => {
+    const props = renderQuick({ startMode: "text" });
+    const modes = screen.getAllByRole("radio").filter((r) => r.getAttribute("name") === "setup-start-mode");
+    expect(modes.map((r) => r.getAttribute("value"))).toEqual(["text", "map"]);
+    const description = document.getElementById(modes[0]!.getAttribute("aria-describedby")!);
     expect(description?.textContent).toMatch(/without a map/);
-    fireEvent.click(text);
-    expect(props.onStartModeChange).toHaveBeenCalledWith("text");
+    fireEvent.click(screen.getByRole("radio", { name: "Map mode" }));
+    expect(props.onStartModeChange).toHaveBeenCalledWith("map");
   });
 
-  it("leads with one big button to continue to the map; the rest is under More options", () => {
+  it("shows the privacy level as equal choices with Recommended preselected", () => {
     const props = renderQuick();
-    const more = screen.getByText("More options and details").closest("details")!;
-    expect(more.open).toBe(false);
-    expect(screen.getByRole("heading", { name: "Ready to start" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Continue to the map" }));
+    const levels = screen.getAllByRole("radio").filter((r) => r.getAttribute("name") === "setup-level");
+    expect(levels.map((r) => r.getAttribute("value"))).toEqual(["recommended", "strict", "customize"]);
+    expect((levels[0] as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByText("More options and details")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Recommended" }));
     expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended" });
-    // The mode choice, strict and customize live inside the expandable section.
-    expect(more.contains(screen.getByRole("radio", { name: /Map mode/ }))).toBe(true);
-    expect(more.contains(screen.getByRole("button", { name: "Start with strict privacy" }))).toBe(true);
-    expect(more.contains(screen.getByRole("button", { name: "Customize" }))).toBe(true);
   });
 
-  it("names the big button by the chosen start mode", () => {
-    renderQuick({ startMode: "text" });
-    expect(screen.queryByRole("button", { name: "Continue to the map" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Start with recommended settings" })).toBeTruthy();
-  });
-
-  it("starts with strict from the details", () => {
+  it("Continue names and applies the chosen level, without moving focus", () => {
     const props = renderQuick();
-    fireEvent.click(screen.getByRole("button", { name: "Start with strict privacy" }));
+    const strict = screen.getByRole("radio", { name: /^Strict/ });
+    strict.focus();
+    fireEvent.click(strict);
+    expect(document.activeElement).toBe(strict);
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Strict" }));
     expect(props.onChoose).toHaveBeenLastCalledWith({ presetId: "strict" });
   });
 
-  it("customize asks the guided question without repeating the presentation question", () => {
+  it("Custom asks the guided question in place and says why Continue waits", () => {
     const props = renderQuick({ startMode: "text" });
-    fireEvent.click(screen.getByRole("button", { name: "Customize" }));
-    expect(screen.getByText("You will start in Text mode.")).toBeTruthy();
-    expect(screen.getAllByRole("radio", { name: /mode/ })).toHaveLength(2);
-    const proceed = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
+    fireEvent.click(screen.getByRole("radio", { name: /^Custom/ }));
+    const proceed = screen.getByRole("button", { name: "Continue with Custom" }) as HTMLButtonElement;
     expect(proceed.disabled).toBe(true);
+    expect(screen.getByText("Choose an answer above to continue.")).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /Use live departures and service alerts/ }));
+    expect(proceed.disabled).toBe(false);
     fireEvent.click(proceed);
     expect(props.onChoose).toHaveBeenCalledWith({ presetId: "customize", guidedChoice: "live-information" });
   });
 
-  it("lists the strict level's effects one expansion away", () => {
+  it("keeps the details of each level behind one Why it matters", () => {
     renderQuick();
-    expect(screen.getByText("History is kept for 7 days.")).toBeTruthy();
-    expect(screen.getByText(/reveal the city and timetable area/)).toBeTruthy();
-    expect(screen.getByText("You can lower this later in Settings.")).toBeTruthy();
+    const why = screen.getByText("Why the privacy level matters").closest("details")!;
+    expect(why.open).toBe(false);
+    expect(why.contains(screen.getByText("History is kept for 7 days."))).toBe(true);
+    expect(why.contains(screen.getByText(/reveal the city and timetable area/))).toBe(true);
   });
 
   it("says what starting downloads and what that request reveals, when the data is not here yet", () => {

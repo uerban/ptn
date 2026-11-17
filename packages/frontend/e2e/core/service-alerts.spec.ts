@@ -9,7 +9,7 @@ import {
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
 import { setFixedDate } from "../helpers/fixed-date";
-import { openSetupOptions } from "../helpers/setup-step";
+import { openSetupOptions, startWithLevel } from "../helpers/setup-step";
 import { RECOMMENDED_DECISIONS } from "../helpers/setup-complete";
 import { LATEST_WHATS_NEW_ID } from "../../src/services/whatsNew.ts";
 
@@ -266,7 +266,7 @@ test.describe("Service alerts @mock-api", () => {
     await page.getByRole("button", { name: /^Vilnius/ }).click();
     await openSetupOptions(page);
     await page.getByRole("radio", { name: /Text mode/ }).check();
-    await page.getByRole("button", { name: "Start with strict privacy" }).click();
+    await startWithLevel(page, "strict");
     await expect(page.getByTestId("setup-shell")).toHaveCount(0);
 
     const sheet = await openDepartureSheet(page);
