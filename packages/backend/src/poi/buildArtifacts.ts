@@ -11,7 +11,7 @@ import { createGunzip, createGzip } from "node:zlib";
 import type { LandmarkCityId } from "@pt/shared";
 import { buildAll, checkSizeLimits } from "./buildAllBundles.js";
 import { CITY_PROFILES } from "./cityProfiles.js";
-import { refreshSnapshot, type SourceSnapshot } from "./sourceSnapshot.js";
+import { pinnedSnapshot, refreshSnapshot, type SourceSnapshot } from "./sourceSnapshot.js";
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 export interface CitySpec { pbf: string; bbox: [number, number, number, number]; poiCorpora: LandmarkCityId[]; walkGraph?: boolean; producerInputs?: boolean }
@@ -29,6 +29,8 @@ export interface BuilderConfig {
   walkBuilder?: string;
   publisher?: string;
   cityTimeoutMs?: number;
+  /** Source URL -> local PBF used instead of downloading it. */
+  pinnedSources?: Record<string, { path: string; sha256: string }>;
 }
 
 async function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.env, timeout = 1800_000): Promise<string> {
@@ -85,7 +87,10 @@ export async function buildReleases(config: BuilderConfig, dependencies: {
     console.log(`[osm-builder] ${city}: starting`);
     const url = registry[city].pbf;
     try {
-      if (!sources.has(url)) sources.set(url, (dependencies.snapshot ?? refreshSnapshot)(url, config.workDir));
+      const pinned = config.pinnedSources?.[url];
+      if (!sources.has(url)) sources.set(url, pinned
+        ? pinnedSnapshot(url, pinned.path, pinned.sha256, config.workDir)
+        : (dependencies.snapshot ?? refreshSnapshot)(url, config.workDir));
       const snapshot = await sources.get(url)!;
       const release = dependencies.buildCity ? await dependencies.buildCity(city, snapshot) : await buildCity(config, city, snapshot);
       results[city] = { release };
