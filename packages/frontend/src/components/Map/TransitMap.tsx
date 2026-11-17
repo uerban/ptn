@@ -866,10 +866,6 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
       );
 
       map.addControl(
-        new CompassControl((key, fallback) => translateRef.current(key, fallback)),
-        "bottom-right"
-      );
-      map.addControl(
         new maplibregl.NavigationControl({ showCompass: false }),
         "bottom-right"
       );
@@ -879,6 +875,11 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
         (position) => onGeolocateRef.current?.(position),
       );
       map.addControl(geolocate, "bottom-right");
+      // Added last so it stacks above the locate button.
+      map.addControl(
+        new CompassControl((key, fallback) => translateRef.current(key, fallback)),
+        "bottom-right"
+      );
       geolocateRef.current = geolocate;
       trackBottomControlInsets(map);
       trackSheetControlLift(map);

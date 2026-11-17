@@ -9,8 +9,8 @@ function needleIcon(): SVGSVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "22");
-  svg.setAttribute("height", "22");
+  svg.setAttribute("width", "18");
+  svg.setAttribute("height", "18");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", "ptn-compass-needle");
   const north = document.createElementNS(ns, "path");
@@ -18,7 +18,7 @@ function needleIcon(): SVGSVGElement {
   north.setAttribute("class", "ptn-compass-north");
   const south = document.createElementNS(ns, "path");
   south.setAttribute("d", "M12 22 L8 12 L16 12 Z");
-  south.setAttribute("fill", "currentColor");
+  south.setAttribute("class", "ptn-compass-south");
   svg.append(north, south);
   return svg;
 }
@@ -34,7 +34,7 @@ export class CompassControl implements maplibregl.IControl {
   private needle = needleIcon();
 
   constructor(private t: Translate) {
-    this.container.className = "maplibregl-ctrl ptn-compass-group";
+    this.container.className = "maplibregl-ctrl maplibregl-ctrl-group ptn-compass-group";
     this.button.type = "button";
     this.button.className = "ptn-compass";
     this.button.dataset.testid = "map-compass";

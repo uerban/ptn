@@ -163,24 +163,16 @@ body {
 .ptn-gps-pause .gps-pause-slash { display: none; }
 .ptn-gps-pause[aria-pressed="true"] { color: var(--fg-muted); }
 .ptn-gps-pause[aria-pressed="true"] .gps-pause-slash { display: inline; }
-/* Compass: a quiet round button, shown only while the map is rotated or tilted. */
+/* Compass: same group button as zoom and locate, in theme colours; shown
+   only while the map is rotated or tilted. */
 .ptn-compass-group[hidden] { display: none; }
-.ptn-compass {
+.maplibregl-ctrl-group button.ptn-compass {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 9999px;
-  background: var(--surface-raised);
-  color: var(--fg-muted);
-  border: 1px solid var(--divider);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
-  cursor: pointer;
 }
-.ptn-compass:hover { background: var(--surface-overlay); }
-.ptn-compass:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ptn-compass-north { fill: var(--danger); }
+.ptn-compass-north { fill: currentColor; }
+.ptn-compass-south { fill: currentColor; opacity: 0.35; }
 .ptn-compass-needle { transition: transform 150ms ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .ptn-compass-needle { transition: none; }
