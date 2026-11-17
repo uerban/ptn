@@ -8,6 +8,7 @@
   "presentation.switchToText": "Przełącz na tryb tekstowy",
   "presentation.showMap": "Pokaż mapę",
   "presentation.backToText": "Powrót do tekstu",
+  "presentation.switchToMap": "Przełącz na tryb mapy",
   "presentation.mapDisclosureHeading": "Wyświetlić mapę?",
   "presentation.mapDisclosureBody": "Pliki map są pobierane jednorazowo z serwera tej aplikacji i zapisywane na urządzeniu, dzięki czemu mapa działa później również w trybie offline. Twój widok początkowy pozostaje w trybie tekstowym.",
   "presentation.mapDisclosureConfirm": "Pobierz i wyświetl mapę",

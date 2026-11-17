@@ -8,6 +8,7 @@
   "presentation.switchToText": "Lülitu tekstirežiimile",
   "presentation.showMap": "Näita kaarti",
   "presentation.backToText": "Tagasi teksti juurde",
+  "presentation.switchToMap": "Lülitu kaardirežiimile",
   "presentation.mapDisclosureHeading": "Kas kuvada kaart?",
   "presentation.mapDisclosureBody": "Kaardifailid laaditakse alla üks kord selle rakenduse serverist ja salvestatakse seadmesse, nii et kaart töötab hiljem ka võrguühenduseta. Algvaade jääb tekstirežiimiks.",
   "presentation.mapDisclosureConfirm": "Kaardi allalaadimine ja kuvamine",

@@ -8,6 +8,7 @@
   "presentation.switchToText": "Vaihda tekstitilaan",
   "presentation.showMap": "Näytä kartta",
   "presentation.backToText": "Takaisin tekstiin",
+  "presentation.switchToMap": "Vaihda karttatilaan",
   "presentation.mapDisclosureHeading": "Näytetäänkö kartta?",
   "presentation.mapDisclosureBody": "Karttatiedostot ladataan kerran tämän sovelluksen palvelimelta ja tallennetaan laitteelle, joten kartta toimii myöhemmin myös ilman verkkoyhteyttä. Aloitusnäkymä pysyy tekstimuodossa.",
   "presentation.mapDisclosureConfirm": "Lataa ja näytä kartta",

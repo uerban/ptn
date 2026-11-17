@@ -8,6 +8,7 @@
   "presentation.switchToText": "Switch to Text mode",
   "presentation.showMap": "Show map",
   "presentation.backToText": "Back to text",
+  "presentation.switchToMap": "Switch to Map mode",
   "presentation.mapDisclosureHeading": "Show a map?",
   "presentation.mapDisclosureBody": "Map files are downloaded once from this app's server and kept on this device, so the map also works offline later. Your starting view stays Text mode.",
   "presentation.mapDisclosureConfirm": "Download and show map",

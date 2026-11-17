@@ -8,6 +8,7 @@
   "presentation.switchToText": "Bytt til tekstmodus",
   "presentation.showMap": "Vis kart",
   "presentation.backToText": "Tilbake til teksten",
+  "presentation.switchToMap": "Bytt til kartmodus",
   "presentation.mapDisclosureHeading": "Vise et kart?",
   "presentation.mapDisclosureBody": "Kartfilene lastes ned én gang fra appens server og lagres på enheten, slik at kartet også fungerer frakoblet senere. Startvisningen forblir i tekstmodus.",
   "presentation.mapDisclosureConfirm": "Last ned og vis kart",

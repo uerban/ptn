@@ -8,6 +8,7 @@
   "presentation.switchToText": "Perjungti į teksto režimą",
   "presentation.showMap": "Rodyti žemėlapį",
   "presentation.backToText": "Grįžti prie teksto",
+  "presentation.switchToMap": "Perjungti į žemėlapio režimą",
   "presentation.mapDisclosureHeading": "Rodyti žemėlapį?",
   "presentation.mapDisclosureBody": "Žemėlapio failai atsisiunčiami vieną kartą iš šios programėlės serverio ir saugomi šiame įrenginyje, todėl vėliau žemėlapis veikia ir neprisijungus prie interneto. Pradinis vaizdas išlieka teksto režimu.",
   "presentation.mapDisclosureConfirm": "Atsisiųsti ir rodyti žemėlapį",

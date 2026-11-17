@@ -8,6 +8,7 @@
   "presentation.switchToText": "Перайсці ў тэкставы рэжым",
   "presentation.showMap": "Паказаць карту",
   "presentation.backToText": "Вярнуцца да тэксту",
+  "presentation.switchToMap": "Перайсці ў рэжым мапы",
   "presentation.mapDisclosureHeading": "Паказаць карту?",
   "presentation.mapDisclosureBody": "Картавыя файлы спампоўваюцца адзін раз з сервера дадатка і захоўваюцца на прыладзе, таму карта пазней працуе па-за сеткай. Ваш пачатковы рэжым застаецца тэкставым.",
   "presentation.mapDisclosureConfirm": "Спампаваць і паказаць карту",
