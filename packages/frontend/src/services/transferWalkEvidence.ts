@@ -31,16 +31,19 @@ export async function transferWalkEvidence(
         legs.push(leg);
         continue;
       }
-      if(!validPedestrianRoute(route)
-        || Math.ceil(route.distanceMeters/speed)>leg.arriveSecs-leg.departSecs) {
+      if(!validPedestrianRoute(route)) {
         feasible=false;break;
       }
       const duration = Math.ceil(route.distanceMeters / speed);
-      // Preserve the engine's transfer deadline and overall arrival. Any
-      // minimum-transfer floor becomes waiting before the physical walk.
-      legs.push({...leg, departSecs: leg.arriveSecs - duration, distanceMeters:route.distanceMeters});
+      // Keep the planned arrival when physical movement fits its interval;
+      // otherwise extend the walk. The next effective boarding (after RT),
+      // not the engine's estimated walk end, is the feasibility deadline.
+      // feasibleRtCandidates shifts this duration after a delayed arrival and
+      // rejects any resulting overlap without shortening physical movement.
+      const arriveSecs = Math.max(leg.arriveSecs, leg.departSecs + duration);
+      legs.push({...leg, departSecs: arriveSecs - duration, arriveSecs, distanceMeters:route.distanceMeters});
     }
-    if(feasible) retained.push({...itinerary,legs});
+    if(feasible) retained.push({...itinerary,legs,alightSecs:legs.at(-1)?.arriveSecs ?? itinerary.alightSecs});
   }
   return retained;
 }

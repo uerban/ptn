@@ -183,7 +183,7 @@ it("keeps a legitimate faster transit winner", async () => {
  expect(result[0].legs[0].type).toBe("transit");
 });
 
-it.each([[30,true],[181,false]] as const)("revalidates %sm routed transfer before merging walking",async(distance,retained)=>{
+it.each([[30,true],[181,true],[361,false]] as const)("revalidates %sm routed transfer before merging walking",async(distance,retained)=>{
  vi.mocked(findReachableStops).mockReset()
   .mockResolvedValueOnce([{stopId:"S1",walkSecs:0,distanceMeters:0}])
   .mockResolvedValueOnce([{stopId:"S4",walkSecs:0,distanceMeters:0}]);
@@ -200,7 +200,7 @@ it.each([[30,true],[181,false]] as const)("revalidates %sm routed transfer befor
  const results=await new SearchOrchestrator(config).search({origin:{lat:54.68,lon:25.28},destination:{lat:54.71,lon:25.28},departureTime:new Date(2026,2,30,7,55),ranking:"least_walking"});
  expect(results.some(result=>!!result.directWalk)).toBe(true);
  expect(results.some(result=>result.legs.length>0)).toBe(retained);
- if(retained) expect(results.find(result=>result.legs.length>0)?.totalWalkMeters).toBe(30);
+ if(retained) expect(results.find(result=>result.legs.length>0)?.totalWalkMeters).toBe(distance);
 });
 
 it.each([[110,false,true],[230,false,false],[0,true,false]] as const)("validates delayed transfer %s cancelled %s",async(delay,cancelled,retained)=>{
@@ -305,7 +305,8 @@ it.each([
 // Direct origin-to-destination reach says nothing about a transit transfer.
 it.each([
  {transfer:"short",retained:true,meters:30},
- {transfer:"long",retained:false},
+ {transfer:"long",retained:true,meters:181},
+ {transfer:"too-long",retained:false},
  {transfer:"unreachable",retained:false},
  {transfer:"unavailable",retained:true},
 ] as const)("validates $transfer transfer when the whole pedestrian journey is unreachable",async({transfer,retained,...expected})=>{
@@ -321,7 +322,7 @@ it.each([
   if(from.lat!==54.69) return null;
   if(transfer==="unreachable") return null;
   if(transfer==="unavailable") throw new WalkGraphUnavailableError("fixture","transient");
-  return {distanceMeters:transfer==="short"?30:181,coords:[[25.28,54.69],[25.28,54.70]] as [number,number][],steps:[]};
+  return {distanceMeters:transfer==="short"?30:transfer==="long"?181:361,coords:[[25.28,54.69],[25.28,54.70]] as [number,number][],steps:[]};
  });
  const results=await new SearchOrchestrator({raptorIndex:index,walkSpeedMps:1.5,getDelay:()=>null,
   allStops:[{id:"S2",name:"S2",lat:54.69,lon:25.28},{id:"S3",name:"S3",lat:54.70,lon:25.28}],
@@ -331,4 +332,27 @@ it.each([
  expect(results).toHaveLength(retained?1:0);
  expect(route).toHaveBeenCalledTimes(2);
  if(retained) expect(results[0].totalWalkMeters).toBe("meters" in expected?expected.meters:undefined);
+});
+
+it.each([[0,0,false],[0,1,true],[0,120,true],[120,120,false],[120,121,true]] as const)("uses effective boarding slack with arrival delay %s and boarding delay %s",async(arrivalDelay,delay,retained)=>{
+ vi.mocked(findReachableStops).mockReset()
+  .mockResolvedValueOnce([{stopId:"S1",walkSecs:0,distanceMeters:0}])
+  .mockResolvedValueOnce([{stopId:"S4",walkSecs:0,distanceMeters:0}]);
+ vi.mocked(planOnDevice).mockReset().mockResolvedValue([{
+  ...ride,alightSecs:31000,transfers:1,legs:[ride.legs[0],
+   {type:"walk",fromStopId:"S2",toStopId:"S3",departSecs:30000,arriveSecs:30120},
+   {...ride.legs[0],fromStopId:"S3",toStopId:"S4",departSecs:30240,arriveSecs:31000,tripId:"T2"}],
+ }]);
+ const results=await new SearchOrchestrator({raptorIndex:index,walkSpeedMps:1.5,
+  getDelay:id=>({delaySeconds:id==="T2"?delay:arrivalDelay,cancelled:false}),
+  allStops:[{id:"S2",name:"S2",lat:54.69,lon:25.28},{id:"S3",name:"S3",lat:54.70,lon:25.28}],
+  osrm:{isReady:()=>false,table:vi.fn(),init:vi.fn()} as never,
+  directWalkRoute:async from=>from.lat===54.69?{distanceMeters:361,coords:[[25.28,54.69],[25.28,54.70]],steps:[]}:null,
+ }).search({origin:{lat:54.68,lon:25.28},destination:{lat:54.71,lon:25.28},departureTime:new Date(2026,2,30,7,55),ranking:"fastest"});
+ expect(results).toHaveLength(retained?1:0);
+ if(retained) {
+  expect(results[0].totalWalkSecs).toBe(241);
+  expect(results[0].totalWalkMeters).toBe(361);
+  expect(results[0].legs[1]).toMatchObject({departSecs:30000+arrivalDelay,arriveSecs:30241+arrivalDelay});
+ }
 });

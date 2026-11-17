@@ -12,8 +12,10 @@ it("preserves physical distance and transfer buffer, deduplicating route work",a
  expect(route).toHaveBeenCalledTimes(1);
  expect(itinerary.legs[0]).not.toHaveProperty("distanceMeters");
 });
-it("rejects longer or unreachable pedestrian transfers",async()=>{
- expect(await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:181,coords:[[25,54],[25.001,54]],steps:[]}),1.5)).toEqual([]);
+it("retains longer physical movement for effective boarding validation and rejects unreachable paths",async()=>{
+ const [longer]=await transferWalkEvidence([itinerary],stops,async()=>({distanceMeters:181,coords:[[25,54],[25.001,54]],steps:[]}),1.5);
+ expect(longer.legs[0]).toMatchObject({departSecs:0,arriveSecs:121,distanceMeters:181});
+ expect(longer.alightSecs).toBe(121);
  expect(await transferWalkEvidence([itinerary],stops,async()=>null,1.5)).toEqual([]);
 });
 
