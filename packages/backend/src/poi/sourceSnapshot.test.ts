@@ -3,7 +3,8 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { inspectPbf, refreshSnapshot } from "./sourceSnapshot.js";
+import { inspectPbf, pinnedSnapshot, refreshSnapshot } from "./sourceSnapshot.js";
+import { createHash } from "node:crypto";
 
 describe("immutable PBF snapshots", () => {
   it.runIf(spawnSync("osmium", ["--version"], { timeout: 1000 }).status === 0)("reads the real PBF timestamp from a download staging filename", async () => {
@@ -136,5 +137,39 @@ describe("immutable PBF snapshots", () => {
         await expect(refreshSnapshot(latest, cache, { ...opts, now: () => new Date("2026-12-30"), fetch: serve([redirect(location)]) })).rejects.toThrow(/redirect/);
       await expect(refreshSnapshot(latest, cache, { ...opts, now: () => new Date("2026-12-30"), fetch: serve(Array.from({ length: 5 }, () => redirect("loop.pbf"))) })).rejects.toThrow(/redirect/);
     } finally { await rm(cache, { recursive: true, force: true }); }
+  });
+});
+
+describe("pinned PBF sources", () => {
+  const url = "https://download.example/europe/lithuania-latest.osm.pbf";
+  const inspect = () => "2026-11-01T00:00:00Z";
+  const now = () => new Date("2026-11-18T00:00:00Z");
+
+  it("freezes a local file that matches its digest without any network", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pinned-"));
+    try {
+      const file = join(dir, "clip.osm.pbf");
+      await writeFile(file, "pbf bytes");
+      const sha256 = createHash("sha256").update("pbf bytes").digest("hex");
+      const snapshot = await pinnedSnapshot(url, file, sha256, join(dir, "cache"), { inspect, now });
+      expect(snapshot).toMatchObject({ url, sha256, bytes: 9, snapshotAt: "2026-11-01T00:00:00.000Z" });
+      expect(snapshot.path).toBe(join(dir, "cache", "sources", "sha256", `${sha256}.osm.pbf`));
+      expect(await readFile(snapshot.path, "utf8")).toBe("pbf bytes");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a file whose digest does not match the pin", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pinned-"));
+    try {
+      const file = join(dir, "clip.osm.pbf");
+      await writeFile(file, "other bytes");
+      await expect(pinnedSnapshot(url, file, "0".repeat(64), join(dir, "cache"), { inspect, now }))
+        .rejects.toThrow(/digest mismatch/);
+      await expect(readdir(join(dir, "cache"))).rejects.toThrow();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

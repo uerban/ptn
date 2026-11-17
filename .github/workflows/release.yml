@@ -274,12 +274,34 @@ jobs:
           if free < minimum:
               raise SystemExit("Need at least 6 GiB free for reference-city OSM and hosting validation")
           PYTHON
+      - name: Fetch the pinned OSM fixture
+        # Release validation builds from a pinned clip, not the live upstream
+        # mirror, so a mirror outage cannot block a release. The live download
+        # is checked weekly by osm-source.yml.
+        run: |
+          read -r url sha < <(python3 -c 'import json; d=json.load(open("config/osm-release-fixture.json")); print(d["url"], d["sha256"])')
+          [[ "$url" == "https://github.com/${GITHUB_REPOSITORY}/releases/download/"* ]]
+          mkdir -p "$RUNNER_TEMP/osm-fixture"
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            --output "$RUNNER_TEMP/osm-fixture/source.osm.pbf" "$url"
+          echo "$sha  $RUNNER_TEMP/osm-fixture/source.osm.pbf" | sha256sum --check
       - name: Build a local signed OSM catalog from the extracted archive
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/ptn-evidence"
           bundle="$GITHUB_WORKSPACE/source/release/ptn-linux-x86_64"
           node "$bundle/examples/native/prepare-osm.mjs" "$RUNNER_TEMP/ptn-osm"
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          fixture = json.loads(Path("config/osm-release-fixture.json").read_text())
+          path = Path(os.environ["RUNNER_TEMP"]) / "ptn-osm/builder.json"
+          config = json.loads(path.read_text())
+          config["pinnedSources"] = {fixture["source"]: {
+              "path": str(Path(os.environ["RUNNER_TEMP"]) / "osm-fixture/source.osm.pbf"),
+              "sha256": fixture["sha256"]}}
+          path.write_text(json.dumps(config, indent=2) + "\n")
+          PYTHON
           PT_ADDRESS_EXTRACT_SCRIPT="$bundle/builder/packages/backend/scripts/extract-addr-fixture.mjs" \
             node "$bundle/builder/packages/backend/src/poi/buildArtifacts.mjs" "$RUNNER_TEMP/ptn-osm/builder.json" \
               2>&1 | tee "$RUNNER_TEMP/ptn-evidence/osm-build.log"

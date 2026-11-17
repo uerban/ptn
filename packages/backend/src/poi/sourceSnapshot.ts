@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { Readable, Transform } from "node:stream";
@@ -27,6 +27,28 @@ export function inspectPbf(path: string): string {
     throw new Error("PBF has no valid upstream replication timestamp");
   }
   return new Date(timestamp).toISOString();
+}
+
+/** Use a local PBF in place of downloading `url`, for builds that must not
+ * depend on the upstream host (release validation). The file must match the
+ * pinned digest; it is frozen into the same content-addressed cache. */
+export async function pinnedSnapshot(
+  url: string,
+  file: string,
+  sha256: string,
+  cache: string,
+  options: { now?: () => Date; inspect?: (path: string) => string | Promise<string> } = {},
+): Promise<SourceSnapshot> {
+  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error("pinned PBF needs a sha256 digest");
+  const actual = await checksum(file);
+  if (actual !== sha256) throw new Error(`pinned PBF digest mismatch: expected ${sha256}, got ${actual}`);
+  const objects = join(cache, "sources", "sha256");
+  await mkdir(objects, { recursive: true });
+  const path = join(objects, `${sha256}.osm.pbf`);
+  await copyFile(file, path);
+  const now = (options.now ?? (() => new Date()))().toISOString();
+  const snapshotAt = new Date(await (options.inspect ?? inspectPbf)(path)).toISOString();
+  return { url, path, sha256, bytes: (await stat(path)).size, snapshotAt, checkedAt: now, downloadedAt: now };
 }
 
 /** A refusal that a repeat request cannot change: policy, size or protocol. */

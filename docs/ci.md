@@ -161,6 +161,27 @@ can trigger missing builds/gates automatically without imposing that cost on
 ordinary merges. `prepare-release-draft.py TAG --check-only` verifies existing
 proof/artifacts and never dispatches builds or creates a release.
 
+## OSM input for release validation
+
+Release validation builds its signed OSM catalog from a pinned Vilnius clip,
+not from the live Geofabrik extract, so a mirror outage cannot block a
+release. The pin lives in `config/osm-release-fixture.json`: the clip's URL
+(an asset of an immutable `osm-fixture-YYYY-MM-DD` prerelease), its sha256,
+and the upstream replication timestamp. The release job refuses a download
+whose digest differs from the pin.
+
+The `osm-source.yml` workflow downloads the live extract through the same
+snapshot code every Monday and clips it. A failure there reports a problem
+with the upstream source; it does not affect releases. To refresh the
+fixture, run it with `publish`:
+
+```sh
+gh workflow run osm-source.yml --ref main -f publish=true
+```
+
+Then commit the pin printed in the run summary to
+`config/osm-release-fixture.json`.
+
 ## Required checks, security and caches
 
 The main-branch ruleset requires the GitHub Actions **CI** aggregate. It includes
