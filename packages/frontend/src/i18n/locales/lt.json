@@ -631,5 +631,8 @@
   "arriveBy.in_15": "Po 15 min.",
   "arriveBy.in_30": "Po 30 min.",
   "arriveBy.in_60": "Po 1 val.",
-  "arriveBy.pick_time": "Pasirinkite laiką"
+  "arriveBy.pick_time": "Pasirinkite laiką",
+  "settings.wait_format": "Laukimo trukmė",
+  "settings.wait_minutes_only": "Rodyti laukimo laiką tik minutėmis",
+  "settings.wait_minutes_only_desc": "Kitais atvejais, jei laukimo trukmė yra valanda ar daugiau, ji rodoma valandomis ir minutėmis, pvz., 1:05."
 }

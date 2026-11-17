@@ -618,5 +618,8 @@
   "arriveBy.in_15": "Za 15 min",
   "arriveBy.in_30": "Za 30 min",
   "arriveBy.in_60": "Za 1 godzinę",
-  "arriveBy.pick_time": "Wybierz godzinę"
+  "arriveBy.pick_time": "Wybierz godzinę",
+  "settings.wait_format": "Czasy oczekiwania",
+  "settings.wait_minutes_only": "Pokaż czasy oczekiwania tylko w minutach",
+  "settings.wait_minutes_only_desc": "W pozostałych przypadkach czas oczekiwania wynoszący godzinę lub więcej jest wyświetlany w formacie godzin i minut, np. 1:05."
 }

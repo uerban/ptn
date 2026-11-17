@@ -641,5 +641,8 @@
   "arriveBy.in_15": "Праз 15 хв",
   "arriveBy.in_30": "Праз 30 хвілін",
   "arriveBy.in_60": "Праз 1 гадзіну",
-  "arriveBy.pick_time": "Выберыце час"
+  "arriveBy.pick_time": "Выберыце час",
+  "settings.wait_format": "Час чакання",
+  "settings.wait_minutes_only": "Паказваць час чакання толькі ў хвілінах",
+  "settings.wait_minutes_only_desc": "Інакш чаканне ў гадзіну і больш паказваецца ў гадзінах і хвілінах, напрыклад 1:05."
 }

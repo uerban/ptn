@@ -627,5 +627,8 @@
   "arriveBy.in_15": "15 minuutin kuluttua",
   "arriveBy.in_30": "30 minuutin kuluttua",
   "arriveBy.in_60": "1 tunnin kuluttua",
-  "arriveBy.pick_time": "Valitse aika"
+  "arriveBy.pick_time": "Valitse aika",
+  "settings.wait_format": "Odotusaikat",
+  "settings.wait_minutes_only": "Näytä odotusaika vain minuutteina",
+  "settings.wait_minutes_only_desc": "Muutoin tunnin tai pidemmän odotuksen kesto näkyy tunteina ja minuutteina, esimerkiksi 1:05."
 }

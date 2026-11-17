@@ -626,5 +626,8 @@
   "arriveBy.in_15": "15 minuti pärast",
   "arriveBy.in_30": "30 minuti pärast",
   "arriveBy.in_60": "1 tunni pärast",
-  "arriveBy.pick_time": "Vali aeg"
+  "arriveBy.pick_time": "Vali aeg",
+  "settings.wait_format": "Ooteajad",
+  "settings.wait_minutes_only": "Näita ooteaegu ainult minutites",
+  "settings.wait_minutes_only_desc": "Muudel juhtudel kuvatakse ooteaeg, mis on tund või rohkem, tundide ja minutitena, näiteks 1:05."
 }

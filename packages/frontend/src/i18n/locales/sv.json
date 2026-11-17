@@ -624,5 +624,8 @@
   "arriveBy.in_15": "Om 15 min",
   "arriveBy.in_30": "Om 30 min",
   "arriveBy.in_60": "Om 1 timme",
-  "arriveBy.pick_time": "Välj tid"
+  "arriveBy.pick_time": "Välj tid",
+  "settings.wait_format": "Väntetider",
+  "settings.wait_minutes_only": "Visa väntetider endast i minuter",
+  "settings.wait_minutes_only_desc": "I övrigt visas en väntetid på en timme eller mer som timmar och minuter, till exempel 1:05."
 }

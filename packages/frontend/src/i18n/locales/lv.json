@@ -629,5 +629,8 @@
   "arriveBy.in_15": "Pēc 15 minūtēm",
   "arriveBy.in_30": "Pēc 30 minūtēm",
   "arriveBy.in_60": "Pēc 1 stundas",
-  "arriveBy.pick_time": "Izvēlieties laiku"
+  "arriveBy.pick_time": "Izvēlieties laiku",
+  "settings.wait_format": "Gaidīšanas laiki",
+  "settings.wait_minutes_only": "Rādīt gaidīšanas laiku tikai minūtēs",
+  "settings.wait_minutes_only_desc": "Pārējos gadījumos gaidīšanas laiks, kas ir viena stunda vai ilgāks, tiek parādīts stundās un minūtēs, piemēram, 1:05."
 }

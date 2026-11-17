@@ -641,5 +641,8 @@
   "settings.micromap_layer_places": "district and place names",
   "settings.trips": "Trips",
   "settings.trip_alerts": "Trip alerts",
-  "settings.offline_load_error": "Could not load offline settings."
+  "settings.offline_load_error": "Could not load offline settings.",
+  "settings.wait_format": "Waiting times",
+  "settings.wait_minutes_only": "Show waits in minutes only",
+  "settings.wait_minutes_only_desc": "Otherwise a wait of an hour or more shows as hours and minutes, like 1:05."
 }

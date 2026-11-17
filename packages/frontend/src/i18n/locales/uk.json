@@ -638,5 +638,8 @@
   "arriveBy.in_15": "Через 15 хв",
   "arriveBy.in_30": "Через 30 хв",
   "arriveBy.in_60": "Через 1 годину",
-  "arriveBy.pick_time": "Вибрати час"
+  "arriveBy.pick_time": "Вибрати час",
+  "settings.wait_format": "Час очікування",
+  "settings.wait_minutes_only": "Показувати час очікування лише у хвилинах",
+  "settings.wait_minutes_only_desc": "В інших випадках час очікування, що становить годину або більше, відображається у форматі годин і хвилин, наприклад 1:05."
 }
