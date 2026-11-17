@@ -699,12 +699,19 @@ export async function searchStopsWithGroups(
 ): Promise<SearchSuggestion[]> {
   const usageCityId = useCityStore.getState().activeCity.id;
   const data = captureCityData(usageCityId);
-  const stops = (await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal))
-    .filter(stop => hasValidCoordinates(stop.location));
+  const fetched = await fetchStopsForProvider(rawQuery, normalizedQuery, provider, signal);
+  let stops = fetched.stops.filter(stop => hasValidCoordinates(stop.location));
 
   if (stops.length === 0) return [];
 
   const tapCounts = await loadTapCounts(stops.map((s) => s.id), usageCityId);
+  if (fetched.local) {
+    // Rank before truncating: an early name-only cap can discard the nearby
+    // or frequently used stop that the final scorer would otherwise prefer.
+    stops = stops.map(stop => ({stop, score: scoreStop(stop, normalizedQuery, tapCounts, hint)}))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, LOCAL_STOP_LIMIT).map(({stop}) => stop);
+  }
 
   const stopIds = new Set(stops.map((s) => s.id));
   const groups = await data.stopGroups
@@ -763,8 +770,9 @@ async function fetchStopsForProvider(
   normalizedQuery: string,
   provider: SearchProvider,
   signal: AbortSignal,
-): Promise<Stop[]> {
-  if (provider === "local") return searchLocalStops(normalizedQuery, signal);
+): Promise<{stops: Stop[]; local: boolean}> {
+  const local = async () => ({stops: await searchLocalStops(normalizedQuery, signal), local: true});
+  if (provider === "local") return local();
 
   // Call-time third-party egress backstop, mirroring planViaTransitous
   // (services/transitousClient.ts): the remote provider reaches transitous even
@@ -777,25 +785,25 @@ async function fetchStopsForProvider(
   // stop results, and the local path reads the already-loaded stops table, so
   // there is no reason to hand back an empty list.
   if (!thirdPartyEgressAllowed()) {
-    return searchLocalStops(normalizedQuery, signal);
+    return local();
   }
 
   // The local path doesn't share this gate — its scan is bounded by city size
   // and we want results from the first character. Backend rejects shorter
   // queries unconditionally, so the round-trip would just be empty anyway.
-  if (normalizedQuery.length < REMOTE_STOP_SEARCH_MIN_CHARS) return [];
+  if (normalizedQuery.length < REMOTE_STOP_SEARCH_MIN_CHARS) return {stops: [], local: false};
 
   try {
     const res = await api.searchStops(rawQuery, signal);
     if (!Array.isArray(res?.data)) {
       console.warn("[searchSuggestions] remote stops API returned non-array data:", res);
-      return [];
+      return {stops: [], local: false};
     }
-    return res.data;
+    return {stops: res.data, local: false};
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
     console.warn("[searchSuggestions] remote stops API failed:", err);
-    return [];
+    return {stops: [], local: false};
   }
 }
 
@@ -809,7 +817,7 @@ async function searchLocalStops(
   throwIfAborted(signal);
   if (records.length === 0) return [];
 
-  const matches: Array<{ stop: Stop; score: number }> = [];
+  const matches: Stop[] = [];
   for (let i = 0; i < records.length; i++) {
     // Cooperative abort: re-check every 256th record so a stale scan doesn't
     // block the next debounced query from getting the CPU. Throwing (not
@@ -823,15 +831,11 @@ async function searchLocalStops(
     if (!hasValidCoordinates(r)) continue;
     const score = nameMatchScore(normalizedQuery, r.name);
     if (score > 0) {
-      matches.push({
-        stop: { id: r.id, name: r.name, location: { lat: r.lat, lon: r.lon } },
-        score,
-      });
+      matches.push({ id: r.id, name: r.name, location: { lat: r.lat, lon: r.lon } });
     }
   }
 
-  matches.sort((a, b) => b.score - a.score);
-  return matches.slice(0, LOCAL_STOP_LIMIT).map((m) => m.stop);
+  return matches;
 }
 
 function scoreStop(

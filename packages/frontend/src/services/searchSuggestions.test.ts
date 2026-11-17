@@ -155,6 +155,57 @@ describe("searchSuggestions", () => {
     expect(out.filter(s => s.kind === "geocoded").map(s => s.label)).toEqual(["Central Library"]);
   });
 
+  it("ranks identical local stop names by location before the candidate limit", async () => {
+    await db.gtfsStops.bulkPut([
+      ...Array.from({length: 25}, (_, i) => gtfsStop(`a-far-${i}`, "Central", 55, 19)),
+      gtfsStop("z-near", "Central", 54.35, 18.65),
+    ]);
+    const out = await searchSuggestions("central", "gdansk", {lat:54.35,lon:18.65}, new AbortController().signal, "local");
+    expect(out[0]).toMatchObject({kind:"stop",stopId:"z-near"});
+    expect(out.filter(s => s.kind === "stop")).toHaveLength(25);
+    expect(mockSearchStops).not.toHaveBeenCalled();
+  });
+
+  it("uses permitted stop usage before the local candidate limit without a location hint", async () => {
+    await db.gtfsStops.bulkPut([
+      ...Array.from({length: 25}, (_, i) => gtfsStop(`a-unused-${i}`, "Central")),
+      gtfsStop("z-used", "Central"),
+    ]);
+    await putPersonal("personalUsage", "used-central", {stopId:"z-used",cityId:useCityStore.getState().activeCity.id,tapCount:5,lastTapped:Date.now()});
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    expect(out[0]).toMatchObject({kind:"stop",stopId:"z-used"});
+    expect(out.filter(s => s.kind === "stop")).toHaveLength(25);
+  });
+
+  it("preserves stable name-only ordering and ignores disabled personalization before the local limit", async () => {
+    await db.gtfsStops.bulkPut([
+      ...Array.from({length:25}, (_, i) => gtfsStop(`a-${String(i).padStart(2,"0")}`, "Central")),
+      gtfsStop("z-used", "Central"),
+    ]);
+    await putPersonal("personalUsage", "used-central", {stopId:"z-used",cityId:useCityStore.getState().activeCity.id,tapCount:5,lastTapped:Date.now()});
+    usePrivacyChoicesStore.getState().setChoice("personalization", "disabled");
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    expect(out.filter(s => s.kind === "stop").map(s => s.stopId)).toEqual(Array.from({length:25}, (_, i) => `a-${String(i).padStart(2,"0")}`));
+  });
+
+  it("ranks the local stop fallback before its cap when third-party search is denied", async () => {
+    setThirdPartyEgressAccessor(() => false);
+    await db.gtfsStops.bulkPut([
+      ...Array.from({length:25}, (_, i) => gtfsStop(`a-${i}`, "Central", 55, 19)),
+      gtfsStop("z-near", "Central", 54.35, 18.65),
+    ]);
+    const out = await searchSuggestions("central", "gdansk", {lat:54.35,lon:18.65}, new AbortController().signal, "remote");
+    expect(out[0]).toMatchObject({kind:"stop",stopId:"z-near"});
+    expect(mockSearchStops).not.toHaveBeenCalled();
+  });
+
+  it("preserves the remote stop result boundary above the local candidate limit", async () => {
+    mockSearchStops.mockResolvedValue({data:Array.from({length:30}, (_, i)=>makeStop(`remote-${i}`, "Central"))});
+    const out = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "remote");
+    expect(out.filter(s => s.kind === "stop")).toHaveLength(30);
+    expect(mockSearchStops).toHaveBeenCalledTimes(1);
+  });
+
   it("filters malformed local stops before the bounded match limit", async () => {
     await db.gtfsStops.bulkPut([
       ...Array.from({length: 25}, (_, i) => gtfsStop(`bad-${i}`, "Central", 91, 18.65)),
