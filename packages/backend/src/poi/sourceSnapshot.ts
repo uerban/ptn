@@ -29,6 +29,11 @@ export function inspectPbf(path: string): string {
   return new Date(timestamp).toISOString();
 }
 
+/** A refusal that a repeat request cannot change: policy, size or protocol. */
+class PbfRefusal extends Error {}
+
+const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
 async function checksum(path: string): Promise<string> {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(path)) hash.update(chunk);
@@ -49,6 +54,10 @@ export async function refreshSnapshot(
     forceAfterMs?: number;
     /** Abort when no response bytes arrive for this long (default 2 min). */
     stallTimeoutMs?: number;
+    /** Waits before each repeat of a transient failure (network error, stall,
+     * HTTP 408/429/5xx, truncated body). Default: 5 s, then 15 s. */
+    retryDelaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
   } = {},
 ): Promise<SourceSnapshot> {
   if (new URL(url).protocol !== "https:") throw new Error("PBF source must use HTTPS");
@@ -82,70 +91,89 @@ export async function refreshSnapshot(
   // take longer than any fixed limit on a slow link, and the caller's build
   // timeout already caps the whole run.
   const stallMs = options.stallTimeoutMs ?? 120_000;
-  const controller = new AbortController();
-  const signal = controller.signal;
-  let stallTimer: ReturnType<typeof setTimeout> | undefined;
-  const progress = () => {
-    clearTimeout(stallTimer);
-    stallTimer = setTimeout(() => controller.abort(new Error(`PBF download stalled for ${stallMs} ms`)), stallMs);
-  };
-  progress();
-  try {
-    // Geofabrik answers `*-latest` with a 307 to a dated object. Follow a few
-    // same-origin HTTPS redirects only; anything else is refused.
-    let response = await get(url, { headers, redirect: "manual", signal });
-    for (let hops = 0; response.status >= 300 && response.status < 400 && response.status !== 304; hops++) {
-      const location = response.headers.get("Location");
-      const next = location ? new URL(location, url) : undefined;
-      if (hops >= 3 || !next || next.protocol !== "https:" || next.origin !== new URL(url).origin)
-        throw new Error(`PBF refresh refused redirect: HTTP ${response.status}`);
-      await response.body?.cancel();
-      response = await get(next.href, { headers, redirect: "manual", signal });
-    }
-    const save = async (snapshot: SourceSnapshot) => {
-      const temporary = `${record}.${randomUUID()}.part`;
-      try { await writeFile(temporary, JSON.stringify(snapshot)); await rename(temporary, record); }
-      finally { await rm(temporary, { force: true }); }
-      return snapshot;
-    };
-    if (response.status === 304) {
-      if (!previous || !("If-None-Match" in headers || "If-Modified-Since" in headers)) throw new Error("unsolicited PBF not-modified response");
-      return save({ ...previous, checkedAt: now.toISOString() });
-    }
-    if (!response.ok || !response.body) throw new Error(`PBF refresh failed: HTTP ${response.status}`);
-    if (response.headers.get("Content-Encoding") && response.headers.get("Content-Encoding") !== "identity") throw new Error("PBF response must not transform bytes");
-    const advertised = response.headers.get("Content-Length");
-    if (advertised && (!/^\d+$/.test(advertised) || Number(advertised) > maxBytes)) throw new Error("PBF exceeds source size limit");
-    const temporary = join(objects, `${randomUUID()}.part`);
-    let bytes = 0;
-    const hash = createHash("sha256");
+  const delays = options.retryDelaysMs ?? [5_000, 15_000];
+  for (let attempt = 0; ; attempt++) {
     try {
-      await pipeline(
-        Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
-        new Transform({ transform(chunk: Buffer, _encoding, callback) {
-          progress();
-          bytes += chunk.length;
-          if (bytes > maxBytes) return callback(new Error("PBF exceeds source size limit"));
-          hash.update(chunk); callback(null, chunk);
-        } }),
-        createWriteStream(temporary, { flags: "wx" }),
-        { signal },
-      );
+      return await download();
+    } catch (error) {
+      if (error instanceof PbfRefusal || attempt >= delays.length) throw error;
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(`[osm-source] ${new URL(url).pathname}: ${reason}; retry ${attempt + 1}/${delays.length}`);
+      await (options.sleep ?? sleep)(delays[attempt]);
+    }
+  }
+
+  async function download(): Promise<SourceSnapshot> {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    const progress = () => {
       clearTimeout(stallTimer);
-      if (!bytes || (advertised && bytes !== Number(advertised))) throw new Error("PBF size mismatch");
-      const snapshotAt = await (options.inspect ?? inspectPbf)(temporary);
-      if (!Number.isFinite(Date.parse(snapshotAt)) || Date.parse(snapshotAt) > now.getTime() + 300_000) throw new Error("invalid PBF snapshot timestamp");
-      const sha256 = hash.digest("hex");
-      const path = join(objects, `${sha256}.osm.pbf`);
-      await rename(temporary, path);
-      return save({ url, path, sha256, bytes, snapshotAt: new Date(snapshotAt).toISOString(),
-        checkedAt: now.toISOString(), downloadedAt: now.toISOString(),
-        ...(response.headers.get("ETag") ? { etag: response.headers.get("ETag")! } : {}),
-        ...(response.headers.get("Last-Modified") ? { lastModified: response.headers.get("Last-Modified")! } : {}),
-      });
-    } finally { await rm(temporary, { force: true }); }
-  } catch (error) {
-    // Report the stall, not the generic AbortError it surfaces as.
-    throw signal.aborted ? signal.reason : error;
-  } finally { clearTimeout(stallTimer); }
+      stallTimer = setTimeout(() => controller.abort(new Error(`PBF download stalled for ${stallMs} ms`)), stallMs);
+    };
+    progress();
+    try {
+      // Geofabrik answers `*-latest` with a 307 to a dated object. Follow a few
+      // same-origin HTTPS redirects only; anything else is refused.
+      let response = await get(url, { headers, redirect: "manual", signal });
+      for (let hops = 0; response.status >= 300 && response.status < 400 && response.status !== 304; hops++) {
+        const location = response.headers.get("Location");
+        const next = location ? new URL(location, url) : undefined;
+        if (hops >= 3 || !next || next.protocol !== "https:" || next.origin !== new URL(url).origin)
+          throw new PbfRefusal(`PBF refresh refused redirect: HTTP ${response.status}`);
+        await response.body?.cancel();
+        response = await get(next.href, { headers, redirect: "manual", signal });
+      }
+      const save = async (snapshot: SourceSnapshot) => {
+        const temporary = `${record}.${randomUUID()}.part`;
+        try { await writeFile(temporary, JSON.stringify(snapshot)); await rename(temporary, record); }
+        finally { await rm(temporary, { force: true }); }
+        return snapshot;
+      };
+      if (response.status === 304) {
+        if (!previous || !("If-None-Match" in headers || "If-Modified-Since" in headers)) throw new PbfRefusal("unsolicited PBF not-modified response");
+        return save({ ...previous, checkedAt: now.toISOString() });
+      }
+      if (!response.ok || !response.body) {
+        const message = `PBF refresh failed: HTTP ${response.status}`;
+        const transient = response.status === 408 || response.status === 429 || response.status >= 500;
+        await response.body?.cancel();
+        throw transient ? new Error(message) : new PbfRefusal(message);
+      }
+      if (response.headers.get("Content-Encoding") && response.headers.get("Content-Encoding") !== "identity") throw new PbfRefusal("PBF response must not transform bytes");
+      const advertised = response.headers.get("Content-Length");
+      if (advertised && (!/^\d+$/.test(advertised) || Number(advertised) > maxBytes)) throw new PbfRefusal("PBF exceeds source size limit");
+      const temporary = join(objects, `${randomUUID()}.part`);
+      let bytes = 0;
+      const hash = createHash("sha256");
+      try {
+        await pipeline(
+          Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+          new Transform({ transform(chunk: Buffer, _encoding, callback) {
+            progress();
+            bytes += chunk.length;
+            if (bytes > maxBytes) return callback(new PbfRefusal("PBF exceeds source size limit"));
+            hash.update(chunk); callback(null, chunk);
+          } }),
+          createWriteStream(temporary, { flags: "wx" }),
+          { signal },
+        );
+        clearTimeout(stallTimer);
+        if (!bytes || (advertised && bytes !== Number(advertised))) throw new Error("PBF size mismatch");
+        const snapshotAt = await (options.inspect ?? inspectPbf)(temporary);
+        if (!Number.isFinite(Date.parse(snapshotAt)) || Date.parse(snapshotAt) > now.getTime() + 300_000) throw new PbfRefusal("invalid PBF snapshot timestamp");
+        const sha256 = hash.digest("hex");
+        const path = join(objects, `${sha256}.osm.pbf`);
+        await rename(temporary, path);
+        return save({ url, path, sha256, bytes, snapshotAt: new Date(snapshotAt).toISOString(),
+          checkedAt: now.toISOString(), downloadedAt: now.toISOString(),
+          ...(response.headers.get("ETag") ? { etag: response.headers.get("ETag")! } : {}),
+          ...(response.headers.get("Last-Modified") ? { lastModified: response.headers.get("Last-Modified")! } : {}),
+        });
+      } finally { await rm(temporary, { force: true }); }
+    } catch (error) {
+      // Report the stall, not the generic AbortError it surfaces as.
+      throw signal.aborted ? signal.reason : error;
+    } finally { clearTimeout(stallTimer); }
+  }
 }

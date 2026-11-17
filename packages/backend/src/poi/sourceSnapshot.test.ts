@@ -42,7 +42,7 @@ describe("immutable PBF snapshots", () => {
       const url = "https://example.org/source.pbf";
       const first = await refreshSnapshot(url, cache, { fetch: (async () => new Response("first", { headers: { ETag: '"v1"' } })) as typeof fetch, now: () => new Date("2026-10-20"), inspect: () => "2026-10-19" });
       const before = await readFile(join(cache, "sources/urls", (await readdir(join(cache, "sources/urls")))[0]), "utf8");
-      await expect(refreshSnapshot(url, cache, { now: () => new Date("2026-10-30"), fetch: (async (_url, init) => {
+      await expect(refreshSnapshot(url, cache, { now: () => new Date("2026-10-30"), retryDelaysMs: [0, 0], fetch: (async (_url, init) => {
         expect((init?.headers as Record<string, string>)["If-None-Match"]).toBeUndefined();
         return new Response("unavailable", { status: 503 });
       }) as typeof fetch })).rejects.toThrow("503");
@@ -76,12 +76,47 @@ describe("immutable PBF snapshots", () => {
     const cache = await mkdtemp(join(tmpdir(), "ptn-pbf-stall-"));
     try {
       await expect(refreshSnapshot("https://example.test/stall.osm.pbf", cache, {
-        stallTimeoutMs: 100, inspect: () => "2026-10-28T00:00:00Z",
+        stallTimeoutMs: 100, retryDelaysMs: [], inspect: () => "2026-10-28T00:00:00Z",
         fetch: (async () => new Response(trickle(1, 0, true))) as typeof fetch,
       })).rejects.toThrow(/stalled/);
       expect((await readdir(join(cache, "sources", "sha256"))).filter((f) => f.endsWith(".part"))).toEqual([]);
     } finally { await rm(cache, { recursive: true, force: true }); }
   }, 5000);
+
+  it("retries transient network and server failures, then freezes the bytes", async () => {
+    const cache = await mkdtemp(join(tmpdir(), "ptn-pbf-retry-"));
+    try {
+      const waits: number[] = [];
+      const outcomes: (() => Response)[] = [
+        () => { throw new TypeError("fetch failed"); },
+        () => new Response("busy", { status: 503 }),
+        () => new Response("data"),
+      ];
+      const snapshot = await refreshSnapshot("https://example.test/x.osm.pbf", cache, {
+        inspect: () => "2026-10-28T00:00:00Z", sleep: async (ms) => { waits.push(ms); },
+        fetch: (async () => outcomes.shift()!()) as typeof fetch,
+      });
+      expect(waits).toEqual([5_000, 15_000]);
+      expect(await readFile(snapshot.path, "utf8")).toBe("data");
+    } finally { await rm(cache, { recursive: true, force: true }); }
+  });
+
+  it("gives up after the last retry and never repeats a refusal", async () => {
+    const cache = await mkdtemp(join(tmpdir(), "ptn-pbf-retry-"));
+    try {
+      let calls = 0;
+      const failing = (async () => { calls++; throw new TypeError("fetch failed"); }) as typeof fetch;
+      await expect(refreshSnapshot("https://example.test/x.osm.pbf", cache, { fetch: failing, sleep: async () => {} })).rejects.toThrow("fetch failed");
+      expect(calls).toBe(3);
+      for (const refused of [new Response("gone", { status: 404 }), new Response("big", { headers: { "Content-Length": "99" } })]) {
+        calls = 0;
+        await expect(refreshSnapshot("https://example.test/x.osm.pbf", cache, { maxBytes: 10, sleep: async () => {},
+          fetch: (async () => { calls++; return refused; }) as typeof fetch })).rejects.toThrow();
+        expect(calls).toBe(1);
+      }
+      expect((await readdir(join(cache, "sources", "sha256"))).filter((f) => f.endsWith(".part"))).toEqual([]);
+    } finally { await rm(cache, { recursive: true, force: true }); }
+  });
 
   it("follows same-origin HTTPS redirects to dated extracts and refuses others", async () => {
     const cache = await mkdtemp(join(tmpdir(), "ptn-snapshot-"));
