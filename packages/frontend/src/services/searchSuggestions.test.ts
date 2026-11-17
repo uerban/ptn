@@ -5,7 +5,7 @@ import "fake-indexeddb/auto";
 import { useCityStore } from "../stores/cityStore.ts";
 import { db, type AddressSearchArtifactRecord, type PoiIndexRecord } from "../db/index.ts";
 import type { Stop, ApiResponse, PoiManifestBundle } from "@pt/shared";
-import { scorePoiRecord, candidateToSuggestion } from "./searchSuggestions.ts";
+import { scorePoiRecord, candidateToSuggestion, addressCandidateToSuggestion } from "./searchSuggestions.ts";
 import type { GeocoderCandidate } from "@pt/shared";
 import { setSearchModeAccessor, __resetSearchModeAccessorForTests, setThirdPartyEgressAccessor, __resetThirdPartyEgressAccessorForTests, searchSuggestions } from "./searchSuggestions.ts";
 import { searchServerSidePoi } from "./searchSuggestions.ts";
@@ -1123,7 +1123,7 @@ describe("candidateToSuggestion (AC-1)", () => {
   };
 
   it("AC-1: maps label/lat/lon 1:1, score===confidence, source osm, category address, no loadSource", () => {
-    const s = candidateToSuggestion(cand, 0);
+    const s = candidateToSuggestion(cand, 0)!;
     expect(s.kind).toBe("geocoded");
     if (s.kind !== "geocoded") throw new Error("expected geocoded");
     expect(s.label).toBe("Central Station");
@@ -1137,9 +1137,9 @@ describe("candidateToSuggestion (AC-1)", () => {
   });
 
   it("AC-1: poiIdentity is deterministic, carries the srv: prefix, and differs by idx", () => {
-    const a = candidateToSuggestion(cand, 0);
-    const b = candidateToSuggestion(cand, 0);
-    const c = candidateToSuggestion(cand, 1);
+    const a = candidateToSuggestion(cand, 0)!;
+    const b = candidateToSuggestion(cand, 0)!;
+    const c = candidateToSuggestion(cand, 1)!;
     if (a.kind !== "geocoded" || b.kind !== "geocoded" || c.kind !== "geocoded") {
       throw new Error("expected geocoded");
     }
@@ -1148,21 +1148,39 @@ describe("candidateToSuggestion (AC-1)", () => {
     expect(a.poiIdentity).not.toBe(c.poiIdentity);        // distinct by idx
   });
 
-  it("AC-1: non-finite confidence falls back to 0.5; non-finite coords are guarded to 0 in BOTH the identity AND the suggestion fields", () => {
-    const bad: GeocoderCandidate = { ...cand, confidence: Number.NaN, lat: Number.NaN, lon: Number.NaN };
-    const s = candidateToSuggestion(bad, 2);
-    if (s.kind !== "geocoded") throw new Error("expected geocoded");
+  it("keeps confidence fallback separate from endpoint validity", () => {
+    const s = candidateToSuggestion({ ...cand, confidence: Number.NaN }, 2)!;
     expect(s.confidence).toBe(0.5);
-    expect(s.score).toBe(0.5);
-    expect(s.poiIdentity.includes("NaN")).toBe(false);
-    // The guarded coords MUST also reach the suggestion's lat/lon fields — a
-    // non-finite candidate must not ship NaN into map-pin placement / route
-    // origin-dest when the user selects the result.
-    expect(Number.isFinite(s.lat)).toBe(true);
-    expect(Number.isFinite(s.lon)).toBe(true);
-    expect(s.lat).toBe(0);
-    expect(s.lon).toBe(0);
+    expect(s.lat).toBe(cand.lat);
+    expect(s.lon).toBe(cand.lon);
   });
+
+  it.each([
+    [Number.NaN, 25], [54, Number.NaN], [Infinity, 25], [54, -Infinity],
+    [90.00001, 25], [-90.00001, 25], [54, 180.00001], [54, -180.00001],
+  ])("rejects invalid endpoint (%s, %s) without inventing a coordinate", (lat, lon) => {
+    expect(candidateToSuggestion({ ...cand, lat, lon }, 0)).toBeNull();
+    expect(addressCandidateToSuggestion({ ...cand, provider: "address-bundle", privacyTier: "local", rowId: 1, matchedKey: "central", lat, lon }, "vilnius")).toBeNull();
+  });
+
+  it.each([[0, 0], [-90, -180], [90, 180]])("preserves valid endpoint (%s, %s), including genuine zero", (lat, lon) => {
+    expect(candidateToSuggestion({ ...cand, lat, lon }, 0)).toMatchObject({lat, lon});
+  });
+
+  it("drops malformed server rows but keeps valid neighbors and their source index identities", async () => {
+    const spy = vi.spyOn(geocoderRegistry, "forward").mockResolvedValue([
+      { ...cand, label: "invalid", lat: Number.NaN }, cand,
+      { ...cand, label: "outside", lon: 181 }, { ...cand, label: "zero", lat: 0, lon: 0 },
+    ]);
+    try {
+      const out = await searchServerSidePoi("central", null, new AbortController().signal);
+      expect(out).toHaveLength(2);
+      expect(out[0]).toMatchObject({label: cand.label, lat: cand.lat, lon: cand.lon});
+      expect(out[1]).toMatchObject({label: "zero", lat: 0, lon: 0});
+      expect(out[0].kind === "geocoded" && out[0].poiIdentity.endsWith("|1")).toBe(true);
+    } finally { spy.mockRestore(); }
+  });
+
 });
 
 describe("search mode accessor (AC-9, AC-15)", () => {
@@ -1694,6 +1712,22 @@ describe("address augmentation gate + two-emit flow", () => {
     expect(fwd).toHaveBeenCalledTimes(1);
     const last = emits.at(-1)!;
     expect(last.some((s) => s.kind === "geocoded" && s.label === "Gedimino g. 9")).toBe(true);
+  });
+
+  it("omits malformed augmentation endpoints while retaining local and valid remote matches", async () => {
+    await db.poiIndex.put(poiRow({ id: "gdansk:a", name: "Gedimino Cafe" }));
+    const valid: GeocoderCandidate = { label: "Gedimino g. 9", lat: 54.4, lon: 18.7, confidence: 0.7, provider: "self-hosted", privacyTier: "self-hosted" };
+    vi.spyOn(geocoderRegistry, "forwardSelfHosted").mockResolvedValue([
+      { ...valid, label: "Gedimino invalid", lat: Number.NaN }, valid,
+    ]);
+    const emits: import("./searchSuggestions.ts").SearchSuggestion[][] = [];
+    await searchSuggestionsStream("gedimino", "gdansk", null, new AbortController().signal, "local", {
+      onResults: partial => emits.push(partial),
+    });
+    const labels = emits.at(-1)!.filter(s => s.kind === "geocoded").map(s => s.label);
+    expect(labels).toContain("Gedimino Cafe");
+    expect(labels).toContain(valid.label);
+    expect(labels).not.toContain("Gedimino invalid");
   });
 
   it("Gate (no geocoder present): geocoder-present accessor false → no second call", async () => {

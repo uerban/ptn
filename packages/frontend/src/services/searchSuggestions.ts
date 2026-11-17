@@ -117,6 +117,16 @@ export type SearchSuggestion =
  *  SearchSuggestion would not type-check; stop/stopGroup carry `name`, not `label`). */
 export type GeocodedSuggestion = Extract<SearchSuggestion, { kind: "geocoded" }>;
 
+/** Invalid endpoints are omitted, never replaced with a routable coordinate. */
+function hasValidCoordinates(c: Pick<GeocoderCandidate, "lat" | "lon">): boolean {
+  return Number.isFinite(c.lat) && Number.isFinite(c.lon)
+    && c.lat >= -90 && c.lat <= 90 && c.lon >= -180 && c.lon <= 180;
+}
+
+function isGeocodedSuggestion(s: GeocodedSuggestion | null): s is GeocodedSuggestion {
+  return s !== null;
+}
+
 /**
  * Map a server geocoder candidate into a geocoded SearchSuggestion. GeocoderCandidate carries
  * no osmId/category/source, so the mapper synthesises: - label/lat/lon: 1:1 from the candidate.
@@ -133,16 +143,11 @@ export type GeocodedSuggestion = Extract<SearchSuggestion, { kind: "geocoded" }>
  * augmentation's one-batch merge both satisfy this). - loadSource: OMITTED (a server result is
  * neither a tile nor a bundle row).
  */
-export function candidateToSuggestion(c: GeocoderCandidate, idx: number): GeocodedSuggestion {
+export function candidateToSuggestion(c: GeocoderCandidate, idx: number): GeocodedSuggestion | null {
+  if (!hasValidCoordinates(c)) return null;
   const conf = Number.isFinite(c.confidence) ? c.confidence : 0.5;
-  // Defensive finite-coord guard: a non-finite lat/lon would make .toFixed(5)
-  // emit "NaN" — both in the identity AND in the suggestion's own lat/lon, which
-  // flow into map-pin placement and route origin/dest when the user selects the
-  // result. The adapter's contract is finite coords; this guards a contract
-  // violation. The guarded values are used for BOTH the identity and the
-  // suggestion fields (no raw/guarded asymmetry — a raw NaN must never ship).
-  const idLat = Number.isFinite(c.lat) ? c.lat : 0;
-  const idLon = Number.isFinite(c.lon) ? c.lon : 0;
+  const idLat = c.lat;
+  const idLon = c.lon;
   return {
     kind: "geocoded",
     label: c.label,
@@ -159,10 +164,11 @@ export function candidateToSuggestion(c: GeocoderCandidate, idx: number): Geocod
 export function addressCandidateToSuggestion(
   c: AddressSearchCandidate,
   cityId: string,
-): GeocodedSuggestion {
+): GeocodedSuggestion | null {
+  if (!hasValidCoordinates(c)) return null;
   const conf = Number.isFinite(c.confidence) ? c.confidence : 0.5;
-  const idLat = Number.isFinite(c.lat) ? c.lat : 0;
-  const idLon = Number.isFinite(c.lon) ? c.lon : 0;
+  const idLat = c.lat;
+  const idLon = c.lon;
   return {
     kind: "geocoded",
     label: c.label,
@@ -235,7 +241,7 @@ export async function searchServerSidePoi(
 ): Promise<SearchSuggestion[]> {
   try {
     const candidates = await geocoderRegistry.forward(query, hint, signal);
-    return candidates.map((c, i) => candidateToSuggestion(c, i));
+    return candidates.map((c, i) => candidateToSuggestion(c, i)).filter(isGeocodedSuggestion);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
     return [];
@@ -578,7 +584,7 @@ export async function searchSuggestionsStream(
     if (candidates.length === 0) return [];
     // Hit-count breadcrumb (absent on an empty result; spec AC-A26).
     console.info("[poiSync] augmentation: candidates", { cityId, candidates: candidates.length });
-    const mapped = candidates.map((c, i) => candidateToSuggestion(c, i)); // one batch, stable idx
+    const mapped = candidates.map((c, i) => candidateToSuggestion(c, i)).filter(isGeocodedSuggestion); // one batch, stable idx
     return dedupServerAgainstLocal(mapped, bestN); // dedup vs the SHOWN (sliced) local POI
   }
 
@@ -894,7 +900,7 @@ export async function searchLocalAddresses(
 ): Promise<GeocodedSuggestion[]> {
   try {
     const candidates = await localAddressCandidates(cityId, query, hint, signal);
-    return candidates.map((candidate) => addressCandidateToSuggestion(candidate, cityId));
+    return candidates.map((candidate) => addressCandidateToSuggestion(candidate, cityId)).filter(isGeocodedSuggestion);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     reportError(error instanceof Error ? error : new Error(String(error)), {
