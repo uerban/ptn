@@ -5,6 +5,7 @@ import {release} from "node:os";
 import {spawnSync} from "node:child_process";
 import {retainArtifact,readArtifact,retainRun} from "../../crates/pt-wasm/tests/baseline_store.mjs";
 import {sha} from "./module.mjs";
+import {walkingRequests} from "./walking.mjs";
 
 function runtime() {
   const hash=createHash("sha256"),fd=openSync(process.execPath,"r"),buffer=Buffer.alloc(65536);
@@ -59,6 +60,7 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   retainRun(store,id,capsule);return capsule;
 }
 
+const GRAPH_UNVERIFIED="unverified; supplied graph state is not proof of original live graph";
 const HANDLE_UNVERIFIED="unverified; supplied artifact state is not proof of original live router";
 function readCapsule(store,id) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
@@ -83,6 +85,16 @@ function readCapsule(store,id) {
     for(const [name,hash] of Object.entries(source.artifacts??{}))if((name==="replayChild"?capsule.artifacts.plannerOriginalChild:capsule.artifacts[name])!==hash)throw new Error("Planner source artifact mismatch");
     for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete planner source capsule");
   }
+  if(capsule.walkingExecution!==undefined) {
+    const config=capsule.walkingExecution;
+    if(config.version!==1||!validWalkingCity(config.cityId)||config.originalGraphIdentity!==GRAPH_UNVERIFIED)throw new Error("Unsupported walking execution capsule");
+    walkingRequests(record,config.profile);
+    for(const name of ["walkingSourceCapsule","walkingOriginalChild","walkingGlue","walkingWasm","walkingGraph","walkingRequestBuilder"])if(!observed[name])throw new Error(`Missing walking artifact: ${name}`);
+    const source=JSON.parse(observed.walkingSourceCapsule);
+    if(source.walkingExecution!==undefined||source.format!==capsule.format||source.scope!==capsule.scope||!same(source.replayRuntime,capsule.replayRuntime))throw new Error("Walking source capsule mismatch");
+    for(const [name,hash] of Object.entries(source.artifacts??{}))if((name==="replayChild"?capsule.artifacts.walkingOriginalChild:capsule.artifacts[name])!==hash)throw new Error("Walking source artifact mismatch");
+    for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete walking source capsule");
+  }
   return {manifestBytes,capsule,observed,record,build};
 }
 
@@ -101,6 +113,24 @@ export function attachPlannerReplay(store,sourceId,id,{glue,wasm,ptb,transfers,p
   retainRun(store,id,attached);return attached;
 }
 
+const validWalkingCity=value=>typeof value==="string"&&/^[a-z0-9][a-z0-9_-]{0,63}$/.test(value);
+
+/** Retain decoded graph state as a new immutable run, without executing glue. */
+export function attachWalkingReplay(store,sourceId,id,{glue,wasm,graph,cityId,profile}) {
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
+  if(!validWalkingCity(cityId))throw new Error("Explicit walking city ID required");
+  const {manifestBytes,capsule,record}=readCapsule(store,sourceId);
+  if(capsule.walkingExecution!==undefined)throw new Error("Walking replay already attached");
+  walkingRequests(record,profile);
+  const bytes={walkingGlue:readFileSync(glue),walkingWasm:readFileSync(wasm),walkingGraph:readFileSync(graph),
+    walkingRequestBuilder:readFileSync(new URL("./walking.mjs",import.meta.url))};
+  const artifacts={...capsule.artifacts,walkingSourceCapsule:retainArtifact(store,manifestBytes),walkingOriginalChild:capsule.artifacts.replayChild,
+    replayChild:retainArtifact(store,readFileSync(new URL("./replay-child.mjs",import.meta.url)))};
+  for(const [name,value] of Object.entries(bytes))artifacts[name]=retainArtifact(store,value);
+  const attached={...capsule,artifacts,walkingExecution:{version:1,cityId,profile,originalGraphIdentity:GRAPH_UNVERIFIED}};
+  retainRun(store,id,attached);return attached;
+}
+
 /** Verify every declared byte before materialization. Explicit replay executes
  * retained trusted code with a bounded process; this is not a security sandbox. */
 export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
@@ -115,9 +145,14 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
     const path=join(destination,name);writeFileSync(path,observed[name],{flag:"wx",mode:0o400});
     plannerInput.artifacts[name]={path,sha256:capsule.artifacts[name]};
   }
+  const walkingInput=capsule.walkingExecution?{...capsule.walkingExecution,artifacts:{}}:null;
+  if(walkingInput)for(const name of ["walkingGlue","walkingWasm","walkingGraph","walkingRequestBuilder"]) {
+    const path=join(destination,name);writeFileSync(path,observed[name],{flag:"wx",mode:0o400});
+    walkingInput.artifacts[name]={path,sha256:capsule.artifacts[name]};
+  }
   const env={...process.env};delete env.NODE_OPTIONS;delete env.NODE_PATH;
   const started=performance.now();
-  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record,JSON.stringify(plannerInput)],
+  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record,JSON.stringify(plannerInput),JSON.stringify(walkingInput)],
     {env,timeout:timeoutMs,maxBuffer:4*1024*1024,encoding:"utf8",killSignal:"SIGKILL"});
   writeFileSync(join(destination,"stdout.txt"),child.stdout??"",{flag:"wx",mode:0o600});
   writeFileSync(join(destination,"stderr.txt"),child.stderr??"",{flag:"wx",mode:0o600});
@@ -127,11 +162,14 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
     try {result=JSON.parse(child.stdout);if(result.completion!=="success"||result.moduleHash!==capsule.artifacts.module||result.recordHash!==capsule.artifacts.record
       ||!same(result.output,record.output))throw new Error("Replay proof mismatch");
       if(plannerInput&&(!same(result.planner?.output,record.planner.output)||result.planner?.patternMode!==plannerInput.patternMode
-        ||!same(result.planner?.artifacts,Object.fromEntries(Object.entries(plannerInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Planner replay proof mismatch");}
+        ||!same(result.planner?.artifacts,Object.fromEntries(Object.entries(plannerInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Planner replay proof mismatch");
+      if(walkingInput&&(!same(result.walking?.calls,walkingRequests(record,walkingInput.profile))||result.walking?.cityId!==walkingInput.cityId||result.walking?.profile!==walkingInput.profile
+        ||!same(result.walking?.artifacts,Object.fromEntries(Object.entries(walkingInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Walking replay proof mismatch");}
     catch {completion="error";}
   }
   const proof={format:"ptn-search-finalization-replay",version:1,scope:capsule.scope,classification:capsule.classification,recordProducerIdentity:capsule.recordProducerIdentity,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
     planner:completion==="success"?(result.planner??null):null,plannerExecution:capsule.plannerExecution??null,
+    walking:completion==="success"?(result.walking??null):null,walkingExecution:capsule.walkingExecution??null,
     completion,elapsedMs:performance.now()-started,exitCode:child.status,signal:child.signal,errorCode:child.error?.code??null,
     logCaptureComplete:child.error?.code!=="ENOBUFS",output:completion==="success"?result.output:null};
   writeFileSync(join(destination,"verification.json"),JSON.stringify(proof,null,2)+"\n",{flag:"wx",mode:0o600});

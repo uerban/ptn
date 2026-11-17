@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
-const [modulePath,recordPath,moduleHash,recordHash,plannerJson="null"]=process.argv.slice(1);
+const [modulePath,recordPath,moduleHash,recordHash,plannerJson="null",walkingJson="null"]=process.argv.slice(1);
 const digest=bytes=>createHash("sha256").update(bytes).digest("hex");
 const moduleBytes=readFileSync(modulePath),recordBytes=readFileSync(recordPath);
 if(digest(moduleBytes)!==moduleHash||digest(recordBytes)!==recordHash)throw new Error("Materialized replay artifact changed");
@@ -34,4 +34,30 @@ if(config) {
     planner={query:observedQuery,output:actual,artifacts,patternMode:config.patternMode};
   }finally{router?.free();}
 }
-process.stdout.write(JSON.stringify({completion:"success",moduleHash,recordHash,output,planner})+"\n");
+let walking=null;
+const walkConfig=JSON.parse(walkingJson);
+if(walkConfig) {
+  const bytes={},artifacts={};
+  for(const [name,row] of Object.entries(walkConfig.artifacts)) {
+    bytes[name]=readFileSync(row.path);if(digest(bytes[name])!==row.sha256)throw new Error("Materialized walking artifact changed");artifacts[name]=row.sha256;
+  }
+  const {walkingRequests}=await import(`data:text/javascript;base64,${bytes.walkingRequestBuilder.toString("base64")}`);
+  const expected=walkingRequests(record,walkConfig.profile);
+  // Separate module instance from any planner, even when both use the same glue.
+  const pkg=await import(`data:text/javascript;base64,${bytes.walkingGlue.toString("base64")}#walking`);
+  pkg.initSync({module:bytes.walkingWasm});
+  let graph;
+  try {
+    graph=new pkg.PtWalkGraph(bytes.walkingGraph);
+    if(graph.cityId()!==walkConfig.cityId)throw new Error("Walking graph city mismatch");
+    const calls=[];
+    const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
+    for(const call of expected) {
+      const route=await graph.route(call.from.lat,call.from.lon,call.to.lat,call.to.lon,walkConfig.profile);
+      if(JSON.stringify(canonical(route))!==JSON.stringify(canonical(call.route)))throw new Error("Walking route differs from observation");
+      calls.push({...call,route});
+    }
+    walking={calls,cityId:walkConfig.cityId,profile:walkConfig.profile,artifacts};
+  }finally{graph?.free();}
+}
+process.stdout.write(JSON.stringify({completion:"success",moduleHash,recordHash,output,planner,walking})+"\n");

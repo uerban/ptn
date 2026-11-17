@@ -5,7 +5,7 @@ import {spawnSync} from "node:child_process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildFinalizationModule,sha,sourceRoot} from "../../../tools/search-finalization/module.mjs";
-import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay} from "../../../tools/search-finalization/capsule.mjs";
+import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay,attachWalkingReplay} from "../../../tools/search-finalization/capsule.mjs";
 import {retainArtifact} from "./baseline_store.mjs";
 let root,moduleDir,recordPath,expected,compiled,moduleManifest;
 before(async()=>{
@@ -269,4 +269,83 @@ test("supplied planner artifacts execute only on replay and preserve source obse
  const unproved=replayFinalizationCapsule(store,"ignored-planner",join(root,"ignored-planner-proof"));assert.equal(unproved.completion,"error");assert.equal(unproved.output,null);
  const manifest=JSON.parse(readFileSync(join(store,"runs/with-engine.json")));manifest.plannerExecution.originalHandleIdentity="verified";writeFileSync(join(store,"runs/with-engine.json"),JSON.stringify(manifest));
  const refused=join(root,"planner-identity-upgrade");assert.throws(()=>replayFinalizationCapsule(store,"with-engine",refused),/Unsupported planner/);assert.equal(existsSync(refused),false);
+});
+
+test("supplied walking graph verifies recorded route calls, with bounded failures and immutable provenance",async()=>{
+ const route={coords:[[25,54],[25.001,54]],distanceMeters:400,steps:[]};
+ const input={itineraries:[{boardSecs:100,alightSecs:900,transfers:1,legs:[
+  {type:"transit",tripId:"T1",routeId:"R",fromStopId:"A",toStopId:"B",departSecs:100,arriveSecs:300,boardStopIdx:0,alightStopIdx:1},
+  {type:"walk",fromStopId:"B",toStopId:"C",departSecs:300,arriveSecs:420},
+  {type:"transit",tripId:"T2",routeId:"R",fromStopId:"C",toStopId:"D",departSecs:600,arriveSecs:900,boardStopIdx:0,alightStopIdx:1}]}],
+  entryWalks:[{stopId:"A",walkSecs:0,distanceMeters:0}],exitWalks:[{stopId:"D",walkSecs:0,distanceMeters:0}],departureSecs:0,
+  stops:[{id:"B",lat:54,lon:25},{id:"C",lat:54,lon:25.001}],walkSpeedMps:1.25,walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120};
+ let record;const output=await compiled.composeSearchResults(input,async()=>route,()=>null,()=>120,r=>{record=r;});
+ const path=join(root,"walking-observed.json"),store=join(root,"walking-store");writeFileSync(path,JSON.stringify(record));
+ retainFinalization(store,"original",path,moduleDir);const sourcePath=join(store,"runs/original.json"),original=readFileSync(sourcePath);
+ const glue=join(root,"walking-glue.mjs"),wasm=join(root,"walking.wasm"),graph=join(root,"walking.ptwg");
+ writeFileSync(wasm,"walk-wasm");writeFileSync(graph,"walk-graph");
+ const code=(body,city="vilnius")=>[
+  'export function initSync({module}){if(module.toString()!=="walk-wasm")throw new Error("WASM state mismatch")}',
+  'export class PtWalkGraph {',
+  'constructor(bytes){if(bytes.toString()!=="walk-graph")throw new Error("graph state mismatch")}',
+  `cityId(){return ${JSON.stringify(city)};}`, 'free(){}', `route(lat,lon,toLat,toLon,profile){if(lat!==54||lon!==25||toLat!==54||toLon!==25.001||profile!=="default")throw new Error("walking query changed");${body}}`, '}'].join("\n");
+ writeFileSync(glue,code(`return ${JSON.stringify(route)};`));const options={glue,wasm,graph,cityId:"vilnius",profile:"default"};
+ const attached=attachWalkingReplay(store,"original","walking",options);assert.deepEqual(readFileSync(sourcePath),original);
+ assert.equal(attached.replayVerification,"unverified");assert.match(attached.walkingExecution.originalGraphIdentity,/unverified/);
+ const moved=join(root,"walking-relocated");cpSync(store,moved,{recursive:true});
+ const proof=replayFinalizationCapsule(moved,"walking",join(root,"walking-proof"));assert.equal(proof.completion,"success",readFileSync(join(root,"walking-proof/stderr.txt"),"utf8"));
+ assert.deepEqual(proof.output,output);assert.deepEqual(proof.walking.calls,[{kind:"transfer",index:0,from:{lat:54,lon:25},to:{lat:54,lon:25.001},route}]);
+ assert.throws(()=>attachWalkingReplay(store,"original","walking",options),/EEXIST/);
+ assert.throws(()=>attachWalkingReplay(store,"walking","again",options),/already attached/);
+ for(const [name,hash] of Object.entries(attached.artifacts).filter(([name])=>name.startsWith("walking"))) {
+  const path=join(store,"artifacts",hash),saved=readFileSync(path);writeFileSync(path,"corrupt");const out=join(root,`walking-corrupt-${name}`);
+  assert.throws(()=>replayFinalizationCapsule(store,"walking",out),/integrity/);assert.equal(existsSync(out),false);writeFileSync(path,saved);
+ }
+ for(const [id,source,completion] of [["wrong-route",code("return null;"),"error"],["wrong-city",code(`return ${JSON.stringify(route)};`,"elsewhere"),"error"],["throw","throw new Error('explicit replay only')","error"],["timeout",code("while(true){}"),"timeout"]]) {
+  writeFileSync(glue,source);attachWalkingReplay(store,"original",id,options);
+  const failure=replayFinalizationCapsule(store,id,join(root,`walking-${id}`),id==="timeout"?150:5000);assert.equal(failure.completion,completion);assert.equal(failure.output,null);assert.equal(failure.walking,null);
+ }
+ assert.throws(()=>attachWalkingReplay(join(root,"pipeline-store"),"linked","ambiguous-direct",options),/Ambiguous/);
+ const unproved=JSON.parse(readFileSync(join(store,"runs/walking.json")));unproved.artifacts.replayChild=retainArtifact(store,Buffer.from('import {readFileSync} from "node:fs";process.stdout.write(JSON.stringify({completion:"success",moduleHash:process.argv[3],recordHash:process.argv[4],output:JSON.parse(readFileSync(process.argv[2])).output}));'));
+ writeFileSync(join(store,"runs/walking-unproved.json"),JSON.stringify(unproved));const denied=replayFinalizationCapsule(store,"walking-unproved",join(root,"walking-unproved"));assert.equal(denied.completion,"error");
+ const unsupported=JSON.parse(readFileSync(join(store,"artifacts",attached.artifacts.record)));
+ unsupported.reads[0]={from:{lat:54,lon:25},to:{lat:54,lon:25.001},outcome:"unavailable",cityId:"vilnius",reason:"transient"};
+ writeFileSync(path,JSON.stringify(unsupported));retainFinalization(store,"unavailable",path,moduleDir);
+ assert.throws(()=>attachWalkingReplay(store,"unavailable","not-a-null-route",options),/Unavailable/);
+ let noCalls;
+ await compiled.composeSearchResults({...input,itineraries:[]},undefined,()=>null,undefined,r=>{noCalls=r;});
+ writeFileSync(path,JSON.stringify(noCalls));retainFinalization(store,"no-calls",path,moduleDir);
+ assert.throws(()=>attachWalkingReplay(store,"no-calls","not-a-graph-execution",options),/No observed/);
+ const nullOutput=await compiled.composeSearchResults(input,async()=>null,()=>null,()=>120,r=>{record=r;});
+ writeFileSync(path,JSON.stringify(record));retainFinalization(store,"null-observation",path,moduleDir);
+ writeFileSync(glue,code("return null;"));attachWalkingReplay(store,"null-observation","null-replay",options);
+ const nullProof=replayFinalizationCapsule(store,"null-replay",join(root,"walking-null-proof"));assert.equal(nullProof.completion,"success");assert.deepEqual(nullProof.output,nullOutput);assert.equal(nullProof.walking.calls[0].route,null);
+});
+
+test("planner and walking attachments compose in either order with independent WASM instances",async()=>{
+ const source=JSON.parse(readFileSync(join(root,"pipeline-store/runs/linked.json")));
+ const record=JSON.parse(readFileSync(join(root,"pipeline-store/artifacts",source.artifacts.record)));
+ const route={coords:[[25.28,54.68],[25.28,54.70]],distanceMeters:400,steps:[]};record.directRoute=route;
+ const start=record.composition.input.departureSecs;
+ const walking={directWalk:{origin:record.query.origin,destination:record.query.destination,route},legs:[],sourceWalkSecs:0,destWalkSecs:0,
+  departureSecs:start,arrivalSecs:start+320,totalSecs:320,totalWalkSecs:320,totalWalkMeters:400,transfers:0};
+ record.output=await compiled.composeSearchResults({...record.composition.input,walking},async()=>route,()=>null,undefined,r=>{record.composition=r;});
+ const path=join(root,"combined-record.json"),store=join(root,"combined-store");writeFileSync(path,JSON.stringify(record));retainFinalization(store,"source",path,moduleDir);
+ const glue=join(root,"combined-glue.mjs"),plannerWasm=join(root,"combined-planner.wasm"),walkingWasm=join(root,"combined-walking.wasm"),ptb=join(root,"combined.ptb"),graph=join(root,"combined.ptwg");
+ writeFileSync(plannerWasm,"planner");writeFileSync(walkingWasm,"walking");writeFileSync(ptb,"ptb");writeFileSync(graph,"graph");
+ writeFileSync(glue,[
+  'let tag;export function initSync({module}){tag??=module.toString()}',
+  `export class PtRouter{free(){}plan(){if(tag!=="planner")throw new Error("planner module instance changed");return ${JSON.stringify(record.planner.output)};}}`,
+  `export class PtWalkGraph{free(){}cityId(){return "vilnius"}route(){if(tag!=="walking")throw new Error("walking module instance changed");return ${JSON.stringify(route)};}}`].join("\n"));
+ const planner={glue,wasm:plannerWasm,ptb,transfers:null,patternMode:"covering-merge"},walk={glue,wasm:walkingWasm,graph,cityId:"vilnius",profile:"default"};
+ attachPlannerReplay(store,"source","planner-first",planner);attachWalkingReplay(store,"planner-first","both-planner-first",walk);
+ attachWalkingReplay(store,"source","walking-first",walk);attachPlannerReplay(store,"walking-first","both-walking-first",planner);
+ for(const id of ["both-planner-first","both-walking-first"]) {
+  const out=join(root,id),proof=replayFinalizationCapsule(store,id,out);
+  assert.equal(proof.completion,"success",readFileSync(join(out,"stderr.txt"),"utf8"));assert.deepEqual(proof.output,record.output);
+  assert.deepEqual(proof.planner.output,record.planner.output);assert.equal(proof.walking.calls.length,1);assert.equal(proof.walking.calls[0].kind,"direct");
+ }
+ assert.throws(()=>attachWalkingReplay(store,"source","wrong-profile",{...walk,profile:"wheelchair"}),/profile differs/);
+ const altered=JSON.parse(readFileSync(join(store,"runs/walking-first.json")));altered.walkingExecution.originalGraphIdentity="verified";writeFileSync(join(store,"runs/claimed-graph.json"),JSON.stringify(altered));
+ const denied=join(root,"claimed-graph-proof");assert.throws(()=>replayFinalizationCapsule(store,"claimed-graph",denied),/Unsupported walking/);assert.equal(existsSync(denied),false);
 });

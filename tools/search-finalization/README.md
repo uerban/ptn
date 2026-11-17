@@ -112,3 +112,41 @@ rerun endpoint selection or raw walking graphs, resolve the original time frame,
 or establish original browser/worker lifecycle equivalence. No runtime package
 or compiler installation is required for replay. Generated glue must be usable
 from its retained data URL; external module/file dependencies are not captured.
+
+## Supplied decoded walking graph
+
+Composition and supported pipeline observations can be extended into another
+immutable run without executing supplied code during attachment:
+
+```sh
+node tools/search-finalization/cli.mjs attach-walking <store> <source-id> <new-id> <glue.js> <wasm> <decoded.ptwg> <city> <default-or-wheelchair>
+```
+
+This retains the exact decoded graph bytes consumed by `PtWalkGraph`, not a
+Brotli transport/release snapshot. City and profile are explicit. For pipelines,
+the profile must agree with the recorded mobility profile. Composition-only
+records do not retain that routing profile, so the supplied choice remains an
+unverified state assertion. The exact request-builder source is retained too.
+
+Replay constructs the graph, checks its city, and reruns each recorded transfer
+route response (including an explicit null response). Pipeline replay also
+checks a retained non-null direct route. Every call's coordinates, order, geometry,
+distance and steps must match exactly. Typed transient/superseded outcomes cannot
+be reproduced by a loaded graph and are rejected. An old pipeline with a null
+direct route is ambiguous about absent/missing/unavailable providers and is
+rejected for this attachment. An observation without pedestrian calls is also
+rejected. These limits do not change ordinary observation replay support.
+
+The child verifies its read buffers and imports the retained request builder by
+value. The parent independently checks call proofs against the observation.
+Missing proofs, city/profile mismatches, route differences, errors and timeouts
+cannot become successful empty output. Planner and walking attachments can be
+combined in either order; their glue instances are separate even when the bytes
+are identical, so initializing one cannot reuse the other's WASM binding.
+
+Original graph/live application identity remains explicitly unverified, and
+original capsule scope/classification remain unchanged. This proves compatibility
+of supplied decoded graph state for declared calls. It does not replay OSRM
+endpoint duration tables, graph discovery/cache/worker lifecycle, decompression,
+original city-scale graph state, or pre-lookup RT feeds. Use OS network denial
+for an offline verification; the process deadline is not a security sandbox.
