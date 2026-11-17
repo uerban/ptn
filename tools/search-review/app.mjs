@@ -129,7 +129,11 @@ function render() {
     $("query-summary").textContent+=` · From ${current.query.entryStops.map(stop=>stopLabel(stop.stopId)).join(", ")} → ${current.query.exitStops.map(stop=>stopLabel(stop.stopId)).join(", ")}`;
   }
   $("query-settings").textContent=JSON.stringify({query:current?.query??{},settings:model.bundle.provenance.settings},null,2);
-  $("provenance-data").textContent=JSON.stringify(model.bundle.provenance,null,2);
+  if(model.bundle.comparison) $("limits").textContent+=` Comparison: ${current?.comparisonStatus??"unknown"}; both source arrays and their original order are retained. Source identities are hidden until provenance is opened.`;
+  $("provenance-data").textContent=JSON.stringify(model.bundle.comparison?{
+    primarySource:"before",before:model.bundle.comparison.before.provenance,after:model.bundle.comparison.after.provenance,
+    displayedCandidates:candidateOrder().map((candidate,index)=>({option:label(index),source:candidate.source})),
+  }:model.bundle.provenance,null,2);
   const ordered=candidateOrder();drawCandidates(ordered);renderForm(ordered);
   $("history").replaceChildren();
   let count=0;

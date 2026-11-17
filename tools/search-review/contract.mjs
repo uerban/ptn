@@ -32,6 +32,11 @@ export function validateReviewStopContext(context,ptbSha256) {
 }
 
 export async function validateReviewBundle(bundle) {
+  if(bundle?.format==="ptn-search-review-bundle" && bundle.version===2) {
+    const expected=await createReviewComparison(bundle.comparison?.before,bundle.comparison?.after);
+    if(JSON.stringify(canonical(bundle))!==JSON.stringify(canonical(expected))) fail("comparison derivation or identity mismatch");
+    return bundle;
+  }
   if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
       || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
   const p = bundle.provenance;
@@ -41,6 +46,7 @@ export async function validateReviewBundle(bundle) {
       || !strings(p.missingDependencies) || !strings(p.unsupported)) fail("missing provenance");
   if (!p.artifacts || !Object.values(p.artifacts).every(digest)
       || !["ptb","queryTuples","glue","wasm"].every(name => digest(p.artifacts[name]))) fail("missing artifact hashes");
+  if(p.executionContract!==undefined && !["snapshot-data-url-v1","file-url-v0"].includes(p.executionContract)) fail("unsupported execution contract");
   if(bundle.stopContext!==undefined) {
     if(!digest(p.artifacts.reviewStopContext)) fail("missing stop context artifact");
     validateReviewStopContext(bundle.stopContext,p.artifacts.ptb);
@@ -65,4 +71,40 @@ export async function validateReviewBundle(bundle) {
   const {bundleId,...content} = bundle;
   if (!digest(bundleId) || bundleId !== await fingerprint(content)) fail("bundle identity mismatch");
   return bundle;
+}
+
+/** A derived blind-review view. Source bundles preserve every rank/duplicate;
+ * source identity participates in candidate identity, even for equal itineraries.
+ * The primary provenance/snapshot is explicitly the before source. */
+export async function createReviewComparison(before,after) {
+  if(before?.version!==1 || after?.version!==1) fail("comparison requires two single-capture bundles");
+  await validateReviewBundle(before);await validateReviewBundle(after);
+  const a=before.provenance,b=after.provenance;
+  const same=(x,y)=>JSON.stringify(canonical(x))===JSON.stringify(canonical(y));
+  const execution=p=>p.executionContract;
+  const supported=["snapshot-data-url-v1","file-url-v0"];
+  if(a.artifacts.ptb!==b.artifacts.ptb || a.artifacts.queryTuples!==b.artifacts.queryTuples
+      || !same(a.settings,b.settings) || !supported.includes(execution(a)) || execution(a)!==execution(b)) fail("incomparable inputs, settings or execution contract");
+  if(!["node","v8","platform","arch","release"].every(key=>a.runtime[key]===b.runtime[key])) fail("incomparable runtime");
+  if(before.cases.length!==after.cases.length) fail("incomparable query count");
+  const cases=[];
+  for(const [index,left] of before.cases.entries()) {
+    const right=after.cases[index];
+    if(!same(left.query,right.query)) fail("incomparable query");
+    const id=left.id,candidates=[];
+    for(const [side,row] of [["before",left],["after",right]]) {
+      for(const [rank,candidate] of row.candidates.entries()) {
+        const source={side,rank,caseId:row.id,candidateId:candidate.id};
+        candidates.push({id:await fingerprint({caseId:id,itinerary:candidate.itinerary,source}),
+          itinerary:structuredClone(candidate.itinerary),source});
+      }
+    }
+    cases.push({id,query:structuredClone(left.query),candidates,
+      capture:{...structuredClone(left.capture),truncated:left.capture.truncated||right.capture.truncated},
+      comparisonStatus:same(left.candidates.map(c=>c.itinerary),right.candidates.map(c=>c.itinerary))?"unchanged":"changed/unreviewed"});
+  }
+  const content={format:"ptn-search-review-bundle",version:2,scope:before.scope,
+    provenance:structuredClone(a),comparison:{primarySource:"before",before:structuredClone(before),after:structuredClone(after)},cases,
+    ...(before.stopContext?{stopContext:structuredClone(before.stopContext)}:{})};
+  return {...content,bundleId:await fingerprint(content)};
 }

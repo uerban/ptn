@@ -4,11 +4,12 @@ import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import {readArtifact} from "./baseline_store.mjs";
 import {diffBaselines} from "./baseline_diff.mjs";
+import {GLUE_EXECUTION} from "./baseline_glue.mjs";
 import {fingerprint,validateReviewBundle,validateReviewStopContext} from "../../../tools/search-review/contract.mjs";
 
 /** Explicit local export only. Raw input artifacts and machine paths stay in
  * the store. Query/candidate data may still be private; sharing is separate. */
-export async function exportReviewBundle(store,runId,destination) {
+export async function buildReviewBundle(store,runId) {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new Error("Invalid run ID");
   const manifest = readFileSync(join(store,"runs",`${runId}.json`));
   const record = JSON.parse(manifest);
@@ -23,6 +24,7 @@ export async function exportReviewBundle(store,runId,destination) {
     snapshotId:await fingerprint({artifacts:record.artifacts,runtime,settings}),
     runManifestSha256:createHash("sha256").update(manifest).digest("hex"),
     classification:record.classification,replayVerification:record.replayVerification,
+    executionContract:record.report.glueExecution??GLUE_EXECUTION.file,
     missingDependencies:record.missingDependencies,unsupported:record.unsupported,
   };
   const cases = [];
@@ -46,6 +48,11 @@ export async function exportReviewBundle(store,runId,destination) {
   }
   const bundle = {...content,bundleId:await fingerprint(content)};
   await validateReviewBundle(bundle);
+  return bundle;
+}
+
+export async function exportReviewBundle(store,runId,destination) {
+  const bundle=await buildReviewBundle(store,runId);
   writeFileSync(destination,`${JSON.stringify(bundle,null,2)}\n`,{flag:"wx"});
   return bundle;
 }

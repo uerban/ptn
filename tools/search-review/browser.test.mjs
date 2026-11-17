@@ -8,6 +8,7 @@ import {chromium} from "../../packages/frontend/node_modules/@playwright/test/in
 import {retainArtifact,retainRun} from "../../crates/pt-wasm/tests/baseline_store.mjs";
 import {exportReviewBundle} from "../../crates/pt-wasm/tests/baseline_review.mjs";
 import {validateReviewActions,effectiveReviewActions} from "./state.mjs";
+import {createReviewComparison} from "./contract.mjs";
 import {buildReviewerPage} from "./build.mjs";
 
 const here=dirname(fileURLToPath(import.meta.url)),url=pathToFileURL(join(here,"index.html")).href;
@@ -34,6 +35,29 @@ before(async()=>{
  browser=await chromium.launch({headless:true});
 });
 after(async()=>{await browser?.close();});
+
+test("derived old/new bundle stays blind through offline reload and neutral export",async()=>{
+ const comparison=await createReviewComparison(bundle,bundle);
+ const context=await browser.newContext({offline:true});
+ try {
+  const page=await context.newPage();await page.goto(url);
+  await page.locator("#bundle-file").setInputFiles(inputFile("comparison.json",comparison));
+  await page.locator("#workspace").waitFor({state:"visible"});await start(page,"Comparison reviewer");
+  assert.equal(await page.locator(".candidate").count(),6);
+  const order=await page.locator(".candidate").evaluateAll(nodes=>nodes.map(node=>node.dataset.candidateId));
+  assert.match(await page.locator("#limits").textContent(),/Comparison: unchanged/);
+  assert.equal(await page.locator("#provenance-data").isVisible(),false);
+  await page.reload();await page.locator(".candidate").first().waitFor();
+  assert.deepEqual(await page.locator(".candidate").evaluateAll(nodes=>nodes.map(node=>node.dataset.candidateId)),order);
+  await page.locator("#mode").selectOption("compare");await page.locator("#verdict").selectOption("equivalent");
+  await page.locator("#save").click();await saved(page);
+  const actions=await exported(page);await validateReviewActions(actions,comparison);
+  assert.equal(actions.sessions[0].actions[0].choice,"equivalent");
+  await page.getByText("Reveal provenance",{exact:true}).click();
+  const provenance=JSON.parse(await page.locator("#provenance-data").textContent());
+  assert.deepEqual(new Set(provenance.displayedCandidates.map(c=>c.source.side)),new Set(["before","after"]));
+ } finally {await context.close();}
+});
 const inputFile=(name,value)=>({name,mimeType:"application/json",buffer:Buffer.from(JSON.stringify(value))});
 async function importBundle(page) {
  await page.goto(url);

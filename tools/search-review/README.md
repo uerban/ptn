@@ -145,3 +145,38 @@ only to the imported bundle; they are neither citywide satisfaction estimates
 nor correctness verdicts. No overall quality score or baseline promotion is
 produced. Reports can contain private notes and identifiers; sharing remains
 an explicit separate action.
+
+## Compare two retained captures
+
+```sh
+node crates/pt-wasm/tests/baseline_review_compare.mjs <store> <before-run> <after-run> <new-bundle.json>
+```
+
+The comparison exporter verifies both immutable captures and their artifacts
+before creating a private, fresh output. PTB bytes, query-manifest bytes, ordered
+queries, planning settings, explicit glue execution contract and core runtime
+must match. Engine glue/WASM hashes may differ. Mismatches reject the comparison;
+use the baseline diff tool to inspect incomparable inputs separately.
+
+Version 2 comparison bundles retain both complete version 1 source bundles.
+Each displayed candidate binds its source side, original rank and source
+candidate identity. Duplicate occurrences remain distinct, including identical
+itineraries from the two sources. Empty arrays and truncation remain visible;
+combined capture truncation is true if either source is truncated. Case status
+is `unchanged` or `changed/unreviewed`, based on the exact ordered itinerary
+arrays. A status is not a usefulness or feasibility verdict.
+
+The primary `provenance` and case snapshot belong to the before source; this is
+explicitly recorded as `comparison.primarySource`. Both source provenance
+records and displayed-option source assignments are available on demand in the
+viewer. Candidate sources are hidden initially and session order remains blind
+and stable through offline reload. The derived comparison is validated again
+on import; changing source ranks, derived arrays or status invalidates it.
+
+New exports record the execution contract explicitly. Older version 1 bundles
+without that metadata still open individually, but cannot establish a portable
+matched-execution comparison. Version 1 action journals work with either bundle
+version and bind to that bundle's identity; feedback is never silently moved
+between single-capture and comparison views. Older viewers that support only
+version 1 must be updated to open version 2. No baseline promotion or automatic
+quality verdict occurs.
