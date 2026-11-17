@@ -174,3 +174,33 @@ test("module build uses workspace TS sources in a clean tree without shared dist
  assert.equal(existsSync(join(tree,"packages/shared/dist")),false);
  assert.equal(existsSync(join(tree,"node_modules")),false);
 });
+
+test("directed reach capsules relocate and replay without clock or live providers",async()=>{
+ let record;
+ const origin={lat:54.68,lon:25.28},stops=[{id:"A",name:"A",...origin},{id:"B",name:"B",lat:54.681,lon:25.28}];
+ const output=await compiled.captureReachableStops(origin,stops,{maxWalkSecs:300,walkSpeedMps:1.25,radiusMeters:500,role:"destination"},
+  {isReady:()=>true,table:async(sources,destinations)=>{assert.deepEqual(destinations,[origin]);assert.equal(sources.length,2);return {durations:[[-1],[20]]};}},"default",value=>{record=value;});
+ assert.deepEqual(output.map(row=>row.stopId),["B"]);
+ assert.equal(Object.hasOwn(record,"nowMs"),false);
+ const path=join(root,"reach.json"),store=join(root,"reach-store");writeFileSync(path,JSON.stringify(record));
+ const capsule=retainFinalization(store,"reach",path,moduleDir);
+ assert.equal(capsule.scope,"frontend directed endpoint reach");
+ assert.ok(capsule.missingDependencies.includes("OSRM module/graph and transfer-table artifacts"));
+ const moved=join(root,"reach-relocated");cpSync(store,moved,{recursive:true});rmSync(store,{recursive:true});
+ const proof=replayFinalizationCapsule(moved,"reach",join(root,"reach-replayed"));
+ assert.equal(proof.completion,"success");assert.equal(proof.scope,capsule.scope);assert.deepEqual(proof.output,output);
+ assert.match(proof.recordProducerIdentity,/unverified/);
+ const stage=join(root,"reach-isolated-toolkit");
+ mkdirSync(join(stage,"tools"),{recursive:true});mkdirSync(join(stage,"crates/pt-wasm/tests"),{recursive:true});
+ cpSync(join(sourceRoot,"tools/search-finalization"),join(stage,"tools/search-finalization"),{recursive:true});
+ cpSync(join(sourceRoot,"crates/pt-wasm/tests/baseline_store.mjs"),join(stage,"crates/pt-wasm/tests/baseline_store.mjs"));
+ const isolated=spawnSync(process.execPath,[join(stage,"tools/search-finalization/cli.mjs"),"replay",moved,"reach",join(root,"reach-isolated-output")],{encoding:"utf8"});
+ assert.equal(isolated.status,0,isolated.stderr);assert.deepEqual(JSON.parse(isolated.stdout).output,output);
+ assert.equal(existsSync(join(stage,"packages")),false);
+ const mismatched={...record,scope:"frontend RT feasibility and ranking"};writeFileSync(path,JSON.stringify(mismatched));
+ const refused=join(root,"reach-wrong-scope");assert.throws(()=>retainFinalization(refused,"reach",path,moduleDir),/Unsupported/);assert.equal(existsSync(refused),false);
+ // A module manifest must explicitly support reach, never infer it from an older module.
+ const build=JSON.parse(readFileSync(join(moved,"artifacts",capsule.artifacts.moduleBuild)));delete build.recordFormats;
+ capsule.artifacts.moduleBuild=retainArtifact(moved,Buffer.from(JSON.stringify(build)));writeFileSync(join(moved,"runs/reach.json"),JSON.stringify(capsule));
+ const unsupported=join(root,"reach-legacy-module");assert.throws(()=>replayFinalizationCapsule(moved,"reach",unsupported),/scope mismatch/);assert.equal(existsSync(unsupported),false);
+});

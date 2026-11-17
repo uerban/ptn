@@ -13,7 +13,8 @@ function runtime() {
 }
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
 const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const SCOPES={"ptn-search-finalization":"frontend RT feasibility and ranking","ptn-search-composition":"frontend post-planner walking composition"};
+const SCOPES={"ptn-search-finalization":"frontend RT feasibility and ranking","ptn-search-composition":"frontend post-planner walking composition","ptn-search-reach":"frontend directed endpoint reach"};
+const scopeOf=record=>record.scope===undefined?(record.format==="ptn-search-reach"?SCOPES[record.format]:undefined):record.scope;
 const PRODUCER_UNVERIFIED="unverified; imported observation is not proof of original application bytes/runtime";
 const digest=value=>typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
 function checkModule(manifest) {
@@ -25,9 +26,9 @@ function checkModule(manifest) {
 function checkRecord(bytes) {
   if(bytes.length>2*1024*1024)throw new Error("Finalization record exceeds limit");
   const record=JSON.parse(bytes);
-  if(!Object.hasOwn(SCOPES,record?.format)||record.version!==1||record.scope!==SCOPES[record.format]
+  if(!Object.hasOwn(SCOPES,record?.format)||record.version!==1||scopeOf(record)!==SCOPES[record.format]
     ||record.classification!=="partial capture"||record.normalization!=="finite-json-wire-v1"
-    ||!Number.isFinite(record.nowMs)||!record.input||!Array.isArray(record.reads)||!Array.isArray(record.output))throw new Error("Unsupported finalization record");
+    ||(record.format!=="ptn-search-reach"&&!Number.isFinite(record.nowMs))||!record.input||!Array.isArray(record.reads)||!Array.isArray(record.output))throw new Error("Unsupported finalization record");
   const finite=value=>{if(typeof value==="number"&&!Number.isFinite(value))throw new Error("Non-finite finalization value");if(value&&typeof value==="object")Object.values(value).forEach(finite);};
   finite(record);return record;
 }
@@ -46,10 +47,12 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   const artifacts={record:retainArtifact(store,recordBytes),module:retainArtifact(store,module),moduleBuild:retainArtifact(store,manifestBytes),
     replayChild:retainArtifact(store,readFileSync(new URL("./replay-child.mjs",import.meta.url)))};
   sources.forEach((bytes,index)=>{artifacts[`source${index}`]=retainArtifact(store,bytes);});
-  const capsule={schemaVersion:1,format:"ptn-search-finalization-capsule",scope:record.scope,classification:"partial capture",
+  const capsule={schemaVersion:1,format:"ptn-search-finalization-capsule",scope:scopeOf(record),classification:"partial capture",
     replayVerification:"unverified",artifacts,replayRuntime:runtime(),
     recordProducerIdentity:PRODUCER_UNVERIFIED,
-    missingDependencies:["upstream endpoint reach and planner execution","raw pedestrian graph and route execution","raw RT feeds before lookup","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]};
+    missingDependencies:record.format==="ptn-search-reach"
+      ? ["endpoint selection before reach resolution","OSRM module/graph and transfer-table artifacts","planner execution","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]
+      : ["upstream endpoint reach and planner execution","raw pedestrian graph and route execution","raw RT feeds before lookup","hermetic compiler/runtime rebuild","original capture producer module/runtime identity"]};
   retainRun(store,id,capsule);return capsule;
 }
 
@@ -64,7 +67,7 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
   for(const name of ["module","record","moduleBuild","replayChild"])if(!observed[name])throw new Error(`Missing capsule artifact: ${name}`);
   const record=checkRecord(observed.record);
   const build=JSON.parse(observed.moduleBuild);checkModule(build);
-  if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||record.scope!==capsule.scope)throw new Error("Capsule scope mismatch");
+  if(!(build.recordFormats??["ptn-search-finalization"]).includes(record.format)||scopeOf(record)!==capsule.scope)throw new Error("Capsule scope mismatch");
   if(build.moduleSha256!==capsule.artifacts.module||build.sources.some((row,index)=>capsule.artifacts[`source${index}`]!==row.sha256))throw new Error("Capsule module provenance mismatch");
   if(!same(capsule.replayRuntime,runtime()))throw new Error("Replay runtime mismatch");
   mkdirSync(destination,{mode:0o700});

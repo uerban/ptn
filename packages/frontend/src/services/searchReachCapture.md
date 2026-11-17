@@ -21,5 +21,7 @@ to 2 MiB; an oversized opt-in capture fails explicitly.
 This is a partial observation boundary. It excludes endpoint selection and the
 preceding OSRM readiness wait, raw provider modules/graphs and transfer table
 artifacts, planner execution, and original application/runtime identity. It does
-not prove that provider responses were physically correct. The existing retained
-finalization/composition capsule CLI does not yet accept this record format.
+not prove that provider responses were physically correct. The retained capsule CLI in `tools/search-finalization` accepts this record
+format and derives its explicit reach scope without adding a clock to the
+observation. Retaining a replay module later does not verify the original
+application producer identity.

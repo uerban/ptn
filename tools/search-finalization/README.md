@@ -1,7 +1,11 @@
 # Retained local finalization replay
 
-The replay module supports both `ptn-search-finalization` and
-`ptn-search-composition` version 1 records. Composition records re-run post-planner
+The replay module supports `ptn-search-finalization`, `ptn-search-composition`
+and `ptn-search-reach` version 1 records. Reach records re-run one directed
+endpoint reach calculation from observed readiness, duration-table and transfer
+lookup responses. Their capsule scope is `frontend directed endpoint reach`;
+they need no query clock because this stage does not read one. They do not
+retain the original provider graphs, endpoint selection or planner execution. Composition records re-run post-planner
 transfer walking evidence and itinerary composition before frozen RT/ranking;
 they retain raw planner results and pedestrian responses rather than rebuilding
 a graph or executing the planner. The module manifest declares supported formats.
@@ -24,7 +28,7 @@ runtime imports reject the build. Compiler version/options are recorded, but
 the compiler/resolver installation is not fully retained. The compiled module
 bytes are the replay authority, not a promise of future source recompilation.
 
-Shared constants/time/util imports resolve explicitly to workspace TypeScript
+Shared constants/time/util/routing imports resolve explicitly to workspace TypeScript
 sources, with compiler settings recorded. They do not require generated
 `shared/dist` files or consume stale copies from a previous build. New shared
 runtime imports need an explicit source mapping. A clean source-only-tree test
@@ -53,9 +57,11 @@ private and never overwritten. Explicit replay executes retained trusted code;
 the process deadline is not a security or network sandbox. Use an OS network
 denial when verifying offline operation.
 
-These capsules remain **partial captures** of frontend RT feasibility/ranking.
-They do not retain upstream endpoint/planner execution, raw pedestrian graphs
-and route execution, or pre-lookup RT feeds. Building a replay module after
+These capsules remain **partial captures** at their declared frontend stage.
+Reach, composition and finalization records are separate observations rather
+than a joined full-search execution. They do not retain endpoint selection,
+planner execution, raw pedestrian graphs and route execution, or pre-lookup RT
+feeds. Building a replay module after
 importing a record also does not establish the original producer application's
 bytes or browser runtime. That producer identity remains explicitly unverified.
 Replay success establishes compatibility and exact output at this boundary,
