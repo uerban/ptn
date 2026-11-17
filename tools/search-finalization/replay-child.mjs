@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
-const [modulePath,recordPath,moduleHash,recordHash,plannerJson="null",walkingJson="null"]=process.argv.slice(1);
+const [modulePath,recordPath,moduleHash,recordHash,plannerJson="null",walkingJson="null",rtJson="null"]=process.argv.slice(1);
 const digest=bytes=>createHash("sha256").update(bytes).digest("hex");
 const moduleBytes=readFileSync(modulePath),recordBytes=readFileSync(recordPath);
 if(digest(moduleBytes)!==moduleHash||digest(recordBytes)!==recordHash)throw new Error("Materialized replay artifact changed");
@@ -67,4 +67,19 @@ if(walkConfig) {
     walking={calls,cityId:walkConfig.cityId,profile:walkConfig.profile,artifacts};
   }finally{graph?.free();}
 }
-process.stdout.write(JSON.stringify({completion:"success",moduleHash,recordHash,output,planner,walking})+"\n");
+let rt=null;
+const rtConfig=JSON.parse(rtJson);
+if(rtConfig) {
+  const bytes={},artifacts={};
+  for(const [name,row] of Object.entries(rtConfig.artifacts)) {bytes[name]=readFileSync(row.path);if(digest(bytes[name])!==row.sha256)throw new Error("Materialized RT artifact changed");artifacts[name]=row.sha256;}
+  const decoder=await import(`data:text/javascript;base64,${bytes.rtModule.toString("base64")}`);
+  const {rtDelayReads}=await import(`data:text/javascript;base64,${bytes.rtRequestBuilder.toString("base64")}`);
+  const expected=rtDelayReads(record),events=JSON.parse(bytes.rtEvents).map(event=>event.kind==="update"?{kind:"update",receivedAt:event.receivedAt,bytes:bytes[`rtEnvelope${event.artifact}`]}:event);
+  const values=decoder.replayRtEnvelopes(events,expected.map(read=>read.tripId));
+  if(!Array.isArray(values)||values.length!==expected.length)throw new Error("RT decoder lookup count mismatch");
+  const reads=expected.map((read,index)=>({tripId:read.tripId,value:values[index]}));
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
+  if(JSON.stringify(canonical(reads))!==JSON.stringify(canonical(expected)))throw new Error("RT lookup differs from supplied envelope history");
+  rt={reads,artifacts};
+}
+process.stdout.write(JSON.stringify({completion:"success",moduleHash,recordHash,output,planner,walking,rt})+"\n");

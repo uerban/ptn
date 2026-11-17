@@ -5,7 +5,8 @@ import {spawnSync} from "node:child_process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildFinalizationModule,sha,sourceRoot} from "../../../tools/search-finalization/module.mjs";
-import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay,attachWalkingReplay} from "../../../tools/search-finalization/capsule.mjs";
+import {retainFinalization,replayFinalizationCapsule,attachPlannerReplay,attachWalkingReplay,attachRtReplay} from "../../../tools/search-finalization/capsule.mjs";
+import {buildRtModule} from "../../../tools/search-finalization/rt-module.mjs";
 import {retainArtifact} from "./baseline_store.mjs";
 let root,moduleDir,recordPath,expected,compiled,moduleManifest;
 before(async()=>{
@@ -373,4 +374,40 @@ test("time frame capability binds captured clock and supplied engine resolveTime
  assert.match(readFileSync(join(root,"clock-wrong-engine-replay/stderr.txt"),"utf8"),/Engine time frame/);
  record.query.departureTimeMs+=3600000;writeFileSync(path,JSON.stringify(record));retainFinalization(store,"clock-altered",path,moduleDir);
  const altered=replayFinalizationCapsule(store,"clock-altered",join(root,"clock-altered-replay"));assert.equal(altered.completion,"error");assert.equal(altered.output,null);
+});
+
+test("frontend binary RT history replays decoding/store lookup without runtime packages",async()=>{
+ const module=join(root,"rt-module"),build=await buildRtModule(module),repeat=await buildRtModule(join(root,"rt-module-repeat"));assert.deepEqual(build,repeat);
+ assert.ok(build.sources.some(row=>row.path.startsWith("dependencies/")));assert.ok(build.sources.some(row=>row.path==="virtual/browser-fs.js"));
+ const envelope=join(root,"rt-wire.bin");writeFileSync(envelope,Buffer.from("0a0152120a0a015410f001180020001801","hex"));
+ const receivedAt=Date.now();let record;
+ compiled.finalizeSearch({composed:[{sourceWalkSecs:0,destWalkSecs:0,departureSecs:0,arrivalSecs:900,totalSecs:900,totalWalkSecs:0,totalWalkMeters:0,transfers:0,
+  legs:[{type:"transit",tripId:"T",routeId:"R",fromStopId:"A",toStopId:"B",departSecs:420,arriveSecs:900,boardStopIdx:0,alightStopIdx:1}]}],walking:null,ranking:"fastest",maxResults:5,minTransferSecs:120},
+  ()=>({delaySeconds:120,cancelled:false,deleted:false,receivedAt}),undefined,r=>{record=r;});assert.equal(record.output.length,1);
+ const path=join(root,"rt-observed.json"),store=join(root,"rt-store"),events=join(root,"rt-events.json");writeFileSync(path,JSON.stringify(record));writeFileSync(events,JSON.stringify([{kind:"update",path:"rt-wire.bin",receivedAt}]));
+ retainFinalization(store,"observed",path,moduleDir);const original=readFileSync(join(store,"runs/observed.json"));
+ const attached=attachRtReplay(store,"observed","with-rt",{moduleDirectory:module,eventsPath:events});assert.deepEqual(readFileSync(join(store,"runs/observed.json")),original);
+ const moved=join(root,"rt-relocated");cpSync(store,moved,{recursive:true});
+ const proof=replayFinalizationCapsule(moved,"with-rt",join(root,"rt-replayed"));assert.equal(proof.completion,"success",readFileSync(join(root,"rt-replayed/stderr.txt"),"utf8"));assert.deepEqual(proof.output,record.output);assert.ok(proof.rt.reads.length>0);assert.equal(proof.rt.reads[0].value.delaySeconds,120);assert.match(proof.rtExecution.originalRtIdentity,/unverified/);
+ assert.throws(()=>attachRtReplay(store,"observed","with-rt",{moduleDirectory:module,eventsPath:events}),/EEXIST/);
+ assert.throws(()=>attachRtReplay(store,"with-rt","again",{moduleDirectory:module,eventsPath:events}),/already attached/);
+ const stage=join(root,"rt-isolated-toolkit");mkdirSync(join(stage,"tools"),{recursive:true});mkdirSync(join(stage,"crates/pt-wasm/tests"),{recursive:true});
+ cpSync(join(sourceRoot,"tools/search-finalization"),join(stage,"tools/search-finalization"),{recursive:true});cpSync(join(sourceRoot,"crates/pt-wasm/tests/baseline_store.mjs"),join(stage,"crates/pt-wasm/tests/baseline_store.mjs"));
+ const isolated=spawnSync(process.execPath,[join(stage,"tools/search-finalization/cli.mjs"),"replay",moved,"with-rt",join(root,"rt-isolated-out")],{encoding:"utf8"});assert.equal(isolated.status,0,isolated.stderr);assert.deepEqual(JSON.parse(isolated.stdout).output,record.output);assert.equal(existsSync(join(stage,"packages")),false);
+ for(const [name,hash] of Object.entries(attached.artifacts).filter(([name])=>name.startsWith("rt"))) {
+  const file=join(store,"artifacts",hash),saved=readFileSync(file);writeFileSync(file,"corrupt");const out=join(root,`rt-corrupt-${name}`);assert.throws(()=>replayFinalizationCapsule(store,"with-rt",out),/integrity/);assert.equal(existsSync(out),false);writeFileSync(file,saved);
+ }
+ const prior=readFileSync(envelope);writeFileSync(envelope,Buffer.from("12ff","hex"));attachRtReplay(store,"observed","malformed",{moduleDirectory:module,eventsPath:events});
+ const bad=replayFinalizationCapsule(store,"malformed",join(root,"rt-malformed-out"));assert.equal(bad.completion,"error");assert.equal(bad.output,null);assert.equal(bad.rt,null);
+ writeFileSync(envelope,prior);writeFileSync(events,JSON.stringify([{kind:"update",path:"rt-wire.bin",receivedAt:receivedAt-1}]));attachRtReplay(store,"observed","wrong-receipt",{moduleDirectory:module,eventsPath:events});
+ const wrong=replayFinalizationCapsule(store,"wrong-receipt",join(root,"rt-wrong-receipt"));assert.equal(wrong.completion,"error");assert.equal(wrong.output,null);
+ for(const [id,code] of [["decoder-throws","throw new Error('explicit decoder replay only')"],["decoder-timeout","export function replayRtEnvelopes(){while(true){}}"]]) {
+  const alternate=join(root,id);cpSync(module,alternate,{recursive:true});rmSync(join(alternate,"module.mjs"));const bytes=Buffer.from(code);writeFileSync(join(alternate,"module.mjs"),bytes);
+  const build=JSON.parse(readFileSync(join(alternate,"manifest.json")));build.moduleSha256=sha(bytes);writeFileSync(join(alternate,"manifest.json"),JSON.stringify(build));
+  attachRtReplay(store,"observed",id,{moduleDirectory:alternate,eventsPath:events});
+  const failed=replayFinalizationCapsule(store,id,join(root,id+"-out"),id==="decoder-timeout"?150:5000);assert.equal(failed.completion,id==="decoder-timeout"?"timeout":"error");assert.equal(failed.output,null);assert.equal(failed.rt,null);
+ }
+ const unproved=JSON.parse(readFileSync(join(store,"runs/with-rt.json")));unproved.artifacts.replayChild=retainArtifact(store,Buffer.from('import {readFileSync} from "node:fs";process.stdout.write(JSON.stringify({completion:"success",moduleHash:process.argv[3],recordHash:process.argv[4],output:JSON.parse(readFileSync(process.argv[2])).output}));'));
+ writeFileSync(join(store,"runs/rt-unproved.json"),JSON.stringify(unproved));assert.equal(replayFinalizationCapsule(store,"rt-unproved",join(root,"rt-unproved-out")).completion,"error");
+ const claimed=JSON.parse(readFileSync(join(store,"runs/with-rt.json")));claimed.rtExecution.originalRtIdentity="verified";writeFileSync(join(store,"runs/claimed.json"),JSON.stringify(claimed));const denied=join(root,"rt-claimed-out");assert.throws(()=>replayFinalizationCapsule(store,"claimed",denied),/Unsupported RT/);assert.equal(existsSync(denied),false);
 });

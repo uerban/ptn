@@ -1,17 +1,8 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import {stampRtUpdate, indexRtTrips} from "../services/rtSnapshot.ts";
 import { RtPoller } from "../services/rtPoller.ts";
 import type { RtRouteUpdate, RtTripUpdate } from "@pt/shared";
-
-// Mirrors the server-side clamp in `parseTripUpdatesBuffer` (±1800 s).
-// Defends against feeds that bypass the backend (cached envelopes, alt poll
-// paths, future decoder regressions) reaching the UI with absurd delays.
-const DELAY_SECONDS_MAX = 1800;
-
-function clampDelay(raw: number): number {
-  if (!Number.isFinite(raw)) return 0;
-  return Math.min(DELAY_SECONDS_MAX, Math.max(-DELAY_SECONDS_MAX, raw));
-}
 
 interface RtState {
   updates: Map<string, RtTripUpdate[]>;
@@ -63,12 +54,7 @@ const tripIndexCache = new WeakMap<Map<string, RtTripUpdate[]>, Map<string, RtTr
 function tripIndex(updates: Map<string, RtTripUpdate[]>): Map<string, RtTripUpdate> {
   let idx = tripIndexCache.get(updates);
   if (!idx) {
-    idx = new Map();
-    for (const trips of updates.values()) {
-      for (const t of trips) {
-        if (!idx.has(t.tripId)) idx.set(t.tripId, t);
-      }
-    }
+    idx = indexRtTrips(updates);
     tripIndexCache.set(updates, idx);
   }
   return idx;
@@ -118,16 +104,8 @@ export const useRtStore = create<RtState>()((set, get) => {
     // one surface writes into `updates` (poller subscriptions AND ad-hoc
     // callers like LinePreview that subscribe through `poller` directly).
     const now = Date.now();
-    const stamped = update.trips.map((t) => {
-      const clamped = clampDelay(t.delaySeconds);
-      if (clamped !== t.delaySeconds || !Number.isFinite(t.delaySeconds)) {
-        console.debug("rt.clamp", {
-          tripId: t.tripId,
-          raw: t.delaySeconds,
-          clamped,
-        });
-      }
-      return { ...t, delaySeconds: clamped, receivedAt: now };
+    const stamped = stampRtUpdate(update, now, (trip, clamped) => {
+      console.debug("rt.clamp", {tripId: trip.tripId, raw: trip.delaySeconds, clamped});
     });
     set((state) => {
       const next = new Map(state.updates);

@@ -1,10 +1,11 @@
 import {readFileSync,writeFileSync,mkdirSync,openSync,readSync,closeSync} from "node:fs";
-import {join} from "node:path";
+import {join,dirname,resolve} from "node:path";
 import {createHash} from "node:crypto";
 import {release} from "node:os";
 import {spawnSync} from "node:child_process";
 import {retainArtifact,readArtifact,retainRun} from "../../crates/pt-wasm/tests/baseline_store.mjs";
 import {sha} from "./module.mjs";
+import {rtDelayReads} from "./rt-requests.mjs";
 import {walkingRequests} from "./walking.mjs";
 
 function runtime() {
@@ -64,6 +65,7 @@ export function retainFinalization(store,id,recordPath,moduleDirectory) {
   retainRun(store,id,capsule);return capsule;
 }
 
+const RT_UNVERIFIED="unverified; supplied RouteUpdate history is not proof of original live RT state";
 const GRAPH_UNVERIFIED="unverified; supplied graph state is not proof of original live graph";
 const HANDLE_UNVERIFIED="unverified; supplied artifact state is not proof of original live router";
 function readCapsule(store,id) {
@@ -98,6 +100,25 @@ function readCapsule(store,id) {
     if(source.walkingExecution!==undefined||source.format!==capsule.format||source.scope!==capsule.scope||!same(source.replayRuntime,capsule.replayRuntime))throw new Error("Walking source capsule mismatch");
     for(const [name,hash] of Object.entries(source.artifacts??{}))if((name==="replayChild"?capsule.artifacts.walkingOriginalChild:capsule.artifacts[name])!==hash)throw new Error("Walking source artifact mismatch");
     for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete walking source capsule");
+  }
+  if(capsule.rtExecution!==undefined) {
+    const config=capsule.rtExecution;
+    if(config.version!==1||config.originalRtIdentity!==RT_UNVERIFIED)throw new Error("Unsupported RT execution capsule");
+    rtDelayReads(record);
+    for(const name of ["rtSourceCapsule","rtOriginalChild","rtModule","rtBuild","rtEventInput","rtEvents","rtRequestBuilder"])if(!observed[name])throw new Error(`Missing RT artifact: ${name}`);
+    const build=JSON.parse(observed.rtBuild);
+    if(build.format!=="ptn-rt-envelope-module"||build.version!==1||build.moduleSha256!==capsule.artifacts.rtModule||!Array.isArray(build.sources)||!build.sources.length
+      ||build.sources.some((row,index)=>!digest(row.sha256)||typeof row.path!=="string"||capsule.artifacts[`rtSource${index}`]!==row.sha256))throw new Error("RT module provenance mismatch");
+    const events=JSON.parse(observed.rtEvents);
+    if(!Array.isArray(events))throw new Error("Invalid RT event history");
+    for(const event of events) {
+      if(event.kind==="update") {if(!Number.isFinite(event.receivedAt)||!digest(event.artifact)||capsule.artifacts[`rtEnvelope${event.artifact}`]!==event.artifact||!observed[`rtEnvelope${event.artifact}`])throw new Error("Missing RT envelope");}
+      else if(event.kind!=="remove"||!Array.isArray(event.routeIds)||event.routeIds.some(id=>typeof id!=="string"))throw new Error("Invalid RT event");
+    }
+    const source=JSON.parse(observed.rtSourceCapsule);
+    if(source.rtExecution!==undefined||source.format!==capsule.format||source.scope!==capsule.scope||!same(source.replayRuntime,capsule.replayRuntime))throw new Error("RT source capsule mismatch");
+    for(const [name,hash] of Object.entries(source.artifacts??{}))if((name==="replayChild"?capsule.artifacts.rtOriginalChild:capsule.artifacts[name])!==hash)throw new Error("RT source artifact mismatch");
+    for(const name of ["record","module","moduleBuild","replayChild"])if(!source.artifacts?.[name])throw new Error("Incomplete RT source capsule");
   }
   return {manifestBytes,capsule,observed,record,build};
 }
@@ -135,6 +156,33 @@ export function attachWalkingReplay(store,sourceId,id,{glue,wasm,graph,cityId,pr
   retainRun(store,id,attached);return attached;
 }
 
+/** Supplied static frontend RouteUpdate history, beginning with an empty store.
+ * No supplied decoder module executes during attachment. */
+export function attachRtReplay(store,sourceId,id,{moduleDirectory,eventsPath}) {
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))throw new Error("Invalid run ID");
+  const {manifestBytes,capsule,record}=readCapsule(store,sourceId);
+  if(capsule.rtExecution!==undefined)throw new Error("RT replay already attached");rtDelayReads(record);
+  const buildBytes=readFileSync(join(moduleDirectory,"manifest.json")),build=JSON.parse(buildBytes);
+  if(build.format!=="ptn-rt-envelope-module"||build.version!==1||!digest(build.moduleSha256)||!Array.isArray(build.sources)||!build.sources.length)throw new Error("Invalid RT module manifest");
+  const module=readFileSync(join(moduleDirectory,"module.mjs"));if(sha(module)!==build.moduleSha256)throw new Error("RT module integrity mismatch");
+  const sources=build.sources.map(row=>{if(!digest(row.sha256))throw new Error("Invalid RT source");const bytes=readFileSync(join(moduleDirectory,"sources",row.sha256));if(sha(bytes)!==row.sha256)throw new Error("RT source integrity mismatch");return bytes;});
+  const eventInput=readFileSync(eventsPath),events=JSON.parse(eventInput);if(!Array.isArray(events))throw new Error("Invalid RT event history");
+  const envelopes=new Map();
+  const retainedEvents=events.map(event=>{
+    if(event.kind==="update"&&typeof event.path==="string"&&Number.isFinite(event.receivedAt)) {
+      const bytes=readFileSync(resolve(dirname(eventsPath),event.path)),hash=sha(bytes);envelopes.set(hash,bytes);return {kind:"update",artifact:hash,receivedAt:event.receivedAt};
+    }
+    if(event.kind==="remove"&&Array.isArray(event.routeIds)&&event.routeIds.every(id=>typeof id==="string"))return {kind:"remove",routeIds:event.routeIds};
+    throw new Error("Invalid RT event");
+  });
+  const artifacts={...capsule.artifacts,rtSourceCapsule:retainArtifact(store,manifestBytes),rtOriginalChild:capsule.artifacts.replayChild,
+    replayChild:retainArtifact(store,readFileSync(new URL("./replay-child.mjs",import.meta.url))),rtModule:retainArtifact(store,module),rtBuild:retainArtifact(store,buildBytes),
+    rtEventInput:retainArtifact(store,eventInput),rtEvents:retainArtifact(store,Buffer.from(JSON.stringify(retainedEvents))),rtRequestBuilder:retainArtifact(store,readFileSync(new URL("./rt-requests.mjs",import.meta.url)))};
+  sources.forEach((bytes,index)=>{artifacts[`rtSource${index}`]=retainArtifact(store,bytes);});
+  for(const [hash,bytes] of envelopes)artifacts[`rtEnvelope${hash}`]=retainArtifact(store,bytes);
+  const attached={...capsule,artifacts,rtExecution:{version:1,originalRtIdentity:RT_UNVERIFIED}};retainRun(store,id,attached);return attached;
+}
+
 /** Verify every declared byte before materialization. Explicit replay executes
  * retained trusted code with a bounded process; this is not a security sandbox. */
 export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
@@ -154,9 +202,13 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
     const path=join(destination,name);writeFileSync(path,observed[name],{flag:"wx",mode:0o400});
     walkingInput.artifacts[name]={path,sha256:capsule.artifacts[name]};
   }
+  const rtInput=capsule.rtExecution?{...capsule.rtExecution,artifacts:{}}:null;
+  if(rtInput)for(const name of Object.keys(observed).filter(name=>name==="rtModule"||name==="rtEvents"||name==="rtRequestBuilder"||name.startsWith("rtEnvelope"))) {
+    const path=join(destination,name);writeFileSync(path,observed[name],{flag:"wx",mode:0o400});rtInput.artifacts[name]={path,sha256:capsule.artifacts[name]};
+  }
   const env={...process.env};delete env.NODE_OPTIONS;delete env.NODE_PATH;
   const started=performance.now();
-  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record,JSON.stringify(plannerInput),JSON.stringify(walkingInput)],
+  const child=spawnSync(process.execPath,["--input-type=module","-e",observed.replayChild.toString("utf8"),modulePath,recordPath,capsule.artifacts.module,capsule.artifacts.record,JSON.stringify(plannerInput),JSON.stringify(walkingInput),JSON.stringify(rtInput)],
     {env,timeout:timeoutMs,maxBuffer:4*1024*1024,encoding:"utf8",killSignal:"SIGKILL"});
   writeFileSync(join(destination,"stdout.txt"),child.stdout??"",{flag:"wx",mode:0o600});
   writeFileSync(join(destination,"stderr.txt"),child.stderr??"",{flag:"wx",mode:0o600});
@@ -169,12 +221,14 @@ export function replayFinalizationCapsule(store,id,destination,timeoutMs=5000) {
         ||!same(result.planner?.artifacts,Object.fromEntries(Object.entries(plannerInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Planner replay proof mismatch");
       if(plannerInput&&record.timeFrame?.kind==="engine"&&!same(result.planner?.timeFrame,record.timeFrame))throw new Error("Engine time frame replay proof mismatch");
       if(walkingInput&&(!same(result.walking?.calls,walkingRequests(record,walkingInput.profile))||result.walking?.cityId!==walkingInput.cityId||result.walking?.profile!==walkingInput.profile
-        ||!same(result.walking?.artifacts,Object.fromEntries(Object.entries(walkingInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Walking replay proof mismatch");}
+        ||!same(result.walking?.artifacts,Object.fromEntries(Object.entries(walkingInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("Walking replay proof mismatch");
+      if(rtInput&&(!same(result.rt?.reads,rtDelayReads(record))||!same(result.rt?.artifacts,Object.fromEntries(Object.entries(rtInput.artifacts).map(([name,row])=>[name,row.sha256])))))throw new Error("RT replay proof mismatch");}
     catch {completion="error";}
   }
   const proof={format:"ptn-search-finalization-replay",version:1,scope:capsule.scope,classification:capsule.classification,recordProducerIdentity:capsule.recordProducerIdentity,manifestSha256:sha(manifestBytes),artifacts:capsule.artifacts,
     planner:completion==="success"?(result.planner??null):null,plannerExecution:capsule.plannerExecution??null,
     walking:completion==="success"?(result.walking??null):null,walkingExecution:capsule.walkingExecution??null,
+    rt:completion==="success"?(result.rt??null):null,rtExecution:capsule.rtExecution??null,
     timeFrame:completion==="success"&&record.format==="ptn-search-pipeline"&&record.timeFrame?{observation:record.timeFrame,verification:record.timeFrame.kind==="timezone"?"timezone conversion recomputed":plannerInput?"supplied engine conversion re-executed":"observed engine conversion; arithmetic checked"}:null,
     completion,elapsedMs:performance.now()-started,exitCode:child.status,signal:child.signal,errorCode:child.error?.code??null,
     logCaptureComplete:child.error?.code!=="ENOBUFS",output:completion==="success"?result.output:null};

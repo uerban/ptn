@@ -168,3 +168,46 @@ Legacy linked records without the extension keep their original contract; their
 proof has no verified time frame. No stored record is rewritten or promoted.
 Active-service computation and original live browser/router identity remain
 outside this verification.
+
+## Supplied frontend RT envelopes
+
+The frontend receives a normalized binary `RouteUpdate`, not the upstream
+GTFS-RT feed. This attachment verifies decoding and frontend store lookup for a
+supplied history, without proving backend parsing or original live-state identity.
+
+```sh
+node tools/search-finalization/cli.mjs build-rt <new-rt-module-dir>
+node tools/search-finalization/cli.mjs attach-rt <store> <source-id> <new-id> <rt-module-dir> <events.json>
+```
+
+History starts with an empty route map. Updates supply binary bytes and explicit
+receipt stamps; removals preserve eviction/reinsertion order:
+
+```json
+[
+  {"kind":"update","path":"route-update.bin","receivedAt":1794556800000},
+  {"kind":"remove","routeIds":["old-route"]}
+]
+```
+
+Paths resolve relative to the events file. Original manifest, consumed binary
+buffers, normalized references, decoder module/build/sources and request helper
+are retained. Capture executes no supplied module. Replay uses hashes and never
+reads original paths. The decoder reuses the actual protobuf schema and production
+store clamp/stamp/first-match helpers. Route replacement drops vanished trips;
+repeated writes preserve insertion order. Receipt time governs overlay freshness.
+
+The bundle retains consumed dependency/workspace source bytes. Its browser build
+uses an explicitly retained empty fs stub; schema-file loading from disk is
+unsupported and unused. It has no external runtime imports. Compiler/resolver
+installation is not a hermetic rebuild promise; retained module bytes are replay
+authority. No package/compiler installation is required for replay. The parent
+checks every derived delay lookup and artifact proof. Corrupt/malformed protobuf,
+mismatched stamps/values and missing proofs are errors, never empty success.
+
+This static history is applied before all captured delay reads. A provider
+changing between synchronous reads cannot be matched by this snapshot. Legacy
+entries without receipt stamps are not reconstructed. Upstream GTFS-RT,
+polling/consent/network scheduling, original provenance and unobserved fields
+remain outside scope. RT may coexist with planner/walking attachments. Nothing
+uploads data or enables capture for normal product searches.
