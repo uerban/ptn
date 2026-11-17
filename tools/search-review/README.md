@@ -180,3 +180,33 @@ version and bind to that bundle's identity; feedback is never silently moved
 between single-capture and comparison views. Older viewers that support only
 version 1 must be updated to open version 2. No baseline promotion or automatic
 quality verdict occurs.
+
+## Frontend returned candidates
+
+Export a retained linked frontend pipeline without executing its retained code:
+
+```sh
+node tools/search-finalization/cli.mjs review <store> <run-id> <new-bundle.json>
+node tools/search-finalization/cli.mjs review-compare <before-store> <before-id> <after-store> <after-id> <new-bundle.json>
+```
+
+Version 3 preserves the complete returned frontend itinerary shapes, order and
+duplicate occurrences. Version 4 combines two compatible version 3 sources for
+blind review. Comparisons require matching retained input contracts, including
+clocks, walking state and RT observations; changed inputs are rejected. Hashes
+bind the exported contents but do not authenticate their producer.
+
+These bundles include only referenced captured stop labels, pedestrian geometry
+and hash provenance. They contain no raw planner binaries, walking graphs, RT
+wire envelopes or machine paths. Stop labels come from the captured frontend
+context, rather than the compiled timetable reader used by version 1.
+
+The viewer displays returned totals directly, including walk-only alternatives.
+Times use the captured timetable frame. Planner leg timings are displayed only
+when a unique structural match exists; differences are not automatically
+attributed to RT. Transfer geometry is included only for a unique matching
+recorded provider response. Access and egress geometry remains unavailable.
+
+Exports retain partial/unverified labels. Importing, rendering or replaying a
+bundle records no human opinion. The existing explicit action journal, blind
+ordering, persistence, undo and report export work with both frontend versions.

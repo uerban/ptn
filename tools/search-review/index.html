@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Sw87TKNmN1SLt7oOHlb4j5Gu/oe2bJ83Y9+dziSIsy4='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5ciqS6Hkuuzu6s6eLCJqk6pV4wFAamPmxYJjWBc8fbo='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <title>PTN journey review</title>
 <style>
 :root{font:16px/1.5 system-ui,sans-serif;color:#172235;background:#f3f5f8;color-scheme:light}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:1320px;margin:auto;padding:24px}h1{margin:0;font-size:1.8rem}h2{font-size:1.2rem;margin:0 0 12px}h3{font-size:1rem}p{margin:8px 0}header{margin-bottom:20px}.muted,small{color:#536174}.toolbar,.navigation,.context{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.panel,.candidate{background:white;border:1px solid #d6dde7;border-radius:12px;padding:18px;margin:14px 0}.toolbar label{min-width:170px}label{display:block;font-weight:600}input,select,textarea,button{font:inherit}input,select,textarea{display:block;max-width:100%;padding:7px;border:1px solid #9ba9bc;border-radius:5px;background:white;color:inherit}textarea{width:100%;min-height:90px}button{cursor:pointer;padding:8px 14px;border:1px solid #8b9ab0;border-radius:6px;background:#fff;color:inherit}button.primary{background:#235edf;border-color:#235edf;color:white}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid #f2b600;outline-offset:2px}#status{min-height:1.5em;padding:8px 0}#status.error{color:#a02020;font-weight:600}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:16px}.candidate{margin:0}.timeline{padding-left:20px;list-style:circle}.timeline li{border-left:3px solid #235edf;margin:12px 0;padding-left:12px;overflow-wrap:anywhere}.timeline li.walk{border-color:#218546}.metric{font-variant-numeric:tabular-nums}.reasons{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0}.reasons label{font-weight:400}.reasons input{display:inline}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,monospace;background:#f3f5f8;padding:12px}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.history li{margin:10px 0;overflow-wrap:anywhere}.badge{background:#edf2ff;color:#183b80;border-radius:4px;padding:2px 7px}#workspace[hidden]{display:none}.review-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.review-grid .panel{margin-top:0}fieldset{border:0;padding:0;margin:0}legend{font-weight:600;margin-bottom:8px}@media(max-width:800px){main{padding:14px}.review-grid{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar label{flex:1}button{min-height:44px}}@media(prefers-color-scheme:dark){:root{color:#e5ebf4;background:#101723;color-scheme:dark}.panel,.candidate,input,select,textarea,button{background:#192333;color:inherit;border-color:#50627a}.muted,small{color:#b0bdd0}pre{background:#101723}.badge{background:#243c65;color:#d3e0ff}#status.error{color:#ffb1a8}}
@@ -62,11 +62,12 @@ function validateReviewStopContext(context,ptbSha256) {
 }
 
 async function validateReviewBundle(bundle) {
-  if(bundle?.format==="ptn-search-review-bundle" && bundle.version===2) {
+  if(bundle?.format==="ptn-search-review-bundle" && [2,4].includes(bundle.version)) {
     const expected=await createReviewComparison(bundle.comparison?.before,bundle.comparison?.after);
     if(JSON.stringify(canonical(bundle))!==JSON.stringify(canonical(expected))) fail("comparison derivation or identity mismatch");
     return bundle;
   }
+  if(bundle?.format==="ptn-search-review-bundle" && bundle.version===3)return validateFrontendReviewBundle(bundle);
   if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
       || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
   const p = bundle.provenance;
@@ -107,13 +108,16 @@ async function validateReviewBundle(bundle) {
  * source identity participates in candidate identity, even for equal itineraries.
  * The primary provenance/snapshot is explicitly the before source. */
 async function createReviewComparison(before,after) {
-  if(before?.version!==1 || after?.version!==1) fail("comparison requires two single-capture bundles");
+  const frontend=before?.version===3&&after?.version===3;
+  if(!frontend&&(before?.version!==1 || after?.version!==1)) fail("comparison requires matching single-capture bundle formats");
   await validateReviewBundle(before);await validateReviewBundle(after);
   const a=before.provenance,b=after.provenance;
   const same=(x,y)=>JSON.stringify(canonical(x))===JSON.stringify(canonical(y));
   const execution=p=>p.executionContract;
   const supported=["snapshot-data-url-v1","file-url-v0"];
-  if(a.artifacts.ptb!==b.artifacts.ptb || a.artifacts.queryTuples!==b.artifacts.queryTuples
+  if(frontend) {
+    if(a.comparisonInputsSha256!==b.comparisonInputsSha256)fail("incomparable frontend inputs or dependency coverage");
+  }else if(a.artifacts.ptb!==b.artifacts.ptb || a.artifacts.queryTuples!==b.artifacts.queryTuples
       || !same(a.settings,b.settings) || !supported.includes(execution(a)) || execution(a)!==execution(b)) fail("incomparable inputs, settings or execution contract");
   if(!["node","v8","platform","arch","release"].every(key=>a.runtime[key]===b.runtime[key])) fail("incomparable runtime");
   if(before.cases.length!==after.cases.length) fail("incomparable query count");
@@ -125,18 +129,72 @@ async function createReviewComparison(before,after) {
     for(const [side,row] of [["before",left],["after",right]]) {
       for(const [rank,candidate] of row.candidates.entries()) {
         const source={side,rank,caseId:row.id,candidateId:candidate.id};
-        candidates.push({id:await fingerprint({caseId:id,itinerary:candidate.itinerary,source}),
-          itinerary:structuredClone(candidate.itinerary),source});
+        candidates.push({id:await fingerprint({caseId:id,itinerary:candidate.itinerary,...(frontend?{evidence:candidate.evidence}:{}),source}),
+          itinerary:structuredClone(candidate.itinerary),...(frontend?{evidence:structuredClone(candidate.evidence)}:{}),source});
       }
     }
     cases.push({id,query:structuredClone(left.query),candidates,
       capture:{...structuredClone(left.capture),truncated:left.capture.truncated||right.capture.truncated},
+      ...(frontend?{context:structuredClone(left.context)}:{}),
       comparisonStatus:same(left.candidates.map(c=>c.itinerary),right.candidates.map(c=>c.itinerary))?"unchanged":"changed/unreviewed"});
   }
-  const content={format:"ptn-search-review-bundle",version:2,scope:before.scope,
+  const content={format:"ptn-search-review-bundle",version:frontend?4:2,scope:before.scope,
     provenance:structuredClone(a),comparison:{primarySource:"before",before:structuredClone(before),after:structuredClone(after)},cases,
     ...(before.stopContext?{stopContext:structuredClone(before.stopContext)}:{})};
   return {...content,bundleId:await fingerprint(content)};
+}
+
+
+/** Frontend single-capture bundle: raw returned shapes are never converted to
+ * stop-engine itineraries. IDs include rank so exact duplicates remain distinct. */
+async function createFrontendReviewBundle(provenance,query,context,rows) {
+  const id=await fingerprint({snapshotId:provenance.snapshotId,query,context,index:0});
+  const candidates=[];
+  for(const [rank,row] of rows.entries())candidates.push({id:await fingerprint({caseId:id,rank,itinerary:row.itinerary,evidence:row.evidence}),...structuredClone(row)});
+  const content={format:"ptn-search-review-bundle",version:3,scope:"frontend returned candidates",provenance:structuredClone(provenance),
+    cases:[{id,query:structuredClone(query),context:structuredClone(context),candidates,capture:{boundary:"frontend returned candidates",equivalence:"exact",truncated:false,resultLimit:provenance.settings.maxResults}}]};
+  return {...content,bundleId:await fingerprint(content)};
+}
+async function validateFrontendReviewBundle(bundle) {
+  if(bundle.scope!=="frontend returned candidates")fail("unsupported frontend scope");
+  const p=bundle.provenance;
+  if(!p||!digest(p.runManifestSha256)||!digest(p.snapshotId)||!digest(p.comparisonInputsSha256)||p.classification!=="partial capture"
+    ||p.replayVerification!=="unverified"||p.derivation!=="retained-frontend-capsule-v1"||typeof p.recordProducerIdentity!=="string"
+    ||!strings(p.missingDependencies)||!strings(p.unsupported)||!p.artifacts||!Object.values(p.artifacts).every(digest)
+    ||!["record","module","moduleBuild","replayChild"].every(key=>digest(p.artifacts[key])))fail("invalid frontend provenance");
+  if(!["node","v8","platform","arch","release","nodeExecutableSha256"].every(key=>typeof p.runtime?.[key]==="string"&&p.runtime[key]))fail("missing frontend runtime");
+  if(!Number.isInteger(p.settings?.maxResults)||p.settings.maxResults<0)fail("invalid frontend result limit");
+  if(p.snapshotId!==await fingerprint({artifacts:p.artifacts,runtime:p.runtime,settings:p.settings,comparisonInputsSha256:p.comparisonInputsSha256}))fail("frontend snapshot mismatch");
+  if(!Array.isArray(bundle.cases)||bundle.cases.length!==1)fail("frontend bundle requires one captured query");
+  const row=bundle.cases[0];
+  if(!row?.query||!Number.isFinite(row.query.departureTimeMs)||!row.context||row.context.derivation!=="captured-frontend-context-v1"
+    ||row.context.recordSha256!==p.artifacts.record||!Number.isFinite(row.context.departureSecs)||!Array.isArray(row.context.stops)||!Array.isArray(row.candidates)
+    ||row.capture?.boundary!=="frontend returned candidates"||row.capture.equivalence!=="exact"||row.capture.truncated!==false||row.capture.resultLimit!==p.settings.maxResults||row.candidates.length>row.capture.resultLimit)fail("invalid frontend case");
+  const stopIds=new Set();
+  for(const stop of row.context.stops) {
+    if(typeof stop.id!=="string"||!stop.id||stopIds.has(stop.id)||typeof stop.name!=="string"||!Number.isFinite(stop.lat)||Math.abs(stop.lat)>90||!Number.isFinite(stop.lon)||Math.abs(stop.lon)>180)fail("invalid captured frontend stop");stopIds.add(stop.id);
+  }
+  for(const candidate of row.candidates) {
+    const itinerary=candidate?.itinerary;
+    if(!itinerary||!Array.isArray(itinerary.legs)||!["departureSecs","arrivalSecs","totalSecs","sourceWalkSecs","destWalkSecs","totalWalkSecs","transfers"].every(key=>Number.isFinite(itinerary[key]))||!candidate.evidence||!Array.isArray(candidate.evidence.walkRoutes))fail("invalid frontend itinerary");
+    for(const leg of itinerary.legs)if(!["transit","walk"].includes(leg.type)||!Number.isFinite(leg.departSecs)||!Number.isFinite(leg.arriveSecs))fail("invalid frontend leg");
+    const evidence=candidate.evidence;
+    if(evidence.scheduled!==null&&(!Array.isArray(evidence.scheduled)||evidence.scheduled.length!==itinerary.legs.length
+      ||evidence.scheduled.some((value,index)=>value?.index!==index||!Number.isFinite(value.departSecs)||!Number.isFinite(value.arriveSecs))))fail("invalid scheduled timing evidence");
+    const walkIndices=new Set();
+    for(const item of evidence.walkRoutes) {
+      if(!Number.isInteger(item?.index)||itinerary.legs[item.index]?.type!=="walk"||walkIndices.has(item.index)
+        ||!((item.status==="unique recorded response"&&item.route)||(item.status==="geometry not uniquely captured"&&item.route===null)))fail("invalid walking evidence association");
+      walkIndices.add(item.index);
+    }
+    if(walkIndices.size!==itinerary.legs.filter(leg=>leg.type==="walk").length)fail("missing walking evidence association");
+    const routes=[...(itinerary.directWalk?[itinerary.directWalk.route]:[]),...candidate.evidence.walkRoutes.filter(item=>item.route).map(item=>item.route)];
+    for(const route of routes)if(!route||!Array.isArray(route.coords)||!Number.isFinite(route.distanceMeters)||route.distanceMeters<0||!Array.isArray(route.steps)
+      ||route.coords.some(point=>!Array.isArray(point)||point.length!==2||!Number.isFinite(point[0])||Math.abs(point[0])>180||!Number.isFinite(point[1])||Math.abs(point[1])>90))fail("invalid frontend pedestrian geometry");
+  }
+  const expected=await createFrontendReviewBundle(p,row.query,row.context,row.candidates.map(({itinerary,evidence})=>({itinerary,evidence})));
+  if(JSON.stringify(canonical(expected))!==JSON.stringify(canonical(bundle)))fail("frontend derivation or identity mismatch");
+  return bundle;
 }
 
 return {canonical,fingerprint,validateReviewBundle};})();
@@ -331,6 +389,53 @@ function candidateOrder() {
   // Without a reviewer no source order is exposed; starting creates a blind order.
   return ids?.map(id=>current.candidates.find(candidate=>candidate.id===id))??[];
 }
+function frontendContext(candidate) {
+  if(!candidate.source)return row().context;
+  return model.bundle.comparison[candidate.source.side].cases.find(item=>item.id===candidate.source.caseId).context;
+}
+function pedestrianRoute(parent,route) {
+  if(!route)return;
+  parent.append(element("p",`Recorded pedestrian route · ${route.distanceMeters} m`));
+  if(route.coords.length>1) {
+    const xs=route.coords.map(point=>point[0]),ys=route.coords.map(point=>point[1]);
+    const xmin=Math.min(...xs),ymin=Math.min(...ys),width=Math.max(...xs)-xmin,height=Math.max(...ys)-ymin;
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg"),line=document.createElementNS(svg.namespaceURI,"polyline");
+    svg.setAttribute("viewBox","0 0 320 160");svg.setAttribute("role","img");svg.setAttribute("aria-label","Recorded pedestrian geometry; schematic without basemap");
+    line.setAttribute("points",route.coords.map(([x,y])=>`${10+(width?(x-xmin)/width:0.5)*300},${150-(height?(y-ymin)/height:0.5)*140}`).join(" "));
+    line.setAttribute("fill","none");line.setAttribute("stroke","currentColor");line.setAttribute("stroke-width","3");svg.append(line);parent.append(svg);
+  }
+  const steps=element("ol","");
+  for(const step of route.steps)steps.append(element("li",`${step.kind??"Walk"}${step.name?` · ${step.name}`:""}${Number.isFinite(step.distanceMeters)?` · ${step.distanceMeters} m`:""}`));
+  parent.append(steps);
+}
+function drawFrontendCandidate(card,candidate) {
+  const itinerary=candidate.itinerary,context=frontendContext(candidate);
+  const stops=new Map(context.stops.map(stop=>[stop.id,stop.name]));
+  const name=id=>stops.get(id)?.trim()?`${stops.get(id)} (${id})`:id??"Unknown stop";
+  card.append(element("p",`Arrival ${clock(itinerary.arrivalSecs)} · Full duration ${minutes(itinerary.totalSecs)} · Transfers ${itinerary.transfers}`));
+  card.append(element("p",`Walking ${minutes(itinerary.totalWalkSecs)} · Distance ${Number.isFinite(itinerary.totalWalkMeters)?`${itinerary.totalWalkMeters} m`:"unknown"} · Access ${minutes(itinerary.sourceWalkSecs)} · Egress ${minutes(itinerary.destWalkSecs)}`));
+  card.append(element("small","Times use the captured timetable frame. Planner timings below are observations, not a real-time correctness verdict."));
+  if(itinerary.directWalk){card.append(element("h3","Walk directly"));pedestrianRoute(card,itinerary.directWalk.route);}
+  for(const flag of ["cancelled","timingUnreliable"])if(itinerary[flag])card.append(element("p",`Captured flag: ${flag}`));
+  if(itinerary.accessRunToCatch)card.append(element("p","Captured access requires running to catch the service."));
+  const timeline=element("ol","");timeline.className="timeline";
+  for(const [index,leg] of itinerary.legs.entries()) {
+    const item=element("li","");if(leg.type==="walk")item.className="walk";
+    item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
+    item.append(element("p",`${name(leg.fromStopId)} → ${name(leg.toStopId)}`));
+    item.append(element("p",`Captured ${clock(leg.departSecs)}–${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+    const scheduled=candidate.evidence.scheduled?.find(value=>value.index===index);
+    if(scheduled)item.append(element("p",`Planner ${clock(scheduled.departSecs)}–${clock(scheduled.arriveSecs)}`));
+    for(const flag of ["cancelled","timingUnreliable","approximate"])if(leg[flag])item.append(element("p",`Captured flag: ${flag}`));
+    if(leg.type==="walk") {
+      const evidence=candidate.evidence.walkRoutes.find(value=>value.index===index);
+      if(evidence?.route)pedestrianRoute(item,evidence.route);
+      else item.append(element("small",`${Number.isFinite(leg.distanceMeters)?`${leg.distanceMeters} m · `:""}Pedestrian geometry not uniquely captured`));
+    }
+    timeline.append(item);
+  }
+  card.append(timeline);
+}
 function drawCandidates(ordered) {
   $("candidates").replaceChildren();
   if(!row())return;
@@ -339,6 +444,7 @@ function drawCandidates(ordered) {
   for(const [index,candidate] of ordered.entries()) {
     const card=element("article","");card.className="candidate";card.dataset.candidateId=candidate.id;
     card.append(element("h2",label(index)));
+    if([3,4].includes(model.bundle.version)){drawFrontendCandidate(card,candidate);$("candidates").append(card);continue;}
     const itinerary=candidate.itinerary,legs=itinerary.legs;
     const estimatedJourney=legs.some(leg=>leg.type==="transit"&&leg.approximate===true),journeyMarker=estimatedJourney?"~":"";
     if(estimatedJourney) {
@@ -395,8 +501,12 @@ function render() {
   $("session-status").textContent=active?`Reviewing as ${active.reviewerId}. Blind order saved.`:"No reviewer selected.";
   if(active)$("reviewer").value=active.reviewerId;
   $("query-title").textContent=current?`Query ${model.index+1} of ${model.bundle.cases.length}`:"Bundle has no queries";
-  $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
+  $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.context?.departureSecs??current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
   $("limits").textContent=`Stop-level schematic; no pedestrian geometry or applied real-time composition. ${current?.capture.truncated?"Capture is truncated; additional candidates may exist.":"Shows the complete captured candidate array, not proof of all possible journeys."}`;
+  if([3,4].includes(model.bundle.version)) {
+    $("limits").textContent="Complete returned frontend candidate array, including captured walking and applied timing. Access/egress geometry and original live application identity remain unverified. This is not proof of all possible journeys.";
+    $("query-summary").textContent=`Service date ${current.context.serviceDate??"unspecified"} · Departure ${clock(current.context.departureSecs)} (captured timetable frame) · ${current.candidates.length} captured options`;
+  }
   if(current?.query.entryStops&&current.query.exitStops) {
     $("query-summary").textContent+=` · From ${current.query.entryStops.map(stop=>stopLabel(stop.stopId)).join(", ")} → ${current.query.exitStops.map(stop=>stopLabel(stop.stopId)).join(", ")}`;
   }

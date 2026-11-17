@@ -227,6 +227,15 @@ test("linked stage capsule replays and rejects an individually valid but disconn
  const path=join(root,"pipeline.json"),store=join(root,"pipeline-store");writeFileSync(path,JSON.stringify(record));
  const capsule=retainFinalization(store,"linked",path,moduleDir);assert.equal(capsule.scope,record.scope);
  const proof=replayFinalizationCapsule(store,"linked",join(root,"pipeline-replay"));assert.equal(proof.completion,"success");assert.deepEqual(proof.output,output);
+ const {exportCapsuleReview}=await import("../../../tools/search-finalization/review.mjs");
+ const reviewDestination=join(root,"frontend-review.json"),review=await exportCapsuleReview(store,"linked",reviewDestination);
+ assert.deepEqual(review.cases[0].candidates.map(candidate=>candidate.itinerary),output);
+ assert.equal(statSync(reviewDestination).mode&0o777,0o600);
+ assert.equal(JSON.stringify(review).includes(root),false);
+ await assert.rejects(exportCapsuleReview(store,"linked",reviewDestination),/EEXIST/);
+ const {store:standalone}=fixture("review-standalone");
+ await assert.rejects(exportCapsuleReview(standalone,"observed",join(root,"invalid-review.json")),/linked pipeline/);
+
  record.planner.query.entryStops[0].walkSecs++;
  writeFileSync(path,JSON.stringify(record));retainFinalization(store,"disconnected",path,moduleDir);
  const failed=replayFinalizationCapsule(store,"disconnected",join(root,"pipeline-disconnected-replay"));

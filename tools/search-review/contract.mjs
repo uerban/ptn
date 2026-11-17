@@ -32,11 +32,12 @@ export function validateReviewStopContext(context,ptbSha256) {
 }
 
 export async function validateReviewBundle(bundle) {
-  if(bundle?.format==="ptn-search-review-bundle" && bundle.version===2) {
+  if(bundle?.format==="ptn-search-review-bundle" && [2,4].includes(bundle.version)) {
     const expected=await createReviewComparison(bundle.comparison?.before,bundle.comparison?.after);
     if(JSON.stringify(canonical(bundle))!==JSON.stringify(canonical(expected))) fail("comparison derivation or identity mismatch");
     return bundle;
   }
+  if(bundle?.format==="ptn-search-review-bundle" && bundle.version===3)return validateFrontendReviewBundle(bundle);
   if (bundle?.format !== "ptn-search-review-bundle" || bundle.version !== 1
       || bundle.scope !== "stop-level compiled engine") fail("unsupported format or scope");
   const p = bundle.provenance;
@@ -77,13 +78,16 @@ export async function validateReviewBundle(bundle) {
  * source identity participates in candidate identity, even for equal itineraries.
  * The primary provenance/snapshot is explicitly the before source. */
 export async function createReviewComparison(before,after) {
-  if(before?.version!==1 || after?.version!==1) fail("comparison requires two single-capture bundles");
+  const frontend=before?.version===3&&after?.version===3;
+  if(!frontend&&(before?.version!==1 || after?.version!==1)) fail("comparison requires matching single-capture bundle formats");
   await validateReviewBundle(before);await validateReviewBundle(after);
   const a=before.provenance,b=after.provenance;
   const same=(x,y)=>JSON.stringify(canonical(x))===JSON.stringify(canonical(y));
   const execution=p=>p.executionContract;
   const supported=["snapshot-data-url-v1","file-url-v0"];
-  if(a.artifacts.ptb!==b.artifacts.ptb || a.artifacts.queryTuples!==b.artifacts.queryTuples
+  if(frontend) {
+    if(a.comparisonInputsSha256!==b.comparisonInputsSha256)fail("incomparable frontend inputs or dependency coverage");
+  }else if(a.artifacts.ptb!==b.artifacts.ptb || a.artifacts.queryTuples!==b.artifacts.queryTuples
       || !same(a.settings,b.settings) || !supported.includes(execution(a)) || execution(a)!==execution(b)) fail("incomparable inputs, settings or execution contract");
   if(!["node","v8","platform","arch","release"].every(key=>a.runtime[key]===b.runtime[key])) fail("incomparable runtime");
   if(before.cases.length!==after.cases.length) fail("incomparable query count");
@@ -95,16 +99,70 @@ export async function createReviewComparison(before,after) {
     for(const [side,row] of [["before",left],["after",right]]) {
       for(const [rank,candidate] of row.candidates.entries()) {
         const source={side,rank,caseId:row.id,candidateId:candidate.id};
-        candidates.push({id:await fingerprint({caseId:id,itinerary:candidate.itinerary,source}),
-          itinerary:structuredClone(candidate.itinerary),source});
+        candidates.push({id:await fingerprint({caseId:id,itinerary:candidate.itinerary,...(frontend?{evidence:candidate.evidence}:{}),source}),
+          itinerary:structuredClone(candidate.itinerary),...(frontend?{evidence:structuredClone(candidate.evidence)}:{}),source});
       }
     }
     cases.push({id,query:structuredClone(left.query),candidates,
       capture:{...structuredClone(left.capture),truncated:left.capture.truncated||right.capture.truncated},
+      ...(frontend?{context:structuredClone(left.context)}:{}),
       comparisonStatus:same(left.candidates.map(c=>c.itinerary),right.candidates.map(c=>c.itinerary))?"unchanged":"changed/unreviewed"});
   }
-  const content={format:"ptn-search-review-bundle",version:2,scope:before.scope,
+  const content={format:"ptn-search-review-bundle",version:frontend?4:2,scope:before.scope,
     provenance:structuredClone(a),comparison:{primarySource:"before",before:structuredClone(before),after:structuredClone(after)},cases,
     ...(before.stopContext?{stopContext:structuredClone(before.stopContext)}:{})};
   return {...content,bundleId:await fingerprint(content)};
+}
+
+
+/** Frontend single-capture bundle: raw returned shapes are never converted to
+ * stop-engine itineraries. IDs include rank so exact duplicates remain distinct. */
+export async function createFrontendReviewBundle(provenance,query,context,rows) {
+  const id=await fingerprint({snapshotId:provenance.snapshotId,query,context,index:0});
+  const candidates=[];
+  for(const [rank,row] of rows.entries())candidates.push({id:await fingerprint({caseId:id,rank,itinerary:row.itinerary,evidence:row.evidence}),...structuredClone(row)});
+  const content={format:"ptn-search-review-bundle",version:3,scope:"frontend returned candidates",provenance:structuredClone(provenance),
+    cases:[{id,query:structuredClone(query),context:structuredClone(context),candidates,capture:{boundary:"frontend returned candidates",equivalence:"exact",truncated:false,resultLimit:provenance.settings.maxResults}}]};
+  return {...content,bundleId:await fingerprint(content)};
+}
+async function validateFrontendReviewBundle(bundle) {
+  if(bundle.scope!=="frontend returned candidates")fail("unsupported frontend scope");
+  const p=bundle.provenance;
+  if(!p||!digest(p.runManifestSha256)||!digest(p.snapshotId)||!digest(p.comparisonInputsSha256)||p.classification!=="partial capture"
+    ||p.replayVerification!=="unverified"||p.derivation!=="retained-frontend-capsule-v1"||typeof p.recordProducerIdentity!=="string"
+    ||!strings(p.missingDependencies)||!strings(p.unsupported)||!p.artifacts||!Object.values(p.artifacts).every(digest)
+    ||!["record","module","moduleBuild","replayChild"].every(key=>digest(p.artifacts[key])))fail("invalid frontend provenance");
+  if(!["node","v8","platform","arch","release","nodeExecutableSha256"].every(key=>typeof p.runtime?.[key]==="string"&&p.runtime[key]))fail("missing frontend runtime");
+  if(!Number.isInteger(p.settings?.maxResults)||p.settings.maxResults<0)fail("invalid frontend result limit");
+  if(p.snapshotId!==await fingerprint({artifacts:p.artifacts,runtime:p.runtime,settings:p.settings,comparisonInputsSha256:p.comparisonInputsSha256}))fail("frontend snapshot mismatch");
+  if(!Array.isArray(bundle.cases)||bundle.cases.length!==1)fail("frontend bundle requires one captured query");
+  const row=bundle.cases[0];
+  if(!row?.query||!Number.isFinite(row.query.departureTimeMs)||!row.context||row.context.derivation!=="captured-frontend-context-v1"
+    ||row.context.recordSha256!==p.artifacts.record||!Number.isFinite(row.context.departureSecs)||!Array.isArray(row.context.stops)||!Array.isArray(row.candidates)
+    ||row.capture?.boundary!=="frontend returned candidates"||row.capture.equivalence!=="exact"||row.capture.truncated!==false||row.capture.resultLimit!==p.settings.maxResults||row.candidates.length>row.capture.resultLimit)fail("invalid frontend case");
+  const stopIds=new Set();
+  for(const stop of row.context.stops) {
+    if(typeof stop.id!=="string"||!stop.id||stopIds.has(stop.id)||typeof stop.name!=="string"||!Number.isFinite(stop.lat)||Math.abs(stop.lat)>90||!Number.isFinite(stop.lon)||Math.abs(stop.lon)>180)fail("invalid captured frontend stop");stopIds.add(stop.id);
+  }
+  for(const candidate of row.candidates) {
+    const itinerary=candidate?.itinerary;
+    if(!itinerary||!Array.isArray(itinerary.legs)||!["departureSecs","arrivalSecs","totalSecs","sourceWalkSecs","destWalkSecs","totalWalkSecs","transfers"].every(key=>Number.isFinite(itinerary[key]))||!candidate.evidence||!Array.isArray(candidate.evidence.walkRoutes))fail("invalid frontend itinerary");
+    for(const leg of itinerary.legs)if(!["transit","walk"].includes(leg.type)||!Number.isFinite(leg.departSecs)||!Number.isFinite(leg.arriveSecs))fail("invalid frontend leg");
+    const evidence=candidate.evidence;
+    if(evidence.scheduled!==null&&(!Array.isArray(evidence.scheduled)||evidence.scheduled.length!==itinerary.legs.length
+      ||evidence.scheduled.some((value,index)=>value?.index!==index||!Number.isFinite(value.departSecs)||!Number.isFinite(value.arriveSecs))))fail("invalid scheduled timing evidence");
+    const walkIndices=new Set();
+    for(const item of evidence.walkRoutes) {
+      if(!Number.isInteger(item?.index)||itinerary.legs[item.index]?.type!=="walk"||walkIndices.has(item.index)
+        ||!((item.status==="unique recorded response"&&item.route)||(item.status==="geometry not uniquely captured"&&item.route===null)))fail("invalid walking evidence association");
+      walkIndices.add(item.index);
+    }
+    if(walkIndices.size!==itinerary.legs.filter(leg=>leg.type==="walk").length)fail("missing walking evidence association");
+    const routes=[...(itinerary.directWalk?[itinerary.directWalk.route]:[]),...candidate.evidence.walkRoutes.filter(item=>item.route).map(item=>item.route)];
+    for(const route of routes)if(!route||!Array.isArray(route.coords)||!Number.isFinite(route.distanceMeters)||route.distanceMeters<0||!Array.isArray(route.steps)
+      ||route.coords.some(point=>!Array.isArray(point)||point.length!==2||!Number.isFinite(point[0])||Math.abs(point[0])>180||!Number.isFinite(point[1])||Math.abs(point[1])>90))fail("invalid frontend pedestrian geometry");
+  }
+  const expected=await createFrontendReviewBundle(p,row.query,row.context,row.candidates.map(({itinerary,evidence})=>({itinerary,evidence})));
+  if(JSON.stringify(canonical(expected))!==JSON.stringify(canonical(bundle)))fail("frontend derivation or identity mismatch");
+  return bundle;
 }

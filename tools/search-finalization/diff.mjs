@@ -43,7 +43,7 @@ function validate(record,path="record") {
     }
   }
 }
-function contract(snapshot) {
+export function capsuleInputContract(snapshot) {
   const {capsule,record,rtEvents}=snapshot;
   known(capsule,["schemaVersion","format","scope","classification","replayVerification","artifacts","replayRuntime","recordProducerIdentity","missingDependencies","plannerExecution","walkingExecution","rtExecution"],"capsule");
   validate(record);
@@ -92,7 +92,7 @@ export function diffFinalizationCapsules(beforeStore,beforeId,afterStore,afterId
     before:summary(before),after:summary(after),codeChanges:changedFields(summary(before).code,summary(after).code),
     beforeOutput:left,afterOutput:right,added,removed,orderingOnly:fields.length>0&&!added.length&&!removed.length,fieldChanges:fields};
   let inputChanges;
-  try {inputChanges=changedFields(normalize(contract(before)),normalize(contract(after)));}
+  try {inputChanges=changedFields(normalize(capsuleInputContract(before)),normalize(capsuleInputContract(after)));}
   catch(error){return {...result,status:"incomparable",reason:error.message,inputChanges:[]};}
   if(inputChanges.length)return {...result,status:"incomparable",reason:"mismatched retained inputs or dependency coverage",inputChanges};
   return {...result,status:fields.length?"changed/unreviewed":"unchanged",inputChanges:[]};

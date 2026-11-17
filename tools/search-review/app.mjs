@@ -59,6 +59,53 @@ function candidateOrder() {
   // Without a reviewer no source order is exposed; starting creates a blind order.
   return ids?.map(id=>current.candidates.find(candidate=>candidate.id===id))??[];
 }
+function frontendContext(candidate) {
+  if(!candidate.source)return row().context;
+  return model.bundle.comparison[candidate.source.side].cases.find(item=>item.id===candidate.source.caseId).context;
+}
+function pedestrianRoute(parent,route) {
+  if(!route)return;
+  parent.append(element("p",`Recorded pedestrian route · ${route.distanceMeters} m`));
+  if(route.coords.length>1) {
+    const xs=route.coords.map(point=>point[0]),ys=route.coords.map(point=>point[1]);
+    const xmin=Math.min(...xs),ymin=Math.min(...ys),width=Math.max(...xs)-xmin,height=Math.max(...ys)-ymin;
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg"),line=document.createElementNS(svg.namespaceURI,"polyline");
+    svg.setAttribute("viewBox","0 0 320 160");svg.setAttribute("role","img");svg.setAttribute("aria-label","Recorded pedestrian geometry; schematic without basemap");
+    line.setAttribute("points",route.coords.map(([x,y])=>`${10+(width?(x-xmin)/width:0.5)*300},${150-(height?(y-ymin)/height:0.5)*140}`).join(" "));
+    line.setAttribute("fill","none");line.setAttribute("stroke","currentColor");line.setAttribute("stroke-width","3");svg.append(line);parent.append(svg);
+  }
+  const steps=element("ol","");
+  for(const step of route.steps)steps.append(element("li",`${step.kind??"Walk"}${step.name?` · ${step.name}`:""}${Number.isFinite(step.distanceMeters)?` · ${step.distanceMeters} m`:""}`));
+  parent.append(steps);
+}
+function drawFrontendCandidate(card,candidate) {
+  const itinerary=candidate.itinerary,context=frontendContext(candidate);
+  const stops=new Map(context.stops.map(stop=>[stop.id,stop.name]));
+  const name=id=>stops.get(id)?.trim()?`${stops.get(id)} (${id})`:id??"Unknown stop";
+  card.append(element("p",`Arrival ${clock(itinerary.arrivalSecs)} · Full duration ${minutes(itinerary.totalSecs)} · Transfers ${itinerary.transfers}`));
+  card.append(element("p",`Walking ${minutes(itinerary.totalWalkSecs)} · Distance ${Number.isFinite(itinerary.totalWalkMeters)?`${itinerary.totalWalkMeters} m`:"unknown"} · Access ${minutes(itinerary.sourceWalkSecs)} · Egress ${minutes(itinerary.destWalkSecs)}`));
+  card.append(element("small","Times use the captured timetable frame. Planner timings below are observations, not a real-time correctness verdict."));
+  if(itinerary.directWalk){card.append(element("h3","Walk directly"));pedestrianRoute(card,itinerary.directWalk.route);}
+  for(const flag of ["cancelled","timingUnreliable"])if(itinerary[flag])card.append(element("p",`Captured flag: ${flag}`));
+  if(itinerary.accessRunToCatch)card.append(element("p","Captured access requires running to catch the service."));
+  const timeline=element("ol","");timeline.className="timeline";
+  for(const [index,leg] of itinerary.legs.entries()) {
+    const item=element("li","");if(leg.type==="walk")item.className="walk";
+    item.append(element("strong",leg.type==="walk"?"Walk":`Transit ${leg.routeShortName??leg.mode??""}`));
+    item.append(element("p",`${name(leg.fromStopId)} → ${name(leg.toStopId)}`));
+    item.append(element("p",`Captured ${clock(leg.departSecs)}–${clock(leg.arriveSecs)} · ${minutes(leg.arriveSecs-leg.departSecs)}`));
+    const scheduled=candidate.evidence.scheduled?.find(value=>value.index===index);
+    if(scheduled)item.append(element("p",`Planner ${clock(scheduled.departSecs)}–${clock(scheduled.arriveSecs)}`));
+    for(const flag of ["cancelled","timingUnreliable","approximate"])if(leg[flag])item.append(element("p",`Captured flag: ${flag}`));
+    if(leg.type==="walk") {
+      const evidence=candidate.evidence.walkRoutes.find(value=>value.index===index);
+      if(evidence?.route)pedestrianRoute(item,evidence.route);
+      else item.append(element("small",`${Number.isFinite(leg.distanceMeters)?`${leg.distanceMeters} m · `:""}Pedestrian geometry not uniquely captured`));
+    }
+    timeline.append(item);
+  }
+  card.append(timeline);
+}
 function drawCandidates(ordered) {
   $("candidates").replaceChildren();
   if(!row())return;
@@ -67,6 +114,7 @@ function drawCandidates(ordered) {
   for(const [index,candidate] of ordered.entries()) {
     const card=element("article","");card.className="candidate";card.dataset.candidateId=candidate.id;
     card.append(element("h2",label(index)));
+    if([3,4].includes(model.bundle.version)){drawFrontendCandidate(card,candidate);$("candidates").append(card);continue;}
     const itinerary=candidate.itinerary,legs=itinerary.legs;
     const estimatedJourney=legs.some(leg=>leg.type==="transit"&&leg.approximate===true),journeyMarker=estimatedJourney?"~":"";
     if(estimatedJourney) {
@@ -123,8 +171,12 @@ function render() {
   $("session-status").textContent=active?`Reviewing as ${active.reviewerId}. Blind order saved.`:"No reviewer selected.";
   if(active)$("reviewer").value=active.reviewerId;
   $("query-title").textContent=current?`Query ${model.index+1} of ${model.bundle.cases.length}`:"Bundle has no queries";
-  $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
+  $("query-summary").textContent=current?`Service date ${current.query.date??"unspecified"} · Departure ${clock(current.context?.departureSecs??current.query.departureSecs)} · ${current.candidates.length} captured options`:"";
   $("limits").textContent=`Stop-level schematic; no pedestrian geometry or applied real-time composition. ${current?.capture.truncated?"Capture is truncated; additional candidates may exist.":"Shows the complete captured candidate array, not proof of all possible journeys."}`;
+  if([3,4].includes(model.bundle.version)) {
+    $("limits").textContent="Complete returned frontend candidate array, including captured walking and applied timing. Access/egress geometry and original live application identity remain unverified. This is not proof of all possible journeys.";
+    $("query-summary").textContent=`Service date ${current.context.serviceDate??"unspecified"} · Departure ${clock(current.context.departureSecs)} (captured timetable frame) · ${current.candidates.length} captured options`;
+  }
   if(current?.query.entryStops&&current.query.exitStops) {
     $("query-summary").textContent+=` · From ${current.query.entryStops.map(stop=>stopLabel(stop.stopId)).join(", ")} → ${current.query.exitStops.map(stop=>stopLabel(stop.stopId)).join(", ")}`;
   }

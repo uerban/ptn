@@ -180,3 +180,25 @@ test("another tab cannot silently overwrite newer local progress",async()=>{
   assert.equal((await exported(one)).sessions[0].reviewerId,"First tab");
  } finally {await context.close();}
 });
+
+test("frontend walking geometry and transit timings render offline and keep comparisons blind",async()=>{
+ const {frontendFixture}=await import("./frontend-fixture.mjs");
+ const frontend=await frontendFixture(),comparison=await createReviewComparison(frontend,frontend);
+ const context=await browser.newContext({offline:true});
+ try {
+  const page=await context.newPage(),errors=[],requests=[];
+  page.on("pageerror",error=>errors.push(error.message));page.on("request",request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
+  await page.goto(url);await page.locator("#bundle-file").setInputFiles(inputFile("frontend.json",comparison));
+  await page.locator("#workspace").waitFor({state:"visible"});await start(page,"Synthetic frontend test");
+  assert.equal(await page.locator(".candidate").count(),6);
+  assert.equal(await page.locator(".candidate svg").count(),4);
+  assert.equal(await page.locator("img").count(),0);
+  assert.match(await page.locator("#candidates").textContent(),/184.2 m/);
+  assert.match(await page.locator("#candidates").textContent(),/Planner 01:00:50–01:04:50/);
+  assert.equal(await page.locator("#provenance-data").isVisible(),false);
+  assert.equal((await exported(page)).sessions[0].actions.length,0);
+  await page.reload();await page.locator(".candidate").first().waitFor();
+  assert.equal(await page.locator(".candidate svg").count(),4);
+  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
+ } finally {await context.close();}
+});
