@@ -1,5 +1,5 @@
 name: OSM source check
-# The live upstream OSM download, kept out of the release chain. A nightly run
+# The live upstream OSM download, kept out of the release chain. A weekly run
 # reports when the mirror is unreachable or its extract stops parsing; it never
 # blocks a release. A manual run with `publish` also replaces the pinned Vilnius
 # clip that release validation builds from as a new immutable release; commit
@@ -7,7 +7,7 @@ name: OSM source check
 
 on:
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "17 3 * * 1"
   workflow_dispatch:
     inputs:
       publish:

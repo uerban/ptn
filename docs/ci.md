@@ -171,7 +171,7 @@ and the upstream replication timestamp. The release job refuses a download
 whose digest differs from the pin.
 
 The `osm-source.yml` workflow downloads the live extract through the same
-snapshot code every night and clips it. A failure there reports a problem
+snapshot code every Monday and clips it. A failure there reports a problem
 with the upstream source; it does not affect releases. To refresh the
 fixture, run it with `publish`:
 

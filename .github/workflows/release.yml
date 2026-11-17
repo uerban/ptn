@@ -277,7 +277,7 @@ jobs:
       - name: Fetch the pinned OSM fixture
         # Release validation builds from a pinned clip, not the live upstream
         # mirror, so a mirror outage cannot block a release. The live download
-        # is checked nightly by osm-source.yml.
+        # is checked weekly by osm-source.yml.
         run: |
           read -r url sha < <(python3 -c 'import json; d=json.load(open("config/osm-release-fixture.json")); print(d["url"], d["sha256"])')
           [[ "$url" == "https://github.com/${GITHUB_REPOSITORY}/releases/download/"* ]]
