@@ -9,7 +9,8 @@
 //!    fetch, retry and logging as TripUpdates);
 //! 2. merges the feeds' last good alerts in configured order, a later feed
 //!    replacing an earlier alert with the same id;
-//! 3. drops alerts whose active periods have all ended;
+//! 3. drops alerts whose active periods have all ended, and publisher test
+//!    alerts ([`is_publisher_test`]);
 //! 4. resolves selectors against the active generation ([`KnownIds`]),
 //!    dropping and counting selectors that name an id the bundle lacks, and
 //!    alerts left with none;
@@ -83,6 +84,37 @@ pub struct AlertsStats {
     /// Alerts dropped while decoding, left with no selector, or past
     /// [`MAX_ALERTS_SERVED`].
     pub dropped_alerts: u32,
+    /// Publisher test alerts (see [`is_publisher_test`]).
+    pub test_alerts: u32,
+}
+
+/// Whole texts publishers use for test alerts ("test"/"testing" in the
+/// languages of the served cities), compared case-insensitively after
+/// trimming whitespace and trailing punctuation.
+const TEST_MARKERS: &[&str] = &[
+    "TEST",
+    "TESTING",
+    "TESTAVIMAS",
+    "TESTAS",
+    "TESTOWANIE",
+    "TESTĒŠANA",
+    "TESTIMINE",
+    "TESTE",
+];
+
+/// An alert whose header or description is nothing but a test marker, such
+/// as Vilnius' long-lived "Eismo situacija" / "TESTAVIMAS" entries. Only a
+/// whole text matches, so a real notice that mentions testing is kept.
+pub fn is_publisher_test(alert: &ServiceAlert) -> bool {
+    alert.header.iter().chain(&alert.description).any(|t| {
+        let text = t
+            .text
+            .trim()
+            .trim_end_matches(|c: char| c.is_ascii_punctuation())
+            .trim()
+            .to_uppercase();
+        TEST_MARKERS.contains(&text.as_str())
+    })
 }
 
 /// The pre-built reply.
@@ -271,6 +303,10 @@ pub fn merge_alerts<'a>(
     for (_, mut alert) in merged {
         if alert.expired_by(now_secs) {
             stats.expired += 1;
+            continue;
+        }
+        if is_publisher_test(&alert) {
+            stats.test_alerts += 1;
             continue;
         }
         if let Some(known) = known {

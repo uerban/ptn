@@ -61,6 +61,7 @@ struct AlertsHealthWire<'a> {
     expired: u32,
     dropped_selectors: u32,
     dropped_alerts: u32,
+    test_alerts: u32,
 }
 
 fn overall_of(feeds: &[FeedHealth]) -> &'static str {
@@ -109,6 +110,7 @@ pub fn rt_health(ctx: &ServerCtx) -> Resp {
         expired: snap.stats.expired,
         dropped_selectors: snap.stats.dropped_selectors,
         dropped_alerts: snap.stats.dropped_alerts,
+        test_alerts: snap.stats.test_alerts,
     });
     let disabled = |service_alerts: Option<AlertsHealthWire<'_>>| match service_alerts {
         None => json_response(503, DISABLED_BODY.to_string()),
