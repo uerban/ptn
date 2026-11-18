@@ -1,6 +1,6 @@
 import { seedLegacyCityProjection } from "../../src/test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import {
   computeWalkingProgress,
   computeWalkRouteProgress,
@@ -12,11 +12,13 @@ import {
 import { db } from "../../src/db/index.ts";
 import { useGuidanceStore } from "../../src/stores/guidanceStore.ts";
 import { useRtStore } from "../../src/stores/rtStore.ts";
-import type { Itinerary, Leg } from "@pt/shared";
+import type { Itinerary, Leg, MobilityProfile } from "@pt/shared";
 import { walkGraphClient, type WalkRoute } from "../../src/services/walkGraphClient.ts";
 import { clearWalkRouteCache, getOrFetchWalkRoute } from "../../src/services/walkRouteCache.ts";
 import { useCityStore } from "../../src/stores/cityStore.ts";
 import { useSettingsStore } from "../../src/stores/settingsStore.ts";
+import { directWalkCandidate } from "../../src/services/directWalkCandidate.ts";
+import { riderWalkSpeedMps } from "@pt/shared/routing";
 
 const walkLeg: Leg = {
   mode: "WALK",
@@ -311,6 +313,72 @@ describe("useGuidanceLegProgress — ride progress from the leg's stops", () => 
     rerender({ pos: { lat: 54.6901, lon: 25.2601 } });
     await new Promise((r) => setTimeout(r, 20));
     expect(useGuidanceStore.getState().transitProgress).toBeNull();
+  });
+});
+
+describe("useGuidanceLegProgress — rider walking time", () => {
+  const here = walkLeg.from.location;
+  const leg: Leg = {
+    ...walkLeg,
+    to: { name: "Destination", location: { lat: 54.351, lon: 18.641 } },
+    distanceMeters: walkRoute.distanceMeters,
+  };
+
+  beforeEach(() => {
+    clearWalkRouteCache();
+    useSettingsStore.setState({ mobilityProfile: "default", walkSpeedMps: 1.25 });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    act(() => {
+      useGuidanceStore.setState({ phase: "idle", itinerary: null, walkingProgress: null });
+      useSettingsStore.setState({ mobilityProfile: "default", walkSpeedMps: 1.25 });
+    });
+  });
+
+  const profiles: [MobilityProfile, number][] = [
+    ["default", 1.25],
+    ["default", 0.5],
+    ["vision_impaired", 0.9],
+    ["wheelchair", 2.5],
+  ];
+  for (const routed of [false, true]) {
+    it.each(profiles)(`agrees with planning at the origin for %s at %s m/s (${routed ? "routed" : "fallback"})`, async (profile, speed) => {
+      useSettingsStore.setState({ mobilityProfile: profile, walkSpeedMps: speed });
+      await getOrFetchWalkRoute(useCityStore.getState().activeCity.id, leg.from.location, leg.to.location,
+        profile === "wheelchair" ? "wheelchair" : "default", {
+          routeFor: async () => routed ? walkRoute : null,
+        });
+      const plan = directWalkCandidate(here, leg.to.location, walkRoute, 0, riderWalkSpeedMps(profile, speed))!;
+      navigate({ legs: [leg], departureTime: leg.departureTime, arrivalTime: leg.arrivalTime } as Itinerary);
+      renderHook(() => useGuidanceLegProgress(here, null));
+      await waitFor(() => expect(useGuidanceStore.getState().walkingProgress).not.toBeNull());
+      // The route's rounded metres and guidance's geometric metres can differ
+      // slightly; their seconds must still describe the same rider's walk.
+      expect(Math.abs(useGuidanceStore.getState().walkingProgress!.estimatedSecondsRemaining - plan.totalSecs)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  it("updates the time for a new walking speed without a new fix or route request", async () => {
+    const routeFor = vi.spyOn(walkGraphClient, "routeFor").mockResolvedValue(walkRoute);
+    navigate({ legs: [leg], departureTime: leg.departureTime, arrivalTime: leg.arrivalTime } as Itinerary);
+    renderHook(() => useGuidanceLegProgress(here, null));
+    await waitFor(() => expect(useGuidanceStore.getState().walkingProgress?.nextStep).toBeDefined());
+    act(() => useSettingsStore.getState().setWalkSpeedMps(0.5));
+    const plan = directWalkCandidate(here, leg.to.location, walkRoute, 0, 0.5)!;
+    await waitFor(() => expect(Math.abs(useGuidanceStore.getState().walkingProgress!.estimatedSecondsRemaining - plan.totalSecs)).toBeLessThanOrEqual(1));
+    expect(routeFor).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["BIKE", "SCOOTER"] as const)("keeps the existing %s progress calculation separate from walking settings", async (mode) => {
+    useSettingsStore.setState({ walkSpeedMps: 0.5 });
+    const ride: Leg = { ...leg, mode };
+    navigate({ legs: [ride], departureTime: ride.departureTime, arrivalTime: ride.arrivalTime } as Itinerary);
+    renderHook(() => useGuidanceLegProgress(here, null));
+    await waitFor(() => expect(useGuidanceStore.getState().walkingProgress).not.toBeNull());
+    expect(useGuidanceStore.getState().walkingProgress!.estimatedSecondsRemaining)
+      .toBe(computeWalkingProgress(ride, here).estimatedSecondsRemaining);
   });
 });
 

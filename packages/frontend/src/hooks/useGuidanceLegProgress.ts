@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Leg, LatLon, WalkingProgress, TransitProgress } from "@pt/shared";
-import { LEG_ARRIVAL_RADIUS_M } from "@pt/shared/constants";
+import { DEFAULT_WALK_SPEED_MPS, LEG_ARRIVAL_RADIUS_M } from "@pt/shared/constants";
+import { riderWalkSpeedMps } from "@pt/shared/routing";
 import {
   haversineDistance,
   bearing,
@@ -12,12 +13,10 @@ import { useCityStore } from "../stores/cityStore.ts";
 import { decodePolyline } from "../utils/polyline.ts";
 import { useGuidanceStore } from "../stores/guidanceStore.ts";
 import { useRtStore } from "../stores/rtStore.ts";
+import { useSettingsStore } from "../stores/settingsStore.ts";
 import { serverTime } from "../services/serverTime.ts";
 import type { WalkRoute } from "../services/walkGraphClient.ts";
 import { useWalkRoute } from "./useWalkRoute.ts";
-
-/** Average walking speed in m/s (~4.5 km/h) */
-const AVG_WALK_SPEED_MS = 1.25;
 
 /**
  * How early, before its (live) departure, a vehicle may already be carrying
@@ -104,6 +103,7 @@ export function computeWalkRouteProgress(
   position: LatLon,
   route: WalkRoute,
   prevAlongMeters?: number,
+  walkSpeedMps = DEFAULT_WALK_SPEED_MPS,
 ): { progress: WalkingProgress; alongMeters: number } {
   const line = route.coords.map(([lon, lat]) => ({ lat, lon }));
   const cum = cumulativeMeters(line);
@@ -124,7 +124,7 @@ export function computeWalkRouteProgress(
     alongMeters: along,
     progress: {
       distanceRemainingMeters: Math.round(remaining),
-      estimatedSecondsRemaining: Math.round(remaining / AVG_WALK_SPEED_MS),
+      estimatedSecondsRemaining: Math.round(remaining / walkSpeedMps),
       bearingDegrees: bearing(position, target),
       remainingFraction: total > 0 ? remaining / total : 0,
       nextStep: next && next.kind !== "depart"
@@ -145,14 +145,15 @@ export function computeWalkingProgress(
   leg: Leg,
   position: LatLon,
   route?: WalkRoute | null,
+  walkSpeedMps = DEFAULT_WALK_SPEED_MPS,
 ): WalkingProgress {
-  if (route && route.coords.length >= 2) return computeWalkRouteProgress(leg, position, route).progress;
+  if (route && route.coords.length >= 2) return computeWalkRouteProgress(leg, position, route, undefined, walkSpeedMps).progress;
 
   const totalDistance = leg.distanceMeters ?? haversineDistance(leg.from.location, leg.to.location);
   const line = leg.polyline ? decodePolyline(leg.polyline) : [leg.from.location, leg.to.location];
   const progress = progressAlongLine(position, line);
   const distanceRemainingMeters = Math.max(0, totalDistance * (1 - progress));
-  const estimatedSecondsRemaining = Math.round(distanceRemainingMeters / AVG_WALK_SPEED_MS);
+  const estimatedSecondsRemaining = Math.round(distanceRemainingMeters / walkSpeedMps);
   const bearingDegrees = bearing(position, leg.to.location);
 
   return {
@@ -306,6 +307,8 @@ export function useGuidanceLegProgress(
   const phase = useGuidanceStore((s) => s.phase);
   const itinerary = useGuidanceStore((s) => s.itinerary);
   const currentLegIndex = useGuidanceStore((s) => s.currentLegIndex);
+  // Match planning's speed policy, including changes without a new GPS fix.
+  const walkSpeedMps = useSettingsStore((s) => riderWalkSpeedMps(s.mobilityProfile, s.walkSpeedMps));
   const currentLeg = itinerary?.legs[currentLegIndex];
   const rideStops = useRideStops(currentLeg);
   // Subscribed, not peeked: a route that resolves after guidance starts
@@ -334,12 +337,13 @@ export function useGuidanceLegProgress(
       if (route) {
         const prev = lastAlong.current;
         const prevAlong = prev && prev.leg === leg && prev.route === route ? prev.along : undefined;
-        const { progress, alongMeters } = computeWalkRouteProgress(leg, position, route, prevAlong);
+        const { progress, alongMeters } = computeWalkRouteProgress(leg, position, route, prevAlong, walkSpeedMps);
         lastAlong.current = { leg, route, along: alongMeters };
         useGuidanceStore.getState().setWalkingProgress(progress);
       } else {
         lastAlong.current = null;
-        useGuidanceStore.getState().setWalkingProgress(computeWalkingProgress(leg, position));
+        const progressSpeed = leg.mode === "WALK" ? walkSpeedMps : DEFAULT_WALK_SPEED_MPS;
+        useGuidanceStore.getState().setWalkingProgress(computeWalkingProgress(leg, position, undefined, progressSpeed));
       }
     } else {
       // Read live delay from RT store instead of static leg.delaySeconds
@@ -384,5 +388,5 @@ export function useGuidanceLegProgress(
         useGuidanceStore.getState().setTransferProximity(false);
       }
     }
-  }, [position, speed, phase, itinerary, currentLegIndex, rideStops, walkRoute]);
+  }, [position, speed, phase, itinerary, currentLegIndex, rideStops, walkRoute, walkSpeedMps]);
 }
