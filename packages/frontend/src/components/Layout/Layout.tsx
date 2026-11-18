@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SearchPickerLayoutContext, usePickerViewport } from "../Search/SearchPickerLayout.ts";
+import { SearchPickerLayoutContext, useKeyboardOpen, usePickerViewport, type SearchPickerMode } from "../Search/SearchPickerLayout.ts";
 import { Outlet, NavLink } from "react-router-dom";
 import { useConnectivity } from "../../hooks/useConnectivity.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -12,15 +12,20 @@ import { Icon } from "../Icon.tsx";
 import { usePresentationText } from "../../i18n/presentationStrings.ts";
 
 export function Layout() {
-  const [fitSearchPicker, setFitSearchPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<SearchPickerMode>(null);
+  const fitSearchPicker = pickerMode !== null;
   const pickerStyle = usePickerViewport(fitSearchPicker);
+  const keyboardOpen = useKeyboardOpen(pickerMode === "text");
+  // While typing, navigation returns as soon as the keyboard closes, so Map
+  // and Settings stay one tap away instead of Back first.
+  const hideNav = pickerMode === "map" || (pickerMode === "text" && keyboardOpen);
   const isOnline = useConnectivity();
   const { t } = useTranslation();
   const scheduleMode = useSettingsStore((s) => s.scheduleMode);
   const presentationText = usePresentationText();
 
   return (
-    <SearchPickerLayoutContext.Provider value={setFitSearchPicker}>
+    <SearchPickerLayoutContext.Provider value={setPickerMode}>
     <div className="flex flex-col h-full pt-safe" style={pickerStyle}>
       <a
         href="#main-content"
@@ -43,7 +48,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {!fitSearchPicker && <nav className="flex border-t border-divider bg-nav-bg shrink-0 pb-safe">
+      {!hideNav && <nav className="flex border-t border-divider bg-nav-bg shrink-0 pb-safe">
         <NavLink
           to="/"
           end
