@@ -24,19 +24,17 @@ import { grantFlow } from "../../privacy/flowGrants.ts";
 import { mayOfferUnprompted } from "../../privacy/contextualPrompts.ts";
 import { FlowDisclosure } from "../Privacy/FlowDisclosure.tsx";
 import { onStorageKeyChange } from "../../services/crossTab.ts";
+import {
+  MAP_DETAIL_ASKED_KEY,
+  markMapDetailAsked,
+  readMapDetailAsked,
+} from "../../map/mapDetailAsked.ts";
 
 /** Asking surface, for the session's **Not now** memory. */
 export const MAP_DETAIL_SURFACE = "map-detail";
-/** Set once the one-time question has been answered; survives reloads. Public UI state. */
-export const MAP_DETAIL_ASKED_KEY = "ptn-map-detail-asked";
-
-function readAsked(): boolean {
-  try {
-    return globalThis.localStorage?.getItem(MAP_DETAIL_ASKED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
+/** Set once the one-time question has been answered (here or in setup). */
+export { MAP_DETAIL_ASKED_KEY };
+const readAsked = readMapDetailAsked;
 
 function subscribeAsked(listener: () => void): () => void {
   return onStorageKeyChange(MAP_DETAIL_ASKED_KEY, listener);
@@ -131,11 +129,7 @@ export function MapDetailControl() {
           details={<p>{text("mapDetail.details", { provider: providerName })}</p>}
           onClose={(answer) => {
             setAnsweredNow(true);
-            try {
-              globalThis.localStorage?.setItem(MAP_DETAIL_ASKED_KEY, "1");
-            } catch {
-              // Storage unavailable: not asked again for this page only.
-            }
+            markMapDetailAsked();
             if (answer === "allowed") {
               applyMapMode("detailed", {
                 setMapDetailMode,

@@ -1,0 +1,6 @@
+{
+  "source": "https://download.geofabrik.de/europe/lithuania-latest.osm.pbf",
+  "url": "https://github.com/uerban/ptn/releases/download/osm-fixture-2026-11-16/vilnius-fced91e735f8efda5f2711cedd65999c512849f681a87bd0ebb5bb90c4864cd5.osm.pbf",
+  "sha256": "fced91e735f8efda5f2711cedd65999c512849f681a87bd0ebb5bb90c4864cd5",
+  "snapshotAt": "2026-11-16T21:22:36.000Z"
+}

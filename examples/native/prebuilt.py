@@ -100,4 +100,6 @@ def run(command, config, state, binary_dir):
         args.append(f"--rt-trip-updates-urls={config['tripUpdatesURL']}")
     if config.get("serviceAlertsURL"):
         args.append(f"--rt-service-alerts-urls={config['serviceAlertsURL']}")
+    if config.get("realtimeClientName"):
+        args.append(f"--rt-client-name={config['realtimeClientName']}")
     os.execve(args[0], args, dict(os.environ))

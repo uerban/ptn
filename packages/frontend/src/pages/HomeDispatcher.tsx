@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import type { Stop } from "@pt/shared";
 import { useSettingsStore } from "../stores/settingsStore.ts";
 import { GuidanceSessionProvider } from "../components/Guidance/GuidanceSession.tsx";
@@ -22,6 +22,14 @@ const TextHome = lazy(() => import("./TextHome.tsx").then((m) => ({ default: m.T
 export function HomeDispatcher() {
   const textMode = useSettingsStore((s) => s.scheduleMode);
   const temporaryMap = useTemporaryMap();
+  const { close: closeTemporaryMap } = temporaryMap;
+  // Leaving Text mode from its temporary map: Map mode becomes the starting
+  // view and the `?view=map` entry is dropped, so a later switch back to
+  // Text mode opens on text, not on a stale temporary map.
+  const switchToMap = useCallback(() => {
+    useSettingsStore.getState().setScheduleMode(false);
+    closeTemporaryMap();
+  }, [closeTemporaryMap]);
   const text = usePresentationText();
   const showMap = !textMode || temporaryMap.active;
   const [textStop, setTextStop] = useState<Stop | null>(null);
@@ -44,6 +52,7 @@ export function HomeDispatcher() {
           }>
             <MapHome
               onBackToText={textMode ? temporaryMap.close : undefined}
+              onSwitchToMap={textMode ? switchToMap : undefined}
               contextStop={textMode ? textStop : null}
             />
           </ErrorBoundary>

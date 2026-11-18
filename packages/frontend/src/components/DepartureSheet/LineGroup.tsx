@@ -10,6 +10,8 @@ import { useCityStore } from "../../stores/cityStore.ts";
 import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { useDelayReportStore } from "../../stores/delayReportStore.ts";
 import { Icon } from "../Icon.tsx";
+import { waitClock, waitSpoken } from "../../utils/waitTime.ts";
+import { dayMarkers, type DayMarker } from "./dayMarkers.ts";
 
 const EMPTY_OVERRIDES: Partial<Record<TransportMode, string>> = {};
 
@@ -46,6 +48,7 @@ export function LineGroup({
     (d) => d.predictedTime ?? d.scheduledTime
   );
   const minutes = useCountdown(timestamps);
+  const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
   const badgeStyle = resolveRouteStyle(routeColor, mode, modeOverrides, scheme, theme, subMode, highContrastEnabled, colorConfig);
 
   // Crowdsourced delay indicator — only when no official RT data exists
@@ -118,6 +121,7 @@ export function LineGroup({
           <CollapsedChips
             departures={departures}
             minutes={minutes}
+            minutesOnly={minutesOnly}
             t={t}
           />
 
@@ -138,20 +142,12 @@ export function LineGroup({
       {/* Expanded schedule panel */}
       {expanded && (
         <div className="mx-3 mb-2 border-t border-divider pt-1.5 space-y-1">
-          {departures.map((dep, idx) => {
-            const mins = minutes[idx] ?? 0;
-            if (mins < DEPARTED_CUTOFF_MINUTES) return null;
-
-            return (
-              <ScheduleRow
-                key={`${dep.tripId}_${dep.scheduledTime}`}
-                departure={dep}
-                minutes={mins}
-                formattingLocale={formattingLocale}
-                t={t}
-              />
-            );
-          })}
+          <ExpandedSchedule
+            departures={departures}
+            minutes={minutes}
+            formattingLocale={formattingLocale}
+            t={t}
+          />
         </div>
       )}
     </div>
@@ -163,10 +159,11 @@ const MAX_COLLAPSED_CHIPS = 4;
 interface CollapsedChipsProps {
   departures: readonly Departure[];
   minutes: number[];
+  minutesOnly: boolean;
   t: (key: string, fallback?: string) => string;
 }
 
-function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
+function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsProps) {
   // Separate into due items and regular upcoming items
   const dueItems: { dep: Departure; mins: number }[] = [];
   const upcomingItems: { dep: Departure; mins: number }[] = [];
@@ -212,7 +209,7 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
               className="text-xs font-medium text-danger line-through"
               title={t("popup.cancelled", "Cancelled")}
             >
-              {mins}&thinsp;m
+              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
             </span>
           );
         }
@@ -234,7 +231,9 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
             key={`${dep.tripId}_${dep.scheduledTime}`}
             className="flex items-center gap-0.5 text-xs font-semibold"
           >
-            <span data-countdown className={timeColor}>{mins}&thinsp;m</span>
+            <span data-countdown className={timeColor}>
+              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
+            </span>
             {delayShouldShow && (
               <span data-countdown className={`text-[0.625rem] font-bold ${delayColor}`}>
                 +{delayMinutes}
@@ -247,15 +246,70 @@ function CollapsedChips({ departures, minutes, t }: CollapsedChipsProps) {
   );
 }
 
-interface ScheduleRowProps {
-  departure: Departure;
-  minutes: number;
+interface ExpandedScheduleProps {
+  departures: readonly Departure[];
+  minutes: number[];
   formattingLocale: string;
   t: (key: string, fallback?: string) => string;
 }
 
-function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowProps) {
+function ExpandedSchedule({ departures, minutes, formattingLocale, t }: ExpandedScheduleProps) {
+  const rows = departures
+    .map((dep, idx) => ({ dep, mins: minutes[idx] ?? 0 }))
+    .filter((r) => r.mins >= DEPARTED_CUTOFF_MINUTES);
+  const markers = dayMarkers(rows.map((r) => r.dep));
+  return (
+    <>
+      {rows.map(({ dep, mins }, i) => {
+        const marker = markers[i]!;
+        return (
+          <div key={`${dep.tripId}_${dep.scheduledTime}`}>
+            {marker.dateDivider && (
+              <DateDivider date={marker.dateDivider} formattingLocale={formattingLocale} />
+            )}
+            <ScheduleRow
+              departure={dep}
+              minutes={mins}
+              marker={marker}
+              formattingLocale={formattingLocale}
+              t={t}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function DateDivider({ date, formattingLocale }: { date: Date; formattingLocale: string }) {
+  const label = date.toLocaleDateString(formattingLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return (
+    <div
+      data-testid="date-divider"
+      className="flex items-center gap-2 pt-1.5 pb-0.5 text-xs font-semibold text-fg"
+    >
+      <span aria-hidden="true" className="h-px flex-1 bg-fg-muted/60" />
+      <span>{label}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-fg-muted/60" />
+    </div>
+  );
+}
+
+interface ScheduleRowProps {
+  departure: Departure;
+  minutes: number;
+  marker?: DayMarker;
+  formattingLocale: string;
+  t: (key: string, fallback?: string) => string;
+}
+
+function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: ScheduleRowProps) {
   const dep = departure;
+  const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
   const isRealTime = Boolean(dep.predictedTime);
   const isDeparted = minutes < 0;
   const delaySeconds = dep.delaySeconds ?? 0;
@@ -298,8 +352,17 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
   } else if (minutes < 0) {
     countdownLabel = `${Math.abs(minutes)} ${t("time.min_ago", "min ago")}`;
   } else {
-    countdownLabel = `${minutes} ${t("time.min", "min")}`;
+    countdownLabel = waitClock(minutes, minutesOnly) ?? `${minutes} ${t("time.min", "min")}`;
   }
+  const countdownSpoken = minutes > 0 && waitClock(minutes, minutesOnly)
+    ? waitSpoken(minutes, formattingLocale)
+    : null;
+
+  const serviceEdge = marker?.lastOfServiceDay
+    ? t("schedule.lastOfServiceDay", "Last trip of the day")
+    : marker?.firstOfServiceDay
+      ? t("schedule.firstOfServiceDay", "First trip of the day")
+      : null;
 
   const timeColor = isDeparted
     ? "text-fg-muted"
@@ -313,8 +376,21 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
       className="flex items-center justify-between"
       style={{ padding: "var(--variant-row-pad)", fontSize: "var(--variant-meta-text-size)" }}
     >
-      {/* Scheduled clock time */}
-      <span data-testid="scheduled-time" data-countdown className="text-fg-muted font-medium">{clockTime}</span>
+      {/* Scheduled clock time, with the service day hand-over named */}
+      <span className="flex items-baseline gap-1.5">
+        <span
+          data-testid="scheduled-time"
+          data-countdown
+          className={serviceEdge ? "text-fg font-bold" : "text-fg-muted font-medium"}
+        >
+          {clockTime}
+        </span>
+        {serviceEdge && (
+          <span data-testid="service-day-edge" className="text-xs font-semibold text-accent">
+            {serviceEdge}
+          </span>
+        )}
+      </span>
 
       <div className="flex items-center gap-2">
         {/* Delay badge — only when real-time and delay >= 60s */}
@@ -336,9 +412,16 @@ function ScheduleRow({ departure, minutes, formattingLocale, t }: ScheduleRowPro
           <span className="w-1.5 h-1.5 bg-success rounded-full" />
         )}
 
-        {/* Countdown — always in minutes */}
-        <span data-countdown className={`font-semibold ${timeColor}`}>
-          {countdownLabel}
+        {/* Countdown: minutes, or h:mm from an hour */}
+        <span data-countdown className={`font-semibold tabular-nums ${timeColor}`}>
+          {countdownSpoken ? (
+            <>
+              <span aria-hidden="true">{countdownLabel}</span>
+              <span className="sr-only">{countdownSpoken}</span>
+            </>
+          ) : (
+            countdownLabel
+          )}
         </span>
       </div>
     </div>

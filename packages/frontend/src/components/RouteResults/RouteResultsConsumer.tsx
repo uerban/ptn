@@ -13,7 +13,7 @@ import { LeaveHint } from "./shared/LeaveHint.tsx";
 import { BoardingLine } from "./shared/BoardingLine.tsx";
 import { LeadingWaitBanner, shouldShowLeadingWaitBanner } from "./shared/LeadingWaitBanner.tsx";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
-import { ServiceAlertTripNotes } from "../ServiceAlerts/ServiceAlertTripNotes.tsx";
+import { RouteAlertMarker, RouteAlertsSummary, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
 import { TzIndicator } from "./shared/TzIndicator.tsx";
 import { formatTime, toMinutes } from "./shared/format.ts";
 import {
@@ -53,11 +53,16 @@ export function RouteResultsConsumer({
   feedTz,
 }: Props) {
   const { t } = useTranslation();
+  const alerts = useListAlerts(itineraries);
   return (
     <div className="flex flex-col gap-2.5 px-3 pb-3">
       {/* One tz indicator per surface — renders nothing for a local verified user. */}
       <div className="flex justify-end leading-none">
         <TzIndicator />
+      </div>
+      {/* Each alert once per list, above the results. */}
+      <div className="-mx-3">
+        <RouteAlertsSummary entries={alerts.all} />
       </div>
       {/* `role="list"` is not redundant: Tailwind preflight sets
           `list-style: none`, and WebKit strips list semantics from an
@@ -74,7 +79,6 @@ export function RouteResultsConsumer({
             ) : (
               it.timingUnreliable === true && <RtWarningBanner reason="unreliable" />
             )}
-            <ServiceAlertTripNotes itinerary={it} />
             <ConsumerCard
               it={it}
               fastest={i === 0}
@@ -84,6 +88,7 @@ export function RouteResultsConsumer({
               runSpeedRatio={runSpeedRatio}
               feedTz={feedTz}
             />
+            <RouteAlertMarker entries={alerts.perItinerary[i] ?? []} />
           </li>
         ))}
       </ul>

@@ -301,6 +301,35 @@ export function stopRecentsSweep(): void {
   }
 }
 
+/** Identifies one surfaced recent row: a stop by id, a place by label and point. */
+export interface RecentTarget {
+  stopId?: string;
+  label: string;
+  lat: number;
+  lon: number;
+}
+
+function matchesTarget(ep: BaseEndpoint, target: RecentTarget): boolean {
+  if (target.stopId !== undefined) return ep.kind === "stop" && ep.stopId === target.stopId;
+  if (ep.kind !== "geocoded" && ep.kind !== "mappoint") return false;
+  return (
+    ep.label === target.label &&
+    ep.lat.toFixed(5) === target.lat.toFixed(5) &&
+    ep.lon.toFixed(5) === target.lon.toFixed(5)
+  );
+}
+
+/** Forgets one recent of the active city (the row's Remove action). */
+export async function forgetRecent(target: RecentTarget): Promise<void> {
+  const cityId = activeCityId();
+  const ids = (await listRecentEntries())
+    .filter((e) => recentInCity(e.value, cityId) && matchesTarget(e.value.endpoint, target))
+    .map((e) => e.id);
+  invalidateRecentsCache();
+  if (ids.length > 0) await deletePersonal(TABLE, ids);
+  invalidateRecentsCache();
+}
+
 /**
  * Drops every recent the user has — persisted rows (including any that could
  * not be decrypted) and this session's entries. Bound to the "purge recents"

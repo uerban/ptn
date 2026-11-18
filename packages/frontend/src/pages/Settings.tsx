@@ -1,5 +1,6 @@
 import { GpsSettings } from "../components/Settings/GpsSettings.tsx";
 import { SearchLayoutSettings } from "../components/Search/SearchLayoutSettings.tsx";
+import { WaitFormatSetting } from "../components/Settings/WaitFormatSetting.tsx";
 import { useState, useRef, useEffect, Suspense, lazy } from "react";
 import {
   useSettingsStore,
@@ -20,7 +21,7 @@ import {
 import { useRemoteRoutingAvailable } from "../services/remoteRoutingAvailability.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { requestNotificationPermission } from "../services/tripNotifications.ts";
-import { useTranslation } from "../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../i18n/index.ts";
 import { usePresentationText } from "../i18n/presentationStrings.ts";
 import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
 import { LanguagePicker } from "../components/Settings/LanguagePicker.tsx";
@@ -115,6 +116,7 @@ const WALK_SPEED_KMH_MAX = 10.8;
 
 export function SettingsPage() {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   const presentationText = usePresentationText();
   const {
     theme, setTheme,
@@ -958,6 +960,7 @@ export function SettingsPage() {
                 <PrivacyLevelSection part="details" />
               </Suspense>
             </ErrorBoundary>
+            <WaitFormatSetting />
             <SearchLayoutSettings />
           </>
         )}

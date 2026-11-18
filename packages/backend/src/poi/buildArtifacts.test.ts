@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildReleases, CITY_SPECS, type BuilderConfig } from "./buildArtifacts.js";
@@ -44,6 +44,22 @@ describe("independent artifact orchestration", () => {
       expect(fetched).toHaveLength(2); expect(built).toEqual(["tbilisi"]);
       expect(result.vilnius.error).toBe("upstream unavailable");
       expect(result.tbilisi.release).toBe("new-release");
+    } finally { await rm(workDir, { recursive: true, force: true }); }
+  });
+
+  it("a pinned source is used instead of downloading, and must match its digest", async () => {
+    const workDir = await mkdtemp(join(tmpdir(), "ptn-builder-"));
+    try {
+      const file = join(workDir, "clip.osm.pbf");
+      await writeFile(file, "not the pinned bytes");
+      const fetched: string[] = []; const built: string[] = [];
+      const result = await buildReleases({ cities: ["vilnius"], workDir, repository: "unused", signingKey: "unused", trustedKeys: ["fixture"], revision: "fixture",
+        pinnedSources: { [CITY_SPECS.vilnius.pbf]: { path: file, sha256: "0".repeat(64) } } }, {
+        snapshot: async (url) => { fetched.push(url); return snapshot(url); },
+        buildCity: async (city) => { built.push(city); return "new-release"; },
+      });
+      expect(fetched).toEqual([]); expect(built).toEqual([]);
+      expect(result.vilnius.error).toMatch(/digest mismatch/);
     } finally { await rm(workDir, { recursive: true, force: true }); }
   });
 });

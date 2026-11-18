@@ -1,4 +1,4 @@
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import { OptionalStorageChoice } from "./OptionalStorageChoice.tsx";
 import { PersonalStorageDetail, PersonalStorageNotice } from "./PersonalStorageNotice.tsx";
 import { RecentsRetentionControl } from "../Settings/PrivacyLevelSection.tsx";
@@ -6,6 +6,7 @@ import { RecentsPurgeControl } from "../Settings/RecentsPurgeControl.tsx";
 
 export function PrivacyStorageSettings() {
   const { t } = useTranslation();
+  usePrivacyNamespace();
   return (
     <section>
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-fg-muted">

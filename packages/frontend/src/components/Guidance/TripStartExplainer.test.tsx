@@ -165,10 +165,14 @@ describe("useTripStart", () => {
 
     fireEvent.click(opener);
     await screen.findByTestId("trip-start-explainer");
-    act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    // The dialog's key listener is attached in an effect that can run after
+    // it first appears, so press Escape until it is handled.
+    await waitFor(() => {
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      });
+      expect(screen.queryByTestId("trip-start-explainer")).toBeNull();
     });
-    expect(screen.queryByTestId("trip-start-explainer")).toBeNull();
     expect(onStarted).not.toHaveBeenCalled();
     expect(calls.request).not.toHaveBeenCalled();
     expect(useGuidanceStore.getState().phase).toBe("idle");

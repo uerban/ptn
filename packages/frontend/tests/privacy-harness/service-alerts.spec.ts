@@ -40,11 +40,8 @@ async function finishSetup(page: Page, preset: "recommended" | "strict"): Promis
   await page.goto("/");
   await page.getByRole("button", { name: /^Vilnius/ }).click();
   await page.getByRole("radio", { name: /Text mode/ }).check();
-  await page
-    .getByRole("button", {
-      name: preset === "recommended" ? "Start with recommended settings" : "Start with strict privacy",
-    })
-    .click();
+  if (preset === "strict") await page.getByRole("radio", { name: /^Strict/ }).check();
+  await page.getByRole("button", { name: preset === "recommended" ? "Continue with Recommended" : "Continue with Strict" }).click();
   await expect(page.getByTestId("setup-shell")).toHaveCount(0);
 }
 
@@ -88,10 +85,10 @@ test.describe("privacy harness — service alerts @mock-api", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /^Vilnius/ }).click();
     await page.getByRole("radio", { name: /Text mode/ }).check();
-    await expect(page.getByRole("button", { name: "Start with recommended settings" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Recommended" })).toBeVisible();
     assertNetworkPattern(recorder, [{ kind: "service-alerts", maxCount: 0 }]);
 
-    await page.getByRole("button", { name: "Start with recommended settings" }).click();
+    await page.getByRole("button", { name: "Continue with Recommended" }).click();
     await expect(page.getByTestId("setup-shell")).toHaveCount(0);
     await openDepartureSheet(page);
     await expect.poll(() => alerts.length, { timeout: 10_000 }).toBeGreaterThan(0);

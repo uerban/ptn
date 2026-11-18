@@ -23,7 +23,7 @@ import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
-import { ServiceAlertTripNotes } from "../ServiceAlerts/ServiceAlertTripNotes.tsx";
+import { RouteAlertsForResult, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
 
 interface Props {
   itineraries: Itinerary[];
@@ -51,6 +51,7 @@ export function RouteResultsAccessible({
 }: Props) {
   const { t } = useTranslation();
   const mobility = useSettingsStore((s) => s.mobilityProfile);
+  const alerts = useListAlerts(itineraries);
 
   return (
     <div className="flex flex-col gap-3 px-3 pb-3">
@@ -113,7 +114,6 @@ export function RouteResultsAccessible({
             ) : (
               it.timingUnreliable === true && <RtWarningBanner reason="unreliable" />
             )}
-            <ServiceAlertTripNotes itinerary={it} />
             <AccessibleCard
               it={it}
               fastest={i === 0}
@@ -123,6 +123,8 @@ export function RouteResultsAccessible({
               runSpeedRatio={runSpeedRatio}
               feedTz={feedTz}
             />
+            {/* After the card, inside its list item: each alert stays with its route. */}
+            <RouteAlertsForResult entries={alerts.perItinerary[i] ?? []} index={i} firstAt={alerts.firstAt} />
           </li>
         ))}
       </ul>

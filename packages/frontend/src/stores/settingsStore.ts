@@ -130,6 +130,8 @@ interface SettingsState {
   walkSpeedMps: number;
   maxWalkSecs: number;
   runToCatch: boolean;
+  /** Show waits of an hour or more in minutes instead of h:mm. */
+  waitMinutesOnly: boolean;
   /** Pre-stop buffer override in seconds. null = use PROFILE_DEFAULT_BUFFER_SECS[mobilityProfile]. 0 = explicit "no buffer". */
   leaveBufferOverrideSeconds: number | null;
   routeSearchVariant: RouteSearchVariant;
@@ -154,6 +156,10 @@ interface SettingsState {
   /** When true, the map flies to the user's GPS location on startup. */
   startupLocate: boolean;
   gpsMode: "enabled" | "until-locate" | "disabled";
+  /** The device delivered a fix before and has not refused since. Some
+   * browsers (iOS) report a granted permission as "prompt" after a restart;
+   * this lets the next launch resume the watch without a Locate me tap. */
+  gpsGranted: boolean;
   searchProvider: SearchProvider;
   /** Temporary Search UI choices, retained while device feedback settles defaults. */
   searchActiveFieldOnly: boolean;
@@ -193,6 +199,7 @@ interface SettingsState {
   setWalkSpeedMps: (speed: number) => void;
   setMaxWalkSecs: (secs: number) => void;
   setRunToCatch: (enabled: boolean) => void;
+  setWaitMinutesOnly: (enabled: boolean) => void;
   setLeaveBufferOverrideSeconds: (seconds: number | null) => void;
   setRouteSearchVariant: (variant: RouteSearchVariant) => void;
   setMapDetailMode: (mode: MapDetailMode) => void;
@@ -208,6 +215,7 @@ interface SettingsState {
   setPoiLooseCategories: (categories: LoosePoiCategory[]) => void;
   setStartupLocate: (enabled: boolean) => void;
   setGpsMode: (mode: "enabled" | "until-locate" | "disabled") => void;
+  setGpsGranted: (granted: boolean) => void;
   setSearchProvider: (provider: SearchProvider) => void;
   setSearchActiveFieldOnly: (enabled: boolean) => void;
   setSearchKeyboardFit: (enabled: boolean) => void;
@@ -378,6 +386,7 @@ export const useSettingsStore = create<SettingsState>()(
       walkSpeedMps: DEFAULT_WALK_SPEED_MPS,
       maxWalkSecs: DEFAULT_MAX_WALK_SECS,
       runToCatch: false,
+      waitMinutesOnly: false,
       leaveBufferOverrideSeconds: null,
       routeSearchVariant: "consumer" satisfies RouteSearchVariant,
       mapDetailMode: "detailed" satisfies MapDetailMode,
@@ -394,6 +403,7 @@ export const useSettingsStore = create<SettingsState>()(
       poiIncludeLooseTierUserSet: false,
       startupLocate: false,
       gpsMode: "enabled",
+      gpsGranted: false,
       searchProvider: "local" satisfies SearchProvider,
       searchActiveFieldOnly: true,
       searchKeyboardFit: true,
@@ -498,6 +508,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setMaxWalkSecs: (secs) => set({ maxWalkSecs: clamp(secs, 60, 3600) }),
       setRunToCatch: (enabled) => set({ runToCatch: enabled }),
+      setWaitMinutesOnly: (enabled) => set({ waitMinutesOnly: enabled }),
       setLeaveBufferOverrideSeconds: (seconds) => {
         if (seconds === null) {
           set({ leaveBufferOverrideSeconds: null });
@@ -546,7 +557,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ poiLooseCategories: selected, poiIncludeLooseTier: selected.length > 0, poiIncludeLooseTierUserSet: true });
       },
       setStartupLocate: (enabled) => set({ startupLocate: enabled }),
-      setGpsMode: (gpsMode) => set({ gpsMode }),
+      setGpsMode: (gpsMode) => set(gpsMode === "enabled" ? { gpsMode } : { gpsMode, gpsGranted: false }),
+      setGpsGranted: (gpsGranted) => { if (get().gpsGranted !== gpsGranted) set({ gpsGranted }); },
       setSearchActiveFieldOnly: (enabled) => set({ searchActiveFieldOnly: enabled }),
       setSearchKeyboardFit: (enabled) => set({ searchKeyboardFit: enabled }),
       setSearchCompactRows: (enabled) => set({ searchCompactRows: enabled }),
@@ -677,6 +689,7 @@ export const useSettingsStore = create<SettingsState>()(
             ? clamp(stored.maxWalkSecs, 60, 3600)
             : current.maxWalkSecs,
           runToCatch: coerceBool(stored?.runToCatch, current.runToCatch),
+          waitMinutesOnly: coerceBool(stored?.waitMinutesOnly, current.waitMinutesOnly),
           leaveBufferOverrideSeconds:
             stored?.leaveBufferOverrideSeconds === null
               ? null
@@ -716,6 +729,7 @@ export const useSettingsStore = create<SettingsState>()(
           startupLocate: coerceBool(stored?.startupLocate, current.startupLocate),
           gpsMode: (stored?.gpsMode === "enabled" || stored?.gpsMode === "until-locate" || stored?.gpsMode === "disabled")
             ? stored.gpsMode : current.gpsMode,
+          gpsGranted: stored?.gpsGranted === true && (stored?.gpsMode === undefined || stored?.gpsMode === "enabled"),
           searchProvider: isSearchProvider(stored?.searchProvider)
             ? stored.searchProvider
             : current.searchProvider,

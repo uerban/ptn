@@ -255,6 +255,14 @@ pub struct ServerConfig {
     )]
     pub rt_service_alerts_poll_interval_ms: u64,
 
+    /// Client identifier sent as the `ET-Client-Name` header on every
+    /// GTFS-RT fetch (TripUpdates and ServiceAlerts). Entur asks every
+    /// client to send it and may rate-limit those that do not; other
+    /// publishers ignore it. Empty (the default) sends no header. Must be
+    /// visible ASCII without spaces at the ends (enforced in `validate()`).
+    #[arg(long, env = "PT_SERVE_RT_CLIENT_NAME", default_value = "")]
+    pub rt_client_name: String,
+
     /// Byte budget for the schedule-tile response cache
     /// (`ops/tile_cache.rs`), default 16 MiB (matches Node's hardcoded
     /// `TileLruCache` budget). Unlike Node, this is configurable: the
@@ -441,6 +449,10 @@ pub enum ConfigError {
         "rt-service-alerts-poll-interval-ms / PT_SERVE_RT_SERVICE_ALERTS_POLL_INTERVAL_MS must be >= 1 (a zero interval would hot-spin the poll thread)"
     )]
     AlertsPollIntervalMsZero,
+    #[error(
+        "rt-client-name / PT_SERVE_RT_CLIENT_NAME must be printable ASCII without leading or trailing spaces (got {0:?})"
+    )]
+    RtClientNameInvalid(String),
     #[error("city_slug must be non-empty")]
     CitySlugEmpty,
     #[error("data_root {0:?} does not exist or is not a directory")]
@@ -488,6 +500,11 @@ impl ServerConfig {
         }
         if self.rt_service_alerts_poll_interval_ms == 0 {
             return Err(ConfigError::AlertsPollIntervalMsZero);
+        }
+        if !crate::rt::fetch::valid_client_name(&self.rt_client_name) {
+            return Err(ConfigError::RtClientNameInvalid(
+                self.rt_client_name.clone(),
+            ));
         }
         if self.city_slug.is_empty() {
             return Err(ConfigError::CitySlugEmpty);
@@ -827,6 +844,23 @@ mod tests {
         match cfg.validate() {
             Err(ConfigError::AlertsPollIntervalMsZero) => {}
             other => panic!("expected AlertsPollIntervalMsZero, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rt_client_name_defaults_empty_and_rejects_bad_values() {
+        use clap::Parser;
+        let cfg = ServerConfig::try_parse_from(base_args()).unwrap();
+        assert_eq!(cfg.rt_client_name, "");
+        for bad in [" ptn", "ptn ", "pt\nn", "ptñ"] {
+            let mut a = base_args();
+            a.push("--rt-client-name".into());
+            a.push(bad.into());
+            let mut cfg = ServerConfig::try_parse_from(a).unwrap();
+            match cfg.validate() {
+                Err(ConfigError::RtClientNameInvalid(v)) => assert_eq!(v, bad),
+                other => panic!("expected RtClientNameInvalid for {bad:?}, got {other:?}"),
+            }
         }
     }
 

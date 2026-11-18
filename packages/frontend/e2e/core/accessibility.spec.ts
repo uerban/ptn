@@ -81,7 +81,7 @@ test.describe("accessibility @mock-api", () => {
     // The setup heading takes focus after a step change, for screen readers.
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
     expect(await axeViolations(page)).toEqual([]);
-    // The choices behind "More options" are checked too.
+    // Every choice is on the page, so one check covers them.
     await openSetupOptions(page);
     expect(await axeViolations(page)).toEqual([]);
     await expect(

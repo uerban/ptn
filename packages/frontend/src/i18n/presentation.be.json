@@ -8,6 +8,7 @@
   "presentation.switchToText": "Перайсці ў тэкставы рэжым",
   "presentation.showMap": "Паказаць карту",
   "presentation.backToText": "Вярнуцца да тэксту",
+  "presentation.switchToMap": "Перайсці ў рэжым мапы",
   "presentation.mapDisclosureHeading": "Паказаць карту?",
   "presentation.mapDisclosureBody": "Картавыя файлы спампоўваюцца адзін раз з сервера дадатка і захоўваюцца на прыладзе, таму карта пазней працуе па-за сеткай. Ваш пачатковы рэжым застаецца тэкставым.",
   "presentation.mapDisclosureConfirm": "Спампаваць і паказаць карту",
@@ -129,5 +130,9 @@
   "placeSearch.show": "Пошук адрасоў на серверы",
   "placeSearch.heading": "Пошук адрасоў на серверы?",
   "placeSearch.details": "Пакуль вы ўводзіце месца, дадатак адпраўляе на сервер дадатка тое, што вы ўводзіце, і раён, які вы шукаеце, а сервер шукае адпаведныя адрасы. Прыпынкі і месцы на гэтым прыстасаванні ўсё роўна шукаюцца тут.",
-  "search.incompleteWalkingDistance": "Маршруты без поўнай пешай адлегласці паказваюцца ў канцы. Адлегласці, ацэненыя па часе хады, пазначаны ~."
+  "search.incompleteWalkingDistance": "Маршруты без поўнай пешай адлегласці паказваюцца ў канцы. Адлегласці, ацэненыя па часе хады, пазначаны ~.",
+  "serviceAlerts.onRoutes": "Абвесткі па гэтых маршрутах: {count}",
+  "serviceAlerts.affectsLines": "Паведамленне аб абслугоўванні на лініі {lines}",
+  "serviceAlerts.sameAsAbove": "Тое ж паведамленне, што і вышэй",
+  "nearby.inHours": "за {time}"
 }

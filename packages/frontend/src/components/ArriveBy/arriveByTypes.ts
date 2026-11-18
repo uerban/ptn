@@ -13,6 +13,8 @@ export interface ArriveByToolbarProps {
   /** The time Search plans from now (null: now); Earlier/Later move it. */
   readonly departAt?: Date | null;
   readonly onDepartAt?: (at: Date | null) => void;
+  /** Search's vehicle filter chips; they share the row of the time summary. */
+  readonly filters?: ReactNode;
 }
 
 /** Props Search hands the Arrive-by results. */

@@ -514,6 +514,40 @@ fn feeds_merge_in_configured_order_and_later_feeds_win() {
 }
 
 #[test]
+fn publisher_test_alerts_are_dropped_and_counted() {
+    // Vilnius' live feed shape: a real-looking header, "TESTAVIMAS" text.
+    let f = parse(&feed(&[
+        alert_entity(
+            "vilnius",
+            &[
+                text(10, &[("Eismo situacija", Some("lt"))]),
+                text(11, &[("TESTAVIMAS", Some("lt"))]),
+                route_sel("R1"),
+            ],
+        ),
+        alert_entity(
+            "header",
+            &[text(10, &[("  test. ", None)]), route_sel("R1")],
+        ),
+        alert_entity(
+            "real",
+            &[
+                text(10, &[("Testing new timetable on line 9", None)]),
+                text(11, &[("Detour via Test street", None)]),
+                route_sel("R1"),
+            ],
+        ),
+        simple_alert("plain", "R1"),
+    ]));
+    let (alerts, stats) = merge_alerts([&f], 0, None);
+    let ids: Vec<&str> = alerts.iter().map(|a| &*a.id).collect();
+    assert_eq!(ids, ["real", "plain"]);
+    assert_eq!(stats.test_alerts, 2);
+    assert_eq!(stats.served, 2);
+    assert_eq!(stats.dropped_alerts, 0);
+}
+
+#[test]
 fn alerts_whose_periods_all_ended_are_dropped() {
     let f = parse(&feed(&[
         alert_entity("ended", &[period(Some(10), Some(100)), route_sel("R1")]),

@@ -10,7 +10,7 @@ import {
 } from "../../map/mapMode.ts";
 import { useExternalBasemapAllowed } from "../../services/basemapPrivacy.ts";
 import { BASEMAP_PROVIDERS } from "../../config/basemapProviders.ts";
-import { useTranslation } from "../../i18n/index.ts";
+import { usePrivacyNamespace, useTranslation } from "../../i18n/index.ts";
 import { MICROMAP_LAYERS, type MicromapLayer } from "../../map/micromap/types.ts";
 import { useMicromapState } from "../../services/micromapLoader.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
@@ -42,6 +42,7 @@ function joinList(items: readonly string[], locale: string): string {
  */
 export function MapModeSection() {
   const { t, formattingLocale } = useTranslation();
+  usePrivacyNamespace();
   const city = useCityStore((s) => s.activeCity);
   const micromapState = useMicromapState(city.id);
   const mapDetailMode = useSettingsStore((s) => s.mapDetailMode);

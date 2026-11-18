@@ -99,15 +99,22 @@ const cardTexts = () => screen.queryAllByTestId("itinerary-card").map((c) => c.t
 const order = () => cardTexts().map((t) => ["L1", "F2", "W3"].find((n) => t.includes(n)));
 const emit = (s: ArriveBySearchState, run = runs[runs.length - 1]!) => act(() => { run.onUpdate(s); });
 
-async function applyDefault(): Promise<void> {
+/** Open the folded time controls (if folded) and choose Arrive by. */
+function chooseArriveBy(): void {
+  const summary = screen.getByTestId("when-summary");
+  if (summary.getAttribute("aria-expanded") !== "true") fireEvent.click(summary);
   fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+}
+
+async function applyDefault(): Promise<void> {
+  chooseArriveBy();
   await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByTestId("arrive-by-apply"));
   await waitFor(() => expect(runs).toHaveLength(1));
 }
 
 beforeEach(() => {
-  useArriveByUi.setState({ cityId: null, mode: "leave", draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {} });
+  useArriveByUi.setState({ cityId: null, mode: "leave", leaveOption: "now", leaveAtMs: null, draftMs: null, edited: false, draftVersion: 0, appliedMs: null, defaults: {} });
   useRoutingStore.setState({ ranking: "fastest" });
   useCityStore.setState({ activeCity: { ...useCityStore.getState().activeCity, tz: TZ } });
   vi.mocked(prepareArriveBy).mockReset().mockResolvedValue({
@@ -131,7 +138,7 @@ describe("Arrive-by toolbar", () => {
     await waitFor(() => expect(performance.getEntriesByName(ARRIVE_BY_MARKS.warm)).toHaveLength(1));
     expect(performance.getEntriesByName(ARRIVE_BY_MARKS.warm)[0]).toMatchObject({ detail: { result: "ran", deadlineMs: deadline, trigger: "results" } });
     // Choosing Arrive by fills that deadline and finds its query warm already.
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     expect(screen.getByTestId("arrive-by-date")).toHaveValue("2026-10-12");
     expect(screen.getByTestId("arrive-by-time")).toHaveValue("10:13");
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
@@ -165,7 +172,7 @@ describe("Arrive-by toolbar", () => {
 
   it("choosing Arrive by warms when no shown list was warmed; back to Leave now posts nothing more", async () => {
     const { rerender } = render(<Page />);
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(performance.getEntriesByName(ARRIVE_BY_MARKS.warm)[0]).toMatchObject({ detail: { trigger: "choice" } }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
@@ -176,7 +183,7 @@ describe("Arrive-by toolbar", () => {
 
   it("posts no warm-up for deadline edits; Apply dispatches one search at the edited deadline", async () => {
     render(<Page />);
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByTestId("arrive-by-date"), { target: { value: "2026-10-12" } });
     fireEvent.change(screen.getByTestId("arrive-by-time"), { target: { value: "10:00" } });
@@ -184,16 +191,114 @@ describe("Arrive-by toolbar", () => {
     await waitFor(() => expect(runs).toHaveLength(1));
     expect(channel.warm).toHaveBeenCalledTimes(1);
     expect(prepareArriveBy).toHaveBeenLastCalledWith(ORIGIN, DEST, Date.parse("2026-10-12T10:00:00+03:00"), expect.anything());
+    // Applying folds the controls; reopened, the applied deadline cannot be applied again.
+    expect(screen.queryByTestId("arrive-by-apply")).not.toBeInTheDocument();
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("Arrive by");
+    fireEvent.click(screen.getByTestId("when-summary"));
     expect(screen.getByTestId("arrive-by-apply")).toBeDisabled();
   });
 
   it("warms when the endpoints arrive after the choice", async () => {
     const { rerender } = render(<Page destination={null as unknown as BaseEndpoint} />);
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     await act(async () => { await Promise.resolve(); });
     expect(channel.warm).not.toHaveBeenCalled();
     rerender(<Page />);
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
+  });
+
+  it("is one summary button beside the filters until opened", () => {
+    render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial
+      filters={<button type="button">Bus</button>} /></MemoryRouter>);
+    const summary = screen.getByTestId("when-summary");
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Bus" }));
+    expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
+    fireEvent.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Leave" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Arrive by" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("folds after a preset and says the chosen time; Pick time stays open", () => {
+    const onDepartAt = vi.fn();
+    render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial onDepartAt={onDepartAt} /></MemoryRouter>);
+    const summary = screen.getByTestId("when-summary");
+    fireEvent.click(summary);
+    fireEvent.click(screen.getByTestId("leave-in15"));
+    expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
+    expect(summary.textContent).toMatch(/^When: Leave (\S+ )?\d\d:\d\d$/);
+    expect(onDepartAt).toHaveBeenCalledTimes(1);
+    fireEvent.click(summary);
+    fireEvent.click(screen.getByTestId("leave-custom"));
+    expect(screen.getByTestId("leave-time")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("leave-now"));
+    expect(summary).toHaveTextContent("When: Now (Leave now)");
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("folding an unapplied Arrive by returns to Leave", () => {
+    render(<Page />);
+    chooseArriveBy();
+    expect(useArriveByUi.getState().mode).toBe("arrive-by");
+    fireEvent.click(screen.getByTestId("when-summary"));
+    expect(useArriveByUi.getState().mode).toBe("leave");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
+    expect(screen.queryByTestId("arrive-by-apply")).not.toBeInTheDocument();
+  });
+
+  it("opens a modal When sheet outside the header, so the results do not move", () => {
+    render(<Page />);
+    const toolbar = screen.getByTestId("arrive-by-toolbar");
+    const summary = screen.getByTestId("when-summary");
+    expect(summary).toHaveAttribute("aria-haspopup", "dialog");
+    fireEvent.click(summary);
+    const sheet = screen.getByRole("dialog", { name: "When" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(toolbar).not.toContainElement(sheet);
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it("closes on Esc, backdrop and Close, returning focus to the chip and falling back to Leave", () => {
+    render(<Page />);
+    const summary = screen.getByTestId("when-summary");
+    for (const how of ["esc", "backdrop", "close"] as const) {
+      summary.focus();
+      chooseArriveBy();
+      expect(useArriveByUi.getState().mode).toBe("arrive-by");
+      if (how === "esc") fireEvent.keyDown(document, { key: "Escape" });
+      else fireEvent.click(screen.getByTestId(how === "backdrop" ? "when-backdrop" : "when-close"));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(useArriveByUi.getState().mode).toBe("leave");
+      expect(document.activeElement).toBe(summary);
+      expect(screen.getByTestId("when-status")).toHaveTextContent("Arrive by not applied");
+    }
+  });
+
+  it("keeps Pick time as a draft until Done", () => {
+    const onDepartAt = vi.fn();
+    render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial onDepartAt={onDepartAt} /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId("when-summary"));
+    fireEvent.click(screen.getByTestId("leave-custom"));
+    fireEvent.change(screen.getByTestId("leave-date"), { target: { value: "2026-10-12" } });
+    fireEvent.change(screen.getByTestId("leave-time"), { target: { value: "09:30" } });
+    expect(onDepartAt).not.toHaveBeenCalled();
+    expect(useArriveByUi.getState().leaveAtMs).toBeNull();
+    fireEvent.click(screen.getByTestId("leave-done"));
+    expect(onDepartAt).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("09:30");
+    expect(screen.getByTestId("when-status")).toHaveTextContent("When: Leave");
+  });
+
+  it("never opens by itself: a restored unapplied Arrive by starts closed, as Leave", () => {
+    useArriveByUi.setState({ mode: "arrive-by", draftMs: Date.parse("2026-10-12T07:13:00Z"), appliedMs: null });
+    render(<Page />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(useArriveByUi.getState().mode).toBe("leave");
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
   });
 
   it("resets to Leave now when the city changes", async () => {
@@ -322,7 +427,7 @@ describe("Arrive-by results", () => {
   it("says Arrive by is unavailable without the channel", async () => {
     installRouter(false);
     render(<Page />);
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     fireEvent.click(screen.getByTestId("arrive-by-apply"));
     await waitFor(() => expect(screen.getByTestId("arrive-by-notice")).toHaveTextContent("not available"));
     expect(prepareArriveBy).not.toHaveBeenCalled();
@@ -331,7 +436,7 @@ describe("Arrive-by results", () => {
   it("reports endpoints without reachable stops", async () => {
     vi.mocked(prepareArriveBy).mockResolvedValue({ kind: "no-stops" });
     render(<Page />);
-    fireEvent.click(screen.getByRole("button", { name: "Arrive by" }));
+    chooseArriveBy();
     fireEvent.click(screen.getByTestId("arrive-by-apply"));
     await waitFor(() => expect(screen.getByTestId("arrive-by-notice")).toHaveTextContent("No transit stops"));
     expect(runs).toHaveLength(0);

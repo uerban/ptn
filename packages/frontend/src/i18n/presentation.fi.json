@@ -8,6 +8,7 @@
   "presentation.switchToText": "Vaihda tekstitilaan",
   "presentation.showMap": "Näytä kartta",
   "presentation.backToText": "Takaisin tekstiin",
+  "presentation.switchToMap": "Vaihda karttatilaan",
   "presentation.mapDisclosureHeading": "Näytetäänkö kartta?",
   "presentation.mapDisclosureBody": "Karttatiedostot ladataan kerran tämän sovelluksen palvelimelta ja tallennetaan laitteelle, joten kartta toimii myöhemmin myös ilman verkkoyhteyttä. Aloitusnäkymä pysyy tekstimuodossa.",
   "presentation.mapDisclosureConfirm": "Lataa ja näytä kartta",
@@ -129,5 +130,9 @@
   "placeSearch.show": "Osoitteiden haku palvelimelta",
   "placeSearch.heading": "Osoitteiden haku palvelimelta?",
   "placeSearch.details": "Kun kirjoitat paikkaa, sovellus lähettää kirjoittamasi tekstin ja hakualueen tämän sovelluksen palvelimelle, joka etsii vastaavia osoitteita. Pysäkit ja paikat tällä laitteella haetaan edelleen täältä.",
-  "search.incompleteWalkingDistance": "Reitit, joiden koko kävelymatkaa ei tiedetä, näytetään viimeisinä. Kävelyajasta arvioidut matkat on merkitty ~."
+  "search.incompleteWalkingDistance": "Reitit, joiden koko kävelymatkaa ei tiedetä, näytetään viimeisinä. Kävelyajasta arvioidut matkat on merkitty ~.",
+  "serviceAlerts.onRoutes": "Ilmoitukset näillä reiteillä: {count}",
+  "serviceAlerts.affectsLines": "Linjan {lines} palveluilmoitus",
+  "serviceAlerts.sameAsAbove": "Sama ilmoitus kuin edellä",
+  "nearby.inHours": "{time} kuluttua"
 }

@@ -27,7 +27,7 @@ describe("search place picker", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Searching…");
     expect(screen.queryByText("Remember recent places?")).not.toBeInTheDocument();
     await screen.findByText("No matching place suggestions");
-    expect(screen.queryByRole("tablist", { name: "Sort" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Sort" })).not.toBeInTheDocument();
   });
   it("shows failed searches separately from empty results", async () => {
     stream.mockRejectedValue(new Error("unavailable"));
@@ -49,7 +49,7 @@ describe("search place picker", () => {
     act(() => oldEmit?.([{ kind: "stop", stopId: "stale", name: "Stale", lat: 1, lon: 1, score: 1 }], { done: true, emitSeq: 1 }));
     expect(screen.queryByRole("option", { name: /Stale/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("tablist", { name: "Sort" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Sort" })).toBeInTheDocument();
     expect(view.container.querySelector("[data-active-field]")).toBeNull();
     expect(toInput()).toHaveValue("old");
   });

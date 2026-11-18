@@ -18,6 +18,7 @@ describe("shared foreground location", () => {
 
   beforeEach(() => {
     useSettingsStore.getState().setGpsMode("enabled");
+    useSettingsStore.getState().setGpsGranted(false);
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
     permission = Object.assign(new EventTarget(), { state: "granted" as PermissionState });
     vi.stubGlobal("navigator", {
@@ -66,6 +67,47 @@ describe("shared foreground location", () => {
     expect(watch).not.toHaveBeenCalled();
     location.request("navigation");
     expect(watch).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes on the next launch after a fix when the browser reports prompt again", async () => {
+    permission.state = "prompt";
+    await subscribe();
+    location.request();
+    success(fix());
+    expect(useSettingsStore.getState().gpsGranted).toBe(true);
+    const relaunched = new LiveLocationController();
+    cleanups.push(relaunched.subscribe(vi.fn()));
+    await Promise.resolve(); await Promise.resolve();
+    expect(watch).toHaveBeenCalledTimes(2);
+    success(fix(55));
+    expect(relaunched.getSnapshot().position?.lat).toBe(55);
+  });
+
+  it("forgets the grant when the device refuses, so the next launch does not ask", async () => {
+    permission.state = "prompt";
+    useSettingsStore.getState().setGpsGranted(true);
+    await subscribe();
+    await Promise.resolve();
+    expect(watch).toHaveBeenCalledTimes(1);
+    failure({ code: 1, message: "Denied" } as GeolocationPositionError);
+    expect(useSettingsStore.getState().gpsGranted).toBe(false);
+    const relaunched = new LiveLocationController();
+    cleanups.push(relaunched.subscribe(vi.fn()));
+    await Promise.resolve(); await Promise.resolve();
+    expect(watch).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets the grant when GPS is switched off or the permission is denied", async () => {
+    useSettingsStore.getState().setGpsGranted(true);
+    useSettingsStore.getState().setGpsMode("until-locate");
+    expect(useSettingsStore.getState().gpsGranted).toBe(false);
+    useSettingsStore.getState().setGpsMode("enabled");
+    useSettingsStore.getState().setGpsGranted(true);
+    permission.state = "denied";
+    await subscribe();
+    await Promise.resolve();
+    expect(useSettingsStore.getState().gpsGranted).toBe(false);
+    expect(watch).not.toHaveBeenCalled();
   });
 
   it("supports explicit location and foreground resume when Safari cannot query permissions", async () => {

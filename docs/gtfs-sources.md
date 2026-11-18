@@ -128,6 +128,39 @@ and runs quoting normalization followed by the capture-bound metro repair and
 its direction/timetable contract. Community bytes alone cannot bypass this
 step. The composed recipe still needs a real authenticated acceptance run.
 
+## Change history
+
+After every successful publication the host keeps a copy of the published
+feeds in `<stateDirectory>/feeds/published/` and compares the next validated
+candidate with them. The result is printed by `refresh` and, when the bytes
+differ, appended to `<stateDirectory>/feeds/change-history.jsonl` (the last
+1000 lines are kept). Each line holds, per source: old and new hashes and
+sizes, the last service date, and for `stops`, `routes`, `trips` and
+`stop_times` the number of added, removed and changed entries with a
+percentage of the previous count. `stop_times` is counted per trip. The
+headline `changePercent` is the largest of the four.
+
+Rows are compared by GTFS ID and column name, so reordered columns or rows are
+not a change. A publisher that renumbers its trip IDs on every export shows
+close to 200% for trips (all removed, all added); read the stop and route
+figures for such feeds. The first publication has no baseline and records
+counts only. To compare two feeds by hand:
+
+```sh
+python3 examples/native/feed_change.py previous.zip current.zip
+```
+
+The history is a record. It does not block publication; the gates above do.
+Prebuilt transit packs have no feed bytes on the host and record nothing.
+
+## Pinning
+
+`host.py pin --reason TEXT [--hours N]` holds publication for a bounded time
+(default 24 hours, maximum 168); `unpin` releases it and `pin-status` shows
+it. A pinned `refresh` still fetches, validates and prints the change against
+the published feeds, then stops before the producer. In prebuilt mode a pinned
+`refresh` skips the pack sync. See the native guide for when to use it.
+
 ## Cadence and retention
 
 `refresh-loop` defaults to hourly polling. `refreshIntervalSeconds` configures

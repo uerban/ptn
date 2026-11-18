@@ -29,7 +29,7 @@ import {
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
-import { ServiceAlertTripNotes } from "../ServiceAlerts/ServiceAlertTripNotes.tsx";
+import { RouteAlertMarker, RouteAlertsSummary, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
 
 const EMPTY_OVERRIDES = {};
 
@@ -65,6 +65,7 @@ export function RouteResultsPower({
     .filter((d) => d.minutes >= 2)
     .sort((a, b) => b.minutes - a.minutes);
   const topDelay = delays[0];
+  const alerts = useListAlerts(itineraries);
 
   return (
     <div className="font-mono">
@@ -85,6 +86,10 @@ export function RouteResultsPower({
           </span>
         </div>
       )}
+
+      {/* Each alert once per list, above the legend: the first row under
+          the legend is always a result. */}
+      <RouteAlertsSummary entries={alerts.all} />
 
       {/* Column legend */}
       <div
@@ -113,7 +118,6 @@ export function RouteResultsPower({
             ) : (
               it.timingUnreliable === true && <RtWarningBanner reason="unreliable" />
             )}
-            <ServiceAlertTripNotes itinerary={it} />
             <PowerCard
               it={it}
               fastest={i === 0}
@@ -123,6 +127,7 @@ export function RouteResultsPower({
               runSpeedRatio={runSpeedRatio}
               feedTz={feedTz}
             />
+            <RouteAlertMarker entries={alerts.perItinerary[i] ?? []} />
           </li>
         ))}
       </ul>

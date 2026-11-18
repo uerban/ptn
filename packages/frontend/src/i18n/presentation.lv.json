@@ -8,6 +8,7 @@
   "presentation.switchToText": "Pāriet uz teksta režīmu",
   "presentation.showMap": "Rādīt karti",
   "presentation.backToText": "Atgriezties pie teksta",
+  "presentation.switchToMap": "Pāriet uz kartes režīmu",
   "presentation.mapDisclosureHeading": "Rādīt karti?",
   "presentation.mapDisclosureBody": "Kartes faili tiek lejupielādēti vienreiz no šīs lietotnes servera un saglabāti šajā ierīcē, tādējādi karte vēlāk darbojas arī bezsaistē. Sākuma skats paliek teksta režīmā.",
   "presentation.mapDisclosureConfirm": "Lejupielādēt un parādīt karti",
@@ -129,5 +130,9 @@
   "placeSearch.show": "Adrešu meklēšana serverī",
   "placeSearch.heading": "Adrešu meklēšana serverī?",
   "placeSearch.details": "Kamēr jūs ievadāt vietas nosaukumu, lietotne nosūta jūsu ievadīto tekstu un meklējamo apgabalu uz šīs lietotnes serveri, kurš meklē atbilstošas adreses. Pieturas un vietas šajā ierīcē joprojām tiek meklētas šeit.",
-  "search.incompleteWalkingDistance": "Maršruti bez pilna iešanas attāluma ir saraksta beigās. Pēc iešanas laika aprēķinātie attālumi atzīmēti ar ~."
+  "search.incompleteWalkingDistance": "Maršruti bez pilna iešanas attāluma ir saraksta beigās. Pēc iešanas laika aprēķinātie attālumi atzīmēti ar ~.",
+  "serviceAlerts.onRoutes": "Brīdinājumi par šiem maršrutiem: {count}",
+  "serviceAlerts.affectsLines": "Pakalpojuma brīdinājums par līniju {lines}",
+  "serviceAlerts.sameAsAbove": "Tāds pats brīdinājums kā iepriekš",
+  "nearby.inHours": "pēc {time}"
 }
