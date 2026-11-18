@@ -249,6 +249,15 @@ pub fn load_tile_inputs(staging_dir: &Path) -> Result<TileInputs> {
     for ti in 0..num_trips {
         let lo = trip_starts[ti] as usize;
         let hi = trip_starts[ti + 1] as usize;
+        // GTFS frequencies.txt: a frequency trip's stop_times are a template.
+        // Each stop gets every window instance, shifted by its offset from the
+        // template's first departure; a quarantined one contributes nothing
+        // (the router does not run it either).
+        let is_frequency = reader.frequencies_for_trip(ti as u32).next().is_some();
+        if is_frequency && reader.frequency_trip_quarantined(ti as u32) {
+            continue;
+        }
+        let mut first_dep: Option<u32> = None;
         for (pos, row) in (lo..hi).enumerate() {
             let st = cursor
                 .stop_time_in_trip(&reader, ti, pos)
@@ -265,6 +274,15 @@ pub fn load_tile_inputs(staging_dir: &Path) -> Result<TileInputs> {
                     "stop_time row {row} references stop_idx={stop_idx} but stops table has only {num_stops} entries"
                 ))
             })?;
+            if is_frequency {
+                let first = *first_dep.get_or_insert(st.dep_secs);
+                let offset = st.dep_secs.saturating_sub(first);
+                for dep in reader.frequency_stop_departures(ti as u32, offset) {
+                    trip_idxs.push(ti as u32);
+                    deps.push(dep);
+                }
+                continue;
+            }
             trip_idxs.push(ti as u32);
             deps.push(st.dep_secs);
         }
@@ -403,6 +421,37 @@ mod tests {
             );
         }
         inputs
+    }
+
+    #[test]
+    fn frequency_trips_expand_to_every_headway_instance() {
+        // frequencies-parity.ptb: trip 0 template S0@25200 → S1@25500 with
+        // windows [21600, 86400) every 600 s and [86400, 108000) every 1800 s;
+        // trip 1 template S0@28800 → S1@29100, [36000, 72000) every 900 s.
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../packages/shared/src/ptb/__fixtures__/frequencies-parity.ptb"
+        );
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::copy(path, dir.path().join("bundle.ptb")).expect("copy fixture");
+        std::fs::write(dir.path().join("route-styles.json"), b"{}").expect("styles");
+        let inputs = load_tile_inputs(dir.path()).expect("loads");
+
+        let (trips, deps) = &inputs.stop_times[1];
+        let trip0: Vec<u32> = trips
+            .iter()
+            .zip(deps)
+            .filter(|(t, _)| **t == 0)
+            .map(|(_, d)| *d)
+            .collect();
+        let want0: Vec<u32> = (21600..86400)
+            .step_by(600)
+            .chain((86400..108000).step_by(1800))
+            .map(|s| s + 300)
+            .collect();
+        assert_eq!(trip0, want0);
+        assert_eq!(trips.iter().filter(|t| **t == 1).count(), 40);
+        assert!(deps.windows(2).all(|w| w[0] <= w[1]));
     }
 
     #[test]
