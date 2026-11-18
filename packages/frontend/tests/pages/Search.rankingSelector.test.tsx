@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
 import { useRoutingStore } from "../../src/stores/routingStore.ts";
@@ -16,46 +16,55 @@ function renderSearch(searchParams = "") {
   return result;
 }
 
+const openSheet = () => {
+  fireEvent.click(screen.getByTestId("sort-summary"));
+  return within(screen.getByRole("dialog", { name: "Sort" }));
+};
+
 describe("Search ranking selector", () => {
   beforeEach(() => {
     useRoutingStore.setState({ ranking: "fastest", results: [], error: null, loading: false });
   });
 
-  it("renders all three ranking buttons", () => {
+  it("says the current ranking on one chip and hides the choices until opened", () => {
     renderSearch();
-    expect(screen.getByText("Fastest")).toBeInTheDocument();
-    expect(screen.getByText("Fewest transfers")).toBeInTheDocument();
-    expect(screen.getByText("Least walking")).toBeInTheDocument();
+    const chip = screen.getByTestId("sort-summary");
+    expect(chip).toHaveAccessibleName("Sort: Fastest");
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Fewest transfers")).not.toBeInTheDocument();
   });
 
-  it("highlights the active ranking", () => {
+  it("offers all three rankings and marks the active one", () => {
     renderSearch();
-    const fastestBtn = screen.getByText("Fastest");
-    expect(fastestBtn).toHaveAttribute("aria-pressed", "true");
-
-    const fewestBtn = screen.getByText("Fewest transfers");
-    expect(fewestBtn).toHaveAttribute("aria-pressed", "false");
+    const sheet = openSheet();
+    expect(screen.getByTestId("sort-summary")).toHaveAttribute("aria-expanded", "true");
+    expect(sheet.getByRole("button", { name: "Fastest" })).toHaveAttribute("aria-pressed", "true");
+    expect(sheet.getByRole("button", { name: "Fewest transfers" })).toHaveAttribute("aria-pressed", "false");
+    expect(sheet.getByRole("button", { name: "Least walking" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("updates store when clicking a different ranking", () => {
+  it.each([
+    ["Fewest transfers", "fewest_transfers"],
+    ["Least walking", "least_walking"],
+  ] as const)("picking %s applies it and closes the sheet", (name, ranking) => {
     renderSearch();
-    fireEvent.click(screen.getByText("Fewest transfers"));
-    expect(useRoutingStore.getState().ranking).toBe("fewest_transfers");
+    fireEvent.click(openSheet().getByRole("button", { name }));
+    expect(useRoutingStore.getState().ranking).toBe(ranking);
+    expect(screen.queryByRole("dialog", { name: "Sort" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("sort-summary")).toHaveAccessibleName(`Sort: ${name}`);
   });
 
-  it("updates store to least_walking", () => {
+  it("closing without a choice keeps the ranking", () => {
     renderSearch();
-    fireEvent.click(screen.getByText("Least walking"));
-    expect(useRoutingStore.getState().ranking).toBe("least_walking");
+    fireEvent.click(openSheet().getByRole("button", { name: "Close" }));
+    expect(useRoutingStore.getState().ranking).toBe("fastest");
+    expect(screen.queryByRole("dialog", { name: "Sort" })).not.toBeInTheDocument();
   });
 
-  it("reflects store changes in button styling", () => {
+  it("reflects a ranking set elsewhere", () => {
     useRoutingStore.setState({ ranking: "least_walking" });
     renderSearch();
-    const leastWalkingBtn = screen.getByText("Least walking");
-    expect(leastWalkingBtn).toHaveAttribute("aria-pressed", "true");
-
-    const fastestBtn = screen.getByText("Fastest");
-    expect(fastestBtn).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("sort-summary")).toHaveAccessibleName("Sort: Least walking");
+    expect(openSheet().getByRole("button", { name: "Least walking" })).toHaveAttribute("aria-pressed", "true");
   });
 });

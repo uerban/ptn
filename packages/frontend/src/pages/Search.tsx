@@ -58,7 +58,8 @@ import { forgetRecent, recordRecent, type RecentTarget } from "../services/recen
 import { savePlace } from "../services/saves.ts";
 import { RecentRow } from "../components/Search/RecentRow.tsx";
 import { RecentNotice, type RecentNoticeState } from "../components/Search/RecentNotice.tsx";
-import { searchChipClass } from "../components/Search/searchChip.ts";
+import { searchBadgeChipClass, searchChipClass } from "../components/Search/searchChip.ts";
+import { SortChip } from "../components/Search/SortChip.tsx";
 import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByEntry.ts";
 import { resolveTransitLegDisplay } from "../services/legEnrichment.ts";
 
@@ -1456,11 +1457,12 @@ export function SearchPage() {
     </>
   );
 
-  // Vehicle filter chips. They sit beside the time summary; without the
-  // arrive-by package they keep a row of their own.
+  // Vehicle filters, on their own row under the time and sort chips. A mode
+  // is its badge alone, so every mode stays in sight; route groups share their
+  // mode's badge and keep their names.
   const vehicleFilters = (availableModes.length >= 2 || availableRouteGroups.length >= 2) ? (
     <div
-      className="flex shrink-0 gap-1.5 max-[359px]:flex-wrap max-[359px]:shrink"
+      className="flex flex-wrap gap-1.5"
       role="group"
       aria-label={t("search.filter_modes", "Filter by vehicle type")}
     >
@@ -1478,28 +1480,32 @@ export function SearchPage() {
         });
         const isExcluded = excludedModes.includes(mode);
         const config = MODE_CONFIG[mode];
+        const name = t(`settings.mode_${mode.toLowerCase()}`, config.label);
         return (
           <button
             key={mode}
+            type="button"
             onClick={() => toggleMode(mode)}
             aria-pressed={!isExcluded}
-            className={vehicleChipClass(isExcluded)}
-            title={t(`settings.mode_${mode.toLowerCase()}`, config.label)}
+            aria-label={name}
+            className={searchBadgeChipClass(isExcluded)}
+            title={name}
           >
             <TransportModeIcon mode={mode} size="sm" />
-            <span>{t(`settings.mode_${mode.toLowerCase()}`, config.label)}</span>
           </button>
         );
       })}
     </div>
   ) : null;
+  const sortChip = <SortChip value={ranking} onChange={setRanking} />;
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-y-auto bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
       {/* Search header — stacked from/to inputs with vertical swap button.
           Padding stops growing past 16px so the fields keep their width at
           large text sizes. */}
-      <div className="shrink-0 bg-surface-raised p-[min(1rem,16px)] shadow-sm space-y-3">
+      <div className={`shrink-0 bg-surface-raised px-[min(1rem,16px)] pt-[min(1rem,16px)] shadow-sm space-y-3 ${
+        activeField ? "pb-[min(1rem,16px)]" : "pb-2 border-b border-divider"}`}>
         <div className="flex items-start gap-2">
           <button
             onClick={() => activeField ? closePicker() : navigate(-1)}
@@ -1622,47 +1628,23 @@ export function SearchPage() {
             recommendedInitial={paginationTime === null}
             departAt={paginationTime}
             onDepartAt={setPaginationTime}
+            sort={sortChip}
             filters={vehicleFilters}
           />
         )}
 
         {/* Route-only controls return after place picking. */}
-        {!activeField && !ArriveByToolbar && vehicleFilters && (
-          <div className="flex max-[359px]:flex-wrap overflow-x-auto pt-1 pb-0.5">{vehicleFilters}</div>
+        {!activeField && !ArriveByToolbar && (
+          <div className="space-y-1.5">
+            <div className="flex">{sortChip}</div>
+            {vehicleFilters}
+          </div>
         )}
       </div>
 
       {hasRouteRestrictions && routingMode === "remote-primary" && <p className="px-3 py-1 text-xs text-fg-muted">
         {t("search.vehicle_filter_local", "Use on-device planning for bus and minibus filters.")}
       </p>}
-
-      {/* Sort chips — pill-style, horizontally scrollable. Never squeezed:
-          a scrolling flex item may shrink to nothing when the header is tall. */}
-      {/* Wraps instead of scrolling on narrow screens and at large text. */}
-      {!activeField && <div
-        className="flex shrink-0 flex-wrap gap-1.5 px-3 py-2 bg-surface-raised border-b border-divider"
-        role="group"
-        aria-label={t("search.sort", "Sort")}
-      >
-        {(["fastest", "fewest_transfers", "least_walking"] as const).map((r) => {
-          const active = ranking === r;
-          return (
-            <button
-              key={r}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setRanking(r)}
-              className={searchChipClass(active ? "selected" : "idle")}
-            >
-              {r === "fastest"
-                ? t("search.fastest", "Fastest")
-                : r === "fewest_transfers"
-                  ? t("search.fewest_transfers", "Fewest transfers")
-                  : t("search.least_walking", "Least walking")}
-            </button>
-          );
-        })}
-      </div>}
 
       {/* Search results or route results */}
       {/* At large text sizes the header and toolbar can be taller than the

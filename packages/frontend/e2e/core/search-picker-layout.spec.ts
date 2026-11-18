@@ -53,30 +53,43 @@ test.describe("compact place picker @mock-api", () => {
     await page.getByRole("button", { name: "Swap origin and destination", exact: true }).click();
     await expect(page.getByRole("searchbox", { name: "From", exact: true })).toHaveValue("Airport");
     await expect(page.getByRole("searchbox", { name: "Where to?", exact: true })).toHaveValue("My location");
-    await expect(page.getByRole("tablist", { name: "Sort", exact: true })).toBeVisible();
+    await expect(page.getByTestId("sort-summary")).toBeVisible();
     await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose on map", exact: true })).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath("search-gps-swap.png") });
   });
-  test("large text: the header stays short and the sort tabs are not squeezed", async ({ page }) => {
+  test("narrow phone: time and sort share one row with no gap below the header", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 692 });
+    await page.goto("/search?toName=Airport&toLat=54.6&toLon=25.3");
+    const sort = page.getByTestId("sort-summary");
+    await expect(sort).toBeVisible();
+    const layout = await sort.evaluate((chip) => {
+      const box = chip.getBoundingClientRect();
+      const time = document.querySelector('[data-testid="when-summary"]')?.getBoundingClientRect();
+      const toolbar = chip.closest('[data-testid="arrive-by-toolbar"]');
+      const header = (toolbar ?? chip).parentElement!.getBoundingClientRect();
+      return { sameRow: !time || time.top === box.top, below: header.bottom - (toolbar ?? chip).getBoundingClientRect().bottom,
+        scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth };
+    });
+    expect(layout.sameRow).toBe(true);
+    expect(layout.below).toBeLessThanOrEqual(9);
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
+  });
+  test("large text: the header stays short and the sort chip is not squeezed", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 700 });
     await page.addInitScript(() => {
       document.addEventListener("DOMContentLoaded", () => { document.documentElement.style.fontSize = "135%"; });
     });
     await page.goto("/search?toName=Airport&toLat=54.6&toLon=25.3");
-    const tabs = page.getByRole("tablist", { name: "Sort", exact: true });
-    await expect(tabs).toBeVisible();
-    const layout = await tabs.evaluate((list) => {
-      const tab = list.querySelector('[role="tab"]')!.getBoundingClientRect();
-      const box = list.getBoundingClientRect();
-      return { tab: tab.height, top: tab.top - box.top, room: box.bottom - tab.bottom,
-        header: box.bottom - list.parentElement!.getBoundingClientRect().top,
+    const sort = page.getByTestId("sort-summary");
+    await expect(sort).toBeVisible();
+    const layout = await sort.evaluate((chip) => {
+      const box = chip.getBoundingClientRect();
+      return { chip: box.height, header: box.bottom,
         scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth, height: window.innerHeight };
     });
-    // The whole tab is inside its row, and the header with the tabs takes less than half the screen.
-    expect(layout.tab).toBeGreaterThanOrEqual(24);
-    expect(layout.top).toBeGreaterThanOrEqual(0);
-    expect(layout.room).toBeGreaterThanOrEqual(0);
+    // The chip keeps its height, and the controls end in the top half of the screen.
+    expect(layout.chip).toBeGreaterThanOrEqual(40);
     expect(layout.header).toBeLessThan(layout.height / 2);
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
     const summary = page.getByTestId("when-summary");
@@ -85,7 +98,7 @@ test.describe("compact place picker @mock-api", () => {
       await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toHaveCount(0);
       await summary.click();
       await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toBeVisible();
-      await expect(tabs.getByRole("tab").first()).toBeVisible();
+      await expect(page.getByTestId("when-sheet")).toBeVisible();
     }
     await page.screenshot({ path: test.info().outputPath("search-large-text-header.png") });
   });

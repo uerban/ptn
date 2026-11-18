@@ -207,13 +207,14 @@ describe("Arrive-by toolbar", () => {
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
   });
 
-  it("is one summary button beside the filters until opened", () => {
+  it("is one summary button beside the sort chip until opened", () => {
     render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial
-      filters={<button type="button">Bus</button>} /></MemoryRouter>);
+      sort={<button type="button">Fastest</button>} filters={<button type="button">Bus</button>} /></MemoryRouter>);
     const summary = screen.getByTestId("when-summary");
     expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Bus" }));
+    expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Fastest" }));
+    expect(summary.parentElement).not.toContainElement(screen.getByRole("button", { name: "Bus" }));
     expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
     fireEvent.click(summary);
