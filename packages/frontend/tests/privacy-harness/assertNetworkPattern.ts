@@ -96,7 +96,10 @@ const KIND_MATCHERS: Array<{ kind: RequestKind; test: (url: string) => boolean }
       /\.(pbf|mvt)(\?|$)/.test(u) ||
       /\/\d+\/\d+\/\d+\.(png|jpg|webp)(\?|$)/.test(u),
   },
-  { kind: "poi-bundle", test: (u) => /\/(poi|pois)\//.test(u) },
+  // Same trap as micromap: under the dev server the app's own POI modules
+  // (/@fs/.../shared/dist/poi/index.js) share the path segment, so the count
+  // tracked the module graph instead of data fetches. Skip script modules.
+  { kind: "poi-bundle", test: (u) => /\/(poi|pois)\//.test(u) && !/\.(m?[jt]sx?)(\?|$)/.test(u) },
 ];
 
 export function classifyRequest(url: string): RequestKind {
