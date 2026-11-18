@@ -351,7 +351,14 @@ fn split_at_junctions(g: &Geom, p: &WalkPath, runs: Vec<Run>) -> Vec<Run> {
         let end = g.end(&r);
         // (point, own turn) of each candidate, in path order.
         let cands: Vec<(usize, f64)> = (r.first + 1..=r.last)
-            .filter(|&k| choices.get(k).copied().unwrap_or(0) >= 3)
+            .filter(|&k| {
+                // A connector outside the graph is not a named street
+                // junction. Exact attachment ties can retain either the
+                // junction's count or the foot's zero for identical geometry.
+                choices.get(k).copied().unwrap_or(0) >= 3
+                    && p.segments[k - 1].is_some()
+                    && p.segments[k].is_some()
+            })
             .map(|k| (k, g.turn(g.cum[k], g.cum[k], end)))
             .filter(|&(_, t)| t.abs() >= JUNCTION_TURN_DEG)
             .collect();
@@ -411,8 +418,10 @@ fn special_turn(g: &Geom, r: &Run) -> Option<Turn> {
 /// Walking directions for `p`: Depart, one step per run, Arrive. The step
 /// distances sum to `p.distance_m`.
 ///
-/// Reads `p.choices` to find junctions inside a run; when its length does
-/// not match `p.points` (a hand-built path), every point counts as 0.
+/// Reads `p.choices` to find junctions traversed on the network on both
+/// sides. Off-network attachment links do not create named junction turns.
+/// When its length does not match `p.points` (a hand-built path), every
+/// point counts as 0.
 ///
 /// An empty path (no points) has no directions and returns `[]`; a
 /// one-point path is Depart 0 m + Arrive. `WalkIndex::route` always returns
@@ -778,6 +787,38 @@ mod tests {
         let s = steps(&one);
         assert_eq!(kinds(&s), vec![StepKind::Depart, StepKind::Arrive]);
         assert_eq!((s[0].start_index, s[1].start_index), (0, 0));
+    }
+
+    #[test]
+    fn an_off_network_arrival_link_is_not_a_named_street_junction() {
+        let p = with_choices(
+            &[(0.0, 0.0), (100.0, 0.0), (100.0, 60.0)],
+            &[Some(A), None],
+            &[0, 3, 0],
+        );
+        let mut tied = p.clone();
+        tied.choices[1] = 0;
+        let directions = steps(&p);
+        assert_eq!(kinds(&directions), vec![StepKind::Depart, StepKind::Arrive]);
+        assert_eq!(directions, steps(&tied));
+        assert!((directions[0].distance_m - p.distance_m).abs() < 1e-6);
+        assert_eq!(directions[1].start_index, 2);
+    }
+
+    #[test]
+    fn an_off_network_departure_link_is_not_a_named_street_junction() {
+        let p = with_choices(
+            &[(0.0, 0.0), (100.0, 0.0), (100.0, 60.0)],
+            &[None, Some(A)],
+            &[0, 3, 0],
+        );
+        let mut tied = p.clone();
+        tied.choices[1] = 0;
+        let directions = steps(&p);
+        assert_eq!(kinds(&directions), vec![StepKind::Depart, StepKind::Arrive]);
+        assert_eq!(directions, steps(&tied));
+        assert!((directions[0].distance_m - p.distance_m).abs() < 1e-6);
+        assert_eq!(directions[1].start_index, 2);
     }
 
     #[test]
