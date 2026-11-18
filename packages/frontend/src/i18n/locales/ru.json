@@ -577,6 +577,8 @@
   "settings.search_dismiss_scroll_desc": "Закрывать клавиатуру при прокрутке предложений мест или сохраненных элементов.",
   "settings.search_layout": "Макет поиска · временные параметры",
   "search.saved_places_trips": "Сохраненные места и маршруты",
+  "search.saved_remove": "Удалить из сохранённых",
+  "search.saved_removed": "{label} удалено из сохранённых",
   "search.saved_show_less": "Показать меньше сохраненных элементов",
   "search.saved_show_all": "Показать все сохраненные элементы ({n})",
   "search.edit_destination": "Редактировать пункт назначения",
