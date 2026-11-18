@@ -159,9 +159,11 @@ function DepartureRow({
   onSelectStop: (stop: Stop) => void;
 }) {
   const { departure, minutes, stop } = pill;
-  const { formattingLocale } = useTranslation();
+  const { formattingLocale, t } = useTranslation();
   const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
-  const clock = minutes > 0 ? waitClock(minutes, minutesOnly) : null;
+  const clock = minutes > 0
+    ? waitClock(minutes, minutesOnly, { hour: t("time.h", "h"), minute: t("time.min", "min") })
+    : null;
   const when = minutes <= 0
     ? text("nearby.due")
     : clock

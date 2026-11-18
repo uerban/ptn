@@ -53,6 +53,7 @@
   "trip.removed": "Гэтага рэйса больш няма ў раскладзе",
   "trip.all_departures": "Усе адпраўленні адсюль",
   "trip.show_on_map": "Паказаць на мапе",
+  "time.h": "гадз",
   "time.min": "хв",
   "unit.meters_compact": "{n} м",
   "unit.meters": "{n} м",

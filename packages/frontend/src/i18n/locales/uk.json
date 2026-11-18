@@ -53,6 +53,7 @@
   "trip.removed": "Цього рейсу більше немає в розкладі",
   "trip.all_departures": "Усі відправлення звідси",
   "trip.show_on_map": "Показати на карті",
+  "time.h": "год",
   "time.min": "хв",
   "unit.meters_compact": "{n} м",
   "unit.meters": "{n} м",
