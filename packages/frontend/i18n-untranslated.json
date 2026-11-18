@@ -9,6 +9,8 @@
     "route.bar_ride_title",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_funicular",
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
@@ -25,6 +27,8 @@
     "route.bar_ride_title",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_funicular",
     "settings.mode_metro",
     "settings.scheme_deuteranopia",
@@ -42,6 +46,8 @@
     "route.bar_ride_title",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_metro",
     "time.min",
     "unit.meters"
@@ -55,6 +61,8 @@
     "route.walk",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_funicular",
     "settings.mode_metro",
     "time.h",
@@ -73,6 +81,8 @@
     "route.bar_ride_title",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_funicular",
     "settings.mode_scooter",
     "settings.scheme_tritanopia",
@@ -97,6 +107,8 @@
     "route.bar_ride_title",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_metro",
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
@@ -109,6 +121,8 @@
     "popup.live",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "walk.step.arrive"
   ],
   "sv": [
@@ -125,6 +139,8 @@
     "route.destination",
     "search.live",
     "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label",
     "settings.mode_scooter",
     "theme.system",
     "time.min",
@@ -133,6 +149,12 @@
   "uk": [
     "popup.live",
     "search.live",
-    "search.poi_badge"
+    "search.poi_badge",
+    "search.saved_rename",
+    "search.saved_rename_label"
+  ],
+  "be": [
+    "search.saved_rename",
+    "search.saved_rename_label"
   ]
 }

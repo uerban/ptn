@@ -592,6 +592,8 @@
   "settings.search_layout": "Search layout · temporary options",
   "search.saved_places_trips": "Saved places and trips",
   "search.saved_remove": "Remove from saved",
+  "search.saved_rename": "Rename",
+  "search.saved_rename_label": "Name for {label}",
   "search.saved_removed": "Removed {label} from saved",
   "search.saved_show_less": "Show fewer saved items",
   "search.saved_show_all": "Show all saved items ({n})",

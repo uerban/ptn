@@ -13,22 +13,28 @@ export interface RecentRowProps {
   label: string;
   /** The row's own option button. */
   children: ReactNode;
-  /** Absent for rows that are already saved: the menu then offers Remove only. */
+  /** Recents only: save the place. */
   onSave?: () => void;
+  /** Saved rows only: rename the save. */
+  onRename?: () => void;
   onRemove: () => void;
   text: {
     actions: string;
     save?: string;
+    rename?: string;
     remove: string;
   };
 }
 
 /**
- * A recent or saved row with Save (recents only) and Remove. The visible ⋯ menu is the main
- * path and works with keyboard and screen readers; on touch, swipe right saves,
- * swipe left removes and a long press opens the same menu.
+ * A recent or saved row with Save (recents) or Rename (saved rows), and Remove.
+ * The visible ⋯ menu is the main path and works with keyboard and screen
+ * readers; on touch, swipe right saves or renames, swipe left removes and a
+ * long press opens the same menu.
  */
-export function RecentRow({ label, children, onSave, onRemove, text }: RecentRowProps) {
+export function RecentRow({ label, children, onSave, onRename, onRemove, text }: RecentRowProps) {
+  const onRight = onSave ?? onRename;
+  const rightLabel = onSave ? text.save : text.rename;
   const [open, setOpen] = useState(false);
   const [dx, setDx] = useState(0);
   const menuId = useId();
@@ -95,8 +101,8 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
       if (g.timer) clearTimeout(g.timer);
       g.timer = null;
     }
-    // Without Save, a right swipe has nothing to do: keep the row still.
-    const next = onSave ? mx : Math.min(mx, 0);
+    // Without Save or Rename, a right swipe has nothing to do: keep the row still.
+    const next = onRight ? mx : Math.min(mx, 0);
     g.dx = next;
     setDx(next);
   };
@@ -105,7 +111,7 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
     const g = gesture.current;
     if (g?.dragging) {
       suppressClick.current = true;
-      if (g.dx >= SWIPE_COMMIT_PX) onSave?.();
+      if (g.dx >= SWIPE_COMMIT_PX) onRight?.();
       else if (g.dx <= -SWIPE_COMMIT_PX) onRemove();
     }
     endGesture();
@@ -142,7 +148,7 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
             reveal === "save" ? "justify-start bg-accent text-badge-text" : "justify-end bg-danger text-badge-text"
           }`}
         >
-          {reveal === "save" ? text.save : text.remove}
+          {reveal === "save" ? rightLabel : text.remove}
         </div>
       )}
       <div
@@ -190,17 +196,18 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
           onKeyDown={onMenuKeyDown}
           className="absolute right-2 top-full z-20 -mt-1 min-w-40 rounded-lg border border-divider bg-surface-raised py-1 shadow-2"
         >
-          {onSave && (
+          {onRight && (
             <button
               type="button"
               role="menuitem"
               onClick={() => {
-                close(true);
-                onSave();
+                // Rename moves focus into its field, so only Save refocuses ⋯.
+                close(!!onSave);
+                onRight();
               }}
               className="block w-full min-h-11 px-4 text-left text-sm text-fg hover:bg-surface-overlay focus:bg-surface-overlay focus:outline-none"
             >
-              {text.save}
+              {rightLabel}
             </button>
           )}
           <button
