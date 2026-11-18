@@ -1258,6 +1258,27 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Reader<B> {
         }
     }
 
+    /// Departure times (service-day seconds) of a frequency-based trip at one
+    /// of its stops: `start + n * headway + offset_secs` for every window, with
+    /// `start + n * headway < end` (GTFS half-open end). `offset_secs` is the
+    /// stop's template departure minus the template's first departure. Empty
+    /// when `trip_idx` has no frequency rows; zero-headway rows are skipped.
+    ///
+    /// GTFS reference: <https://gtfs.org/documentation/schedule/reference/#frequenciestxt>
+    pub fn frequency_stop_departures(
+        &self,
+        trip_idx: u32,
+        offset_secs: u32,
+    ) -> impl Iterator<Item = u32> + '_ {
+        self.frequencies_for_trip(trip_idx)
+            .filter(|f| f.headway_secs > 0 && f.start_secs < f.end_secs)
+            .flat_map(move |f| {
+                (f.start_secs..f.end_secs)
+                    .step_by(usize::from(f.headway_secs))
+                    .filter_map(move |s| s.checked_add(offset_secs))
+            })
+    }
+
     /// `true` when this bundle carries an explicit `0x01 WindowMeta` region (i.e.
     /// the producer emitted a non-default `windowDays`). `false` ⇒ the region was
     /// ABSENT and `window_days()` floored to `WINDOW_DEFAULT_DAYS` (90) — which is

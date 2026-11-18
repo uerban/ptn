@@ -320,6 +320,20 @@ pub(crate) struct DeparturesCore {
     pub rows: Vec<DepartureRow>,
 }
 
+/// First timed departure of trip `t` (its template origin for frequencies).
+fn trip_first_dep(gen: &Generation, t: usize) -> Option<u32> {
+    let starts = gen.reader.trip_starts().ok()?;
+    let (lo, hi) = (*starts.get(t)? as usize, *starts.get(t + 1)? as usize);
+    (0..hi.saturating_sub(lo)).find_map(|pos| {
+        let st = match gen.stop_time_cursor.as_ref() {
+            Some(c) => c.stop_time_in_trip(&gen.reader, t, pos),
+            None => gen.reader.stop_time(lo + pos),
+        }
+        .ok()?;
+        (st.dep_secs != MISSING_DEP_SECS).then_some(st.dep_secs)
+    })
+}
+
 pub(crate) fn compute_departures(
     query: &str,
     gen: &Generation,
@@ -474,6 +488,8 @@ pub(crate) fn compute_departures(
     // --- 7. Collect in-window survivors (departure projected + filtered) ---
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut scanned: u64 = 0;
+    let has_frequencies = gen.reader.has_frequencies();
+    let mut first_dep_cache: HashMap<u32, Option<u32>> = HashMap::new();
     if !window_outside_service_range {
         for &date in &candidate_dates {
             // Per-date safepoint. Free (at most a handful of iterations) and it
@@ -531,6 +547,39 @@ pub(crate) fn compute_departures(
                 };
                 if !gen.reader.service_active_on(svc, ymd) {
                     continue;
+                }
+                // A frequency-based trip's stop_times are a template: its
+                // departures here are every window instance shifted by this
+                // stop's offset from the template's first departure (GTFS
+                // frequencies.txt). The template time itself is not a run.
+                if has_frequencies {
+                    if gen.reader.frequency_trip_quarantined(trip_idx) {
+                        continue;
+                    }
+                    if gen.reader.frequencies_for_trip(trip_idx).next().is_some() {
+                        let first = *first_dep_cache
+                            .entry(trip_idx)
+                            .or_insert_with(|| trip_first_dep(gen, trip_idx as usize));
+                        let Some(first) = first else { continue };
+                        let offset = st.dep_secs.saturating_sub(first);
+                        for dep_secs in gen.reader.frequency_stop_departures(trip_idx, offset) {
+                            let Ok(dep) = service_day_to_unix(date, i64::from(dep_secs), tz) else {
+                                continue;
+                            };
+                            if dep < from || dep >= to {
+                                continue;
+                            }
+                            candidates.push(Candidate {
+                                trip_idx,
+                                stop_seq: st.stop_seq,
+                                date,
+                                dep_secs,
+                                arr_diff: st.arr_diff,
+                                dep,
+                            });
+                        }
+                        continue;
+                    }
                 }
                 // DEPARTURE projection stays inline — it is the filter key.
                 let dep = match service_day_to_unix(date, i64::from(st.dep_secs), tz) {

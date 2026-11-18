@@ -40,7 +40,7 @@ import { TransferBadge } from "../components/Map/TransferBadge.tsx";
 import { useWatchPosition } from "../hooks/useWatchPosition.ts";
 import { useDeviceHeading } from "../hooks/useDeviceHeading.ts";
 import { useMapGuidance } from "../hooks/useMapGuidance.ts";
-import { findStopContextCandidates } from "../hooks/useRiderModeDetection.ts";
+import { useStopContextRiderPrompt } from "../hooks/useStopContextRiderPrompt.ts";
 import { useGuidanceSession } from "../components/Guidance/GuidanceSession.tsx";
 import { TextModeButton } from "../presentation/TextModeButton.tsx";
 import { WhatsNewCard } from "../components/WhatsNew/WhatsNewCard.tsx";
@@ -50,10 +50,7 @@ import { MapObstacle } from "../components/Map/MapObstacle.tsx";
 import { haversineDistance } from "../utils/geo.ts";
 import { useCityGtfsLifecycle } from "../hooks/useCityGtfsLifecycle.ts";
 import type { StopWithLines, FavoritePlace, RiderCandidate, Departure, Stop } from "@pt/shared";
-import {
-  GTFS_CLIENT_REFRESH_INTERVAL_MS,
-  PEDESTRIAN_SPEED_THRESHOLD_MS,
-} from "@pt/shared/constants";
+import { GTFS_CLIENT_REFRESH_INTERVAL_MS } from "@pt/shared/constants";
 
 // ---------------------------------------------------------------------------
 // Popup and sheet are independent — you can browse popups for different stops
@@ -133,39 +130,6 @@ export function HomePage({ onBackToText, onSwitchToMap, contextStop }: HomePageP
   // --- Rider dashboard data (progress tracking runs in GuidanceSessionProvider) ---
   const { currentLeg, upcomingStops, connectingDepartures } = useGuidanceSession();
 
-  // --- Stop-context rider mode prompt ---
-  const [stopContextCandidates, setStopContextCandidates] = useState<RiderCandidate[]>([]);
-  const lastViewedDeparturesRef = useRef<Departure[]>([]);
-
-  // Monitor speed to trigger the rider mode prompt when a user boards a vehicle
-  useEffect(() => {
-    // Only detect when not already navigating or in rider mode
-    if (guidancePhase !== "idle") {
-      setStopContextCandidates([]);
-      return;
-    }
-
-    const speed = watchPos.speed;
-    if (speed === null || speed < PEDESTRIAN_SPEED_THRESHOLD_MS) return;
-
-    const recentDepartures = lastViewedDeparturesRef.current;
-    if (recentDepartures.length > 0) {
-      const candidates = findStopContextCandidates(recentDepartures, new Date());
-      if (candidates.length > 0 && candidates.length <= 3) {
-        setStopContextCandidates(candidates);
-      }
-    }
-  }, [watchPos.speed, guidancePhase]);
-
-  const handleRiderModeSelect = useCallback((candidate: RiderCandidate) => {
-    useGuidanceStore.getState().enterRiderMode("stopContext", candidate.tripId);
-    setStopContextCandidates([]);
-  }, []);
-
-  const handleRiderModeDismiss = useCallback(() => {
-    setStopContextCandidates([]);
-  }, []);
-
   // --- Line view coordination -----------------------------------------------
   const lineViewVisible = useLineViewStore((s) => s.isVisible);
   const lineViewRouteId = useLineViewStore((s) => s.activeRouteId);
@@ -190,12 +154,19 @@ export function HomePage({ onBackToText, onSwitchToMap, contextStop }: HomePageP
   const { departures: popupDepartures, loading: popupLoading } =
     useDepartures(popupStop?.id ?? null, false, 1.5, { hedge: true });
 
-  // Track last-viewed departures from popup for stop-context rider mode
-  useEffect(() => {
-    if (popupDepartures.length > 0) {
-      lastViewedDeparturesRef.current = popupDepartures;
-    }
-  }, [popupDepartures]);
+  // --- Stop-context rider mode prompt ---
+  const riderPrompt = useStopContextRiderPrompt({
+    stop: popupStop,
+    departures: popupDepartures,
+    position: geoPosition,
+    speed: watchPos.speed,
+    phase: guidancePhase,
+  });
+  const dismissRiderPrompt = riderPrompt.dismiss;
+  const handleRiderModeSelect = useCallback((candidate: RiderCandidate) => {
+    useGuidanceStore.getState().enterRiderMode("stopContext", candidate.tripId);
+    dismissRiderPrompt();
+  }, [dismissRiderPrompt]);
 
   // --- Handlers ------------------------------------------------------------
   // One line loader for the stop popup and the trip sheet: opening either
@@ -510,15 +481,15 @@ export function HomePage({ onBackToText, onSwitchToMap, contextStop }: HomePageP
       )}
 
       {/* Stop-context rider mode prompt */}
-      {stopContextCandidates.length > 0 && (
+      {riderPrompt.candidates.length > 0 && (
         <MapObstacle
           id="rider-mode-prompt"
           className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30"
         >
           <RiderModePrompt
-            candidates={stopContextCandidates}
+            candidates={riderPrompt.candidates}
             onSelect={handleRiderModeSelect}
-            onDismiss={handleRiderModeDismiss}
+            onDismiss={dismissRiderPrompt}
           />
         </MapObstacle>
       )}

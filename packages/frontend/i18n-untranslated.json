@@ -13,6 +13,7 @@
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
     "settings.scheme_tritanopia",
+    "time.h",
     "time.min",
     "unit.meters"
   ],
@@ -29,6 +30,7 @@
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
     "settings.scheme_tritanopia",
+    "time.h",
     "time.min",
     "unit.meters"
   ],
@@ -55,6 +57,7 @@
     "search.poi_badge",
     "settings.mode_funicular",
     "settings.mode_metro",
+    "time.h",
     "time.min",
     "unit.meters"
   ],

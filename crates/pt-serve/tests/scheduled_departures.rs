@@ -534,6 +534,106 @@ fn loop_trip_two_departures_no_dedup() {
     assert_eq!(deps[1]["scheduledDepartureSecs"], DEP_0830);
 }
 
+/// Append a `0x17 Frequencies` region (`(trip, start, end, headway)` rows,
+/// inexact) to a built bundle, as the producer does for `frequencies.txt`.
+fn with_frequencies(mut buf: Vec<u8>, rows: &[(u32, u32, u32, u16)]) -> Vec<u8> {
+    let mut body = (rows.len() as u32).to_le_bytes().to_vec();
+    for &(trip, start, end, headway) in rows {
+        body.extend_from_slice(&trip.to_le_bytes());
+        body.extend_from_slice(&start.to_le_bytes());
+        body.extend_from_slice(&end.to_le_bytes());
+        body.extend_from_slice(&headway.to_le_bytes());
+        body.extend_from_slice(&[0, 0]);
+    }
+    let off = buf.len().div_ceil(4096) * 4096;
+    buf.resize((off + body.len()).div_ceil(4096) * 4096, 0);
+    buf[off..off + body.len()].copy_from_slice(&body);
+    let mut e = 32;
+    while u16::from_le_bytes([buf[e], buf[e + 1]]) != 0 {
+        e += 24;
+    }
+    buf[e..e + 2].copy_from_slice(&pt_core::region_ids::FREQUENCIES.to_le_bytes());
+    buf[e + 8..e + 16].copy_from_slice(&(off as u64).to_le_bytes());
+    buf[e + 16..e + 24].copy_from_slice(&(body.len() as u64).to_le_bytes());
+    buf
+}
+
+#[test]
+fn frequency_trip_expands_to_every_headway_instance() {
+    // T_FREQ is a template (S1@08:00 → S2@08:10) run every 10 min from 08:00
+    // to 08:30 (end excluded): 08:00, 08:10, 08:20. At S2 each is +10 min.
+    // T_SCHED is an ordinary trip at S2@08:35 and must stay as-is.
+    let mut feed = publisher::build_feed_ptb(
+        &["S1", "S2"],
+        &[RouteSpec {
+            route_id: "R_METRO",
+            short_name: "1",
+            route_type: 1,
+            color: "FF0000",
+            text_color: "FFFFFF",
+        }],
+        &[
+            TripSpec {
+                trip_id: "T_FREQ",
+                headsign: "North",
+                route_idx: 0,
+                service_idx: 0,
+                direction_id: 0,
+                wheelchair: 0,
+                stop_times: vec![(1, 0, 28800, 0), (2, 1, 29400, 0)],
+            },
+            TripSpec {
+                trip_id: "T_SCHED",
+                headsign: "North",
+                route_idx: 0,
+                service_idx: 0,
+                direction_id: 0,
+                wheelchair: 0,
+                stop_times: vec![(1, 0, 30600, 0), (2, 1, 30900, 0)],
+            },
+        ],
+        &[all_active_mask()],
+        FEED_START,
+        VILNIUS_TZ_OFFSET,
+    );
+    feed.bytes = with_frequencies(feed.bytes, &[(0, 28800, 30600, 600)]);
+    let s1 = vec![(0u32, feed.abs_rows[0][0]), (1u32, feed.abs_rows[1][0])];
+    let s2 = vec![(0u32, feed.abs_rows[0][1]), (1u32, feed.abs_rows[1][1])];
+    let dpix = publisher::build_departures_idx_csr(&feed.bytes, &[s1, s2]);
+    let h = build_harness(&feed, Some(dpix));
+
+    let q = format!("stopId=S2&from={}&to={}", DEP_0800, DEP_0900);
+    let (status, v) = json_resp(scheduled_departures(&q, &h.gen, &h.ctx, None));
+    assert_eq!(status, 200, "{v}");
+    let got: Vec<(String, i64)> = v["departures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| {
+            (
+                d["tripId"].as_str().unwrap().to_string(),
+                d["scheduledDepartureSecs"].as_i64().unwrap(),
+            )
+        })
+        .collect();
+    let want: Vec<(String, i64)> = [
+        ("T_FREQ", DEP_0810),
+        ("T_FREQ", DEP_0810 + 600),
+        ("T_FREQ", DEP_0810 + 1200),
+        ("T_SCHED", DEP_0800 + 2100),
+    ]
+    .iter()
+    .map(|&(t, d)| (t.to_string(), d))
+    .collect();
+    assert_eq!(got, want, "{v}");
+
+    // The public route applies the same expansion.
+    let q = format!("stopId=S2&from={}&to={}", DEP_0800, DEP_0900);
+    let (status, v) = json_resp(departures_for_stop(&q, &h.gen, &h.ctx, None, None));
+    assert_eq!(status, 200, "{v}");
+    assert_eq!(v["data"].as_array().unwrap().len(), 4, "{v}");
+}
+
 // ---------------------------------------------------------------------------
 // (l) overnight (25:30) crossing the civil-date boundary surfaces in a
 //     midnight-straddling window

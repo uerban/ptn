@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { usePickerViewport } from "./SearchPickerLayout.ts";
+import { useKeyboardOpen, usePickerViewport } from "./SearchPickerLayout.ts";
 const original = Object.getOwnPropertyDescriptor(window, "visualViewport");
 afterEach(() => {
   if (original) Object.defineProperty(window, "visualViewport", original);
@@ -25,5 +25,15 @@ describe("search visual viewport fit", () => {
     Object.defineProperty(window, "visualViewport", { configurable: true, value: undefined });
     const { result } = renderHook(() => usePickerViewport(true));
     expect(result.current).toMatchObject({ height: window.innerHeight, width: window.innerWidth, top: 0, left: 0 });
+  });
+  it("reports the keyboard only while the visual viewport is clearly shorter", () => {
+    const viewport = Object.assign(new EventTarget(), { width: 360, height: window.innerHeight, offsetTop: 0, offsetLeft: 0 });
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+    const { result } = renderHook(() => useKeyboardOpen(true));
+    expect(result.current).toBe(false);
+    act(() => { viewport.height = window.innerHeight - 300; viewport.dispatchEvent(new Event("resize")); });
+    expect(result.current).toBe(true);
+    act(() => { viewport.height = window.innerHeight; viewport.dispatchEvent(new Event("resize")); });
+    expect(result.current).toBe(false);
   });
 });

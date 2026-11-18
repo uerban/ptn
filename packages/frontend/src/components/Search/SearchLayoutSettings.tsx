@@ -7,7 +7,7 @@ export function SearchLayoutSettings() {
   const { t } = useTranslation();
   const choices = [
     { key: "field", title: t("settings.search_active_field", "Show only the active field"), description: t("settings.search_active_field_desc", "Turn off to keep both journey fields visible while choosing a place."), value: settings.searchActiveFieldOnly, set: settings.setSearchActiveFieldOnly },
-    { key: "keyboard", title: t("settings.search_keyboard_fit", "Fit search above the keyboard"), description: t("settings.search_keyboard_fit_desc", "Fit the picker to the visible screen and hide bottom navigation while choosing a place."), value: settings.searchKeyboardFit, set: settings.setSearchKeyboardFit },
+    { key: "keyboard", title: t("settings.search_keyboard_fit", "Fit search above the keyboard"), description: t("settings.search_keyboard_fit_desc", "Fit the picker to the visible screen and hide bottom navigation while the keyboard is open."), value: settings.searchKeyboardFit, set: settings.setSearchKeyboardFit },
     { key: "rows", title: t("settings.search_compact_rows", "Compact suggestion rows"), description: t("settings.search_compact_rows_desc", "Turn off for more space between suggestions."), value: settings.searchCompactRows, set: settings.setSearchCompactRows },
     { key: "scroll", title: t("settings.search_dismiss_scroll", "Dismiss keyboard on scroll"), description: t("settings.search_dismiss_scroll_desc", "Close the keyboard when scrolling place suggestions or saved items."), value: settings.searchDismissOnScroll, set: settings.setSearchDismissOnScroll },
   ];

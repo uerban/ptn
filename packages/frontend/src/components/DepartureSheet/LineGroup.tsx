@@ -164,6 +164,8 @@ interface CollapsedChipsProps {
 }
 
 function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsProps) {
+  // Chips are compact: "1 h 9 m", matching their "57 m".
+  const waitUnits = { hour: t("time.h", "h"), minute: "m" };
   // Separate into due items and regular upcoming items
   const dueItems: { dep: Departure; mins: number }[] = [];
   const upcomingItems: { dep: Departure; mins: number }[] = [];
@@ -209,7 +211,7 @@ function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsP
               className="text-xs font-medium text-danger line-through"
               title={t("popup.cancelled", "Cancelled")}
             >
-              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
+              {waitClock(mins, minutesOnly, waitUnits) ?? <>{mins}&thinsp;m</>}
             </span>
           );
         }
@@ -232,7 +234,7 @@ function CollapsedChips({ departures, minutes, minutesOnly, t }: CollapsedChipsP
             className="flex items-center gap-0.5 text-xs font-semibold"
           >
             <span data-countdown className={timeColor}>
-              {waitClock(mins, minutesOnly) ?? <>{mins}&thinsp;m</>}
+              {waitClock(mins, minutesOnly, waitUnits) ?? <>{mins}&thinsp;m</>}
             </span>
             {delayShouldShow && (
               <span data-countdown className={`text-[0.625rem] font-bold ${delayColor}`}>
@@ -273,6 +275,7 @@ function ExpandedSchedule({ departures, minutes, formattingLocale, t }: Expanded
               marker={marker}
               formattingLocale={formattingLocale}
               t={t}
+              striped={i % 2 === 1}
             />
           </div>
         );
@@ -305,11 +308,13 @@ interface ScheduleRowProps {
   marker?: DayMarker;
   formattingLocale: string;
   t: (key: string, fallback?: string) => string;
+  striped?: boolean;
 }
 
-function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: ScheduleRowProps) {
+function ScheduleRow({ departure, minutes, marker, formattingLocale, t, striped = false }: ScheduleRowProps) {
   const dep = departure;
   const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
+  const waitUnits = { hour: t("time.h", "h"), minute: t("time.min", "min") };
   const isRealTime = Boolean(dep.predictedTime);
   const isDeparted = minutes < 0;
   const delaySeconds = dep.delaySeconds ?? 0;
@@ -352,9 +357,9 @@ function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: Schedu
   } else if (minutes < 0) {
     countdownLabel = `${Math.abs(minutes)} ${t("time.min_ago", "min ago")}`;
   } else {
-    countdownLabel = waitClock(minutes, minutesOnly) ?? `${minutes} ${t("time.min", "min")}`;
+    countdownLabel = waitClock(minutes, minutesOnly, waitUnits) ?? `${minutes} ${t("time.min", "min")}`;
   }
-  const countdownSpoken = minutes > 0 && waitClock(minutes, minutesOnly)
+  const countdownSpoken = minutes > 0 && waitClock(minutes, minutesOnly, waitUnits)
     ? waitSpoken(minutes, formattingLocale)
     : null;
 
@@ -373,7 +378,10 @@ function ScheduleRow({ departure, minutes, marker, formattingLocale, t }: Schedu
   return (
     <div
       data-testid="schedule-row"
-      className="flex items-center justify-between"
+      data-striped={striped || undefined}
+      // Alternate rows carry a faint tint of the text colour, so the shade
+      // follows light and dark themes and long lists stay easy to track.
+      className={`flex items-center justify-between ${striped ? "bg-fg/[0.04]" : ""}`}
       style={{ padding: "var(--variant-row-pad)", fontSize: "var(--variant-meta-text-size)" }}
     >
       {/* Scheduled clock time, with the service day hand-over named */}

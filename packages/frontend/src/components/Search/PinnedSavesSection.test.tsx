@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import "fake-indexeddb/auto";
 import type { BaseEndpoint } from "@pt/shared";
 import { PinnedSavesSection, type ResolvedSave } from "./PinnedSavesSection.tsx";
@@ -81,7 +81,7 @@ describe("PinnedSavesSection", () => {
     const onSelect = vi.fn();
     render(<PinnedSavesSection onSelect={onSelect} />);
     await waitFor(() => screen.getByRole("listitem"));
-    fireEvent.click(screen.getByRole("listitem"));
+    fireEvent.click(within(screen.getByRole("listitem")).getAllByRole("button")[0]!);
     expect(onSelect).toHaveBeenCalledTimes(1);
     const arg = onSelect.mock.calls[0]![0] as ResolvedSave;
     expect(arg.id).toBe("a");
@@ -102,7 +102,7 @@ describe("PinnedSavesSection", () => {
     render(<PinnedSavesSection onSelect={onSelect} />);
     await waitFor(() => screen.getByRole("listitem"));
     expect(screen.getByRole("listitem").textContent).toContain("Daily");
-    fireEvent.click(screen.getByRole("listitem"));
+    fireEvent.click(within(screen.getByRole("listitem")).getAllByRole("button")[0]!);
     expect(onSelect).toHaveBeenCalledTimes(1);
     const arg = onSelect.mock.calls[0]![0] as ResolvedSave;
     expect(arg.alias).toBe("Daily");
@@ -158,7 +158,7 @@ describe("searchable saved places and trips", () => {
     const view = render(<PinnedSavesSection onSelect={onSelect} query="dluga" />);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(6));
     view.rerender(<PinnedSavesSection onSelect={onSelect} query="daily" />);
-    fireEvent.click(screen.getByRole("listitem"));
+    fireEvent.click(within(screen.getByRole("listitem")).getAllByRole("button")[0]!);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ origin: stop1, destination: home }));
   });
 
@@ -181,5 +181,64 @@ describe("per-city saved places", () => {
     render(<PinnedSavesSection onSelect={vi.fn()} />);
     await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(1));
     expect(screen.getByRole("listitem").textContent).toContain("Here");
+  });
+
+  test("Remove hides a save at once, Undo keeps it, and the delete lands after the window", async () => {
+    await seed([
+      { id: "p1", alias: "Home", origin: home, savedAt: 2 },
+      { id: "p2", alias: "Work", origin: stop2, savedAt: 1 },
+    ]);
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    expect(screen.queryByRole("menuitem", { name: /Save place/ })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove from saved" }));
+    expect(screen.queryByText("Home")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText("Home")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Work" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove from saved" }));
+    expect(screen.getByTestId("recent-notice").textContent).toContain("Removed Work from saved");
+    await waitFor(() => expect(screen.queryByTestId("recent-notice")).toBeNull(), { timeout: 6000 });
+    cleanup();
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+    expect(screen.queryByText("Work")).toBeNull();
+  }, 10000);
+  test("Rename from the menu keeps the new name; Escape and an unchanged name do nothing", async () => {
+    await seed([{ id: "p1", alias: "Home", origin: home, savedAt: 2 }]);
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Name for Długa 21" }) as HTMLInputElement;
+    expect(input.value).toBe("Home");
+    fireEvent.change(input, { target: { value: "Mum's" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(await screen.findByText("Home")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "  Mum's  " } });
+    fireEvent.submit(screen.getByRole("textbox").closest("form")!);
+    expect(await screen.findByText("Mum's")).toBeTruthy();
+    cleanup();
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    expect(await screen.findByText("Mum's")).toBeTruthy();
+  });
+
+  test("an empty name shows the place again", async () => {
+    await seed([{ id: "p1", alias: "Home", origin: home, savedAt: 2 }]);
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: " " } });
+    fireEvent.blur(screen.getByRole("textbox"));
+    await waitFor(() => expect(screen.queryByText("Home")).toBeNull());
+    expect(screen.getByText("Długa 21")).toBeTruthy();
   });
 });

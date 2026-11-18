@@ -251,6 +251,21 @@ export async function resolveSavedRows(
   return resolveEntries(await resolvePersonalRows<unknown>(TABLE, rows));
 }
 
+/**
+ * Renames a save in place, in the tier it is already kept in. An empty name
+ * clears the alias, so the row shows its place or trip again.
+ */
+export async function renameSave(id: string, alias: string): Promise<void> {
+  const entry = (await listPersonal<unknown>(TABLE)).find((e) => e.id === id);
+  if (!entry || !isSavePayload(entry.value)) return;
+  await putPersonal<SavePayload>(
+    TABLE,
+    id,
+    { ...entry.value, alias: alias.trim() },
+    { sessionOnly: !entry.durable },
+  );
+}
+
 export async function deleteSave(id: string): Promise<void> {
   await deletePersonal(TABLE, [id]);
 }
