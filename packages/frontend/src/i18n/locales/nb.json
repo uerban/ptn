@@ -1,4 +1,5 @@
 {
+  "time.h": "t",
   "a11y.skip_to_content": "Gå til hovedinnholdet",
   "mapTap.title": "Plassert nål",
   "mapTap.action.origin": "Bruk som utgangspunkt",
@@ -563,6 +564,8 @@
   "settings.search_dismiss_scroll_desc": "Lukk tastaturet når du blar gjennom stedsforslag eller lagrede elementer.",
   "settings.search_layout": "Søkelayout · midlertidige alternativer",
   "search.saved_places_trips": "Lagrede steder og reiser",
+  "search.saved_remove": "Fjern fra lagrede",
+  "search.saved_removed": "Fjernet {label} fra lagrede",
   "search.saved_show_less": "Vis færre lagrede elementer",
   "search.saved_show_all": "Vis alle lagrede elementer ({n})",
   "search.edit_destination": "Rediger destinasjon",

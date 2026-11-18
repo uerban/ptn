@@ -298,6 +298,39 @@ describe("Search.tsx shows recents on empty focus + badges them", () => {
     );
   });
 
+  it("removing a recent drops it from the count at once and shows Undo in its place", async () => {
+    const recent = (label: string, lat: number) => ({
+      kind: "geocoded", label, lat, lon: 25.2, confidence: 0.9, category: "landmark",
+      source: "osm", poiIdentity: `node/${label}`, score: 1, recent: { usedAt: 1, usedAsOrigin: false },
+    });
+    searchSuggestionsStreamMock.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (async (_q: string, _city: string, _loc: unknown, _sig: unknown, _provider: unknown, cb: any) => {
+        cb?.onResults?.([recent("Airport", 54.6), recent("Old Town", 54.7)]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    );
+    const { getAllByRole, findByText, getByRole, getByTestId, queryByRole } = render(
+      <MemoryRouter initialEntries={["/search"]}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+    fireEvent.focus(getAllByRole("searchbox")[1]);
+    await findByText("2 place suggestions");
+
+    fireEvent.click(getByRole("button", { name: "Actions for Airport" }));
+    fireEvent.click(getByRole("menuitem", { name: "Remove from recents" }));
+
+    expect(await findByText("1 place suggestions")).toBeInTheDocument();
+    expect(queryByRole("option", { name: /Airport/ })).toBeNull();
+    // The notice takes the removed row's place: it precedes the remaining row
+    // instead of floating over it.
+    const notice = getByTestId("recent-notice");
+    const remaining = getByRole("option", { name: /Old Town/ });
+    expect(notice.compareDocumentPosition(remaining) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notice.className).not.toMatch(/sticky|absolute|fixed/);
+  });
+
   it("a suggestion row whose `recent` marker is set renders a 'Recent' badge", async () => {
     const { getAllByRole, findByTestId } = render(
       <MemoryRouter initialEntries={["/search"]}>

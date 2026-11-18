@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 
 /** How long Undo stays offered before a removal is final. */
-export const UNDO_WINDOW_MS = 6000;
-const SAVED_VISIBLE_MS = 3000;
+export const UNDO_WINDOW_MS = 4000;
+const SAVED_VISIBLE_MS = 2000;
 
 export type RecentNoticeState =
   | { kind: "saved"; label: string }
@@ -53,7 +53,7 @@ export function RecentNotice({ notice, onDone, text }: RecentNoticeProps) {
   return (
     <div
       data-testid="recent-notice"
-      className="sticky bottom-2 z-20 mx-3 my-2 flex min-h-11 items-center justify-between gap-3 rounded-lg bg-fg px-4 py-2 text-sm text-surface shadow-2"
+      className="flex min-h-11 items-center justify-between gap-3 border-b border-divider bg-surface-overlay px-4 py-1 text-sm text-fg"
     >
       <span role="status" className="min-w-0">{message}</span>
       {notice.kind === "removed" && (

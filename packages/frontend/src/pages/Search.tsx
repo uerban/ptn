@@ -3,7 +3,7 @@ import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts
 import { liveLocation } from "../services/liveLocation.ts";
 import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
 import { excludedRouteIdsForGroups, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RouteResults } from "../components/RouteResults/RouteResults.tsx";
 import { RoutingModeIndicator } from "../components/RoutingModeIndicator.tsx";
@@ -316,6 +316,12 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
 
 const vehicleChipClass = (excluded: boolean): string => searchChipClass(excluded ? "off" : "on");
 
+function suggestionKey(suggestion: SearchSuggestion): string {
+  return suggestion.kind === "stop" ? `stop:${suggestion.stopId}` :
+    suggestion.kind === "stopGroup" ? `group:${suggestion.groupId}` :
+    `poi:${suggestion.label}:${suggestion.category}:${suggestion.lat}:${suggestion.lon}`;
+}
+
 function suggestionEndpoint(suggestion: SearchSuggestion): { ep: BaseEndpoint; name: string } {
   let ep: BaseEndpoint;
   let name: string;
@@ -410,7 +416,8 @@ export function SearchPage() {
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   // Recents hidden by Remove while its Undo is offered, then forgotten.
   const [hiddenRecents, setHiddenRecents] = useState<ReadonlySet<string>>(() => new Set());
-  const [recentNotice, setRecentNotice] = useState<RecentNoticeState | null>(null);
+  // Shown in the list where its recent was, so it never covers another row.
+  const [recentNotice, setRecentNotice] = useState<{ key: string; notice: RecentNoticeState } | null>(null);
   // The engine returns up to SEARCH_MAX_RESULTS; show them a page at a time.
   const [visibleSuggestionCount, setVisibleSuggestionCount] = useState(SUGGESTION_PAGE_SIZE);
   const [suggestionStatus, setSuggestionStatus] = useState<"idle" | "searching" | "ready" | "error">("idle");
@@ -434,8 +441,13 @@ export function SearchPage() {
     toText ? null : "to"
   );
   const [mapPickerField, setMapPickerField] = useState<"from" | "to" | null>(null);
+  // A removed recent leaves the list and the count at once, not after Undo expires.
+  const shownSuggestions = useMemo(
+    () => suggestions.filter((s) => s.kind === "stopGroup" || !s.recent || !hiddenRecents.has(suggestionKey(s))),
+    [suggestions, hiddenRecents],
+  );
   const activeQuery = activeField === "from" ? (fromText ?? "") : activeField === "to" ? toText : "";
-  useSearchPickerLayout(mapPickerField !== null || (activeField !== null && keyboardFit));
+  useSearchPickerLayout(mapPickerField !== null ? "map" : activeField !== null && keyboardFit ? "text" : null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const fromInputRef = useRef<HTMLInputElement>(null);
   const toInputRef = useRef<HTMLInputElement>(null);
@@ -1254,10 +1266,10 @@ export function SearchPage() {
     setActiveField(null);
   }
 
-  function saveRecent(suggestion: SearchSuggestion) {
+  function saveRecent(key: string, suggestion: SearchSuggestion) {
     const { ep, name } = suggestionEndpoint(suggestion);
     void savePlace({ endpoint: ep, alias: name })
-      .then(() => setRecentNotice({ kind: "saved", label: name }))
+      .then(() => setRecentNotice({ key, notice: { kind: "saved", label: name } }))
       .catch(() => {});
   }
 
@@ -1268,14 +1280,17 @@ export function SearchPage() {
       : { label: suggestion.label, lat: suggestion.lat, lon: suggestion.lon };
     setHiddenRecents((prev) => new Set(prev).add(key));
     setRecentNotice({
-      kind: "removed",
-      label: target.label,
-      commit: () => void forgetRecent(target).catch(() => {}),
-      undo: () => setHiddenRecents((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      }),
+      key,
+      notice: {
+        kind: "removed",
+        label: target.label,
+        commit: () => void forgetRecent(target).catch(() => {}),
+        undo: () => setHiddenRecents((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        }),
+      },
     });
   }
 
@@ -1334,7 +1349,7 @@ export function SearchPage() {
       }
     } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      if (suggestions[0]) selectSuggestion(suggestions[0]);
+      if (shownSuggestions[0]) selectSuggestion(shownSuggestions[0]);
       else dismissKeyboard();
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -1663,14 +1678,14 @@ export function SearchPage() {
             <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-2 px-3">
               <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-[1_1_8rem] py-1 text-[0.6875rem] leading-snug text-fg-muted">
               {suggestionStatus === "error" ? t("search.suggestions_error", "Could not search for places. Try again.")
-                : suggestionStatus === "searching" && suggestions.length === 0 ? t("search.searching", "Searching…")
-                : suggestions.length > 0 ? t("search.suggestion_count", "{n} place suggestions").replace("{n}", String(suggestions.length))
+                : suggestionStatus === "searching" && shownSuggestions.length === 0 ? t("search.searching", "Searching…")
+                : shownSuggestions.length > 0 ? t("search.suggestion_count", "{n} place suggestions").replace("{n}", String(shownSuggestions.length))
                 : activeQuery.trim() && suggestionStatus === "ready" ? t("search.no_place_suggestions", "No matching place suggestions")
                 : <span className="sr-only">{t("search.type_place", "Type a stop, address or place")}</span>}
               </div>
               <SearchPlaceActions onMap={chooseOnMap} onLocation={useCurrentLocation} locationAvailable={gpsMode !== "disabled"} />
             </div>
-            {suggestions.length > 0 && (
+            {(shownSuggestions.length > 0 || recentNotice) && (
               <div
                 ref={stopResultsRef}
                 role="listbox"
@@ -1678,13 +1693,24 @@ export function SearchPage() {
                 className="bg-surface-raised"
                 onKeyDown={handleStopResultsKeyDown}
               >
-                {suggestions.slice(0, visibleSuggestionCount).map((suggestion) => {
-                  const key =
-                    suggestion.kind === "stop" ? `stop:${suggestion.stopId}` :
-                    suggestion.kind === "stopGroup" ? `group:${suggestion.groupId}` :
-                    `poi:${suggestion.label}:${suggestion.category}:${suggestion.lat}:${suggestion.lon}`;
+                {suggestions.map((suggestion) => {
+                  const key = suggestionKey(suggestion);
                   const isRecent = suggestion.kind !== "stopGroup" && !!suggestion.recent;
-                  if (isRecent && hiddenRecents.has(key)) return null;
+                  const notice = recentNotice?.key === key ? (
+                    <RecentNotice
+                      key={`notice:${key}`}
+                      notice={recentNotice.notice}
+                      onDone={() => setRecentNotice((current) => current?.key === key ? null : current)}
+                      text={{
+                        saved: t("search.recent_saved", "Saved {label}"),
+                        removed: t("search.recent_removed", "Removed {label} from recents"),
+                        undo: t("search.recent_undo", "Undo"),
+                      }}
+                    />
+                  ) : null;
+                  if (isRecent && hiddenRecents.has(key)) return notice;
+                  const shownIndex = shownSuggestions.indexOf(suggestion);
+                  if (shownIndex < 0 || shownIndex >= visibleSuggestionCount) return null;
                   const icon =
                     suggestion.kind === "stop" ? "\u{1F68F}" :
                     suggestion.kind === "stopGroup" ? "\u{1F68F}" :
@@ -1750,10 +1776,10 @@ export function SearchPage() {
                   );
                   if (!isRecent) return option;
                   return (
+                    <Fragment key={key}>
                     <RecentRow
-                      key={key}
                       label={label}
-                      onSave={() => saveRecent(suggestion)}
+                      onSave={() => saveRecent(key, suggestion)}
                       onRemove={() => removeRecent(key, suggestion)}
                       text={{
                         actions: t("search.recent_actions", "Actions for {label}"),
@@ -1763,22 +1789,13 @@ export function SearchPage() {
                     >
                       {option}
                     </RecentRow>
+                    {notice}
+                    </Fragment>
                   );
                 })}
               </div>
             )}
-            {recentNotice && (
-              <RecentNotice
-                notice={recentNotice}
-                onDone={() => setRecentNotice(null)}
-                text={{
-                  saved: t("search.recent_saved", "Saved {label}"),
-                  removed: t("search.recent_removed", "Removed {label} from recents"),
-                  undo: t("search.recent_undo", "Undo"),
-                }}
-              />
-            )}
-            {suggestions.length > visibleSuggestionCount && (
+            {shownSuggestions.length > visibleSuggestionCount && (
               <button
                 type="button"
                 data-testid="search-show-more"

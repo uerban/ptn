@@ -6,9 +6,9 @@ describe("waitClock", () => {
     expect(waitClock(59, false)).toBeNull();
   });
   it("shows an hour or more as h:mm", () => {
-    expect(waitClock(60, false)).toBe("1:00");
-    expect(waitClock(65, false)).toBe("1:05");
-    expect(waitClock(754, false)).toBe("12:34");
+    expect(waitClock(60, false)).toBe("1\u00a0h");
+    expect(waitClock(65, false)).toBe("1\u00a0h 5\u00a0min");
+    expect(waitClock(754, false)).toBe("12\u00a0h 34\u00a0min");
   });
   it("keeps minutes when asked to", () => {
     expect(waitClock(125, true)).toBeNull();

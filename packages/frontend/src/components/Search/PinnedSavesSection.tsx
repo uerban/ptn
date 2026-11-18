@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type { BaseEndpoint } from "@pt/shared";
-import { saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
+import { deleteSave, saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
+import { RecentRow } from "./RecentRow.tsx";
+import { RecentNotice, type RecentNoticeState } from "./RecentNotice.tsx";
 import { useResolvedSaves } from "../../hooks/useResolvedSaves.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { normalizeQuery, nameMatchScore } from "../../services/geocoder/BundledGeocoderAdapter.ts";
@@ -38,12 +40,50 @@ function CityPinnedSavesSection({
   );
 
   const [expandedQuery, setExpandedQuery] = useState<string | null>(null);
+  // Removed saves leave the list at once; the delete is final when Undo ends.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const [notice, setNotice] = useState<{ id: string; notice: RecentNoticeState } | null>(null);
   const normalizedQuery = normalizeQuery(query);
-  const matches = useMemo(() => filterSavedPlaces(resolved ?? [], query), [resolved, query]);
+  const matches = useMemo(
+    () => filterSavedPlaces(resolved ?? [], query).filter((save) => !hidden.has(save.id)),
+    [resolved, query, hidden],
+  );
   const expanded = expandedQuery === normalizedQuery;
   const previewLimit = normalizedQuery ? 8 : 3;
-  const visible = expanded ? matches : matches.slice(0, previewLimit);
-  if (matches.length === 0) return null;
+  const shown = expanded ? matches : matches.slice(0, previewLimit);
+  // The Undo notice takes the removed save's place in the list.
+  const allMatches = filterSavedPlaces(resolved ?? [], query);
+  const visible = allMatches.filter((save) => shown.includes(save) || save.id === notice?.id);
+  if (matches.length === 0 && !notice) return null;
+
+  const remove = (save: ResolvedSave) => {
+    setHidden((prev) => new Set(prev).add(save.id));
+    setNotice({
+      id: save.id,
+      notice: {
+        kind: "removed",
+        label: save.alias || labelFor(save),
+        commit: () => void deleteSave(save.id).catch(() => {}),
+        undo: () => setHidden((prev) => {
+          const next = new Set(prev);
+          next.delete(save.id);
+          return next;
+        }),
+      },
+    });
+  };
+  const removedNotice = notice && (
+    <RecentNotice
+      key={`notice:${notice.id}`}
+      notice={notice.notice}
+      onDone={() => setNotice(null)}
+      text={{
+        saved: "",
+        removed: t("search.saved_removed", "Removed {label} from saved"),
+        undo: t("search.recent_undo", "Undo"),
+      }}
+    />
+  );
 
   return (
     <div
@@ -54,10 +94,20 @@ function CityPinnedSavesSection({
       <div className="px-4 pt-2 pb-1 text-xs font-semibold text-fg-muted uppercase tracking-wider">
         {t("search.saved_places_trips", "Saved places and trips")}
       </div>
-      {visible.map((save) => (
+      {visible.map((save) => save.id === notice?.id && hidden.has(save.id) ? (
+        <div role="listitem" key={save.id}>{removedNotice}</div>
+      ) : (
+        <div role="listitem" key={save.id}>
+        <RecentRow
+          label={save.alias || labelFor(save)}
+          onRemove={() => remove(save)}
+          text={{
+            actions: t("search.recent_actions", "Actions for {label}"),
+            remove: t("search.saved_remove", "Remove from saved"),
+          }}
+        >
         <button
-          key={save.id}
-          role="listitem"
+          type="button"
           onClick={() => onSelect(save)}
           className={`w-full min-h-11 text-left px-4 ${compact ? "py-2" : "py-3"} border-b border-divider
             hover:bg-surface-overlay focus:bg-surface-overlay focus:outline-none
@@ -71,6 +121,8 @@ function CityPinnedSavesSection({
             {save.alias && <span className="block text-xs text-fg-muted truncate">{labelFor(save)}</span>}
           </span>
         </button>
+        </RecentRow>
+        </div>
       ))}
       {matches.length > previewLimit && <button
         type="button"

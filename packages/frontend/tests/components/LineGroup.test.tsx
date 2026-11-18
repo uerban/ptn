@@ -105,4 +105,30 @@ describe("LineGroup", () => {
     // Schedule rows only appear when expanded
     expect(screen.queryByTestId("schedule-row")).toBeNull();
   });
+
+  it("shades every other expanded row so long schedules stay easy to follow", () => {
+    const deps = [5, 15, 25, 35].map((m, i) => ({
+      ...baseDep,
+      tripId: `t${i}`,
+      scheduledTime: new Date(Date.now() + m * 60_000).toISOString(),
+    }));
+    const { container } = render(
+      <LineGroup routeShortName="1" routeColor="e53935" mode="BUS" headsign="Centre" departures={deps} />,
+      { wrapper: Wrapper },
+    );
+    fireEvent.click(container.querySelector("[aria-expanded]")!);
+    const rows = screen.getAllByTestId("schedule-row");
+    expect(rows.map((r) => r.hasAttribute("data-striped"))).toEqual([false, true, false, true]);
+  });
+
+  it("shows waits of an hour or more as hours and minutes, not a clock time", () => {
+    const deps = [{ ...baseDep, scheduledTime: new Date(Date.now() + 69.5 * 60_000).toISOString() }];
+    const { container } = render(
+      <LineGroup routeShortName="1" routeColor="e53935" mode="BUS" headsign="Centre" departures={deps} />,
+      { wrapper: Wrapper },
+    );
+    fireEvent.click(container.querySelector("[aria-expanded]")!);
+    expect(screen.getByTestId("schedule-row").textContent).not.toMatch(/1:\d\d/);
+    expect(screen.getByTestId("schedule-row").textContent).toMatch(/1\u00a0h (9|10)\u00a0min/);
+  });
 });

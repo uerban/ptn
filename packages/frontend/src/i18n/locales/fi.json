@@ -566,6 +566,8 @@
   "settings.search_dismiss_scroll_desc": "Sulje näppäimistö, kun selaat paikkasuosituksia tai tallennettuja kohteita.",
   "settings.search_layout": "Hakunäkymä · väliaikaiset vaihtoehdot",
   "search.saved_places_trips": "Tallennetut paikat ja matkat",
+  "search.saved_remove": "Poista tallennetuista",
+  "search.saved_removed": "{label} poistettiin tallennetuista",
   "search.saved_show_less": "Näytä vähemmän tallennettuja kohteita",
   "search.saved_show_all": "Näytä kaikki tallennetut kohteet ({n})",
   "search.edit_destination": "Muokkaa määränpäätä",

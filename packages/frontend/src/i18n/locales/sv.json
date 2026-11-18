@@ -1,4 +1,5 @@
 {
+  "time.h": "tim",
   "a11y.skip_to_content": "Gå till huvudinnehållet",
   "mapTap.title": "Placerad markör",
   "mapTap.action.origin": "Använd som utgångspunkt",
@@ -563,6 +564,8 @@
   "settings.search_dismiss_scroll_desc": "Stäng tangentbordet när du bläddrar bland platsförslag eller sparade objekt.",
   "settings.search_layout": "Söklayout · tillfälliga alternativ",
   "search.saved_places_trips": "Sparade platser och resor",
+  "search.saved_remove": "Ta bort från sparade",
+  "search.saved_removed": "Tog bort {label} från sparade",
   "search.saved_show_less": "Visa färre sparade objekt",
   "search.saved_show_all": "Visa alla sparade objekt ({n})",
   "search.edit_destination": "Redigera destination",

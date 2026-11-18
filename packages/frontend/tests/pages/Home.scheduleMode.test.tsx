@@ -4,7 +4,7 @@ vi.mock("../../src/components/Map/MapDetailControl.tsx", () => ({
 }));
 
 vi.mock("../../src/services/liveLocation.ts", () => ({ liveLocation: { request: vi.fn() } }));
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
@@ -225,6 +225,17 @@ function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
+
+// HomeDispatcher lazy-loads both homes. Load them once up front so the first
+// test's findBy* window does not also pay for transforming their import tree,
+// which overran the 1 s default on a loaded machine.
+beforeAll(async () => {
+  await Promise.all([
+    import("../../src/pages/HomeDispatcher.tsx"),
+    import("../../src/pages/Home.tsx"),
+    import("../../src/pages/TextHome.tsx"),
+  ]);
+}, 30000);
 
 async function renderDispatcher(entry = "/") {
   const { HomeDispatcher } = await import("../../src/pages/HomeDispatcher.tsx");

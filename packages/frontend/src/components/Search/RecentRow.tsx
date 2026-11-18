@@ -13,17 +13,18 @@ export interface RecentRowProps {
   label: string;
   /** The row's own option button. */
   children: ReactNode;
-  onSave: () => void;
+  /** Absent for rows that are already saved: the menu then offers Remove only. */
+  onSave?: () => void;
   onRemove: () => void;
   text: {
     actions: string;
-    save: string;
+    save?: string;
     remove: string;
   };
 }
 
 /**
- * A recent search row with Save and Remove. The visible ⋯ menu is the main
+ * A recent or saved row with Save (recents only) and Remove. The visible ⋯ menu is the main
  * path and works with keyboard and screen readers; on touch, swipe right saves,
  * swipe left removes and a long press opens the same menu.
  */
@@ -89,15 +90,17 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
       if (g.timer) clearTimeout(g.timer);
       g.timer = null;
     }
-    g.dx = mx;
-    setDx(mx);
+    // Without Save, a right swipe has nothing to do: keep the row still.
+    const next = onSave ? mx : Math.min(mx, 0);
+    g.dx = next;
+    setDx(next);
   };
 
   const onPointerUp = () => {
     const g = gesture.current;
     if (g?.dragging) {
       suppressClick.current = true;
-      if (g.dx >= SWIPE_COMMIT_PX) onSave();
+      if (g.dx >= SWIPE_COMMIT_PX) onSave?.();
       else if (g.dx <= -SWIPE_COMMIT_PX) onRemove();
     }
     endGesture();
@@ -178,17 +181,19 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
           onKeyDown={onMenuKeyDown}
           className="absolute right-2 top-full z-20 -mt-1 min-w-40 rounded-lg border border-divider bg-surface-raised py-1 shadow-2"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              close(true);
-              onSave();
-            }}
-            className="block w-full min-h-11 px-4 text-left text-sm text-fg hover:bg-surface-overlay focus:bg-surface-overlay focus:outline-none"
-          >
-            {text.save}
-          </button>
+          {onSave && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close(true);
+                onSave();
+              }}
+              className="block w-full min-h-11 px-4 text-left text-sm text-fg hover:bg-surface-overlay focus:bg-surface-overlay focus:outline-none"
+            >
+              {text.save}
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
