@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useId, type KeyboardEvent } from "react";
 import type { StopGroupRecord } from "../../db/index.ts";
 import type { DirectionLabel } from "../../services/directionResolver.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -84,7 +84,7 @@ export function StopCard({
   const ariaLabelParts = [group.name, transferPart, distancePart, linePart, ...directionParts].filter(Boolean);
   const ariaLabel = ariaLabelParts.join(", ");
 
-  const stopSummaryId = `stop-${group.groupId}-summary`;
+  const stopSummaryId = useId();
 
   // When `expandable` is true the chevron <button> is the single interactive
   // control for the row, so the outer card must NOT also be a focusable

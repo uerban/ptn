@@ -36,6 +36,21 @@ const platformCodes = new Map([
 ]);
 
 describe("ExpandableStopGroup", () => {
+  it.each(["g1", "cluster:Žaliasis tiltas:54.6990"])("keeps expanded panel references unique and resolvable for %s", (groupId) => {
+    render(<>{[0, 1].map(copy => <ExpandableStopGroup key={copy} group={{ ...baseGroup, groupId }}
+      distanceMeters={100} lineLabels={["1"]} lineColors={new Map()} directionLabels={[]}
+      platformCodes={platformCodes} stopNames={new Map()} onStopSelect={vi.fn()} />)}</>, { wrapper: Wrapper });
+    const toggles = screen.getAllByTestId("group-expand-toggle");
+    toggles.forEach(toggle => fireEvent.click(toggle));
+    const targets = toggles.map(toggle => {
+      const refs = toggle.getAttribute("aria-controls")!.split(/\s+/);
+      expect(refs).toHaveLength(1);
+      const panel = document.getElementById(refs[0]);
+      expect(panel).toBe(toggle.closest("[data-testid=expandable-stop-group]")!.querySelector("[data-testid=substops-list]"));
+      return refs[0];
+    });
+    expect(new Set(targets).size).toBe(2);
+  });
   it("starts collapsed — sub-stops are hidden", () => {
     render(
       <ExpandableStopGroup

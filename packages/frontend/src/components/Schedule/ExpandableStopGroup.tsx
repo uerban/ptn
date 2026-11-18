@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { StopGroupRecord } from "../../db/index.ts";
 import type { DirectionLabel } from "../../services/directionResolver.ts";
 import { useTranslation } from "../../i18n/index.ts";
@@ -28,7 +28,7 @@ export function ExpandableStopGroup({
 }: ExpandableStopGroupProps) {
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
-  const substopsId = `group-${group.groupId}-stops`;
+  const substopsId = useId();
 
   function handleExpand() {
     setExpanded((prev) => !prev);

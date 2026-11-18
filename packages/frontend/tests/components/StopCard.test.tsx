@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { I18nContext } from "../../src/i18n/index.ts";
@@ -31,6 +32,21 @@ const baseDirections: DirectionLabel[] = [
 ];
 
 describe("StopCard", () => {
+  it("resolves the description for a group key containing spaces", () => {
+    render(<StopCard group={{ ...baseGroup, groupId: "cluster:Žaliasis tiltas:54.6990" }}
+      distanceMeters={50} lineLabels={["1"]} lineColors={new Map()} directionLabels={[]} onSelect={vi.fn()} />,
+    { wrapper: Wrapper });
+    expect(screen.getByTestId("stop-card")).toHaveAccessibleDescription("Central Station, 1 lines, 50 m away");
+  });
+
+  it("keeps descriptions local to repeated copies of the same group", () => {
+    render(<>{[50, 100].map(distance => <StopCard key={distance} group={baseGroup}
+      distanceMeters={distance} lineLabels={["1"]} lineColors={new Map()} directionLabels={[]} onSelect={vi.fn()} />)}</>,
+    { wrapper: Wrapper });
+    const cards = screen.getAllByTestId("stop-card");
+    expect(cards[0]).toHaveAccessibleDescription("Central Station, 1 lines, 50 m away");
+    expect(cards[1]).toHaveAccessibleDescription("Central Station, 1 lines, 100 m away");
+  });
   it("renders group name and distance in meters", () => {
     render(
       <StopCard
