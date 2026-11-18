@@ -91,17 +91,19 @@ export interface RecordRecentOptions {
 }
 
 /**
- * Identity of a `BaseEndpoint`. Identical endpoints collapse onto the same
- * recent, so re-visiting a location updates `usedAt` in place rather than
- * producing duplicates. Computed in memory only: stored rows carry an opaque
- * random id, never this value.
+ * Identity of a `BaseEndpoint`. Endpoints with the same identity collapse onto
+ * one recent, so re-visiting a location updates it in place rather than
+ * producing duplicates. A named place is identified by its name alone: the
+ * same place found again at slightly different coordinates is one recent that
+ * keeps the last used point. Computed in memory only: stored rows carry an
+ * opaque random id, never this value.
  */
 export function endpointFingerprint(ep: BaseEndpoint): string {
   switch (ep.kind) {
     case "stop":
       return `stop:${ep.stopId}`;
     case "geocoded":
-      return `geo:${ep.lat.toFixed(5)}:${ep.lon.toFixed(5)}:${ep.label}`;
+      return `geo:${ep.label}`;
     case "mappoint":
       return `map:${ep.lat.toFixed(5)}:${ep.lon.toFixed(5)}`;
     case "stopGroup":
@@ -164,9 +166,13 @@ export async function recordRecent(
     recentInCity(e.value, cityId),
   );
   if (!stillValid()) return;
-  const existing = entries.find(
-    (e) => endpointFingerprint(e.value.endpoint) === fingerprint,
-  );
+  const same = entries
+    .filter((e) => endpointFingerprint(e.value.endpoint) === fingerprint)
+    .sort((a, b) => b.value.usedAt - a.value.usedAt);
+  const existing = same[0];
+  // Older rows of the same place (recorded before places were identified by
+  // name) are folded into this one.
+  const duplicates = same.slice(1).map((e) => e.id);
   const id = existing?.id ?? newPersonalId();
   const payload: RecentPayload = {
     endpoint,
@@ -186,9 +192,11 @@ export async function recordRecent(
     return;
   }
 
+  if (duplicates.length > 0) await deletePersonal(TABLE, duplicates);
+  const kept = entries.filter((e) => !duplicates.includes(e.id));
   const after = existing
-    ? entries.map((e) => (e.id === id ? { ...e, value: payload } : e))
-    : [...entries, { id, value: payload, durable: false }];
+    ? kept.map((e) => (e.id === id ? { ...e, value: payload } : e))
+    : [...kept, { id, value: payload, durable: false }];
   if (after.length > MAX_RECENTS) {
     const oldest = [...after]
       .sort((a, b) => a.value.usedAt - b.value.usedAt)
@@ -224,6 +232,15 @@ export async function listRecents(): Promise<RecentRef[]> {
       usedAsOrigin: e.value.usedAsOrigin,
     }));
   out.sort((a, b) => b.usedAt - a.usedAt);
+  // Rows stored before places were identified by name can repeat a place:
+  // list each place once, at its newest use.
+  const seen = new Set<string>();
+  const unique = out.filter((r) => {
+    const f = endpointFingerprint(r.base);
+    if (seen.has(f)) return false;
+    seen.add(f);
+    return true;
+  });
   // A consent, policy or city change while decrypting discards this result.
   if (
     !isOptionalStorageEnabledNow("recents") ||
@@ -233,7 +250,7 @@ export async function listRecents(): Promise<RecentRef[]> {
     return [];
   }
   if (revision !== recentsRevision) return listRecents();
-  const values = out.slice(0, RECENTS_LIST_LIMIT);
+  const values = unique.slice(0, RECENTS_LIST_LIMIT);
   _recentsCache = { cityId, axis, values };
   return values;
 }
@@ -301,7 +318,7 @@ export function stopRecentsSweep(): void {
   }
 }
 
-/** Identifies one surfaced recent row: a stop by id, a place by label and point. */
+/** Identifies one surfaced recent row: a stop by id, a place by name, a map point by label and point. */
 export interface RecentTarget {
   stopId?: string;
   label: string;
@@ -311,7 +328,9 @@ export interface RecentTarget {
 
 function matchesTarget(ep: BaseEndpoint, target: RecentTarget): boolean {
   if (target.stopId !== undefined) return ep.kind === "stop" && ep.stopId === target.stopId;
-  if (ep.kind !== "geocoded" && ep.kind !== "mappoint") return false;
+  // A named place is one recent whatever point it was last used at.
+  if (ep.kind === "geocoded") return ep.label === target.label;
+  if (ep.kind !== "mappoint") return false;
   return (
     ep.label === target.label &&
     ep.lat.toFixed(5) === target.lat.toFixed(5) &&

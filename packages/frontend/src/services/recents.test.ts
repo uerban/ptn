@@ -173,6 +173,37 @@ describe("recordRecent", () => {
   });
 });
 
+describe("named places", () => {
+  const moved: BaseEndpoint = { ...geocodedEndpoint, lat: 54.401, lon: 18.602 } as BaseEndpoint;
+  const city = () => useCityStore.getState().activeCity.id;
+  const putOld = (endpoint: BaseEndpoint, usedAt: number) =>
+    putPersonal("recentLocations", crypto.randomUUID(), { endpoint, usedAt, usedAsOrigin: false, cityId: city() });
+
+  it("keeps one recent per place name with the last used point", async () => {
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false, now: () => 10 });
+    await recordRecent(moved, { usedAsOrigin: false, now: () => 20 });
+    const out = await listRecents();
+    expect(out).toHaveLength(1);
+    expect(out[0]!.base).toMatchObject({ lat: 54.401, lon: 18.602 });
+    expect(await db.recentLocations.count()).toBe(1);
+  });
+
+  it("lists stored repeats of a place once, then folds and forgets them all", async () => {
+    await putOld(geocodedEndpoint, 10);
+    await putOld(moved, 20);
+    __resetRecentsCacheForTests();
+    const out = await listRecents();
+    expect(out).toHaveLength(1);
+    expect(out[0]!.usedAt).toBe(20);
+    await recordRecent(geocodedEndpoint, { usedAsOrigin: false, now: () => 30 });
+    expect(await db.recentLocations.count()).toBe(1);
+    await putOld(moved, 5);
+    await forgetRecent({ label: "Długa 21", lat: 54.4, lon: 18.6 });
+    expect(await listRecents()).toEqual([]);
+    expect(await db.recentLocations.count()).toBe(0);
+  });
+});
+
 describe("forgetRecent", () => {
   it("removes only the named stop or place", async () => {
     await recordRecent(stopEndpoint, { usedAsOrigin: true, now: () => 10 });

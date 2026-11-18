@@ -87,6 +87,11 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
       if (Math.abs(my) > SLOP_PX && Math.abs(my) >= Math.abs(mx)) return endGesture();
       if (Math.abs(mx) <= SLOP_PX) return;
       g.dragging = true;
+      try {
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer already gone; the gesture ends on pointerup/cancel.
+      }
       if (g.timer) clearTimeout(g.timer);
       g.timer = null;
     }
@@ -125,7 +130,11 @@ export function RecentRow({ label, children, onSave, onRemove, text }: RecentRow
   const reveal = dx > SLOP_PX ? "save" : dx < -SLOP_PX ? "remove" : null;
 
   return (
-    <div className="relative overflow-visible">
+    // Clipped sideways: a row pushed right by a swipe must not widen the
+    // scrolling list, or the browser takes over the gesture as a sideways
+    // scroll, cancels it and the row snaps back. Vertically the menu still
+    // shows below the row.
+    <div className="relative overflow-x-clip overflow-y-visible">
       {reveal && (
         <div
           aria-hidden="true"
