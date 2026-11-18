@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import type { LatLon, BaseEndpoint } from "@pt/shared";
 import {
   persistMapTap,
@@ -116,11 +116,32 @@ describe("coarsen", () => {
     );
   });
 
-  test("fine precision inputs produce identical output within the same session", () => {
-    const a = coarsen({ lat: 54.352001, lon: 18.646001 }, 500);
-    const b = coarsen({ lat: 54.352002, lon: 18.646002 }, 500);
-    expect(a.snappedCoord.lat).toBe(b.snappedCoord.lat);
-    expect(a.snappedCoord.lon).toBe(b.snappedCoord.lon);
+  test("fine precision inputs within a known cell produce identical output", () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5); // zero jitter
+    try {
+      const a = coarsen({ lat: 54.352001, lon: 18.646001 }, 500);
+      const b = coarsen({ lat: 54.352002, lon: 18.646002 }, 500);
+      expect(a.snappedCoord.lat).toBe(b.snappedCoord.lat);
+      expect(a.snappedCoord.lon).toBe(b.snappedCoord.lon);
+    } finally { random.mockRestore(); }
+  });
+
+  test("fine precision inputs can straddle a permitted session grid boundary", () => {
+    const latStep = 500 / 111_320;
+    const lat = Math.round(54.352001 / latStep) * latStep;
+    const lonStep = 500 / (111_320 * Math.cos(lat * Math.PI / 180));
+    const middle = (18.646001 + 18.646002) / 2;
+    const fraction = Math.floor(middle / lonStep) + 0.5 - middle / lonStep;
+    expect(fraction).toBeGreaterThanOrEqual(-0.5);
+    expect(fraction).toBeLessThan(0.5);
+    const random = vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0.5).mockReturnValueOnce(fraction + 0.5);
+    try {
+      const a = coarsen({ lat: 54.352001, lon: 18.646001 }, 500);
+      const b = coarsen({ lat: 54.352002, lon: 18.646002 }, 500);
+      expect(a.snappedCoord.lat).toBe(b.snappedCoord.lat);
+      expect(b.snappedCoord.lon - a.snappedCoord.lon).toBeCloseTo(lonStep, 12);
+    } finally { random.mockRestore(); }
   });
 
   test("gridMeters field equals input", () => {
