@@ -1,5 +1,5 @@
 import { encodePolyline } from "../utils/polyline.ts";
-import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
+import { captureCityData, StaleCityDataError, useCityDataStore } from "../services/cityData.ts";
 import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
 import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
@@ -396,6 +396,7 @@ export function SearchPage() {
   );
   const preferredAdapter = useSettingsStore((s) => s.preferredAdapter);
   const searchProvider = useSettingsStore((s) => s.searchProvider);
+  const cityDataToken = useCityDataStore((s) => s.active?.token);
   const poiLooseCategories = useSettingsStore((s) => s.poiLooseCategories);
   const activeFieldOnly = useSettingsStore((s) => s.searchActiveFieldOnly);
   const keyboardFit = useSettingsStore((s) => s.searchKeyboardFit);
@@ -1067,13 +1068,13 @@ export function SearchPage() {
   userLocationRef.current = userLocation;
   const hasUserLocation = userLocation != null;
 
-  // A different field means different suggestions: clear them so the old
-  // field's rows never show under the new one.
+  // A different field or catalog invalidates selectable rows immediately.
+  // The token stays stable for shape-only updates.
   useEffect(() => {
     setSuggestions([]);
-  }, [activeField]);
+  }, [activeField, cityDataToken]);
 
-  // One request identity per field/query/provider. Cleanup aborts immediately on
+  // One request identity per field/query/provider/catalog. Cleanup aborts immediately on
   // edits, field switches, selection and unmount, including during the debounce.
   // The rows on screen stay until the new results replace them, so the list
   // does not blink empty on every keystroke.
@@ -1152,7 +1153,7 @@ export function SearchPage() {
       });
     }, activeQuery.trim() ? 300 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [activeField, activeQuery, cityId, searchProvider, poiLooseCategories, placeSearchAllowed, hasUserLocation]);
+  }, [activeField, activeQuery, cityId, cityDataToken, searchProvider, poiLooseCategories, placeSearchAllowed, hasUserLocation]);
 
   // Capture a committed endpoint as a recent (privacy-axis gated inside
   // recordRecent; no-ops when the axis is "off"). Excludes live-GPS and
