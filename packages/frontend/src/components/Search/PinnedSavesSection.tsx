@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { BaseEndpoint } from "@pt/shared";
-import { deleteSave, saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
+import { deleteSave, renameSave, saveBelongsToCity, type ResolvedSave } from "../../services/saves.ts";
 import { RecentRow } from "./RecentRow.tsx";
 import { RecentNotice, type RecentNoticeState } from "./RecentNotice.tsx";
 import { useResolvedSaves } from "../../hooks/useResolvedSaves.ts";
@@ -43,6 +43,7 @@ function CityPinnedSavesSection({
   // Removed saves leave the list at once; the delete is final when Undo ends.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [notice, setNotice] = useState<{ id: string; notice: RecentNoticeState } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const normalizedQuery = normalizeQuery(query);
   const matches = useMemo(
     () => filterSavedPlaces(resolved ?? [], query).filter((save) => !hidden.has(save.id)),
@@ -96,13 +97,26 @@ function CityPinnedSavesSection({
       </div>
       {visible.map((save) => save.id === notice?.id && hidden.has(save.id) ? (
         <div role="listitem" key={save.id}>{removedNotice}</div>
+      ) : save.id === renaming ? (
+        <div role="listitem" key={save.id}>
+          <RenameField
+            save={save}
+            label={t("search.saved_rename_label", "Name for {label}").replace("{label}", labelFor(save))}
+            onDone={(alias) => {
+              setRenaming(null);
+              if (alias !== null && alias.trim() !== save.alias) void renameSave(save.id, alias).catch(() => {});
+            }}
+          />
+        </div>
       ) : (
         <div role="listitem" key={save.id}>
         <RecentRow
           label={save.alias || labelFor(save)}
+          onRename={() => setRenaming(save.id)}
           onRemove={() => remove(save)}
           text={{
             actions: t("search.recent_actions", "Actions for {label}"),
+            rename: t("search.saved_rename", "Rename"),
             remove: t("search.saved_remove", "Remove from saved"),
           }}
         >
@@ -133,6 +147,57 @@ function CityPinnedSavesSection({
         {expanded ? t("search.saved_show_less", "Show fewer saved items") : t("search.saved_show_all", "Show all saved items ({n})").replace("{n}", String(matches.length))}
       </button>}
     </div>
+  );
+}
+
+/**
+ * Inline name field for a save. Enter or leaving the field keeps the name,
+ * Escape cancels; an empty name shows the place or trip again.
+ */
+function RenameField({ save, label, onDone }: {
+  save: ResolvedSave;
+  label: string;
+  onDone: (alias: string | null) => void;
+}) {
+  const [value, setValue] = useState(save.alias || labelFor(save));
+  const done = useRef(false);
+  const finish = (alias: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(alias);
+  };
+  return (
+    <form
+      className="flex items-center gap-3 px-4 py-2 border-b border-divider"
+      onSubmit={(e) => {
+        e.preventDefault();
+        finish(value);
+      }}
+    >
+      <span className="text-fg-muted text-lg" aria-hidden="true">
+        {save.destination ? "\u{1F517}" : "\u{2B50}"}
+      </span>
+      <input
+        autoFocus
+        data-testid="saved-rename-input"
+        aria-label={label}
+        value={value}
+        placeholder={labelFor(save)}
+        maxLength={80}
+        enterKeyHint="done"
+        onChange={(e) => setValue(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => finish(value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            finish(null);
+          }
+        }}
+        className="min-w-0 flex-1 min-h-11 rounded-md border border-divider bg-surface px-3 text-base text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      />
+    </form>
   );
 }
 

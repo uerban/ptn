@@ -569,6 +569,8 @@
   "settings.search_layout": "Meklēšanas izkārtojums · pagaidu opcijas",
   "search.saved_places_trips": "Saglabātās vietas un braucieni",
   "search.saved_remove": "Noņemt no saglabātajiem",
+  "search.saved_rename": "Pārdēvēt",
+  "search.saved_rename_label": "Nosaukums {label}",
   "search.saved_removed": "{label} noņemts no saglabātajiem",
   "search.saved_show_less": "Rādīt mazāk saglabāto vienību",
   "search.saved_show_all": "Rādīt visus saglabātos elementus ({n})",

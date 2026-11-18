@@ -75,6 +75,23 @@ describe("RecentRow", () => {
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
+  it("on a saved row, offers Rename and swipe right renames", () => {
+    const onRename = vi.fn();
+    const onRemove = vi.fn();
+    render(
+      <RecentRow label="Home" onRename={onRename} onRemove={onRemove} text={{ actions: "More for {label}", rename: "Rename", remove: "Remove from saved" }}>
+        <button type="button">Home</button>
+      </RecentRow>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More for Home" }));
+    expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Rename", "Remove from saved"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    expect(onRename).toHaveBeenCalledTimes(1);
+    swipe(120);
+    expect(onRename).toHaveBeenCalledTimes(2);
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
   it("ignores short swipes and swipes from the screen edge", () => {
     const { onSave, onRemove } = renderRow();
     swipe(40);

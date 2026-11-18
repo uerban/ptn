@@ -565,6 +565,8 @@
   "settings.search_layout": "Søkelayout · midlertidige alternativer",
   "search.saved_places_trips": "Lagrede steder og reiser",
   "search.saved_remove": "Fjern fra lagrede",
+  "search.saved_rename": "Gi nytt navn",
+  "search.saved_rename_label": "Navn for {label}",
   "search.saved_removed": "Fjernet {label} fra lagrede",
   "search.saved_show_less": "Vis færre lagrede elementer",
   "search.saved_show_all": "Vis alle lagrede elementer ({n})",

@@ -559,6 +559,8 @@
   "settings.search_layout": "Układ wyszukiwania · opcje tymczasowe",
   "search.saved_places_trips": "Zapisane miejsca i trasy",
   "search.saved_remove": "Usuń z zapisanych",
+  "search.saved_rename": "Zmień nazwę",
+  "search.saved_rename_label": "Nazwa dla {label}",
   "search.saved_removed": "Usunięto {label} z zapisanych",
   "search.saved_show_less": "Pokaż mniej zapisanych pozycji",
   "search.saved_show_all": "Pokaż wszystkie zapisane pozycje ({n})",

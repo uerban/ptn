@@ -580,6 +580,8 @@
   "settings.search_layout": "Размеркаванне пошуку · часовыя опцыі",
   "search.saved_places_trips": "Захаваныя месцы і паездкі",
   "search.saved_remove": "Выдаліць з захаваных",
+  "search.saved_rename": "Змяніць назву",
+  "search.saved_rename_label": "Назва для {label}",
   "search.saved_removed": "{label} выдалена з захаваных",
   "search.saved_show_less": "Паказаць менш захаваных элементаў",
   "search.saved_show_all": "Паказаць усе захаваныя элементы ({n})",

@@ -565,6 +565,8 @@
   "settings.search_layout": "Söklayout · tillfälliga alternativ",
   "search.saved_places_trips": "Sparade platser och resor",
   "search.saved_remove": "Ta bort från sparade",
+  "search.saved_rename": "Byt namn",
+  "search.saved_rename_label": "Namn för {label}",
   "search.saved_removed": "Tog bort {label} från sparade",
   "search.saved_show_less": "Visa färre sparade objekt",
   "search.saved_show_all": "Visa alla sparade objekt ({n})",

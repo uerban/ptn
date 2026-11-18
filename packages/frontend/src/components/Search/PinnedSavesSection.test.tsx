@@ -207,4 +207,38 @@ describe("per-city saved places", () => {
     await screen.findByText("Home");
     expect(screen.queryByText("Work")).toBeNull();
   }, 10000);
+  test("Rename from the menu keeps the new name; Escape and an unchanged name do nothing", async () => {
+    await seed([{ id: "p1", alias: "Home", origin: home, savedAt: 2 }]);
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Name for Długa 21" }) as HTMLInputElement;
+    expect(input.value).toBe("Home");
+    fireEvent.change(input, { target: { value: "Mum's" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(await screen.findByText("Home")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "  Mum's  " } });
+    fireEvent.submit(screen.getByRole("textbox").closest("form")!);
+    expect(await screen.findByText("Mum's")).toBeTruthy();
+    cleanup();
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    expect(await screen.findByText("Mum's")).toBeTruthy();
+  });
+
+  test("an empty name shows the place again", async () => {
+    await seed([{ id: "p1", alias: "Home", origin: home, savedAt: 2 }]);
+    render(<PinnedSavesSection onSelect={vi.fn()} />);
+    await screen.findByText("Home");
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Home" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: " " } });
+    fireEvent.blur(screen.getByRole("textbox"));
+    await waitFor(() => expect(screen.queryByText("Home")).toBeNull());
+    expect(screen.getByText("Długa 21")).toBeTruthy();
+  });
 });
