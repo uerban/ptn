@@ -45,7 +45,7 @@ describe("Settings structure", () => {
     renderSettings();
     const card = await screen.findByRole("region", { name: "Recent places" }, LAZY);
     expect(within(card).getByRole("button", { name: "Purge" })).toBeInTheDocument();
-    expect(within(card).getByRole("radio", { name: "Encrypted at rest" })).toBeInTheDocument();
+    expect(await within(card).findByRole("radio", { name: "Encrypted at rest" }, LAZY)).toBeInTheDocument();
     // …and not again among the per-axis overrides or as its own section.
     fireEvent.click(screen.getByRole("button", { name: /Advanced/ }));
     await screen.findByRole("heading", { level: 2, name: "Per-axis overrides" }, LAZY);
