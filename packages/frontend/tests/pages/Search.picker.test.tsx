@@ -64,6 +64,28 @@ describe("search place picker", () => {
     expect(toInput()).toHaveValue("Library");
     expect(view.container.querySelector("[data-active-field]")).toBeNull();
   });
+  it.each(["unmatched", ""])("Enter does not select the previous query while %j is pending", async (query) => {
+    stream.mockImplementation(async (value, _c, _h, _s, _p, cb) => {
+      if (value === "lib") cb.onResults([{ kind: "stop", stopId: "library", name: "Library", lat: 54, lon: 25, score: 1 }], { done: true, emitSeq: 0 });
+      else await new Promise(() => {});
+    });
+    const view = mount();
+    fireEvent.change(toInput(), { target: { value: "lib" } });
+    await screen.findByRole("option", { name: /Library/ });
+    fireEvent.change(toInput(), { target: { value: query } });
+    fireEvent.keyDown(toInput(), { key: "Enter" });
+    expect(toInput()).toHaveValue(query);
+    expect(view.container.querySelector("[data-active-field=to]")).not.toBeNull();
+    expect(screen.getByRole("option", { name: /Library/ })).toBeInTheDocument();
+  });
+  it("Enter dismisses the keyboard after a completed empty result", async () => {
+    mount();
+    fireEvent.change(toInput(), { target: { value: "unmatched" } });
+    await screen.findByText("No matching place suggestions");
+    fireEvent.keyDown(toInput(), { key: "Enter" });
+    expect(toInput()).toHaveValue("unmatched");
+    expect(toInput()).not.toHaveFocus();
+  });
   it("respects the keyboard-on-scroll preference without closing the picker", () => {
     const view = mount();
     (toInput() as HTMLInputElement).focus();

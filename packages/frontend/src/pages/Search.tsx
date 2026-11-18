@@ -1371,6 +1371,9 @@ export function SearchPage() {
       }
     } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
+      // Retained rows can belong to the previous query during the debounce.
+      // Only implicitly commit a result once the current query is ready.
+      if (suggestionStatus !== "ready") return;
       if (shownSuggestions[0]) selectSuggestion(shownSuggestions[0]);
       else dismissKeyboard();
     } else if (e.key === "Escape") {
