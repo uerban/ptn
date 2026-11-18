@@ -1,4 +1,5 @@
 import { invalidateCityData } from "./cityData.ts";
+import { groupStops } from "./stopGrouping.ts";
 import { seedLegacyCityProjection } from "../test-helpers/cityData.ts";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { clearPersonal, putPersonal } from "./personalStorage.ts";
@@ -238,6 +239,18 @@ describe("searchSuggestions", () => {
     const { searchSuggestions } = await import("./searchSuggestions.ts");
     const results = await searchSuggestions("", "gdansk", null, new AbortController().signal, "local");
     expect(results).toEqual([]);
+  });
+  it("retains both distant same-latitude stop groups through storage and final merge", async () => {
+    const stops = [gtfsStop("w1", "Central", 54.7, 25.2), gtfsStop("w2", "Central", 54.7001, 25.2),
+      gtfsStop("e1", "Central", 54.7, 25.3), gtfsStop("e2", "Central", 54.7001, 25.3)];
+    await db.gtfsStops.bulkPut(stops);
+    await db.stopGroups.bulkPut(groupStops(stops));
+    const rows = await searchSuggestions("central", "gdansk", null, new AbortController().signal, "local");
+    const groups = rows.filter(row => row.kind === "stopGroup");
+    expect(groups).toHaveLength(2);
+    expect(groups.map(group => group.stopIds.slice().sort()).sort()).toEqual([["e1", "e2"], ["w1", "w2"]]);
+    expect(rows.some(row => row.kind === "stop")).toBe(false);
+    expect(mockSearchStops).not.toHaveBeenCalled();
   });
 
   it("matches local GTFS stops by name prefix from the first character", async () => {

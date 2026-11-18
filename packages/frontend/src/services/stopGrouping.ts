@@ -173,5 +173,13 @@ export function groupStops(stops: StopForGrouping[]): StopGroupRecord[] {
   const numberedGroups = groupByNumberedSuffix(stops, grouped);
   const clusterGroups = groupByNameCluster(stops, grouped);
 
-  return [...parentGroups, ...numberedGroups, ...clusterGroups];
+  const groups = [...parentGroups, ...numberedGroups, ...clusterGroups];
+  const identityCounts = new Map<string, number>();
+  for (const group of groups) identityCounts.set(group.groupId, (identityCounts.get(group.groupId) ?? 0) + 1);
+  // Rounded latitude alone can collide for distant same-name clusters.
+  // Preserve existing keys unless ambiguous; encode the full membership
+  // instead of a lossy coordinate/hash, independently of input order.
+  return groups.map(group => identityCounts.get(group.groupId)! > 1
+    ? { ...group, groupId: `collision:${encodeURIComponent(JSON.stringify([group.groupId, group.stopIds.slice().sort()]))}` }
+    : group);
 }

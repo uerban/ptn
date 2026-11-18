@@ -119,6 +119,20 @@ describe("groupStops", () => {
   // ── Strategy 3: name_cluster ─────────────────────────────────────────────
 
   describe("name_cluster grouping", () => {
+    it("keeps distant same-name clusters with equal rounded latitude distinct", () => {
+      const stops = [
+        { id: "w1", name: "Central", lat: 54.7, lon: 25.2 },
+        { id: "w2", name: "Central", lat: 54.7001, lon: 25.2 },
+        { id: "e1", name: "Central", lat: 54.7, lon: 25.3 },
+        { id: "e2", name: "Central", lat: 54.7001, lon: 25.3 },
+      ];
+      const groups = groupStops(stops);
+      expect(groups).toHaveLength(2);
+      expect(new Set(groups.map(group => group.groupId)).size).toBe(2);
+      const identities = (rows: ReturnType<typeof groupStops>) => rows.map(group =>
+        [group.stopIds.slice().sort().join(","), group.groupId]).sort();
+      expect(identities(groupStops(stops.slice().reverse()))).toEqual(identities(groups));
+    });
     it("clusters same-name stops within 150 m", () => {
       // ~100 m apart (well within threshold)
       const stops: StopForGrouping[] = [
