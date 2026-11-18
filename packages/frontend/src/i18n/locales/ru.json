@@ -578,6 +578,8 @@
   "settings.search_layout": "Макет поиска · временные параметры",
   "search.saved_places_trips": "Сохраненные места и маршруты",
   "search.saved_remove": "Удалить из сохранённых",
+  "search.saved_rename": "Переименовать",
+  "search.saved_rename_label": "Название для {label}",
   "search.saved_removed": "{label} удалено из сохранённых",
   "search.saved_show_less": "Показать меньше сохраненных элементов",
   "search.saved_show_all": "Показать все сохраненные элементы ({n})",

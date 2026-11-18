@@ -566,6 +566,8 @@
   "settings.search_layout": "Otsingu paigutus · ajutised valikud",
   "search.saved_places_trips": "Salvestatud kohad ja reisid",
   "search.saved_remove": "Eemalda salvestatutest",
+  "search.saved_rename": "Ümbernimetamine",
+  "search.saved_rename_label": "Nimi {label}",
   "search.saved_removed": "{label} eemaldati salvestatutest",
   "search.saved_show_less": "Näita vähem salvestatud objekte",
   "search.saved_show_all": "Näita kõiki salvestatud objekte ({n})",

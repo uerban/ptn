@@ -572,6 +572,8 @@
   "settings.search_layout": "Paieškos išdėstymas · laikinos parinktys",
   "search.saved_places_trips": "Išsaugotos vietos ir kelionės",
   "search.saved_remove": "Pašalinti iš išsaugotų",
+  "search.saved_rename": "Pervardyti",
+  "search.saved_rename_label": "Pavadinimas {label}",
   "search.saved_removed": "{label} pašalinta iš išsaugotų",
   "search.saved_show_less": "Rodyti mažiau išsaugotų elementų",
   "search.saved_show_all": "Rodyti visus išsaugotus elementus ({n})",
