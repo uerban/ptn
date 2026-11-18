@@ -325,8 +325,11 @@ describe("Arrive-by results", () => {
     emit(state("complete", [LATEST, FAST, FEW]));
     await waitFor(() => expect(order()).toEqual(["L1", "F2", "W3"]));
     expect(screen.getByRole("status")).toHaveTextContent("latest departure first");
-    const shown = performance.getEntriesByName(ARRIVE_BY_MARKS.shown) as PerformanceMark[];
-    expect(shown.map((m) => (m.detail as { status: string }).status)).toEqual(["latest", "complete"]);
+    // The mark follows the paint, so it can land just after the cards appear.
+    await waitFor(() => {
+      const shown = performance.getEntriesByName(ARRIVE_BY_MARKS.shown) as PerformanceMark[];
+      expect(shown.map((m) => (m.detail as { status: string }).status)).toEqual(["latest", "complete"]);
+    });
   });
 
   it("marks the applied search's page steps (H73) without changing what it shows", async () => {
