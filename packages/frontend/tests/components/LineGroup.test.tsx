@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { I18nContext } from "../../src/i18n/index.ts";
 import { LineGroup } from "../../src/components/DepartureSheet/LineGroup.tsx";
@@ -122,13 +122,21 @@ describe("LineGroup", () => {
   });
 
   it("shows waits of an hour or more as hours and minutes, not a clock time", () => {
-    const deps = [{ ...baseDep, scheduledTime: new Date(Date.now() + 69.5 * 60_000).toISOString() }];
-    const { container } = render(
-      <LineGroup routeShortName="1" routeColor="e53935" mode="BUS" headsign="Centre" departures={deps} />,
-      { wrapper: Wrapper },
-    );
-    fireEvent.click(container.querySelector("[aria-expanded]")!);
-    expect(screen.getByTestId("schedule-row").textContent).not.toMatch(/1:\d\d/);
-    expect(screen.getByTestId("schedule-row").textContent).toMatch(/1\u00a0h (9|10)\u00a0min/);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 19, 0, 30));
+    try {
+      const deps = [{ ...baseDep, scheduledTime: new Date(Date.now() + 70 * 60_000).toISOString() }];
+      const { container } = render(
+        <LineGroup routeShortName="1" routeColor="e53935" mode="BUS" headsign="Centre" departures={deps} />,
+        { wrapper: Wrapper },
+      );
+      fireEvent.click(container.querySelector("[aria-expanded]")!);
+      const row = screen.getByTestId("schedule-row");
+      // The departure clock legitimately contains 1:40; only the wait is a duration.
+      expect(within(row).getByTestId("scheduled-time").textContent).toMatch(/1:40/);
+      expect(within(row).getByText("1 h 10 min").textContent).toBe("1\u00a0h 10\u00a0min");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
