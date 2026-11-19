@@ -5,7 +5,7 @@ import type {
 } from "../types/scheduleTile.js";
 import type { RtTripUpdate } from "../proto/route-update.js";
 import { lowerBound } from "../util/binarySearch.js";
-import { ymdLocal, addDaysCivil } from "../util/ymd.js";
+import { ymdLocal, addDaysCivil, yyyymmddToLocalMidnight } from "../util/ymd.js";
 import { serviceDayToUnix, unixToServiceDay } from "../time/timeDomain.js";
 import { serviceActiveForDate } from "./serviceActiveForDate.js";
 
@@ -15,7 +15,7 @@ import { serviceActiveForDate } from "./serviceActiveForDate.js";
  * departures for the same inputs. Adding optional fields, fixing wrong test assertions, etc. do
  * NOT bump.
  */
-export const GET_DEPARTURES_FROM_TILE_VERSION = "1";
+export const GET_DEPARTURES_FROM_TILE_VERSION = "2";
 
 /** Query input for `getDeparturesFromTile`. */
 export interface GetDeparturesFromTileArgs {
@@ -23,7 +23,7 @@ export interface GetDeparturesFromTileArgs {
   stopId: string;
   /** Wall-clock reference time. The 10-minute backward cutoff is `now - 10min`. */
   now: Date;
-  /** Maximum departures to return after sorting by scheduled time. */
+  /** Maximum departures to return after sorting by predicted or scheduled time. */
   limit: number;
   /** Window upper bound at `now + lookAheadHours`. Range 1..48 per legacy contract. */
   lookAheadHours: number;
@@ -36,8 +36,8 @@ export interface GetDeparturesFromTileArgs {
   tz?: string;
   /**
    * Optional real-time trip updates. Map keys: prefer `${tripId}|${YYYYMMDD}`
-   * for date-scoped updates; fall back to bare `tripId`. Mirrors the legacy
-   * RT key strategy in `getDepartures`. When absent, no RT fields are populated.
+   * for date-scoped updates. Bare `tripId` applies to trips without dated entries.
+   * When absent, no RT fields are populated.
    */
   realtimeUpdates?: ReadonlyMap<string, RtTripUpdate>;
 }
@@ -66,8 +66,8 @@ const TEN_MINUTES_MS = 10 * 60 * 1000;
  *     end-of-day this can be 4 days (yesterday + today + tomorrow + day-after).
  *
  * Real-time merge (when `realtimeUpdates` is provided): per departure, look up
- * the date-scoped key `${tripId}|${baseDateYmd}` first; fall back to the bare
- * `tripId`. Set `delaySeconds` from RT; set `predictedTime` only when
+ * the date-scoped key `${tripId}|${baseDateYmd}` first. Use the bare trip ID
+ * only for trips without scoped entries. Set `delaySeconds` from RT; set `predictedTime` only when
  * `delaySeconds !== 0`; set `cancelled` only when `rt.cancelled === true`
  * (false collapses to undefined to drop the wire field, matching legacy). A
  * trip with `rt.deleted` is dropped from the board altogether.
@@ -169,6 +169,32 @@ export function getDeparturesFromTile(
     }
   }
 
+  // Scan only the scheduled range that could move into the prediction window.
+  // Explicit dates also cover trips whose service day falls outside the normal scan.
+  let minDelay = 0;
+  let maxDelay = 0;
+  // The servers can send a bare mirror of a dated update for legacy consumers.
+  const datedTrips = new Set<string>();
+  const extraDates = new Set<string>();
+  const standardDates = new Set(baseDates.map(({ ymd }) => ymd));
+  for (const [key, update] of realtimeUpdates ?? []) {
+    if (!update.cancelled && !update.deleted) {
+      minDelay = Math.min(minDelay, update.delaySeconds);
+      maxDelay = Math.max(maxDelay, update.delaySeconds);
+    }
+    const separator = key.lastIndexOf("|");
+    if (separator < 0) continue;
+    const ymd = key.slice(separator + 1);
+    if (!/^\d{8}$/.test(ymd) || addDaysCivil(ymd, 0) !== ymd) continue;
+    datedTrips.add(key.slice(0, separator));
+    if (standardDates.has(ymd) || extraDates.has(ymd)) continue;
+    extraDates.add(ymd);
+    const baseMs = tz
+      ? serviceDayToUnix(Number(ymd), 0, tz) * 1000
+      : yyyymmddToLocalMidnight(ymd).getTime();
+    baseDates.push({ baseMs, ymd });
+  }
+
   // Per-base-date active service set (stop-scoped).
   const activeByBase = new Map<string, Set<number>>();
   for (const { ymd } of baseDates) {
@@ -188,8 +214,8 @@ export function getDeparturesFromTile(
   // Per-base-date filter: lowerSecs/upperSecs reframed against each midnight.
   const departures: Departure[] = [];
   for (const { baseMs, ymd } of baseDates) {
-    const lowerSecs = Math.floor((cutoffMs - baseMs) / 1000);
-    const upperSecs = Math.ceil((upperCutoffMs - baseMs) / 1000);
+    const lowerSecs = Math.floor((cutoffMs - baseMs) / 1000) - maxDelay;
+    const upperSecs = Math.ceil((upperCutoffMs - baseMs) / 1000) - minDelay;
 
     // Skip a base date whose entire window is below the stop's first
     // departureSecs or above its last — saves the binary-search call.
@@ -243,30 +269,15 @@ export function getDeparturesFromTile(
         scheduledMs = scheduled.getTime();
         scheduledTime = scheduled.toISOString();
       }
-      // Exact real-instant cut (unchanged): authoritative window membership.
-      if (scheduledMs < cutoffMs) continue;
-      if (scheduledMs > upperCutoffMs) continue;
+      const rt = realtimeUpdates?.get(`${tripId}|${ymd}`) ??
+        (datedTrips.has(tripId) || extraDates.has(ymd) ? undefined : realtimeUpdates?.get(tripId));
+      if (rt?.deleted || (extraDates.has(ymd) && !rt)) continue;
 
-      let predictedTime: string | undefined;
-      let delaySeconds: number | undefined;
-      let cancelled: boolean | undefined;
-
-      if (realtimeUpdates) {
-        const rt =
-          realtimeUpdates.get(`${tripId}|${ymd}`) ??
-          realtimeUpdates.get(tripId);
-        // A DELETED trip must not be shown to riders, not even as cancelled.
-        if (rt?.deleted) continue;
-        if (rt) {
-          delaySeconds = rt.delaySeconds;
-          cancelled = rt.cancelled || undefined;
-          if (rt.delaySeconds !== 0) {
-            predictedTime = new Date(
-              scheduledMs + rt.delaySeconds * 1000,
-            ).toISOString();
-          }
-        }
-      }
+      const delaySeconds = rt?.delaySeconds;
+      const cancelled = rt?.cancelled || undefined;
+      const predictedMs = scheduledMs + (cancelled ? 0 : delaySeconds ?? 0) * 1000;
+      if (predictedMs < cutoffMs || predictedMs > upperCutoffMs) continue;
+      const predictedTime = predictedMs === scheduledMs ? undefined : new Date(predictedMs).toISOString();
 
       departures.push({
         routeId: route.id,
@@ -287,8 +298,8 @@ export function getDeparturesFromTile(
 
   departures.sort(
     (a, b) =>
-      new Date(a.scheduledTime).getTime() -
-      new Date(b.scheduledTime).getTime(),
+      Date.parse(a.predictedTime ?? a.scheduledTime) -
+      Date.parse(b.predictedTime ?? b.scheduledTime),
   );
 
   const sliced = departures.slice(0, limit);

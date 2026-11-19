@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseTripUpdatesBuffer } from "../../src/gtfs/realtime.js";
 
 async function encodeFeed(entity: unknown[]): Promise<Uint8Array> {
@@ -14,8 +14,8 @@ async function encodeFeed(entity: unknown[]): Promise<Uint8Array> {
   }).finish();
 }
 
-describe("GTFS-RT delaySeconds clamping", () => {
-  it("caps extreme positive and negative delays", async () => {
+describe("GTFS-RT signed delays", () => {
+  it("preserves large positive and negative delays", async () => {
     const data = await encodeFeed([
       {
         id: "positive",
@@ -35,8 +35,8 @@ describe("GTFS-RT delaySeconds clamping", () => {
 
     const updates = await parseTripUpdatesBuffer(data);
 
-    expect(updates.get("trip-positive")?.delaySeconds).toBe(1800);
-    expect(updates.get("trip-negative")?.delaySeconds).toBe(-1800);
+    expect(updates.get("trip-positive")?.delaySeconds).toBe(7200);
+    expect(updates.get("trip-negative")?.delaySeconds).toBe(-7200);
   });
 
   it("passes values at the boundary through unchanged", async () => {
@@ -63,7 +63,7 @@ describe("GTFS-RT delaySeconds clamping", () => {
     expect(updates.get("trip-at-min")?.delaySeconds).toBe(-1800);
   });
 
-  it("clamps values one second past the boundary", async () => {
+  it("preserves values one second past the old boundary", async () => {
     const data = await encodeFeed([
       {
         id: "just-over",
@@ -83,8 +83,8 @@ describe("GTFS-RT delaySeconds clamping", () => {
 
     const updates = await parseTripUpdatesBuffer(data);
 
-    expect(updates.get("trip-1801")?.delaySeconds).toBe(1800);
-    expect(updates.get("trip-minus-1801")?.delaySeconds).toBe(-1800);
+    expect(updates.get("trip-1801")?.delaySeconds).toBe(1801);
+    expect(updates.get("trip-minus-1801")?.delaySeconds).toBe(-1801);
   });
 
   it("falls back to zero when the feed omits stop-time updates", async () => {
@@ -102,24 +102,4 @@ describe("GTFS-RT delaySeconds clamping", () => {
     expect(updates.get("trip-zero")).toEqual({ delaySeconds: 0, cancelled: false });
   });
 
-  it("emits a debug log when a delay is clamped", async () => {
-    const data = await encodeFeed([
-      {
-        id: "over",
-        tripUpdate: {
-          trip: { tripId: "trip-over" },
-          stopTimeUpdate: [{ departure: { delay: 7200 } }],
-        },
-      },
-    ]);
-    const debug = vi.fn();
-    const logger = { debug } as unknown as Parameters<typeof parseTripUpdatesBuffer>[1];
-
-    await parseTripUpdatesBuffer(data, logger);
-
-    expect(debug).toHaveBeenCalledWith(
-      expect.objectContaining({ tripId: "trip-over", rawDelay: 7200, clamped: 1800 }),
-      expect.stringContaining("clamped"),
-    );
-  });
 });
