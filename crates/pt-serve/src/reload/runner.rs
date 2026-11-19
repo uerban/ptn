@@ -9,11 +9,11 @@
 //! Two ways to invoke a single reload pass:
 //!
 //! - [`ReloadRunner::run_one`] — synchronous, returns the outcome. Used by tests AND by the signal
-//! loop ([`ReloadRunner::signal_loop`]).
+//!   loop ([`ReloadRunner::signal_loop`]).
 //! - [`ReloadRunner::trigger_reload`] — equivalent to
-//! receiving a SIGHUP without actually delivering one. Tests prefer this over real signal delivery
-//! ('s "reserve actual SIGHUP for end-to-end tests" guidance). It enqueues a pending-reload via the
-//! same latch path the signal loop uses.
+//!   receiving a SIGHUP without actually delivering one. Tests prefer this over real signal delivery
+//!   ('s "reserve actual SIGHUP for end-to-end tests" guidance). It enqueues a pending-reload via the
+//!   same latch path the signal loop uses.
 //!
 //! ## Pending-reload latch
 //!

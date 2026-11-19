@@ -22,6 +22,7 @@ const HEADER: usize = 4096;
 /// Region IDs for the two SoA columns.
 const STOPS_SOA: u16 = 0x40;
 const ROUTES_SOA: u16 = 0x41;
+const ROUTE_SIDE_TABLE: u16 = pt_core::region_ids::ROUTE_SIDE_TABLE;
 
 /// `0x17 Frequencies` — GTFS `frequencies.txt` rows. Must match
 /// `pt-core`'s `region_ids::FREQUENCIES`). 16 B/record; count u32 LE prefix;
@@ -145,12 +146,50 @@ pub fn emit_region_table(header: &mut [u8], entries: &[(u16, u64, u64)]) {
 ///
 /// `service_pool` is the `count × S` distinct-bitfield body (the emitter writes
 /// the count prefix); `service_to_bitfield` is the `numServices × u32` LE index.
+/// Encode the optional `0x23` body, or `None` when no route has any of its fields.
+fn route_side_body(
+    routes_attrs: &[crate::pass1::attrs::RouteAttrs],
+    networks: &[crate::pass1::NetworkAttrs],
+    pool: &StringPool,
+) -> Option<Vec<u8>> {
+    let has_fields = routes_attrs.iter().any(|a| {
+        !a.desc.is_empty()
+            || !a.url.is_empty()
+            || a.sort_order.is_some()
+            || !a.network_id.is_empty()
+    });
+    if !has_fields {
+        return None;
+    }
+    let network_rows: Vec<(u32, u32)> = networks
+        .iter()
+        .map(|n| (pool.index_of(&n.id), pool.index_of(&n.name)))
+        .collect();
+    let rows: Vec<pt_core::route_side::RouteSideRow> = routes_attrs
+        .iter()
+        .map(|a| pt_core::route_side::RouteSideRow {
+            desc_idx: pool.index_of(&a.desc),
+            url_idx: pool.index_of(&a.url),
+            sort_order: a.sort_order,
+            network_ord: networks
+                .binary_search_by(|n| n.id.as_str().cmp(a.network_id.as_str()))
+                .ok()
+                .map(|ordinal| ordinal as u32),
+        })
+        .collect();
+    Some(pt_core::route_side::encode_route_side_table(
+        &network_rows,
+        &rows,
+    ))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn build_current_bundle(
     stop_keys: &[String],
     stops_attrs: &[crate::pass1::attrs::StopAttrs],
     route_keys: &[String],
     routes_attrs: &[crate::pass1::attrs::RouteAttrs],
+    networks: &[crate::pass1::NetworkAttrs],
     parent_pairs: &[(u32, u32)],
     pool: &StringPool,
     trips: &[u8],
@@ -187,6 +226,7 @@ pub fn build_current_bundle(
     let routes_soa_len = route_keys.len() * ROUTES_SOA_BYTES_PER_ROUTE;
     let mut routes_soa = vec![0u8; routes_soa_len];
     write_routes_soa(&mut routes_soa, route_keys, routes_attrs, pool)?;
+    let route_side = route_side_body(routes_attrs, networks, pool);
 
     // Build `0x15` as count prefix plus distinct bitfields; `0x16` is the
     // verbatim per-service pool index.
@@ -257,6 +297,8 @@ pub fn build_current_bundle(
         (0, 0)
     };
 
+    let route_side_placed = route_side.as_deref().map(&mut place);
+
     // Optional 0x01 WindowMeta: emit ONLY when the derived window exceeds the
     // 90-day default (omit-at-default, the 0xFA precedent). 4-byte body
     // (windowDays u16 LE + reserved u16 LE). ALIGNMENT (M10): a NATURAL 2-byte
@@ -319,6 +361,9 @@ pub fn build_current_bundle(
             boarding_b as u64,
         ));
     }
+    if let Some((off, len)) = route_side_placed {
+        entries.push((ROUTE_SIDE_TABLE, off as u64, len as u64));
+    }
     if emit_window_meta {
         entries.push((WINDOW_META, window_meta_off as u64, window_meta_b as u64));
     }
@@ -337,6 +382,9 @@ pub fn build_current_bundle(
     buf[transfers_off..transfers_off + transfers_b].copy_from_slice(transfers);
     if emit_boarding {
         buf[boarding_off..boarding_off + boarding_b].copy_from_slice(stop_time_boarding);
+    }
+    if let (Some(body), Some((off, len))) = (&route_side, route_side_placed) {
+        buf[off..off + len].copy_from_slice(body);
     }
     if emit_window_meta {
         // windowDays u16 LE @ +0, reserved u16 LE = 0 @ +2 (the +2 stays zero

@@ -3,14 +3,12 @@
 //!
 //! Layout:
 //! - [`manifest`] — wire-format JSON shapes (`GenerationManifest`, `PointerManifest`) plus
-//! the schema-version constants.
-//! - [`fsync`] — cross-platform durable-fsync helper (Linux
-//! `fsync(2)`, macOS `F_FULLFSYNC`). Used by both the producer publish protocol and pt-serve's
-//! last-good promotion path.
-//! - [`clock`] — `Clock` trait + `SystemClock` + `MockClock`. Lets the
-//! server's staleness/reload logic be driven from tests without sleeping.
-//! - [`validate`] —
-//! validator API surface.
+//!   the schema-version constants.
+//! - [`fsync`] — cross-platform durable-fsync helper (Linux `fsync(2)`, macOS `F_FULLFSYNC`). Used
+//!   by both the producer publish protocol and pt-serve's last-good promotion path.
+//! - [`clock`] — `Clock` trait + `SystemClock` + `MockClock`. Lets the server's staleness/reload
+//!   logic be driven from tests without sleeping.
+//! - [`validate`] — validator API surface.
 
 #[cfg(feature = "durable-fsync")]
 pub mod artifact_lease;

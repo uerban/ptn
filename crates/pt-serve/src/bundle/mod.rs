@@ -2,7 +2,7 @@
 //!
 //! - [`generation`] — the swap-targeted state ([`Generation`]).
 //! - [`loader`] — the startup load
-//! path with last-good fallback.
+//!   path with last-good fallback.
 pub mod generation;
 pub mod handle;
 pub mod installed;

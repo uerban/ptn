@@ -79,7 +79,7 @@ export function makeRemoteStopPlanner(
 ): StopPlanner {
   return (query, date) => {
     if (query.excludedRouteIds?.length) {
-      return Promise.reject(new Error("Use on-device planning for bus and minibus filters."));
+      return Promise.reject(new Error("Use on-device planning with route filters."));
     }
     return gateRemoteRouting(() => plan(planRequestFromQuery(query, date)), isAllowed);
   };

@@ -23,8 +23,8 @@ pub enum DeriveInseat {
 /// Top-level CLI. The producer has two modes:
 ///
 /// - **Default (no subcommand)**: P3 sidecar path — `--gtfs-url`/`--gtfs-path` in, `--out <PATH>`
-/// writes a single PTB + JSON sidecars. Acquires `producer.lock`, fault-injection honors
-/// `PT_PRODUCER_FAULT_INJECT` env, signals pt-serve via the pidfile.
+///   writes a single PTB + JSON sidecars. Acquires `producer.lock`, fault-injection honors
+///   `PT_PRODUCER_FAULT_INJECT` env, signals pt-serve via the pidfile.
 ///
 /// Old args remain at the top level for backward compatibility with the
 /// existing sidecar invocation. A `periodic-refresh` invocation simply

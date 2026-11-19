@@ -40,6 +40,8 @@ export interface RoutingBundleRoute {
   agencyId?: string;
   /** GTFS `route_type` (`mode` is derived from it); absent on older bundles. */
   routeType?: number;
+  /** GTFS network of this route; absent when it has none or on older bundles. */
+  networkId?: string;
   /** Ordered stop IDs defining this route's stop sequence. */
   stopIds: string[];
   /** Trips on this route, each with departure times parallel to stopIds. */
@@ -152,6 +154,12 @@ export interface RoutingBundleTransfer {
   toTripId?: string;
 }
 
+/** GTFS network referenced by `RoutingBundleRoute.networkId`. */
+export interface RoutingBundleNetwork {
+  id: string;
+  name?: string;
+}
+
 /** GTFS frequencies.txt row carried on the routing wire, keyed by PTB trip ordinal. */
 export interface RoutingBundleFrequency {
   tripIdx: number;
@@ -172,6 +180,8 @@ export interface RoutingBundleData {
   transfers?: RoutingBundleTransfer[];
   /** GTFS frequencies.txt rows, keyed by PTB global trip ordinal. Omitted when absent. */
   frequencies?: RoutingBundleFrequency[];
+  /** GTFS networks used by this bundle's routes. Omitted when absent. */
+  networks?: RoutingBundleNetwork[];
   meta: {
     generatedAt: string; // ISO 8601
     etag?: string;

@@ -143,6 +143,11 @@ const STOP_TIME_BOARDING_REGION_ID = 0xfa;
 // GTFS reference: https://gtfs.org/documentation/schedule/reference/#frequenciestxt
 export const FREQUENCIES_REGION_ID = 0x17;
 
+// Optional cold route metadata and GTFS networks. Layout: docs/ptb-region-ids.md §6.
+export const ROUTE_SIDE_TABLE_REGION_ID = 0x23;
+const ROUTE_SIDE_TABLE_VERSION = 1;
+const ROUTE_SIDE_ABSENT = 0xffffffff;
+
 // ── Pattern-major band region IDs (B1 — FROZEN registry §4) ───────────────────
 // The frozen-registry homes for the pattern-major timetable (docs/ptb-region-ids.md §4). Mirror pt-core's `region_ids`
 // consts. The pattern band:
@@ -499,6 +504,26 @@ export interface PtbTransfer {
   transferType: number;
 }
 
+/** A GTFS network from `networks.txt`. */
+export interface PtbNetwork {
+  id: string;
+  name?: string;
+}
+
+/** Optional GTFS fields for one route, parallel to `PtbBundle.routes`. */
+export interface PtbRouteSideRow {
+  desc?: string;
+  url?: string;
+  sortOrder?: number;
+  networkId?: string;
+}
+
+/** Decoded `0x23 RouteSideTable`. */
+export interface PtbRouteSideTable {
+  networks: PtbNetwork[];
+  routes: PtbRouteSideRow[];
+}
+
 /**
  * One decoded `0x17 Frequencies` row. Mirrors `FrequencyRecord` (Rust).
  * `endSecs` is the half-open EXCLUDED upper bound per the GTFS spec — the last
@@ -658,6 +683,11 @@ export interface PtbBundle extends PtbHeader {
    */
   frequencies?: PtbFrequencyRow[];
   /**
+   * Decoded `0x23 RouteSideTable`, or `undefined` when the region is absent, has
+   * a newer version, or is malformed. Routing never depends on it.
+   */
+  routeSide?: PtbRouteSideTable;
+  /**
    * Decoded pattern band (`0x10`-`0x14` / `0x45`/`0x46`), or `undefined` when
    * the bundle carries no band (a staging bundle).
    * Decoded + validated by {@link decodePatternBand}; {@link loadPtb} consumes it
@@ -767,6 +797,8 @@ export function loadPtb(bytes: Uint8Array): PtbBundle {
   let stopTimeBoardingRegion: PtbRegion | undefined;
   // Optional 0x17 Frequencies region; undefined ⇒ absent ⇒ no frequency rows.
   let frequenciesRegion: PtbRegion | undefined;
+  // Optional 0x23 RouteSideTable; undefined ⇒ absent ⇒ no route side metadata.
+  let routeSideRegion: PtbRegion | undefined;
   // Optional WindowMeta (0x01); undefined ⇒ absent ⇒ windowDays defaults to
   // SERVICE_WINDOW_DAYS (90).
   let windowMetaRegion: PtbRegion | undefined;
@@ -825,6 +857,7 @@ export function loadPtb(bytes: Uint8Array): PtbBundle {
     else if (regionId === ROUTES_SOA_REGION_ID) routesSoaRegion = reg;
     else if (regionId === STOP_TIME_BOARDING_REGION_ID) stopTimeBoardingRegion = reg;
     else if (regionId === FREQUENCIES_REGION_ID) frequenciesRegion = reg;
+    else if (regionId === ROUTE_SIDE_TABLE_REGION_ID) routeSideRegion = reg;
     else if (regionId === WINDOW_META_REGION_ID) windowMetaRegion = reg;
     else if (regionId === SERVICE_BITFIELD_POOL_REGION_ID) serviceBitfieldPoolRegion = reg;
     else if (regionId === SERVICE_TO_BITFIELD_REGION_ID) serviceToBitfieldRegion = reg;
@@ -1166,6 +1199,13 @@ export function loadPtb(bytes: Uint8Array): PtbBundle {
   const decodedFrequencies = decodeFrequencies(buf, frequenciesRegion, isV2, numTrips);
   const frequencies = decodedFrequencies.rows;
   if (v2) v2.quarantinedFrequencyTrips = decodedFrequencies.quarantined;
+  const routeSide = routeSideRegion
+    ? decodeRouteSideTable(
+        buf.subarray(routeSideRegion.offset, routeSideRegion.offset + routeSideRegion.length),
+        routes.length,
+        pool,
+      )
+    : undefined;
 
   // `patternBand` (0x10-0x14 / 0x45 / 0x46) was decoded UP FRONT (before the
   // StopTimes/TripStarts dispatch) so the carry-less branch could materialize the
@@ -1205,9 +1245,69 @@ export function loadPtb(bytes: Uint8Array): PtbBundle {
     routesSoaRegion,
     boarding,
     frequencies,
+    ...(routeSide ? { routeSide } : {}),
     patternBand,
     carryMaterializedFromBand,
   };
+}
+
+/**
+ * Decode a `0x23 RouteSideTable` body. Returns `undefined` for an unknown version
+ * or malformed body, so bad metadata disables network filters and never blocks
+ * routing. Mirrors `pt_core::route_side::RouteSideTable::decode`.
+ */
+export function decodeRouteSideTable(
+  body: Uint8Array,
+  numRoutes: number,
+  stringPool: readonly string[],
+): PtbRouteSideTable | undefined {
+  const HEADER_BYTES = 16;
+  if (body.length < HEADER_BYTES) return undefined;
+  const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
+  if (view.getUint16(0, true) !== ROUTE_SIDE_TABLE_VERSION) return undefined;
+  if (view.getUint16(2, true) !== 0 || view.getUint32(12, true) !== 0) return undefined;
+  const routeCount = view.getUint32(4, true);
+  const networkCount = view.getUint32(8, true);
+  if (routeCount !== numRoutes) return undefined;
+  if (body.length !== HEADER_BYTES + networkCount * 8 + routeCount * 16) return undefined;
+
+  const column = (start: number, index: number): number => view.getUint32(start + index * 4, true);
+  const inPool = (index: number): boolean => index < stringPool.length;
+  const text = (index: number): string | undefined => stringPool[index] || undefined;
+
+  const idBase = HEADER_BYTES;
+  const nameBase = idBase + networkCount * 4;
+  const networks: PtbNetwork[] = [];
+  for (let n = 0; n < networkCount; n++) {
+    const idIdx = column(idBase, n);
+    const nameIdx = column(nameBase, n);
+    if (!inPool(idIdx) || !inPool(nameIdx)) return undefined;
+    const name = text(nameIdx);
+    networks.push({ id: stringPool[idIdx]!, ...(name ? { name } : {}) });
+  }
+
+  const descBase = nameBase + networkCount * 4;
+  const urlBase = descBase + routeCount * 4;
+  const sortBase = urlBase + routeCount * 4;
+  const networkBase = sortBase + routeCount * 4;
+  const routes: PtbRouteSideRow[] = [];
+  for (let r = 0; r < routeCount; r++) {
+    const descIdx = column(descBase, r);
+    const urlIdx = column(urlBase, r);
+    const sortOrder = column(sortBase, r);
+    const networkOrd = column(networkBase, r);
+    if (!inPool(descIdx) || !inPool(urlIdx)) return undefined;
+    if (networkOrd !== ROUTE_SIDE_ABSENT && networkOrd >= networkCount) return undefined;
+    const desc = text(descIdx);
+    const url = text(urlIdx);
+    routes.push({
+      ...(desc ? { desc } : {}),
+      ...(url ? { url } : {}),
+      ...(sortOrder !== ROUTE_SIDE_ABSENT ? { sortOrder } : {}),
+      ...(networkOrd !== ROUTE_SIDE_ABSENT ? { networkId: networks[networkOrd]!.id } : {}),
+    });
+  }
+  return { networks, routes };
 }
 
 /**

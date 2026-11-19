@@ -2,8 +2,9 @@ use crate::error::{Error, Result};
 use crate::pass1::attrs::{remap_attrs, RouteAttrs, StopAttrs, TripAttrs};
 use crate::pass1::calendar::{parse_calendar, parse_calendar_dates, ServiceAttrs};
 use crate::pass1::identity::{IdentityInterner, InternTable};
+use crate::pass1::networks::{apply_feed_networks, used_networks, NetworkAttrs, RouteScan};
 use crate::pass1::stop_sequences::{scan_trip_stop_triples, TripEndpoint, TripStopTriple};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub struct Pass1Result {
@@ -17,6 +18,8 @@ pub struct Pass1Result {
     /// `Vec::is_empty()` for feeds with no parent_station column.
     pub stop_parent_map: Vec<(u32, u32)>,
     pub routes_attrs: Vec<RouteAttrs>,
+    /// Networks used by published routes, sorted by ID.
+    pub networks: Vec<NetworkAttrs>,
     pub service_attrs: Vec<ServiceAttrs>,
     pub trips_attrs: Vec<TripAttrs>,
     pub stop_times_per_trip: Vec<u32>,
@@ -85,6 +88,7 @@ pub fn run_pass1_union(feed_dirs: &[PathBuf]) -> Result<Pass1Result> {
     // these the first-feed-wins guard would silently overwrite such rows.
     let mut pre_stops_seen: Vec<bool> = Vec::new();
     let mut pre_routes_seen: Vec<bool> = Vec::new();
+    let mut network_union: BTreeMap<String, String> = BTreeMap::new();
 
     // Pass 1a: per-feed CSV scans. Order matters — calendar/calendar_dates
     // populate services BEFORE trips.txt references service_id; routes.txt
@@ -97,12 +101,13 @@ pub fn run_pass1_union(feed_dirs: &[PathBuf]) -> Result<Pass1Result> {
             &mut pre_stops_attrs,
             &mut pre_stops_seen,
         )?;
-        scan_routes(
+        let route_scan = scan_routes(
             &dir.join("routes.txt"),
             &mut routes,
             &mut pre_routes_attrs,
             &mut pre_routes_seen,
         )?;
+        apply_feed_networks(dir, &route_scan, &mut pre_routes_attrs, &mut network_union)?;
         parse_calendar(
             &dir.join("calendar.txt"),
             &mut services,
@@ -141,6 +146,7 @@ pub fn run_pass1_union(feed_dirs: &[PathBuf]) -> Result<Pass1Result> {
     // Remap attrs vectors from pre-finalize to post-finalize indexing.
     let stops_attrs = remap_attrs(pre_stops_attrs, stops_t.remap());
     let routes_attrs = remap_attrs(pre_routes_attrs, routes_t.remap());
+    let networks = used_networks(network_union, &routes_attrs);
     let service_attrs = remap_attrs(pre_service_attrs, services_t.remap());
     let mut trips_attrs = remap_attrs(pre_trips_attrs, trips_t.remap());
 
@@ -302,6 +308,7 @@ pub fn run_pass1_union(feed_dirs: &[PathBuf]) -> Result<Pass1Result> {
         stops_attrs,
         stop_parent_map,
         routes_attrs,
+        networks,
         service_attrs,
         trips_attrs,
         stop_times_per_trip,
@@ -382,7 +389,7 @@ fn scan_routes(
     interner: &mut IdentityInterner<String>,
     attrs: &mut Vec<RouteAttrs>,
     seen: &mut Vec<bool>,
-) -> Result<()> {
+) -> Result<RouteScan> {
     if !path.exists() {
         return Err(Error::MissingFile(path.display().to_string()));
     }
@@ -390,6 +397,14 @@ fn scan_routes(
     let mut rdr = csv::Reader::from_reader(file);
     let headers = rdr.headers()?.clone();
     let id_idx = header_pos(&headers, "route_id", path)?;
+    let desc_idx = headers.iter().position(|h| h == "route_desc");
+    let url_idx = headers.iter().position(|h| h == "route_url");
+    let sort_idx = headers.iter().position(|h| h == "route_sort_order");
+    let network_idx = headers.iter().position(|h| h == "network_id");
+    let mut scan = RouteScan {
+        has_network_column: network_idx.is_some(),
+        ..RouteScan::default()
+    };
     let agency_idx = headers.iter().position(|h| h == "agency_id");
     let short_idx = headers.iter().position(|h| h == "route_short_name");
     let long_idx = headers.iter().position(|h| h == "route_long_name");
@@ -423,13 +438,28 @@ fn scan_routes(
             .and_then(|i| record.get(i))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        let pre_id = interner.intern(id) as usize;
+        let optional = |idx: Option<usize>| {
+            idx.and_then(|i| record.get(i))
+                .unwrap_or_default()
+                .to_string()
+        };
+        let (desc, url, network_id) =
+            (optional(desc_idx), optional(url_idx), optional(network_idx));
+        let sort_order = sort_idx
+            .and_then(|i| record.get(i))
+            .and_then(|s| s.parse::<u32>().ok())
+            .filter(|value| *value != u32::MAX);
+        let pre_id = interner.intern(id.clone()) as usize;
         // First-feed-wins. See `scan_stops` for the orphan-extension and
         // default-aliasing rationale; the same risk exists here for a row
         // with `route_type=0`, no agency, and no names.
         pad_defaults(attrs, pre_id + 1);
         pad_defaults(seen, pre_id + 1);
-        if !seen[pre_id] {
+        let owned = !seen[pre_id];
+        scan.routes
+            .entry(id)
+            .or_insert(owned.then_some(pre_id as u32));
+        if owned {
             attrs[pre_id] = RouteAttrs {
                 agency_id,
                 short_name,
@@ -437,11 +467,15 @@ fn scan_routes(
                 route_type,
                 route_color,
                 route_text_color,
+                desc,
+                url,
+                sort_order,
+                network_id,
             };
             seen[pre_id] = true;
         }
     }
-    Ok(())
+    Ok(scan)
 }
 
 fn scan_trips(

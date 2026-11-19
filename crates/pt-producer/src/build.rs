@@ -117,6 +117,48 @@ pub struct BuildOutcome {
     pub coverage_incomplete_reasons: Vec<String>,
 }
 
+/// Build the StringPool by an explicit record-by-record column walk in finalized
+/// sorted-id order. The order here IS the byte-equality contract; the TS mirror
+/// writer (buildTinyPtnb.ts) must replicate it exactly. Route side table strings
+/// come last, so feeds without those fields keep identical pools.
+///
+/// Takes columns rather than the whole `Pass1Result` so the pool's borrow leaves
+/// `stop_time_boarding` assignable after pass 2.
+pub fn build_string_pool<'a>(
+    stops: (&'a [String], &'a [pass1::attrs::StopAttrs]),
+    routes: (&'a [String], &'a [pass1::attrs::RouteAttrs]),
+    trips: (&'a [String], &'a [pass1::attrs::TripAttrs]),
+    networks: &'a [pass1::NetworkAttrs],
+) -> strpool::StringPool<'a> {
+    let mut pool = strpool::StringPool::new();
+    for (key, a) in stops.0.iter().zip(stops.1) {
+        pool.intern(key);
+        pool.intern(&a.name);
+    }
+    for (key, a) in routes.0.iter().zip(routes.1) {
+        pool.intern(key);
+        pool.intern(&a.agency_id);
+        pool.intern(&a.short_name);
+        pool.intern(&a.long_name);
+        pool.intern(&a.route_color);
+        pool.intern(&a.route_text_color);
+    }
+    for (key, a) in trips.0.iter().zip(trips.1) {
+        pool.intern(key);
+        pool.intern(&a.headsign);
+        pool.intern(&a.shape_id);
+    }
+    for a in routes.1 {
+        pool.intern(&a.desc);
+        pool.intern(&a.url);
+    }
+    for network in networks {
+        pool.intern(&network.id);
+        pool.intern(&network.name);
+    }
+    pool
+}
+
 /// Build a current PTB v1 bundle from a set of local GTFS zip paths.
 ///
 /// - `feed_zip_paths` — local paths to GTFS zips. The caller is responsible
@@ -232,27 +274,12 @@ pub fn build_ptb(
         rows
     };
 
-    let pool = {
-        let mut pool = strpool::StringPool::new();
-        for (key, a) in p1.stops.keys().iter().zip(&p1.stops_attrs) {
-            pool.intern(key);
-            pool.intern(&a.name);
-        }
-        for (key, a) in p1.routes.keys().iter().zip(&p1.routes_attrs) {
-            pool.intern(key);
-            pool.intern(&a.agency_id);
-            pool.intern(&a.short_name);
-            pool.intern(&a.long_name);
-            pool.intern(&a.route_color);
-            pool.intern(&a.route_text_color);
-        }
-        for (key, a) in p1.trips.keys().iter().zip(&p1.trips_attrs) {
-            pool.intern(key);
-            pool.intern(&a.headsign);
-            pool.intern(&a.shape_id);
-        }
-        pool
-    };
+    let pool = build_string_pool(
+        (p1.stops.keys(), &p1.stops_attrs),
+        (p1.routes.keys(), &p1.routes_attrs),
+        (p1.trips.keys(), &p1.trips_attrs),
+        &p1.networks,
+    );
 
     let layout = layout::Layout::compute(
         p1.stops.len() as u64,
@@ -635,6 +662,7 @@ pub fn reencode_staging_bundle_as_current(
         &p1.stops_attrs,
         p1.routes.keys(),
         &p1.routes_attrs,
+        &p1.networks,
         &p1.stop_parent_map,
         pool,
         trips,

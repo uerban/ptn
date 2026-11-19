@@ -278,6 +278,39 @@ class Refresh(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported table"):
             gtfs.namespace_feed(self.feed, self.root / "out.zip", "one")
 
+    def test_namespace_scopes_route_networks(self):
+        with zipfile.ZipFile(self.feed, "a") as z:
+            z.writestr("networks.txt", "network_id,network_name\nn,City\n")
+            z.writestr("route_networks.txt", "network_id,route_id\nn,r\n")
+        out = self.root / "out.zip"
+        gtfs.namespace_feed(self.feed, out, "one")
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(
+                z.read("networks.txt").decode(), "network_id,network_name\none:n,City\n"
+            )
+            self.assertEqual(
+                z.read("route_networks.txt").decode(), "network_id,route_id\none:n,one:r\n"
+            )
+
+    def test_namespace_scopes_route_network_column(self):
+        source = self.root / "column.zip"
+        with zipfile.ZipFile(source, "w") as z:
+            z.writestr("routes.txt", "route_id,route_type,network_id\nr,3,n\ns,3,\n")
+        out = self.root / "out.zip"
+        gtfs.namespace_feed(source, out, "one")
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(
+                z.read("routes.txt").decode(),
+                "route_id,route_type,network_id\none:r,3,one:n\none:s,3,\n",
+            )
+
+    def test_unknown_namespace_id_field_fails_closed(self):
+        source = self.root / "unknown.zip"
+        with zipfile.ZipFile(source, "w") as z:
+            z.writestr("networks.txt", "network_id,linked_network_id\nn,m\n")
+        with self.assertRaisesRegex(ValueError, "unknown ID field"):
+            gtfs.namespace_feed(source, self.root / "out.zip", "one")
+
     def test_archive_traversal_and_links_refused(self):
         for name, kind in [
             ("repo/../../escape", tarfile.REGTYPE),

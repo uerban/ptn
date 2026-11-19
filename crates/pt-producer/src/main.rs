@@ -342,30 +342,12 @@ fn run() -> Result<()> {
         rows
     };
 
-    // Build the StringPool by an explicit record-by-record column walk in
-    // finalized sorted-id order. The order here IS the byte-equality contract;
-    // the TS mirror writer (buildTinyPtnb.ts) must replicate it exactly.
-    let pool = {
-        let mut pool = pt_producer::strpool::StringPool::new();
-        for (key, a) in p1.stops.keys().iter().zip(&p1.stops_attrs) {
-            pool.intern(key);
-            pool.intern(&a.name);
-        }
-        for (key, a) in p1.routes.keys().iter().zip(&p1.routes_attrs) {
-            pool.intern(key);
-            pool.intern(&a.agency_id);
-            pool.intern(&a.short_name);
-            pool.intern(&a.long_name);
-            pool.intern(&a.route_color);
-            pool.intern(&a.route_text_color);
-        }
-        for (key, a) in p1.trips.keys().iter().zip(&p1.trips_attrs) {
-            pool.intern(key);
-            pool.intern(&a.headsign);
-            pool.intern(&a.shape_id);
-        }
-        pool
-    };
+    let pool = pt_producer::build::build_string_pool(
+        (p1.stops.keys(), &p1.stops_attrs),
+        (p1.routes.keys(), &p1.routes_attrs),
+        (p1.trips.keys(), &p1.trips_attrs),
+        &p1.networks,
+    );
 
     let layout = layout::Layout::compute(
         p1.stops.len() as u64,

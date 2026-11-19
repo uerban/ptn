@@ -4,25 +4,25 @@
 //!
 //!
 //! 1. **`/ready` flips to 503 immediately** on SIGTERM. The LB (k8s Service / nginx upstream
-//! healthcheck) needs to see the 503 so it removes the pod from the rotation — otherwise new
-//! requests would keep landing on a process that's about to close the listener.
+//!    healthcheck) needs to see the 503 so it removes the pod from the rotation — otherwise new
+//!    requests would keep landing on a process that's about to close the listener.
 //! 2. **PreStop grace
-//! sleep (`prestop_grace_secs`, default 5)**. While the LB observes 503 and finishes its dampening
-//! window, the listener still accepts traffic — any in-flight request from BEFORE the flip still
-//! completes via the normal path.
+//!    sleep (`prestop_grace_secs`, default 5)**. While the LB observes 503 and finishes its dampening
+//!    window, the listener still accepts traffic — any in-flight request from BEFORE the flip still
+//!    completes via the normal path.
 //! 3. **`stop_accepting()` closes the accept loop**. After the grace
-//! expires, the listener no longer hands new connections to workers. Workers exit their
-//! `recv_timeout(100ms)` cycle as soon as the stop flag is observed.
+//!    expires, the listener no longer hands new connections to workers. Workers exit their
+//!    `recv_timeout(100ms)` cycle as soon as the stop flag is observed.
 //! 4. **Bounded join**. Workers
-//! join up to `request_timeout`. Because the per-request watchdog fires at exactly
-//! `request_timeout`, a worker that's still pinned to an in-flight request is guaranteed to be
-//! unstuck within the bound — the dispatcher drops the `tiny_http::Request` without responding, the
-//! recv_timeout loop re-checks the stop flag, and the worker exits.
+//!    join up to `request_timeout`. Because the per-request watchdog fires at exactly
+//!    `request_timeout`, a worker that's still pinned to an in-flight request is guaranteed to be
+//!    unstuck within the bound — the dispatcher drops the `tiny_http::Request` without responding, the
+//!    recv_timeout loop re-checks the stop flag, and the worker exits.
 //! 5. **`exit(0)`** even when
-//! stage 4 hits the timeout. Rationale: a timeout-induced drain is the watchdog working AS DESIGNED
-//! — the orchestrator asked us to shut down, and we did. Returning exit code 1 would imply
-//! "shutdown failed", which is not what happened (the transport-enforced timeout is the
-//! force-drain mechanism).
+//!    stage 4 hits the timeout. Rationale: a timeout-induced drain is the watchdog working AS DESIGNED
+//!    — the orchestrator asked us to shut down, and we did. Returning exit code 1 would imply
+//!    "shutdown failed", which is not what happened (the transport-enforced timeout is the
+//!    force-drain mechanism).
 //!
 //!
 //! That thread is gone — the controller below now owns the bridge, runs all four stages in

@@ -151,7 +151,7 @@
   "settings.preview": "Esikatselu",
   "settings.mode_colors": "Tilan värit",
   "settings.mode_bus": "Bussi",
-  "search.vehicle_filter_local": "Käytä bussien ja pienoisbussien suodatukseen reittisuunnittelua laitteella.",
+  "search.vehicle_filter_local": "Käytä laitteessa tapahtuvaa reittisuunnittelua reittisuodattimien avulla.",
   "settings.mode_minibus": "Pienoisbussi",
   "settings.mode_tram": "Raitiovaunu",
   "settings.mode_trolleybus": "Johdinauto",

@@ -3,17 +3,19 @@
 //! Three pins:
 //!
 //! 1. **Walk back from each `ExitResult`** through the per-round `parents` chain. A **Walk** parent
-//! continues from `parent.source_round` — NOT `cur_round - 1` — so a footpath leg that bridged
-//! several rounds rewinds to the round its source stop was last improved. A **Transit** parent uses
-//! the EXPLICIT `alight_stop_idx` POSITION, never a search for `to_stop`: on a circular route the
-//! terminal stop appears twice and a first-match search would pick the wrong occurrence.
-//! 2. **Legs
-//! are built back-to-front by `push` then a single `reverse()`** — O(n), not the O(n²) prepend. 3.
-//! **Pareto dedup keyed `(transfers, exit_stop)`, keep MIN `alight_secs`**, built in first-seen
-//! insertion order (first-seen wins on ties — `>=` keeps the existing entry, replace only on strict
-//! `<`). Then a **STABLE** sort by `alight_secs` ONLY (no secondary tiebreak). The insertion order
-//! — driven by the `exit_results` order, which is driven by the already-found skip in `scan.rs` —
-//! is the array order the committed golden (`crates/pt-core/tests/golden/`) locks.
+//!    continues from `parent.source_round` — NOT `cur_round - 1` — so a footpath leg that bridged
+//!    several rounds rewinds to the round its source stop was last improved. A **Transit** parent
+//!    uses the EXPLICIT `alight_stop_idx` POSITION, never a search for `to_stop`: on a circular
+//!    route the terminal stop appears twice and a first-match search would pick the wrong
+//!    occurrence.
+//! 2. **Legs are built back-to-front by `push` then a single `reverse()`** — O(n), not the O(n²)
+//!    prepend.
+//! 3. **Pareto dedup keyed `(transfers, exit_stop)`, keep MIN `alight_secs`**, built in first-seen
+//!    insertion order (first-seen wins on ties — `>=` keeps the existing entry, replace only on
+//!    strict `<`). Then a **STABLE** sort by `alight_secs` ONLY (no secondary tiebreak). The
+//!    insertion order — driven by the `exit_results` order, which is driven by the already-found
+//!    skip in `scan.rs` — is the array order the committed golden (`crates/pt-core/tests/golden/`)
+//!    locks.
 
 use alloc::vec::Vec;
 use hashbrown::HashMap;

@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {runtimeCityIds, deploymentCityIds, runtimeCityConfigs, deploymentCityConfigs} from "./deployment.ts";
+import {CITIES} from "./cities.ts";
 
 afterEach(() => {
   delete globalThis.__PTN_DEPLOYMENT__;
@@ -106,5 +107,24 @@ describe("host-defined runtime cities", () => {
       expect(useCityStore.getState().activeCity.name).toBe("Host City");
       expect(useCityStore.getState().activeCity.tz).toBe("Europe/Riga");
     } finally {localStorage.removeItem("ptn-city");}
+  });
+});
+
+describe("runtime route network config", () => {
+  const city = (routeNetworks: unknown) => ({
+    schemaVersion: 2,
+    cities: [{ ...CITIES[0], routeNetworks }],
+  });
+  it("keeps valid presentation fields", () => {
+    const rows = [{ networkId: "night", id: "late", label: "Late", order: 2, defaultExcluded: true }];
+    expect(runtimeCityConfigs(city(rows), CITIES)?.[0]?.routeNetworks).toEqual(rows);
+  });
+  it.each([
+    [[{ id: "missing-network" }]],
+    [[{ networkId: "a", order: "1" }]],
+    [[{ networkId: "a", defaultExcluded: "yes" }]],
+    [[{ networkId: "a" }, { networkId: "a" }]],
+  ])("rejects %j", (rows) => {
+    expect(() => runtimeCityConfigs(city(rows), CITIES)).toThrow();
   });
 });
