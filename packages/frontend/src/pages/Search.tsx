@@ -504,6 +504,10 @@ export function SearchPage() {
 
   // Ensure GTFS data is initialized when Search is accessed directly (cold load)
   const cityId = useCityStore((s) => s.activeCity.id);
+  // A manual choice owns its field until the stop-prefill URL intent changes.
+  // Keep one key per field so refreshes cannot replay old links over user edits.
+  const stopPrefillKey = JSON.stringify([cityId, searchParams.get("fromStopId"), searchParams.get("toStopId")]);
+  const manualEndpointKeysRef = useRef<Partial<Record<"from" | "to", string>>>({});
   const cityRouteGroups = useCityStore((s) => s.activeCity.routeGroups);
   const availableRouteGroups = useMemo(() => {
     const groups = cityRouteGroups ?? [];
@@ -567,9 +571,9 @@ export function SearchPage() {
     const data = captureCityData(cityId);
     let cancelled = false;
     (async () => {
-      if (fromStopId) {
+      if (fromStopId && manualEndpointKeysRef.current.from !== stopPrefillKey) {
         const stop = await data.gtfsStops.get(fromStopId);
-        if (stop && !cancelled) {
+        if (stop && !cancelled && manualEndpointKeysRef.current.from !== stopPrefillKey) {
           fromTouchedRef.current = true;
           setFromText(stop.name);
           setFromEndpoint({
@@ -581,9 +585,9 @@ export function SearchPage() {
           });
         }
       }
-      if (toStopId) {
+      if (toStopId && manualEndpointKeysRef.current.to !== stopPrefillKey) {
         const stop = await data.gtfsStops.get(toStopId);
-        if (stop && !cancelled) {
+        if (stop && !cancelled && manualEndpointKeysRef.current.to !== stopPrefillKey) {
           setToText(stop.name);
           setToEndpoint({
             kind: "stop",
@@ -601,7 +605,7 @@ export function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, gtfsSyncing, preferredAdapter, cityId]);
+  }, [searchParams, gtfsSyncing, preferredAdapter, cityId, stopPrefillKey]);
 
   // Endpoints handed off from a surface outside this page — today the map
   // long-press action sheet, which reduces the pin through `mapTapStore`,
@@ -614,6 +618,7 @@ export function SearchPage() {
   useEffect(() => {
     if (!pendingOrigin && !pendingDestination) return;
     if (pendingOrigin) {
+      protectEndpointChoice("from");
       // Marks the from field as user-set so the live-GPS default effect
       // doesn't overwrite the pin on the next geolocation update.
       fromTouchedRef.current = true;
@@ -621,6 +626,7 @@ export function SearchPage() {
       setFromEndpoint(pendingOrigin);
     }
     if (pendingDestination) {
+      protectEndpointChoice("to");
       endpointHandoffRef.current = true;
       setToText(handoffEndpointLabel(pendingDestination, t));
       setToEndpoint(pendingDestination);
@@ -1162,7 +1168,12 @@ export function SearchPage() {
     void recordRecent(ep, { usedAsOrigin: field === "from" }).catch(() => {});
   }, []);
 
+  function protectEndpointChoice(field: "from" | "to") {
+    manualEndpointKeysRef.current[field] = stopPrefillKey;
+  }
+
   function handleSearch(query: string, field: "from" | "to") {
+    protectEndpointChoice(field);
     const typedEndpoint = parseCoordinateEndpoint(query);
 
     if (field === "from") {
@@ -1192,6 +1203,7 @@ export function SearchPage() {
   }
 
   function selectMapPoint(endpoint: BaseEndpoint) {
+    protectEndpointChoice(mapPickerField === "from" ? "from" : "to");
     if (mapPickerField === "from") {
       fromTouchedRef.current = true;
       setFromText(handoffEndpointLabel(endpoint, t));
@@ -1226,6 +1238,7 @@ export function SearchPage() {
       if (!liveLocation.request("locate")) requestedGpsField.current = null;
       return;
     }
+    protectEndpointChoice(activeField);
     const endpoint: BaseEndpoint = { kind: "mappoint", lat: userLocation.lat, lon: userLocation.lon };
     if (activeField === "from") {
       fromTouchedRef.current = false;
@@ -1262,6 +1275,8 @@ export function SearchPage() {
     dismissKeyboard();
     setSuggestions([]);
     if (save.destination) {
+      protectEndpointChoice("from");
+      protectEndpointChoice("to");
       // Pair save: fill both fields regardless of which one had focus.
       const originName = endpointDisplay(save.origin);
       const destName = endpointDisplay(save.destination);
@@ -1275,6 +1290,7 @@ export function SearchPage() {
       setActiveField(null);
       return;
     }
+    protectEndpointChoice(activeField === "from" ? "from" : "to");
     const name = save.alias || endpointDisplay(save.origin);
     if (activeField === "from") {
       setFromText(name);
@@ -1317,6 +1333,7 @@ export function SearchPage() {
   }
 
   function selectSuggestion(suggestion: SearchSuggestion) {
+    protectEndpointChoice(activeField === "from" ? "from" : "to");
     searchAbortRef.current?.abort();
     dismissKeyboard();
     const { ep, name } = suggestionEndpoint(suggestion);
@@ -1402,6 +1419,8 @@ export function SearchPage() {
   }
 
   function handleSwap() {
+    protectEndpointChoice("from");
+    protectEndpointChoice("to");
     // Swap origin and destination text/endpoints.
     const prevFromText = fromText;
     const prevFromEp = fromEndpoint;
