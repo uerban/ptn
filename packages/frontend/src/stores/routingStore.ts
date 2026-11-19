@@ -249,10 +249,9 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       // (and could fire a provider-fallback server search). The caller's
       // `.catch` recognises StaleWasmInitError and drops it silently. `loading`
       // is dropped here too so the store state can't hang on a bare reset().
-      if (err instanceof StaleCityDataError) throw new StaleWasmInitError();
-      if (err instanceof StaleWasmInitError) {
+      if (err instanceof StaleCityDataError || err instanceof StaleWasmInitError) {
         set({ loading: false });
-        throw err;
+        throw err instanceof StaleCityDataError ? new StaleWasmInitError() : err;
       }
       // Route engine-class throws to `engineError` so the UI's
       // `engine-error` testid surfaces only on actual engine failures,

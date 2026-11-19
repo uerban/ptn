@@ -379,3 +379,29 @@ it("keeps a newer unloaded-index rejection after older searches complete", async
     expect(run.useRoutingStore.getState().error).toMatch(/GTFS data not loaded/);
   } finally { await run.cleanup(); }
 });
+
+it.each(["invalidated completion", "stale rejection", "wasm rejection"])("finishes loading when the current city data becomes stale: %s", async (mode) => {
+  const run = await overlappingRoutingSearches();
+  const { invalidateCityData, StaleCityDataError } = await import("../../src/services/cityData.ts");
+  const { StaleWasmInitError } = await import("../../src/services/raptorWasm.ts");
+  const { api } = await import("../../src/services/api.ts");
+  vi.mocked(api.plan).mockClear();
+  const success = vi.fn();
+  const completion = run.newerSearch.then(success);
+  const reason = mode === "wasm rejection" ? new StaleWasmInitError("active stale WASM") : new StaleCityDataError();
+  try {
+    if (mode === "invalidated completion") invalidateCityData();
+    run.older.resolve([run.olderResult]); await run.olderSearch;
+    // An obsolete request must not finish the newer request's loading first.
+    expect(run.useRoutingStore.getState().loading).toBe(true);
+    if (mode === "invalidated completion") run.newer.resolve([run.newerResult]);
+    else run.newer.reject(reason);
+    await expect(completion).rejects.toBeInstanceOf(StaleWasmInitError);
+    if (mode === "wasm rejection") await expect(completion).rejects.toBe(reason);
+    expect(success).not.toHaveBeenCalled();
+    expect(run.useRoutingStore.getState()).toMatchObject({
+      loading: false, results: [], error: null, engineError: null, engineFailureKind: null,
+    });
+    expect(api.plan).not.toHaveBeenCalled();
+  } finally { await run.cleanup(); }
+});
