@@ -86,6 +86,69 @@ describe("Search 'search on the server' re-run + remoteAllowed", () => {
     vi.restoreAllMocks();
   });
 
+  it.each(["completion", "rejection"])("ignores obsolete server %s after a same-endpoint local restart", async (mode) => {
+    const { activateCityData, CityDataContext, invalidateCityData } = await import("../../src/services/cityData.ts");
+    const cityId = useCityStore.getState().activeCity.id;
+    // The app uses the resident immutable catalog; all conversion reads settle
+    // in microtasks instead of leaving an unrelated legacy-IDB read in flight.
+    activateCityData(new CityDataContext({
+      meta: { cityId, generatedAt: "2026-11-19" }, routes: [], calendar: [],
+      stops: [
+        { id: "stop-a", name: "Alpha", lat: 50.1, lon: 19.9 },
+        { id: "stop-b", name: "Beta", lat: 50.2, lon: 20 },
+      ],
+    }, { id: "current", cityId, generationId: "attempt-fixture", etag: "attempt-fixture", generatedAt: "2026-11-19", lastSynced: 1 }));
+    const view = render(
+      <MemoryRouter initialEntries={["/search?fromStopId=stop-a&toStopId=stop-b"]}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("engine-failure-search-server");
+    const fields = screen.getAllByRole("searchbox") as HTMLInputElement[];
+    fireEvent.change(fields[0], { target: { value: "54.7000, 25.3000" } });
+    await waitFor(() => expect(searchSpy.mock.calls.at(-1)?.[0]).toMatchObject({ kind: "mappoint", lat: 54.7 }));
+    fireEvent.change(fields[1], { target: { value: "54.7100, 25.3100" } });
+    await waitFor(() => expect(searchSpy.mock.calls.at(-1)?.[1]).toMatchObject({ kind: "mappoint", lat: 54.71 }));
+    await screen.findByTestId("engine-failure-search-server");
+    let resolveRemote!: () => void, rejectRemote!: (error: Error) => void, resolveLocal!: () => void;
+    const remote = new Promise<void>((resolve, reject) => { resolveRemote = resolve; rejectRemote = reject; });
+    const local = new Promise<void>((resolve) => { resolveLocal = resolve; });
+    searchSpy.mockClear();
+    searchSpy.mockImplementation(async (_from, _to, _at, opts?: { remote?: boolean }) => {
+      useRoutingStore.setState({ results: [], error: null, engineError: null, engineFailureKind: null, loading: true });
+      if (opts?.remote) { await remote; return; }
+      await local;
+      useRoutingStore.setState({ error: "current local failure", loading: false });
+    });
+    try {
+      fireEvent.click(screen.getByTestId("engine-failure-search-server"));
+      await waitFor(() => expect(searchSpy).toHaveBeenCalledTimes(1));
+      await act(async () => { useGtfsDataStore.setState({ syncing: true }); });
+      await act(async () => { useGtfsDataStore.setState({ syncing: false }); });
+      await waitFor(() => expect(searchSpy).toHaveBeenCalledTimes(2));
+      const [remoteArgs, localArgs] = searchSpy.mock.calls;
+      expect(remoteArgs[3]).toEqual({ remote: true });
+      expect(localArgs[3]).toBeUndefined();
+      expect(localArgs[0]).toBe(remoteArgs[0]);
+      expect(localArgs[1]).toBe(remoteArgs[1]);
+      expect(view.container.querySelectorAll(".h-20.animate-pulse")).toHaveLength(3);
+      await act(async () => {
+        if (mode === "completion") resolveRemote(); else rejectRemote(new Error("obsolete server failure"));
+        await remote.catch(() => {});
+      });
+      expect(useRoutingStore.getState().loading).toBe(true);
+      expect(screen.queryByText(/No routes found/i)).not.toBeInTheDocument();
+      expect(screen.queryByText("obsolete server failure")).not.toBeInTheDocument();
+      expect(view.container.querySelectorAll(".h-20.animate-pulse")).toHaveLength(3);
+      await act(async () => { resolveLocal(); await local; });
+      expect(await screen.findByText("current local failure")).toBeInTheDocument();
+    } finally {
+      await act(async () => { resolveRemote(); resolveLocal(); await Promise.allSettled([remote, local]); });
+      view.unmount();
+      invalidateCityData();
+    }
+  });
+
   it("clicking 'Search on the server' re-runs the held query with { remote: true }", async () => {
     render(
       <MemoryRouter initialEntries={["/search?fromStopId=stop-a&toStopId=stop-b"]}>

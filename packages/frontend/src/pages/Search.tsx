@@ -532,6 +532,14 @@ export function SearchPage() {
   // search still waiting for the build is kept instead (see the effect).
   const ptRouterReady = useGtfsDataStore((s) => s.ptRouter !== null);
   const onDeviceSearchRef = useRef<OnDeviceSearchRun | null>(null);
+  // Retries can keep the same query fields. Fence callbacks by execution too.
+  const planningAttemptRef = useRef<object | null>(null);
+  const beginPlanningAttempt = useCallback(() => {
+    if (onDeviceSearchRef.current) onDeviceSearchRef.current.cancelled = true;
+    const attempt = {};
+    planningAttemptRef.current = attempt;
+    return attempt;
+  }, []);
   // The auto-search effect keeps a waiting search across its own re-run, so
   // its cleanup does not cancel; the search is cancelled here on unmount.
   useEffect(() => {
@@ -539,6 +547,8 @@ export function SearchPage() {
     return () => {
       if (ref.current) ref.current.cancelled = true;
       ref.current = null;
+      planningAttemptRef.current = null;
+      remotePrimaryFiredRef.current = null;
     };
   }, []);
   useEffect(() => {
@@ -647,6 +657,7 @@ export function SearchPage() {
   // `provider-fallback` mode — hence declared BEFORE that effect.
   const handleSearchOnServer = useCallback(() => {
     if (!fromEndpoint || !toEndpoint) return;
+    const attempt = beginPlanningAttempt();
     const currentCity = useCityStore.getState().activeCity;
     if (excludedRouteIdsForGroups(useGtfsDataStore.getState().raptorIndex?.routes ?? [], currentCity.routeGroups ?? [],
       useSettingsStore.getState().excludedRouteGroupsByCity[currentCity.id] ?? []).length > 0) {
@@ -661,6 +672,7 @@ export function SearchPage() {
     // the main effect's cancel guard, over the SAME re-fire triggers so a
     // ranking flip or mode-chip toggle mid-RTT isn't misread as fresh.
     const stale = () =>
+      planningAttemptRef.current !== attempt ||
       latestQueryRef.current.from !== at.from ||
       latestQueryRef.current.to !== at.to ||
       latestQueryRef.current.at !== at.at ||
@@ -707,7 +719,7 @@ export function SearchPage() {
       .finally(() => {
         if (!stale()) setLoading(false);
       });
-  }, [fromEndpoint, toEndpoint, paginationTime, ranking, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels]);
+  }, [fromEndpoint, toEndpoint, paginationTime, ranking, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels, beginPlanningAttempt]);
 
   // Remote-primary: the SERVER is the primary planner.
   // On any plan() rejection we fall back to on-device and SIGNAL it (the banner).
@@ -718,6 +730,7 @@ export function SearchPage() {
   // safe to invoke outside the effect's cancel lifecycle.
   const handleRemotePrimarySearch = useCallback(() => {
     if (!fromEndpoint || !toEndpoint) return;
+    const attempt = beginPlanningAttempt();
     const currentCity = useCityStore.getState().activeCity;
     if (excludedRouteIdsForGroups(useGtfsDataStore.getState().raptorIndex?.routes ?? [], currentCity.routeGroups ?? [],
       useSettingsStore.getState().excludedRouteGroupsByCity[currentCity.id] ?? []).length > 0) {
@@ -727,6 +740,7 @@ export function SearchPage() {
     }
     const at = { from: fromEndpoint, to: toEndpoint, at: paginationTime, ranking, excludedModes, excludedRouteGroupsByCity };
     const stale = () =>
+      planningAttemptRef.current !== attempt ||
       latestQueryRef.current.from !== at.from ||
       latestQueryRef.current.to !== at.to ||
       latestQueryRef.current.at !== at.at ||
@@ -808,7 +822,7 @@ export function SearchPage() {
         setSearchError(err instanceof Error ? err.message : "Route search failed");
         setLoading(false);
       });
-  }, [fromEndpoint, toEndpoint, paginationTime, ranking, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels]);
+  }, [fromEndpoint, toEndpoint, paginationTime, ranking, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels, beginPlanningAttempt]);
 
   const hasRouteRestrictions = availableRouteGroups.some((g) => (excludedRouteGroupsByCity[cityId] ?? []).includes(g.id));
   const fromLat = fromEndpoint?.lat;
@@ -838,7 +852,11 @@ export function SearchPage() {
     if (ptRouterReady && prev?.pending && !prev.routerReadyAtStart && sameValues(prev.query, query)) return;
     if (prev) prev.cancelled = true;
     onDeviceSearchRef.current = null;
-    if (!fromEndpoint || !toEndpoint) return;
+    if (!fromEndpoint || !toEndpoint) {
+      planningAttemptRef.current = null;
+      remotePrimaryFiredRef.current = null;
+      return;
+    }
     const operatorRemotePrimary =
       routingMode === "remote-primary" && !hasRouteRestrictions &&
       routingProvider === "operator" &&
@@ -860,7 +878,11 @@ export function SearchPage() {
       // Read latest store state (not the render closure) to catch the
       // synchronous syncing=true set by the init effect that runs first.
       const { syncing, raptorIndex, loadedCityId } = useGtfsDataStore.getState();
-      if (!raptorIndex || syncing || loadedCityId !== cityId) return;
+      if (!raptorIndex || syncing || loadedCityId !== cityId) {
+        planningAttemptRef.current = null;
+        remotePrimaryFiredRef.current = null;
+        return;
+      }
     }
     // remote-primary: fire the server FIRST (the on-device index is loaded, so a
     // server failure can always fall back to it). Dedup re-fires that come only
@@ -880,6 +902,7 @@ export function SearchPage() {
       return;
     }
     if (transitousRemotePrimary) {
+      planningAttemptRef.current = null;
       remotePrimaryFiredRef.current = null;
       setLoading(false);
       setSearchError(null);
@@ -900,6 +923,7 @@ export function SearchPage() {
     // above. On the failure path (503 / corrupt bytes) ptRouter stays null,
     // re-fire never happens, and the original engine-error surface
     // remains — which is what wasm-engine-failure.spec.ts asserts.
+    beginPlanningAttempt();
     const run: OnDeviceSearchRun = { query, routerReadyAtStart: ptRouterReady, pending: true, cancelled: false };
     let delegatedToRemote = false;
     setLoading(true);
@@ -976,7 +1000,7 @@ export function SearchPage() {
       setLoading(false);
     }
 
-}, [fromEndpoint, toEndpoint, preferredAdapter, raptorReady, ptRouterReady, gtfsSyncing, cityId, paginationTime, excludedModes, excludedRouteGroupsByCity, ranking, feedTz, hasRouteRestrictions, routingMode, routingProvider, remoteAllowed, transitousAllowed, transitousQueryKey, failedTransitousPrimaryKey, handleSearchOnServer, handleRemotePrimarySearch, endpointLabels]);
+}, [fromEndpoint, toEndpoint, preferredAdapter, raptorReady, ptRouterReady, gtfsSyncing, cityId, paginationTime, excludedModes, excludedRouteGroupsByCity, ranking, feedTz, hasRouteRestrictions, routingMode, routingProvider, remoteAllowed, transitousAllowed, transitousQueryKey, failedTransitousPrimaryKey, handleSearchOnServer, handleRemotePrimarySearch, endpointLabels, beginPlanningAttempt]);
 
   // The RECOVERY affordance (engine-failure "Search on the server") is the no-wasm user's only
   // route — never gated on the availability probe. If the source is truly down, the real plan()

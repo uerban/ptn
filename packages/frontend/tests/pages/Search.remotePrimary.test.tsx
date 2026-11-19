@@ -439,6 +439,76 @@ describe("Search remote-primary flow", () => {
   // (9) dedup (no double egress): a remote-primary search fired once must NOT
   // re-fire the server when only a readiness dep flips (e.g. ptRouter lands) with
   // the query unchanged.
+  it("restarts a pending remote-primary attempt after GTFS refresh with the same endpoints", async () => {
+    let resolveOld!: () => void, resolveCurrent!: () => void;
+    const older = new Promise<void>((resolve) => { resolveOld = resolve; });
+    const current = new Promise<void>((resolve) => { resolveCurrent = resolve; });
+    let calls = 0;
+    const search = vi.fn().mockImplementation(async () => {
+      const call = ++calls;
+      useRoutingStore.setState({ results: [], error: null, engineError: null, engineFailureKind: null, loading: true });
+      if (call === 1) { await older; return; }
+      await current;
+      useRoutingStore.setState({ results: [], error: null, engineError: null, engineFailureKind: null, loading: false });
+    });
+    useRoutingStore.setState({ search, origin: { kind: "mappoint", lat: 54.7, lon: 25.3 }, destination: { kind: "mappoint", lat: 54.71, lon: 25.31 } });
+    const view = renderSearch();
+    try {
+      await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+      await act(async () => { useGtfsDataStore.setState({ syncing: true }); });
+      await act(async () => { useGtfsDataStore.setState({ syncing: false }); });
+      await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+      expect(search.mock.calls[1][0]).toBe(search.mock.calls[0][0]);
+      expect(search.mock.calls[1][1]).toBe(search.mock.calls[0][1]);
+      expect(search.mock.calls.every((call) => call[3]?.remote === true)).toBe(true);
+      await act(async () => { resolveOld(); await older; });
+      expect(screen.queryByTestId("server-no-route")).not.toBeInTheDocument();
+      expect(view.container.querySelectorAll(".h-20.animate-pulse")).toHaveLength(3);
+      await act(async () => { resolveCurrent(); await current; });
+      expect(await screen.findByTestId("server-no-route")).toBeInTheDocument();
+      expect(search).toHaveBeenCalledTimes(2);
+    } finally {
+      await act(async () => { resolveOld(); resolveCurrent(); await Promise.allSettled([older, current]); });
+    }
+  });
+
+  it("preserves a pending attempt on a readiness-only change", async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    const search = vi.fn().mockImplementation(async () => {
+      await pending;
+      useRoutingStore.setState({ results: [], error: null, engineError: null, engineFailureKind: null, loading: false });
+    });
+    useRoutingStore.setState({ search });
+    renderSearch();
+    try {
+      await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+      await act(async () => { useGtfsDataStore.setState({ ptRouter: {} as never }); });
+      await act(async () => { finish(); await pending; });
+      expect(await screen.findByTestId("server-no-route")).toBeInTheDocument();
+      expect(search).toHaveBeenCalledTimes(1);
+    } finally { await act(async () => { finish(); await pending; }); }
+  });
+
+  it("does not start fallback after unmount", async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    const search = vi.fn().mockImplementation(async (_from, _to, _at, opts?: { remote?: boolean }) => {
+      if (opts?.remote) {
+        await pending;
+        useRoutingStore.setState({ results: [], error: "server failed after leaving", engineError: null, engineFailureKind: null, loading: false });
+      } else useRoutingStore.setState({ results: [], error: null, engineError: null, engineFailureKind: null, loading: false });
+    });
+    useRoutingStore.setState({ search });
+    const view = renderSearch();
+    try {
+      await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+      view.unmount();
+      await act(async () => { finish(); await pending; });
+      expect(search).toHaveBeenCalledTimes(1);
+    } finally { await act(async () => { finish(); await pending; }); }
+  });
+
   it("does not re-leave the device when only a readiness dep flips (dedup)", async () => {
     const searchSpy = vi.fn().mockImplementation(async (_from, _to, _at, opts?: { remote?: boolean }) => {
       if (opts?.remote) {
