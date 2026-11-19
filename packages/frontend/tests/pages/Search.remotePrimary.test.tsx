@@ -422,6 +422,7 @@ describe("Search remote-primary flow", () => {
     // Flip ranking WHILE the remote /plan is still pending. This re-fires the main
     // auto-search effect (ranking is in its deps) and advances
     // latestQueryRef.current.ranking so the in-flight remote result is now stale.
+    fireEvent.click(screen.getByTestId("sort-summary"));
     fireEvent.click(screen.getByRole("button", { name: /fewest transfers/i }));
 
     // Resolve the stale remote result and let its .then chain run.

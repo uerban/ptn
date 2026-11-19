@@ -1,5 +1,14 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+
+/** An on-screen keyboard shrinks the visual viewport and leaves the window as it was. */
+async function setKeyboardHeight(page: Page, height: number): Promise<void> {
+  await page.evaluate((keyboard) => {
+    const viewport = window.visualViewport!;
+    Object.defineProperty(viewport, "height", { configurable: true, get: () => window.innerHeight - keyboard });
+    viewport.dispatchEvent(new Event("resize"));
+  }, height);
+}
 
 test.describe("compact place picker @mock-api", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -8,8 +17,8 @@ test.describe("compact place picker @mock-api", () => {
     await mockApi(page);
     await page.route("**/poi/manifest.json", route => route.fulfill({ status: 404, body: "" }));
   });
-  test("fits four complete suggestions in a keyboard-sized viewport with both place actions", async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 360 });
+  test("fits four complete suggestions above the keyboard and brings navigation back when it closes", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 660 });
     await page.goto("/search");
     const destination = page.getByRole("searchbox", { name: "Where to?", exact: true });
     await expect(destination).toBeVisible();
@@ -34,17 +43,21 @@ test.describe("compact place picker @mock-api", () => {
     });
     await destination.fill("Space test");
     await expect(page.getByRole("option")).toHaveCount(6);
+    await expect(page.locator("nav")).toHaveCount(1);
+    await setKeyboardHeight(page, 300);
+    await expect(page.locator("nav")).toHaveCount(0);
     const dimensions = await page.getByRole("option").evaluateAll(elements => ({
       firstTop: elements[0].getBoundingClientRect().top,
-      complete: elements.filter(element => element.getBoundingClientRect().bottom <= window.innerHeight).length,
+      complete: elements.filter(element => element.getBoundingClientRect().bottom <= window.visualViewport!.height).length,
       scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth,
     }));
     expect(dimensions.firstTop).toBeLessThan(130);
     expect(dimensions.complete).toBeGreaterThanOrEqual(4);
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
     await expect(page.getByRole("button", { name: "Choose on map", exact: true })).toBeVisible();
-    await expect(page.locator("nav")).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath("search-picker-compact.png") });
+    await setKeyboardHeight(page, 0);
+    await expect(page.locator("nav")).toHaveCount(1);
   });
   test("GPS swap keeps both journey fields and navigation visible", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 660 });
@@ -53,30 +66,43 @@ test.describe("compact place picker @mock-api", () => {
     await page.getByRole("button", { name: "Swap origin and destination", exact: true }).click();
     await expect(page.getByRole("searchbox", { name: "From", exact: true })).toHaveValue("Airport");
     await expect(page.getByRole("searchbox", { name: "Where to?", exact: true })).toHaveValue("My location");
-    await expect(page.getByRole("tablist", { name: "Sort", exact: true })).toBeVisible();
+    await expect(page.getByTestId("sort-summary")).toBeVisible();
     await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose on map", exact: true })).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath("search-gps-swap.png") });
   });
-  test("large text: the header stays short and the sort tabs are not squeezed", async ({ page }) => {
+  test("narrow phone: time and sort share one row with no gap below the header", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 692 });
+    await page.goto("/search?toName=Airport&toLat=54.6&toLon=25.3");
+    const sort = page.getByTestId("sort-summary");
+    await expect(sort).toBeVisible();
+    const layout = await sort.evaluate((chip) => {
+      const box = chip.getBoundingClientRect();
+      const time = document.querySelector('[data-testid="when-summary"]')?.getBoundingClientRect();
+      const toolbar = chip.closest('[data-testid="arrive-by-toolbar"]');
+      const header = (toolbar ?? chip).parentElement!.getBoundingClientRect();
+      return { sameRow: !time || time.top === box.top, below: header.bottom - (toolbar ?? chip).getBoundingClientRect().bottom,
+        scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth };
+    });
+    expect(layout.sameRow).toBe(true);
+    expect(layout.below).toBeLessThanOrEqual(9);
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
+  });
+  test("large text: the header stays short and the sort chip is not squeezed", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 700 });
     await page.addInitScript(() => {
       document.addEventListener("DOMContentLoaded", () => { document.documentElement.style.fontSize = "135%"; });
     });
     await page.goto("/search?toName=Airport&toLat=54.6&toLon=25.3");
-    const tabs = page.getByRole("tablist", { name: "Sort", exact: true });
-    await expect(tabs).toBeVisible();
-    const layout = await tabs.evaluate((list) => {
-      const tab = list.querySelector('[role="tab"]')!.getBoundingClientRect();
-      const box = list.getBoundingClientRect();
-      return { tab: tab.height, top: tab.top - box.top, room: box.bottom - tab.bottom,
-        header: box.bottom - list.parentElement!.getBoundingClientRect().top,
+    const sort = page.getByTestId("sort-summary");
+    await expect(sort).toBeVisible();
+    const layout = await sort.evaluate((chip) => {
+      const box = chip.getBoundingClientRect();
+      return { chip: box.height, header: box.bottom,
         scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth, height: window.innerHeight };
     });
-    // The whole tab is inside its row, and the header with the tabs takes less than half the screen.
-    expect(layout.tab).toBeGreaterThanOrEqual(24);
-    expect(layout.top).toBeGreaterThanOrEqual(0);
-    expect(layout.room).toBeGreaterThanOrEqual(0);
+    // The chip keeps its height, and the controls end in the top half of the screen.
+    expect(layout.chip).toBeGreaterThanOrEqual(40);
     expect(layout.header).toBeLessThan(layout.height / 2);
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.width);
     const summary = page.getByTestId("when-summary");
@@ -85,7 +111,7 @@ test.describe("compact place picker @mock-api", () => {
       await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toHaveCount(0);
       await summary.click();
       await expect(page.getByRole("button", { name: "Arrive by", exact: true })).toBeVisible();
-      await expect(tabs.getByRole("tab").first()).toBeVisible();
+      await expect(page.getByTestId("when-sheet")).toBeVisible();
     }
     await page.screenshot({ path: test.info().outputPath("search-large-text-header.png") });
   });

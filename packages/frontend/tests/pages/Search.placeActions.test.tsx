@@ -54,13 +54,13 @@ describe("search endpoint actions", () => {
     expect(from()).toHaveValue("Airport");
     expect(to()).toHaveValue("My location");
     expect(to()).not.toHaveFocus();
-    expect(screen.getByRole("group", { name: "Sort" })).toBeInTheDocument();
+    expect(screen.getByTestId("sort-summary")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose on map" })).toBeNull();
     // Swapping back must also leave the form open with the same two places.
     fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
     expect(from()).toHaveValue("My location");
     expect(to()).toHaveValue("Airport");
-    expect(screen.getByRole("group", { name: "Sort" })).toBeInTheDocument();
+    expect(screen.getByTestId("sort-summary")).toBeInTheDocument();
   });
 
   it("does not open the destination picker when a swap moves an empty field there", () => {
@@ -68,7 +68,7 @@ describe("search endpoint actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
     expect(to()).toHaveValue("");
     expect(to()).not.toHaveFocus();
-    expect(screen.getByRole("group", { name: "Sort" })).toBeInTheDocument();
+    expect(screen.getByTestId("sort-summary")).toBeInTheDocument();
   });
 
   it("makes GPS explicitly changeable and does not overwrite a chosen replacement", async () => {

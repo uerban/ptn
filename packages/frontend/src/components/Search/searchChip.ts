@@ -1,12 +1,12 @@
 /**
- * One chip look for the Search header: the time chip, vehicle filters, leave
- * presets and sort choices. 40 px tall at default text, growing with larger
+ * One chip look for the Search header: the time and sort chips, vehicle
+ * filters and leave presets. 40 px tall at default text, growing with larger
  * text (no upper cap), with the tap area padded to at least 44 px.
  */
 export type SearchChipVariant = "selected" | "idle" | "on" | "off";
 
 const BASE =
-  "relative min-h-10 shrink-0 inline-flex items-center gap-1.5 px-3 rounded-full border " +
+  "relative min-h-10 shrink-0 inline-flex items-center gap-1.5 rounded-full border " +
   "text-xs font-semibold leading-tight whitespace-nowrap transition-colors " +
   // Tap area: at least 44 px tall even while the chip draws 40 px.
   "before:absolute before:inset-x-0 before:-inset-y-0.5 before:content-[''] " +
@@ -21,6 +21,18 @@ const VARIANT: Record<SearchChipVariant, string> = {
   off: "bg-surface text-fg-secondary border-divider line-through decoration-2 hover:border-accent",
 };
 
+// A badge has no label to strike through, so a line crosses the badge itself.
+const BADGE_STRIKE =
+  "after:absolute after:inset-x-1.5 after:top-1/2 after:h-0.5 after:-translate-y-1/2 after:-rotate-45 " +
+  "after:rounded-full after:bg-fg after:ring-1 after:ring-surface after:content-['']";
+
 export function searchChipClass(variant: SearchChipVariant): string {
-  return `${BASE} ${VARIANT[variant]}`;
+  return `${BASE} px-3 ${VARIANT[variant]}`;
+}
+
+/** A vehicle filter drawn as its badge alone; the caller names the button. */
+export function searchBadgeChipClass(excluded: boolean): string {
+  // The tap area also reaches 44 px wide, inside the gap between chips.
+  const shape = "min-w-10 justify-center px-1 before:-inset-x-0.5!";
+  return excluded ? `${BASE} ${shape} ${VARIANT.off} ${BADGE_STRIKE}` : `${BASE} ${shape} ${VARIANT.on}`;
 }

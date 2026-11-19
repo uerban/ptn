@@ -1,7 +1,7 @@
 /**
  * Time choice in the Search header. Collapsed it is one button that says
  * what the results are planned for ("Leave: Now", "Arrive by 10:13") and
- * shares its row with Search's vehicle filters, so the header stays short.
+ * shares its row with Search's sort chip, so the header stays short.
  * Opened it shows Leave or Arrive by, the
  * deadline in city time, and Apply. The arrive-by owner is warmed for the
  * likely query (the pair's default deadline) when Search shows the pair's
@@ -23,7 +23,6 @@ import { prepareArriveBy } from "./arriveByQuery.ts";
 import type { ArriveByToolbarProps } from "./arriveByTypes.ts";
 import { endpointPairKey, useArriveByUi, type LeaveOption } from "./arriveByUiStore.ts";
 import { searchChipClass } from "../Search/searchChip.ts";
-import { ScrollFade } from "../Search/ScrollFade.tsx";
 import { BottomSheet } from "../Layout/BottomSheet.tsx";
 
 const deviceTz = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -60,7 +59,7 @@ const inputClass = "min-h-12 w-full min-w-0 px-3 text-sm rounded-lg border borde
 
 const summaryClass = searchChipClass("idle");
 
-export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, filters }: ArriveByToolbarProps) {
+export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, sort, filters }: ArriveByToolbarProps) {
   const { t, locale } = useTranslation();
   const cityId = useCityStore((s) => s.activeCity.id);
   const tz = useCityStore((s) => s.activeCity.tz) ?? deviceTz();
@@ -251,10 +250,11 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
   const canApply = mode === "arrive-by" && draftMs !== null && draftMs !== appliedMs;
 
   return (
-    <div className="space-y-2" data-testid="arrive-by-toolbar">
-      {/* The time chip stays put; only the vehicle filters scroll, with a
-          fade at an edge that hides more. Below 360 px the row wraps. */}
-      <div className="flex items-center gap-1.5 py-0.5 max-[359px]:flex-wrap">
+    <div data-testid="arrive-by-toolbar">
+      {/* Time and sort share a row until the sort chip would be cut too short
+          to tell its choices apart; it then takes a row of its own. */}
+      <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" className={summaryClass} data-testid="when-summary" aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>
           <span className="sr-only">{`${t("arriveBy.when", "When")}: `}</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="shrink-0 text-accent">
@@ -266,7 +266,9 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
-        {filters && <ScrollFade>{filters}</ScrollFade>}
+        {sort}
+      </div>
+      {filters}
       </div>
       {/* Always mounted so screen readers pick up the change; no status
           role, which the arrive-by results own. */}
@@ -275,7 +277,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
           : announce === "summary" ? `${t("arriveBy.when", "When")}: ${summary}` : ""}
       </span>
       {announce === "fallback" && (
-        <p className="text-xs text-fg-secondary" aria-hidden="true">{t("arriveBy.not_applied", "Arrive by not applied")}</p>
+        <p className="mt-1.5 text-xs text-fg-secondary" aria-hidden="true">{t("arriveBy.not_applied", "Arrive by not applied")}</p>
       )}
       {open && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
