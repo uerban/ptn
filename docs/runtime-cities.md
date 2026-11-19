@@ -36,11 +36,42 @@ credentials outside the public descriptor.
 
 Optional public metadata includes `countryCode` (ISO 3166-1 alpha-2, shown
 next to the city name during setup), `transitSources`, `routeGroups`,
-`defaultExcludedModes`, `poiFetchMode`, `poiCityIds` and `sharedMobility`.
+`routeNetworks`, `defaultExcludedModes`, `poiFetchMode`, `poiCityIds` and `sharedMobility`.
 These are explicitly validated by the client. Schema-2 cities do not inherit
 hidden behavior based on a compiled city ID. GBFS requests still require the
 user's explicit opt-in. POI mode accepts `eager-bundle`, `lazy-tile` and
 `server-side`; `poiCityIds` describes constituent artifact areas.
+
+## Route filters
+
+Search offers route filters from the GTFS networks in a city's feed. A transport
+mode gets filter chips when its routes belong to at least two groups. Routes
+without a network join a fallback chip named after the mode. Feeds publish
+networks through `networks.txt` with `route_networks.txt`, or through
+`routes.network_id`.
+
+`routeNetworks` is optional and only changes how a network is presented:
+
+```json
+{
+  "routeNetworks": [
+    {
+      "networkId": "minibus",
+      "id": "minibus",
+      "label": "Minibus",
+      "labelKey": "settings.mode_minibus",
+      "order": 2,
+      "defaultExcluded": false
+    }
+  ]
+}
+```
+
+Only `networkId` is required. `id` keeps stored rider choices stable, and
+`defaultExcluded` starts the network switched off until a rider enables it. A
+chip label uses `labelKey`, then `label`, then the feed's `network_name`, then
+the network ID. `routeGroups` still applies to bundles without network data.
+Plans with an active route filter run on the device.
 
 ## POI corpora
 
