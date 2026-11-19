@@ -204,3 +204,89 @@ algorithm version and Python version. Identical retained inputs/runtime produce
 identical plans. Over-capacity quotas fail instead of truncating. This does not
 establish door-to-door access, physical pedestrian connectivity, complete city
 coverage or journey usefulness. Those remain separate evaluations.
+
+## Check candidates against published GTFS
+
+`timetable.py` independently checks compatibility with a retained source GTFS
+ZIP. It uses no planner code, downloads nothing, extracts no archive members to
+disk, and does not mutate a pilot ledger. Supply the original source archive and
+stop-level candidate snapshots, rather than a compiled PTB file:
+
+```sh
+python3 tools/search-pilot/timetable.py \
+  --gtfs source.gtfs.zip --cases dated-candidates.json --out new-timetable-report.json
+```
+
+The input has this shape. Replace the digest and example identifiers/times with
+retained evidence. Each case's `serviceDate` identifies the **query** time origin;
+it does not assert that every leg runs on that service date.
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceGTFSsha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "timeFrame": {"kind": "gtfs-service-origin", "timezone": "Europe/Vilnius"},
+  "cases": [{
+    "id": "example",
+    "serviceDate": "20261113",
+    "candidates": [{"legs": [{
+      "type": "transit", "tripId": "trip", "routeId": "route",
+      "fromStopId": "a", "toStopId": "b",
+      "patternStopIds": ["a", "b"], "boardStopIdx": 0, "alightStopIdx": 1,
+      "departSecs": 36000, "arriveSecs": 36600
+    }]}]
+  }]
+}
+```
+
+`timeFrame` declares that projected seconds are elapsed seconds from local noon
+minus twelve elapsed hours on the query date, following the
+[GTFS time definition](https://gtfs.org/documentation/schedule/reference/#field-types).
+The checker requires the declared timezone to match the source's shared
+`agency_timezone` and fingerprints the IANA timezone-rule bytes it actually uses.
+It checks compatibility under this declared contract; it does not prove that a
+captured engine used that frame or that the source produced a particular PTB.
+If the declaration is absent, timing and service eligibility remain unevaluated.
+
+A compatible source service origin is derived from the projected endpoint
+instant minus its published stop time. It must equal local noon minus twelve
+elapsed hours for an actual service date. Two valid but different endpoint
+origins produce a finding. If one endpoint establishes a unique origin, the
+other is compared against that same origin; a missing published time remains
+unevaluated. The report records the derived date, both origins, and which
+endpoints establish it. It never rounds a difference to a day, adjusts candidate
+times, or substitutes the query date for a leg date. This handles next-day trips,
+previous-day trips with published times over 24 hours, and DST origin intervals
+of 23 or 25 elapsed hours. Ambiguous or nonexistent local noon is unsupported.
+
+Checks cover exact trip/route identity, weekday and inclusive date range,
+`calendar_dates` overrides (including dates-only feeds), published boarding and
+alighting times, and pickup/drop-off restrictions. Stop occurrences use explicit
+indexes and require the entire source/candidate stop prefix through alighting
+to match. No subsequence search or first-matching-stop substitution is used.
+Differences strictly after alighting do not affect those occurrences; the report
+records both pattern lengths and whether the full patterns match. Stop sequence
+numbers are sorted numerically and need not be contiguous or equal the indexes.
+
+Each diagnostic is `checked`, `finding`, `source-invalid`, or `not-evaluated`.
+Findings require investigation; they are not automatically planner defects.
+Frequency expansion (both `exact_times` modes), conditional pickup/drop-off,
+missing source times, unaligned occurrences, flexible-service constraints and
+non-transit legs remain explicitly unsupported or unevaluated. Malformed
+referenced source rows and structural input errors are rejected. This is not a
+complete GTFS feed validator.
+
+The output records source/case digests and diagnostic counts. It is created
+exclusively with private file permissions; existing outputs, including symlinks,
+are refused. Exit code 2 means findings or invalid-source diagnostics were
+retained; 0 means neither was emitted, and can still include unevaluated checks
+or empty candidate lists. Other nonzero exits indicate invalid input or an I/O
+failure. No exit code establishes journey feasibility or acceptance.
+
+Operational input limits are 16 MiB case JSON, 64 MiB compressed GTFS, 128 MiB per
+read table, four million rows per table, 50 cases, 256 candidates per case, 256
+legs per candidate, 1,024 referenced trips and 8,192 occurrences per referenced
+trip. These are diagnostic-tool admission limits, not routing resource budgets.
+Pedestrian reachability, connection/transfer rules, real-time composition,
+accessibility, candidate completeness/ranking and human usefulness remain
+separate evaluations. `qualityVerdict` stays null.
