@@ -15,7 +15,6 @@
 
 use pt_core::Reader;
 use sha2::{Digest, Sha256};
-use std::net::{SocketAddr, TcpListener};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -46,36 +45,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
     h.finalize().iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn pick_free_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
-}
-
-fn http_status(addr: SocketAddr, path: &str) -> Option<u16> {
-    use std::io::{Read, Write};
-    let mut stream = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(1)).ok()?;
-    stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
-    let req = format!("GET {} HTTP/1.0\r\nHost: x\r\n\r\n", path);
-    stream.write_all(req.as_bytes()).ok()?;
-    let mut buf = String::new();
-    stream.read_to_string(&mut buf).ok()?;
-    let line = buf.lines().next()?;
-    line.split_whitespace().nth(1)?.parse().ok()
-}
-
-fn wait_until_ready(addr: SocketAddr, deadline: Instant) -> bool {
-    while Instant::now() < deadline {
-        if http_status(addr, "/api/health/ready") == Some(200) {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-    false
-}
-
 /// Producer-derive proof + byte-identical reproducibility: spawn the producer over
 /// the committed tiny-gtfs feed at the pinned anchor and
 /// assert the freshly emitted bytes hash to `COMMITTED_SHA256`, the header stamps
@@ -90,8 +59,6 @@ fn producer_reemits_v1_byte_identically() {
     let bin = env!("CARGO_BIN_EXE_pt-producer");
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("tiny-v1.ptb");
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
 
     let mut child = Command::new(bin)
         .arg("--gtfs-path")
@@ -103,7 +70,7 @@ fn producer_reemits_v1_byte_identically() {
         .arg("--city-tz-iana")
         .arg("UTC")
         .arg("--listen-addr")
-        .arg(addr.to_string())
+        .arg("127.0.0.1:0")
         .arg("--idle-after-ingestion")
         .arg("0")
         .stdout(Stdio::piped())
@@ -111,8 +78,6 @@ fn producer_reemits_v1_byte_identically() {
         .spawn()
         .expect("spawn producer");
 
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let ready = wait_until_ready(addr, deadline);
     // --idle-after-ingestion 0 → the producer exits on its own shortly after ready.
     let exit_deadline = Instant::now() + Duration::from_secs(15);
     let status = loop {
@@ -128,10 +93,6 @@ fn producer_reemits_v1_byte_identically() {
     };
     let collected = child.wait_with_output().expect("wait_with_output");
     let stderr = String::from_utf8_lossy(&collected.stderr);
-    assert!(
-        ready || out.exists(),
-        "producer never reached ready and wrote no artifact\nstderr:\n{stderr}"
-    );
     assert!(
         status.success(),
         "producer exited non-zero\nstderr:\n{stderr}"
