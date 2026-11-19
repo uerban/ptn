@@ -24,6 +24,7 @@ fn write_routes_soa_round_trips_columns() {
             route_type: 3,
             route_color: "C0".into(),
             route_text_color: "T0".into(),
+            ..RouteAttrs::default()
         },
         RouteAttrs {
             agency_id: "AG1".into(),
@@ -32,6 +33,7 @@ fn write_routes_soa_round_trips_columns() {
             route_type: 715,
             route_color: "C1".into(),
             route_text_color: "T1".into(),
+            ..RouteAttrs::default()
         },
     ];
     let mut pool = StringPool::new();

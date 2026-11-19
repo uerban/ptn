@@ -159,7 +159,7 @@
   "settings.preview": "Попередній перегляд",
   "settings.mode_colors": "Кольори видів транспорту",
   "settings.mode_bus": "Автобус",
-  "search.vehicle_filter_local": "Для фільтрації автобусів і маршруток використовуйте планування на пристрої.",
+  "search.vehicle_filter_local": "Використовуйте планування маршрутів безпосередньо на пристрої з фільтрами маршрутів.",
   "settings.mode_minibus": "Маршрутка",
   "settings.mode_tram": "Трамвай",
   "settings.mode_trolleybus": "Тролейбус",

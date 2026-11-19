@@ -16,6 +16,7 @@ pub mod pattern_emit;
 pub mod projection;
 pub mod reader;
 pub mod records;
+pub mod route_side;
 pub mod region_ids;
 pub mod soa_emit;
 pub mod stop_index;

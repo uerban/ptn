@@ -179,3 +179,33 @@ it("preserves index, context, and ready engine on unchanged revalidation", async
   expect(useGtfsDataStore.getState().wasmEngine).toMatchObject({status: "ready",
     initGeneration: useGtfsDataStore.getState().getInitGeneration()});
 });
+
+it("does not warn when a reset supersedes the eager engine build", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    mocks.prepare.mockResolvedValue(prepared());
+    let finish!: () => void;
+    mocks.engine.mockImplementation(() => new Promise(resolve => { finish = () => resolve({free: vi.fn()}); }));
+    await useGtfsDataStore.getState().init(originalCity.id);
+    await vi.waitFor(() => expect(mocks.engine).toHaveBeenCalled());
+    await useGtfsDataStore.getState().reset();
+    finish();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("PtRouter eager init failed"), expect.anything());
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+it("still warns when the eager engine build fails", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    mocks.prepare.mockResolvedValue(prepared());
+    mocks.engine.mockRejectedValue(new Error("bad bytes"));
+    await useGtfsDataStore.getState().init(originalCity.id);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("PtRouter eager init failed"), expect.objectContaining({message: "bad bytes"})));
+  } finally {
+    warn.mockRestore();
+  }
+});

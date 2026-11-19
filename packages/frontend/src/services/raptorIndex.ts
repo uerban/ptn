@@ -20,6 +20,8 @@ export interface RaptorIndexRoute {
    * (matching service alerts); never consulted by the RAPTOR scan. */
   agencyId?: string;
   routeType?: number;
+  /** GTFS network, used only to derive rider-facing route filters. */
+  networkId?: string;
   stopIds: string[];
   trips: {
     tripId: string;
@@ -149,6 +151,8 @@ export interface TransferRule {
 
 export interface RaptorIndex {
   routes: RaptorIndexRoute[];
+  /** GTFS networks used by `routes`; absent when the bundle carries none. */
+  networks?: Array<{ id: string; name?: string }>;
   routeIdToIdx: Map<string, number>;
   routesAtStop: Map<string, number[]>;
   services: Map<string, RaptorIndexService>;
@@ -250,6 +254,7 @@ interface Raw {
     textColor?: string;
     agencyId?: string;
     routeType?: number;
+    networkId?: string;
     stopIds: string[];
     directionPatterns?: RouteDirectionPattern[];
     /**
@@ -307,6 +312,7 @@ interface Raw {
     toTripId?: string;
   }>;
   frequencyRecords?: FrequencyWindow[];
+  networkRecords?: Array<{ id: string; name?: string }>;
 }
 
 /**
@@ -583,7 +589,7 @@ function aggregateDisplay(patterns: RaptorIndexRoute[]): {
  *   argument retain the canonical Off-mode result.
  */
 export function hydrate(
-  { routeRecords, serviceRecords, stopRecords, transferRecords, frequencyRecords }: Raw,
+  { routeRecords, serviceRecords, stopRecords, transferRecords, frequencyRecords, networkRecords }: Raw,
   footTransfers?: FootTransfers,
   mode: PatternMode = PatternMode.Off,
 ): RaptorIndex {
@@ -597,6 +603,7 @@ export function hydrate(
     textColor: r.textColor,
     ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
     ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
+    ...(r.networkId !== undefined ? { networkId: r.networkId } : {}),
     stopIds: r.stopIds,
     trips: (r.trips ?? [])
       .slice()
@@ -746,6 +753,7 @@ export function hydrate(
     transferRulesRouteScoped,
     ...(patterns !== undefined ? { patterns, patternsAtStop } : {}),
     ...(frequenciesByTrip ? { frequenciesByTrip } : {}),
+    ...(networkRecords && networkRecords.length > 0 ? { networks: networkRecords } : {}),
   };
 }
 
@@ -780,6 +788,7 @@ export function rawFromBundle(
     textColor: r.textColor,
     ...(r.agencyId !== undefined ? { agencyId: r.agencyId } : {}),
     ...(r.routeType !== undefined ? { routeType: r.routeType } : {}),
+    ...(r.networkId !== undefined ? { networkId: r.networkId } : {}),
     stopIds: r.stopIds,
     directionPatterns: r.directionPatterns,
     // Inline trips for THIS record only (per-pattern safe — no id regroup).
@@ -863,7 +872,7 @@ export function rawFromBundle(
     headwaySecs: f.headwaySecs,
     exactTimes: f.exactTimes,
   }));
-  return { routeRecords, tripRecords, serviceRecords, stopRecords, transferRecords, frequencyRecords };
+  return { routeRecords, tripRecords, serviceRecords, stopRecords, transferRecords, frequencyRecords, networkRecords: wire.networks };
 }
 
 /**

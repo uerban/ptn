@@ -201,8 +201,8 @@ fn dedup_all_identical_collapses_to_one() {
     assert_eq!(pool.len(), S12, "pool holds exactly one S-byte bitfield");
     assert_eq!(idx, vec![0, 0, 0], "every service points at pool[0]");
     // Round-trip (I6).
-    for s in 0..masks.len() {
-        assert_eq!(pool_slice(&pool, &idx, s, S12), masks[s].as_slice());
+    for (s, mask) in masks.iter().enumerate() {
+        assert_eq!(pool_slice(&pool, &idx, s, S12), mask.as_slice());
     }
 }
 
@@ -222,8 +222,8 @@ fn dedup_all_distinct_is_identity_i7() {
     assert_eq!(idx, vec![0, 1, 2, 3], "all-distinct → idx == 0..N");
     let expected: Vec<u8> = masks.iter().flatten().copied().collect();
     assert_eq!(pool, expected, "all-distinct → pool is input-order concat");
-    for s in 0..masks.len() {
-        assert_eq!(pool_slice(&pool, &idx, s, S12), masks[s].as_slice());
+    for (s, mask) in masks.iter().enumerate() {
+        assert_eq!(pool_slice(&pool, &idx, s, S12), mask.as_slice());
     }
 }
 
@@ -261,8 +261,8 @@ fn dedup_interleaved_repeats_preserve_first_seen_order() {
     assert_eq!(&pool[0..S12], a.as_slice());
     assert_eq!(&pool[S12..2 * S12], b.as_slice());
     assert_eq!(&pool[2 * S12..3 * S12], c.as_slice());
-    for s in 0..masks.len() {
-        assert_eq!(pool_slice(&pool, &idx, s, S12), masks[s].as_slice());
+    for (s, mask) in masks.iter().enumerate() {
+        assert_eq!(pool_slice(&pool, &idx, s, S12), mask.as_slice());
     }
 }
 

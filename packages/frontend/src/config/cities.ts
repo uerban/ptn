@@ -1,6 +1,6 @@
 import presets from "../../../../examples/native/city-presets.json";
 import {deploymentCityConfigs} from "./deployment.ts";
-import type { RouteGroup } from "../services/routeGroups.ts";
+import type { RouteGroup, RouteNetworkConfig } from "../services/routeGroups.ts";
 import type { PoiFetchMode, SelfHostedGeocoderConfig, TransportMode } from "@pt/shared";
 
 /**
@@ -62,6 +62,8 @@ export interface CityConfig {
    * exclusions; explicit global choices take precedence.
    */
   readonly routeGroups?: readonly RouteGroup[];
+  /** Optional labels, order and defaults for GTFS networks found in the feed. */
+  readonly routeNetworks?: readonly RouteNetworkConfig[];
   readonly defaultExcludedModes?: readonly TransportMode[];
   /**
    * Per-city OPERATOR default POI fetch mode (the per-city activation switch —

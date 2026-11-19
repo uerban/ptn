@@ -3,7 +3,7 @@ import { captureCityData, StaleCityDataError, useCityDataStore } from "../servic
 import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
 import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
-import { excludedRouteIdsForGroups, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
+import { deriveRouteGroups, effectiveExcludedRouteGroups, excludedRouteIdsForCity, isRouteGroupExcluded, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
 import { Fragment, useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RouteResults } from "../components/RouteResults/RouteResults.tsx";
@@ -509,12 +509,17 @@ export function SearchPage() {
   // Keep one key per field so refreshes cannot replay old links over user edits.
   const stopPrefillKey = JSON.stringify([cityId, searchParams.get("fromStopId"), searchParams.get("toStopId")]);
   const manualEndpointKeysRef = useRef<Partial<Record<"from" | "to", string>>>({});
-  const cityRouteGroups = useCityStore((s) => s.activeCity.routeGroups);
+  const routeGroupCity = useCityStore((s) => s.activeCity);
+  const enabledRouteGroupsByCity = useSettingsStore((s) => s.enabledRouteGroupsByCity);
+  const cityRouteGroups = useMemo(() => deriveRouteGroups(raptorIndex, routeGroupCity), [raptorIndex, routeGroupCity]);
   const availableRouteGroups = useMemo(() => {
-    const groups = cityRouteGroups ?? [];
-    const present = new Set(raptorIndex?.routes.map((r) => routeGroupFor(r, groups)?.id));
-    return groups.filter((g) => present.has(g.id));
+    const present = new Set(raptorIndex?.routes.map((r) => routeGroupFor(r, cityRouteGroups)?.id));
+    return cityRouteGroups.filter((g) => present.has(g.id));
   }, [cityRouteGroups, raptorIndex]);
+  const effectiveRouteGroupExclusions = useMemo(
+    () => effectiveExcludedRouteGroups(cityRouteGroups, excludedRouteGroupsByCity[cityId] ?? [], enabledRouteGroupsByCity[cityId]),
+    [cityRouteGroups, excludedRouteGroupsByCity, enabledRouteGroupsByCity, cityId],
+  );
   const feedTz = useCityStore((s) => s.activeCity.tz);
   // Standing remote use needs an allowed routing flow; a per-search grant on
   // an on-device setup must not turn into automatic remote searches.
@@ -660,9 +665,8 @@ export function SearchPage() {
     if (!fromEndpoint || !toEndpoint) return;
     const attempt = beginPlanningAttempt();
     const currentCity = useCityStore.getState().activeCity;
-    if (excludedRouteIdsForGroups(useGtfsDataStore.getState().raptorIndex?.routes ?? [], currentCity.routeGroups ?? [],
-      useSettingsStore.getState().excludedRouteGroupsByCity[currentCity.id] ?? []).length > 0) {
-      setSearchError(t("search.vehicle_filter_local", "Use on-device planning for bus and minibus filters."));
+    if (excludedRouteIdsForCity(useGtfsDataStore.getState().raptorIndex, currentCity, useSettingsStore.getState()).length > 0) {
+      setSearchError(t("search.vehicle_filter_local", "Use on-device planning with route filters."));
       setLoading(false);
       return;
     }
@@ -733,9 +737,8 @@ export function SearchPage() {
     if (!fromEndpoint || !toEndpoint) return;
     const attempt = beginPlanningAttempt();
     const currentCity = useCityStore.getState().activeCity;
-    if (excludedRouteIdsForGroups(useGtfsDataStore.getState().raptorIndex?.routes ?? [], currentCity.routeGroups ?? [],
-      useSettingsStore.getState().excludedRouteGroupsByCity[currentCity.id] ?? []).length > 0) {
-      setSearchError(t("search.vehicle_filter_local", "Use on-device planning for bus and minibus filters."));
+    if (excludedRouteIdsForCity(useGtfsDataStore.getState().raptorIndex, currentCity, useSettingsStore.getState()).length > 0) {
+      setSearchError(t("search.vehicle_filter_local", "Use on-device planning with route filters."));
       setLoading(false);
       return;
     }
@@ -825,7 +828,7 @@ export function SearchPage() {
       });
   }, [fromEndpoint, toEndpoint, paginationTime, ranking, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels, beginPlanningAttempt]);
 
-  const hasRouteRestrictions = availableRouteGroups.some((g) => (excludedRouteGroupsByCity[cityId] ?? []).includes(g.id));
+  const hasRouteRestrictions = availableRouteGroups.some((g) => isRouteGroupExcluded(g, effectiveRouteGroupExclusions));
   const fromLat = fromEndpoint?.lat;
   const fromLon = fromEndpoint?.lon;
   const toLat = toEndpoint?.lat;
@@ -1035,8 +1038,10 @@ export function SearchPage() {
       routingProvider === "transitous" &&
       routingMode !== "on-device" &&
       transitousAllowed &&
+      // Transitous cannot honour route filters, so never show its unfiltered plans.
+      !hasRouteRestrictions &&
       !(
-        routingMode === "remote-primary" && !hasRouteRestrictions &&
+        routingMode === "remote-primary" &&
         failedTransitousPrimaryKey === transitousQueryKey
       ) &&
       fromLat != null &&
@@ -1058,6 +1063,7 @@ export function SearchPage() {
       routingProvider,
       routingMode,
       transitousAllowed,
+      hasRouteRestrictions,
       fromLat,
       fromLon,
       toLat,
@@ -1540,13 +1546,13 @@ export function SearchPage() {
       {availableModes.flatMap((mode) => {
         const children = availableRouteGroups.filter((g) => g.parentMode === mode);
         if (children.length > 0) return children.map((group: RouteGroup) => {
-          const isExcluded = excludedModes.includes(mode) || (excludedRouteGroupsByCity[cityId] ?? []).includes(group.id);
+          const isExcluded = excludedModes.includes(mode) || isRouteGroupExcluded(group, effectiveRouteGroupExclusions);
           return <button key={`group-${group.id}`} data-testid={`route-group-${group.id}`}
-            onClick={() => toggleRouteGroup(cityId, group, cityRouteGroups ?? [])}
+            onClick={() => toggleRouteGroup(cityId, group, cityRouteGroups)}
             aria-pressed={!isExcluded}
             className={vehicleChipClass(isExcluded)}>
             <TransportModeIcon mode={mode} size="sm" />
-            <span>{t(group.labelKey, group.label)}</span>
+            <span>{group.labelKey ? t(group.labelKey, group.label) : group.label}</span>
           </button>;
         });
         const isExcluded = excludedModes.includes(mode);
@@ -1714,7 +1720,7 @@ export function SearchPage() {
       </div>
 
       {hasRouteRestrictions && routingMode === "remote-primary" && <p className="px-3 py-1 text-xs text-fg-muted">
-        {t("search.vehicle_filter_local", "Use on-device planning for bus and minibus filters.")}
+        {t("search.vehicle_filter_local", "Use on-device planning with route filters.")}
       </p>}
 
       {/* Search results or route results */}

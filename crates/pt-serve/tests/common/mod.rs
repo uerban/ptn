@@ -3,14 +3,14 @@
 //! `isolated_config()` returns a triple `(TempDir, ServerConfig, Arc<MockClock>)`:
 //!
 //! - The `TempDir` is the test's `data_root`. Each test gets a fresh dir so filesystem state from
-//! one test never bleeds into another under parallel execution. Drop deletes the dir.
+//!   one test never bleeds into another under parallel execution. Drop deletes the dir.
 //! - The
-//! `ServerConfig` carries the full P4 surface. Tests pin a minimal but realistic set of values via
-//! [`default_test_config`]; the non-trivial knobs (`max_rss_bytes`, the overhead bytes) get
-//! sentinels large enough never to trip the guard.
+//!   `ServerConfig` carries the full P4 surface. Tests pin a minimal but realistic set of values via
+//!   [`default_test_config`]; the non-trivial knobs (`max_rss_bytes`, the overhead bytes) get
+//!   sentinels large enough never to trip the guard.
 //! - The `Arc<MockClock>` lets tests drive
-//! staleness / reload runner / cleanup logic deterministically (the cleanup pass's "older than 1h"
-//! check keys off the clock).
+//!   staleness / reload runner / cleanup logic deterministically (the cleanup pass's "older than 1h"
+//!   check keys off the clock).
 //!
 //! NOTE on `#[allow(dead_code)]`: this module is included via
 //! `#[path = "common/mod.rs"] mod common;` in each integration test file, so

@@ -2,7 +2,7 @@ import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
 import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
 import { effectiveExcludedModes } from "./settingsStore.ts";
-import { excludedRouteIdsForGroups } from "../services/routeGroups.ts";
+import { excludedRouteIdsForCity } from "../services/routeGroups.ts";
 import { create } from "zustand";
 import type { BaseEndpoint, RankingCriteria } from "@pt/shared";
 import { endpointCoord } from "@pt/shared/route-endpoint";
@@ -140,7 +140,6 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         walkSpeedMps,
         maxWalkSecs,
         runToCatch,
-        excludedRouteGroupsByCity,
       } = useSettingsStore.getState();
 
       const excludedModes = effectiveExcludedModes(useSettingsStore.getState(), useCityStore.getState().activeCity.defaultExcludedModes);
@@ -188,8 +187,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         mobilityProfile,
         runToCatch,
         excludedModes: excludedModes.length > 0 ? excludedModes : undefined,
-        excludedRouteIds: excludedRouteIdsForGroups(raptorIndex.routes, useCityStore.getState().activeCity.routeGroups ?? [],
-          excludedRouteGroupsByCity[useCityStore.getState().activeCity.id] ?? []),
+        excludedRouteIds: excludedRouteIdsForCity(raptorIndex, useCityStore.getState().activeCity, useSettingsStore.getState()),
         feedTz: useCityStore.getState().activeCity.tz,
         backendAssist: {
           enabled: backendAssist,

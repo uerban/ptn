@@ -179,6 +179,32 @@ describe("Search remote-primary flow", () => {
     );
   });
 
+  it("never shows Transitous plans while a route filter is active", async () => {
+    const activeCity = useCityStore.getState().activeCity;
+    useSettingsStore.setState({
+      routingMode: "remote-primary",
+      routingProvider: "transitous",
+      excludedRouteGroupsByCity: { [activeCity.id]: ["night:BUS"] },
+    });
+    useGtfsDataStore.setState({
+      raptorIndex: {
+        ...emptyRaptorIndex,
+        routes: [
+          { id: "a", mode: "BUS", networkId: "city" },
+          { id: "b", mode: "BUS", networkId: "night" },
+        ],
+      } as unknown as RaptorIndex,
+    });
+    const searchSpy = vi.fn().mockResolvedValue(undefined);
+    useRoutingStore.setState({ results: [], error: null, engineError: null, loading: false, search: searchSpy });
+
+    renderSearch();
+
+    await waitFor(() => expect(searchSpy).toHaveBeenCalled());
+    expect(screen.queryByTestId("transitous-primary")).not.toBeInTheDocument();
+    useSettingsStore.setState({ excludedRouteGroupsByCity: {} });
+  });
+
   // (2) remote success → itineraries + indicator, no banner.
   it("remote success renders itineraries and the indicator, no fallback banner", async () => {
     const searchSpy = vi.fn().mockImplementation(async (_from, _to, _at, opts?: { remote?: boolean }) => {

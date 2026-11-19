@@ -257,6 +257,7 @@ pub fn encode_label_anchors(anchors: &IndexMap<String, &'static str>) -> Vec<u8>
 mod tests {
     use super::*;
 
+    #[allow(clippy::too_many_arguments)]
     fn sub_mode_entry(
         id: &str,
         label: &str,

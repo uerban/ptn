@@ -43,6 +43,8 @@ function invalidateResidentCity(cityId: string): void {
  */
 function startPtRouterBuild(cityId: string): void {
   useGtfsDataStore.getState().ensureWasmReady(cityId, { preferCache: true }).catch((err) => {
+    // A superseded build is expected (reset or city switch); not a failure.
+    if (err instanceof StaleWasmInitError) return;
     console.warn("PtRouter eager init failed; the next search surfaces it as an engine error:", err);
   });
 }

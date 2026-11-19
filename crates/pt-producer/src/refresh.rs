@@ -16,7 +16,7 @@
 //!   crash; on ext4 `data=ordered` (the default) skipping it loses the
 //!   rename on power loss.
 //! - The staging directory is `<data_root>/.publishing/<gen-id>/`. The
-//! janitor handles the case where this directory survives a crash:
+//!   janitor handles the case where this directory survives a crash:
 //!   the 1-hour staleness threshold + lock-state check is the reap predicate.
 //! - The janitor runs AT END OF STEP 9 (before SIGHUP) on every successful
 //!   publish — see step 9b below. Each tick therefore self-bounds the

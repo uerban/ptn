@@ -136,22 +136,24 @@ fn contiguous_subsequence_offset(haystack: &[u32], needle: &[u32]) -> Option<u32
 /// `coveringMergeFold` in `packages/shared/src/raptor/patternSignature.ts`:
 ///
 /// - **Fold predicate.** Group `G` folds into group `H` iff `G.stop_idxs` is a CONTIGUOUS
-/// SUBSEQUENCE of `H.stop_idxs` (∃ offset `k>=0` with `H.stop_idxs[k..k+G.len] == G.stop_idxs`) AND
-/// `H` is strictly LONGER (`H.len > G.len`). Equal-length distinct groups never fold; identical
-/// signatures were already merged in the first pass. - **Tie-break.** If several `H` cover `G`,
-/// fold into the FIRST covering `H` in enumeration order. - **Fold-into-surviving (MULTI-LEVEL via
-/// composition).** Folds are evaluated in enumeration order; only a SURVIVING (not-yet-folded)
-/// group may be a source or a target. A group already folded away is skipped as both. A surviving
-/// group `H` may FIRST receive folds (as a target) and LATER fold into a strictly-longer surviving
-/// group `H'` (as a source). When that happens its members' offsets COMPOSE: a member `H` earlier
-/// absorbed from `G` at relative offset `k_child` lands in `H'` at `k_child + k_parent` (where
-/// `k_parent` is `H`'s offset into `H'`); `H`'s own native members (offset 0) land at `k_parent`.
-/// The covering predicate (`H ⊑ H'`, strictly longer) guarantees the composed offset is a valid
-/// window into `H'`. Chains are NOT prevented — the spec wants every contiguous-subsequence group
-/// folded into a longer one, so blocking `H` from ever becoming a source would wrongly leave it
-/// unfolded. - **Alignment.** A folded member is appended to `H` with its composed offset; the
-/// downstream Index builder serves it only at `H` positions `[offset, offset+member_len)` and
-/// writes the `DEP_SECS_NOT_SERVED` (`-1`) sentinel elsewhere.
+///   SUBSEQUENCE of `H.stop_idxs` (∃ offset `k>=0` with `H.stop_idxs[k..k+G.len] == G.stop_idxs`)
+///   AND `H` is strictly LONGER (`H.len > G.len`). Equal-length distinct groups never fold;
+///   identical signatures were already merged in the first pass.
+/// - **Tie-break.** If several `H` cover `G`, fold into the FIRST covering `H` in enumeration
+///   order.
+/// - **Fold-into-surviving (MULTI-LEVEL via composition).** Folds are evaluated in enumeration
+///   order; only a SURVIVING (not-yet-folded) group may be a source or a target. A group already
+///   folded away is skipped as both. A surviving group `H` may FIRST receive folds (as a target)
+///   and LATER fold into a strictly-longer surviving group `H'` (as a source). When that happens
+///   its members' offsets COMPOSE: a member `H` earlier absorbed from `G` at relative offset
+///   `k_child` lands in `H'` at `k_child + k_parent` (where `k_parent` is `H`'s offset into `H'`);
+///   `H`'s own native members (offset 0) land at `k_parent`. The covering predicate (`H ⊑ H'`,
+///   strictly longer) guarantees the composed offset is a valid window into `H'`. Chains are NOT
+///   prevented — the spec wants every contiguous-subsequence group folded into a longer one, so
+///   blocking `H` from ever becoming a source would wrongly leave it unfolded.
+/// - **Alignment.** A folded member is appended to `H` with its composed offset; the downstream
+///   Index builder serves it only at `H` positions `[offset, offset+member_len)` and writes the
+///   `DEP_SECS_NOT_SERVED` (`-1`) sentinel elsewhere.
 ///
 /// `H`'s own members keep their existing offsets; `G`'s members are appended
 /// carrying `G.offsets[m] + k` (the source member's own offset within `G`

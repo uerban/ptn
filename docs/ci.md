@@ -4,7 +4,7 @@ Routine checks and release preparation have different costs and purposes.
 
 | Workflow | Trigger | Required work |
 | --- | --- | --- |
-| **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
+| **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed; advisory Chromium browser tests |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
 | **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Sole main build: build/test source, build all installable platforms, validate native/Docker fresh-host lifecycle, security scans and retain archives |
 | **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
@@ -34,6 +34,20 @@ checks execute through QEMU; ARMv6 also checks trusted local TLS and hard-float
 attributes. These checks use cached Rust dependencies and pinned Linux compilers.
 The required **CI** aggregate rejects any failed/cancelled platform check; a
 prose-only change deliberately skips both source and platform builds.
+
+Also in parallel, **Browser tests (Chromium)** run the core Playwright suite
+(`e2e/core/`, without the `@coldstart` timing budgets that the regression gates
+measure) against a dev server built with both browser engines, including
+arrive-by. A test that passes only on its retry fails the job, so flaky tests
+are reported instead of hidden. The job is advisory for now: it is not part of
+the **CI** aggregate while its run time and flake rate are measured. On failure
+it uploads the Playwright report and a trace of every failed attempt.
+
+WebKit is not run in CI yet. On Linux runners it renders the map's WebGL in
+software and the page stops painting for tens of seconds, so map and sheet
+tests time out at random. On macOS runners Tab skips links, as in Safari by
+default, which breaks the keyboard specs, and other map and sheet tests still
+flake. Run `pnpm --filter @pt/frontend e2e:pr` locally to cover WebKit.
 
 Routine checks do not fetch reference-city OSM/GTFS inputs, package release
 archives or run deployment lifecycle checks. Those remain mandatory during

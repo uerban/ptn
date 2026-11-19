@@ -7,9 +7,9 @@
 //!    rewriting handlers.
 //!
 //! 2. Request handlers in `src/app/` take `&Generation`, not `Arc<Generation>`. An ambient
-//! `Arc<Generation>` clone in a handler would pin the previous generation across a hot-reload swap,
-//! defeating the lock-free reload contract. The dispatcher loads the `Arc` once at the seam and
-//! hands `&Generation` down.
+//!    `Arc<Generation>` clone in a handler would pin the previous generation across a hot-reload swap,
+//!    defeating the lock-free reload contract. The dispatcher loads the `Arc` once at the seam and
+//!    hands `&Generation` down.
 //!
 //! 3. `arc_swap::ArcSwap::load_full` is restricted to a tight whitelist of
 //!    seam files. Clippy enforces the same rule (`disallowed-methods` in the
@@ -17,9 +17,9 @@
 //!    boundary is checked even when clippy is skipped.
 //!
 //! 4. `pt-serve/src/bundle/loader.rs` does not duplicate structural validation that lives in
-//! `pt_core::validate::structural`. The loader is the per-Generation entry point; structural checks
-//! (magic-bytes, region bounds, CSR bounds) belong on the engine side so a single source of truth
-//! covers both server and bench paths.
+//!    `pt_core::validate::structural`. The loader is the per-Generation entry point; structural checks
+//!    (magic-bytes, region bounds, CSR bounds) belong on the engine side so a single source of truth
+//!    covers both server and bench paths.
 
 use std::path::Path;
 use walkdir::WalkDir;

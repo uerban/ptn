@@ -151,7 +151,7 @@
   "settings.preview": "Eelvaade",
   "settings.mode_colors": "Režiimivärvid",
   "settings.mode_bus": "Buss",
-  "search.vehicle_filter_local": "Bussi- ja väikebussifiltrite jaoks kasuta marsruudi planeerimist seadmes.",
+  "search.vehicle_filter_local": "Kasuta seadmesisest planeerimist koos marsruudifiltritega.",
   "settings.mode_minibus": "Väikebuss",
   "settings.mode_tram": "Tramm",
   "settings.mode_trolleybus": "Trollibuss",

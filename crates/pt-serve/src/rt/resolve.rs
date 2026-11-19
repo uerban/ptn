@@ -33,7 +33,7 @@
 
 use crate::bundle::Generation;
 use crate::domain::time_domain::service_day_to_unix;
-use crate::rt::parser::{TimePrediction, TripUpdate, MAX_DELAY_SECONDS, MIN_DELAY_SECONDS};
+use crate::rt::parser::{TimePrediction, TripUpdate};
 use jiff::{civil::Date, tz::TimeZone, Timestamp, ToSpan};
 use std::collections::HashMap;
 
@@ -89,10 +89,9 @@ pub fn resolve_time_predictions(
             for key in keys {
                 let update = updates.get_mut(&key).expect("key collected above");
                 let prediction = update.time_prediction.take().expect("collected above");
-                let delay = delay_at(gen, tz, t, &prediction);
+                let delay = delay_at(gen, tz, t, &prediction).and_then(|d| i32::try_from(d).ok());
                 if let Some(d) = delay {
-                    update.delay_seconds =
-                        d.clamp(MIN_DELAY_SECONDS.into(), MAX_DELAY_SECONDS.into()) as i32;
+                    update.delay_seconds = d;
                 }
                 if !key.contains('|') {
                     if delay.is_some() {
@@ -165,13 +164,17 @@ fn delay_at(gen: &Generation, tz: &TimeZone, t: usize, prediction: &TimePredicti
             let Ok(scheduled) = service_day_to_unix(date, i64::from(st.dep_secs), tz) else {
                 continue;
             };
-            let delta = prediction.time - scheduled;
-            if best.is_none_or(|b| delta.abs() < b.abs()) {
+            let Some(delta) = prediction.time.checked_sub(scheduled) else {
+                continue;
+            };
+            if (-MAX_MATCH_SECONDS..=MAX_MATCH_SECONDS).contains(&delta)
+                && best.is_none_or(|b| delta.abs() < b.abs())
+            {
                 best = Some(delta);
             }
         }
     }
-    best.filter(|d| d.abs() <= MAX_MATCH_SECONDS)
+    best
 }
 
 /// The reader's `YYYYMMDD` date key.

@@ -265,12 +265,15 @@ def namespace_feed(source, output, source_id):
         "fare_attributes.txt",
         "fare_rules.txt",
         "blocks.txt",
+        "networks.txt",
+        "route_networks.txt",
     }
     fields = {
         "agency_id",
         "stop_id",
         "parent_station",
         "route_id",
+        "network_id",
         "trip_id",
         "service_id",
         "shape_id",

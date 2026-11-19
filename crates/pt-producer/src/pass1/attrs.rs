@@ -34,6 +34,14 @@ pub struct RouteAttrs {
     pub route_color: String,
     /// GTFS routes.route_text_color — 6-hex RGB string (e.g. "FFFFFF"), empty if absent.
     pub route_text_color: String,
+    /// GTFS routes.route_desc, empty if absent.
+    pub desc: String,
+    /// GTFS routes.route_url, empty if absent.
+    pub url: String,
+    /// GTFS routes.route_sort_order; malformed values are treated as absent.
+    pub sort_order: Option<u32>,
+    /// GTFS network assigned through routes.txt or route_networks.txt, empty if none.
+    pub network_id: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

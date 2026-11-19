@@ -15,7 +15,7 @@ async function encodeFeed(entity: unknown[]): Promise<Uint8Array> {
 }
 
 describe("parseTripUpdatesBuffer", () => {
-  it("clamps extreme delaySeconds values before storing them", async () => {
+  it("preserves large signed delaySeconds values", async () => {
     const data = await encodeFeed([
       {
         id: "positive",
@@ -42,8 +42,8 @@ describe("parseTripUpdatesBuffer", () => {
 
     const updates = await parseTripUpdatesBuffer(data);
 
-    expect(updates.get("trip-positive")).toEqual({ delaySeconds: 1800, cancelled: false });
-    expect(updates.get("trip-negative")).toEqual({ delaySeconds: -1800, cancelled: false });
+    expect(updates.get("trip-positive")).toEqual({ delaySeconds: 7200, cancelled: false });
+    expect(updates.get("trip-negative")).toEqual({ delaySeconds: -5400, cancelled: false });
     expect(updates.get("trip-normal")).toEqual({ delaySeconds: 120, cancelled: false });
   });
 

@@ -2,14 +2,13 @@
 //!
 //! Design goals:
 //! - `Index::build` is called ONCE, outside the timed loop. Build time is reported
-//! separately as `index_build_ms`, attributed to *load* not query.
-//! - Only `plan(reader, &index,
-//! transfers, &mut state, query)` is timed per iteration; `ScanState` is reused across iterations
-//! (capacity retained, reset inside `plan`).
-//! - Emits median + p95 per-query latency as
-//! machine-readable JSON to stdout, so CI can `tee` it to a file and upload as an artifact. -
-//! Runnable over the committed `tiny.ptb` (or any `.ptb` + optional `transfers.bin`) so results can
-//! be verified locally.
+//!   separately as `index_build_ms`, attributed to *load* not query.
+//! - Only `plan(reader, &index, transfers, &mut state, query)` is timed per iteration; `ScanState`
+//!   is reused across iterations (capacity retained, reset inside `plan`).
+//! - Emits median + p95 per-query latency as machine-readable JSON to stdout, so CI can `tee` it to
+//!   a file and upload as an artifact.
+//! - Runnable over the committed `tiny.ptb` (or any `.ptb` + optional `transfers.bin`) so results
+//!   can be verified locally.
 //!
 //! Usage:
 //!   pt-core-emit bench <ptb-path> [transfers-path] [--iterations N] [--warmup N]

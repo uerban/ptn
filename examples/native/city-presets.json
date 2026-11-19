@@ -119,6 +119,22 @@
         "routeIdPattern": "(?:^|:)minibusR[0-9]+$"
       }
     ],
+    "routeNetworks": [
+      {
+        "networkId": "bus",
+        "id": "bus",
+        "label": "Bus",
+        "labelKey": "settings.mode_bus",
+        "order": 1
+      },
+      {
+        "networkId": "minibus",
+        "id": "minibus",
+        "label": "Minibus",
+        "labelKey": "settings.mode_minibus",
+        "order": 2
+      }
+    ],
     "name": "Tbilisi",
     "center": {
       "lat": 41.7151,

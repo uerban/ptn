@@ -2,19 +2,19 @@
 //!
 //!
 //! 1. **Failed reload does NOT update `last-good.json` mtime.** A failed validation must keep the
-//! previously-committed last-good pointer untouched — operators rely on `last-good.json`'s age for
-//! the `last_good_age_exceeds_retention` alert.
+//!    previously-committed last-good pointer untouched — operators rely on `last-good.json`'s age for
+//!    the `last_good_age_exceeds_retention` alert.
 //! 2. **`Noop` does NOT reset
-//! `reload_consecutive_failures`.** Already covered as a unit test in `tests/reload.rs`; replicated
-//! here for completeness alongside the other negative cases, with an additional sub-assertion that
-//! a SUBSEQUENT successful adoption DOES reset.
+//!    `reload_consecutive_failures`.** Already covered as a unit test in `tests/reload.rs`; replicated
+//!    here for completeness alongside the other negative cases, with an additional sub-assertion that
+//!    a SUBSEQUENT successful adoption DOES reset.
 //! 3. **In-place corruption → `BundleSizeMismatch`.**
-//! The reload pipeline's cheap on-disk-size precheck must catch a truncated bundle BEFORE SHA-256
-//! fires (the precheck closes the torn-write race window).
+//!    The reload pipeline's cheap on-disk-size precheck must catch a truncated bundle BEFORE SHA-256
+//!    fires (the precheck closes the torn-write race window).
 //! 4. **Snapshot proof via content stamp.**
-//! A request that captures `Arc<Generation>` before a swap continues to see the OLD generation's
-//! `generation_id` even after the swap — verifying the lock-free reload contract: in-flight holders
-//! observe the generation they snapshotted, not the latest swap target.
+//!    A request that captures `Arc<Generation>` before a swap continues to see the OLD generation's
+//!    `generation_id` even after the swap — verifying the lock-free reload contract: in-flight holders
+//!    observe the generation they snapshotted, not the latest swap target.
 //!
 //! Note: this integration test legitimately calls `ArcSwap::load_full` to
 //! simulate the in-flight worker; the clippy disallowed-methods rule that

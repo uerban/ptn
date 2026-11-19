@@ -1,4 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
+import { effectiveExcludedRouteGroups } from "../services/routeGroups.ts";
 import { useCityStore } from "./cityStore.ts";
 import { effectiveExcludedModes, useSettingsStore } from "./settingsStore.ts";
 
@@ -151,4 +152,38 @@ it("migrates city aliases in colour/group maps while preserving current and unav
   expect(merged.excludedRouteGroupsByCity.tricity).toEqual(["old", "new"]);
   expect(merged.excludedRouteGroupsByCity.unavailable).toEqual(["kept"]);
   expect(merged.excludedModes).toEqual(["METRO"]);
+});
+
+describe("default-off route groups", () => {
+  const night = {id: "night:BUS", parentMode: "BUS", label: "Night", networkId: "night", defaultExcluded: true} as const;
+  const late = {id: "late:BUS", parentMode: "BUS", label: "Late", networkId: "late", defaultExcluded: true} as const;
+  const city = {id: "city:BUS", parentMode: "BUS", label: "City", networkId: "city"} as const;
+  const groups = [night, late, city];
+  const reset = () => useSettingsStore.setState({excludedModes: [], enabledModes: [], excludedRouteGroupsByCity: {}, enabledRouteGroupsByCity: {}});
+
+  it("persists an opt-in without storing the other city defaults", () => {
+    reset();
+    useSettingsStore.getState().toggleRouteGroup("tbilisi", night, groups);
+    const state = useSettingsStore.getState();
+    expect(state.enabledRouteGroupsByCity.tbilisi).toEqual(["night:BUS"]);
+    expect(state.excludedRouteGroupsByCity.tbilisi).toEqual([]);
+    expect(effectiveExcludedRouteGroups(groups, state.excludedRouteGroupsByCity.tbilisi!, state.enabledRouteGroupsByCity.tbilisi)).toEqual(["late:BUS"]);
+  });
+  it("turns an opted-in group back off as an explicit exclusion", () => {
+    reset();
+    useSettingsStore.getState().toggleRouteGroup("tbilisi", night, groups);
+    useSettingsStore.getState().toggleRouteGroup("tbilisi", night, groups);
+    const state = useSettingsStore.getState();
+    expect(state.enabledRouteGroupsByCity.tbilisi).toEqual([]);
+    expect(state.excludedRouteGroupsByCity.tbilisi).toEqual(["night:BUS"]);
+  });
+  it("keeps stored exclusions and opt-ins through rehydration", () => {
+    const merged = useSettingsStore.persist.getOptions().merge!({
+      excludedRouteGroupsByCity: {tbilisi: ["minibus"]},
+      enabledRouteGroupsByCity: {gdansk: ["night:BUS"], tricity: ["late:BUS"], bad: "nope"},
+    }, useSettingsStore.getInitialState());
+    expect(merged.excludedRouteGroupsByCity.tbilisi).toEqual(["minibus"]);
+    expect(merged.enabledRouteGroupsByCity.tricity).toEqual(["night:BUS", "late:BUS"]);
+    expect(merged.enabledRouteGroupsByCity.bad).toBeUndefined();
+  });
 });

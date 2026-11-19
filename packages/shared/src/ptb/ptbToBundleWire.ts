@@ -103,6 +103,8 @@ export interface PtbBundleWire {
     agencyId?: string;
     /** GTFS `route_type` (`mode` is derived from it). */
     routeType?: number;
+    /** GTFS network of this route, omitted when it has none. */
+    networkId?: string;
     stopIds: string[];
     trips: Array<{
       tripId: string;
@@ -159,6 +161,8 @@ export interface PtbBundleWire {
    */
   transfers?: WireTransfer[];
   frequencies?: WireFrequency[];
+  /** GTFS networks used by `routes`; omitted when the bundle has none. */
+  networks?: Array<{ id: string; name?: string }>;
 }
 
 /** One GTFS `transfers.txt` rule with string ids (idx→string resolved). */
@@ -690,14 +694,18 @@ export function ptbBundleToWire(
     const directionPatterns = options.includeDirectionPatterns
       ? buildDirectionPatterns(ptb, tripIdxs, sortedByTrip, stopIdOf)
       : [];
+    const networkId = ptb.routeSide?.routes[r]?.networkId;
     const withDirectionPatterns = (
-      wireRoute: PtbBundleWire["routes"][number],
-    ): PtbBundleWire["routes"][number] => directionPatterns.length > 0
-      ? { ...wireRoute, directionPatterns: directionPatterns.map((pattern) => ({
-          ...pattern,
-          stopIds: [...pattern.stopIds],
-        })) }
-      : wireRoute;
+      baseRoute: PtbBundleWire["routes"][number],
+    ): PtbBundleWire["routes"][number] => {
+      const wireRoute = networkId ? { ...baseRoute, networkId } : baseRoute;
+      return directionPatterns.length > 0
+        ? { ...wireRoute, directionPatterns: directionPatterns.map((pattern) => ({
+            ...pattern,
+            stopIds: [...pattern.stopIds],
+          })) }
+        : wireRoute;
+    };
 
     if (patternsEnabled(mode)) {
       // One wire-route per signature group. The signature is the trip's own stopIdx sequence
@@ -871,5 +879,6 @@ export function ptbBundleToWire(
     stops,
     ...(transfers.length > 0 ? { transfers } : {}),
     ...(frequencies && frequencies.length > 0 ? { frequencies } : {}),
+    ...(ptb.routeSide && ptb.routeSide.networks.length > 0 ? { networks: ptb.routeSide.networks } : {}),
   };
 }

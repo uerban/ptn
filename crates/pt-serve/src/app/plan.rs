@@ -6,7 +6,7 @@
 //! Error contract: - malformed JSON body → 400 - unknown stopId in entry/exit → 400 - non-numeric
 //! date string → 400 - walkSpeedMps / minTransferSecs out of range → 400
 //! - EngineError / project
-//! error → 500 - no path found → 200 `[]`
+//!   error → 500 - no path found → 200 `[]`
 //!
 //! Epoch protocol (→ wiring): the worker holds an `Option<ScanState>`; this handler reallocates it
 //! whenever the cached epoch does not match the active generation's. P3 sets every generation's

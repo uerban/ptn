@@ -87,11 +87,20 @@ function runtimeOptionalMetadata(city: Record<string, unknown>): Partial<import(
   }
   if (city.routeGroups !== undefined) {
     const groups = rows("routeGroups");
-    if (groups.some(row => !text(row.id) || !text(row.label) || !text(row.labelKey) || !modes.includes(row.parentMode as string)
+    if (groups.some(row => !text(row.id) || !text(row.label) || (row.labelKey !== undefined && !text(row.labelKey)) || !modes.includes(row.parentMode as string)
       || (row.fallback !== undefined && typeof row.fallback !== "boolean")
       || (row.routeIdPattern !== undefined && (!text(row.routeIdPattern) || row.routeIdPattern.length > 256)))) throw new Error("Invalid city route groups");
     for (const group of groups) if (group.routeIdPattern) new RegExp(group.routeIdPattern as string);
     result.routeGroups = groups;
+  }
+  if (city.routeNetworks !== undefined) {
+    const networks = rows("routeNetworks");
+    const optionalText = (value: unknown): boolean => value === undefined || text(value);
+    if (networks.some(row => !text(row.networkId) || !optionalText(row.id) || !optionalText(row.label) || !optionalText(row.labelKey)
+      || (row.order !== undefined && !Number.isFinite(row.order))
+      || (row.defaultExcluded !== undefined && typeof row.defaultExcluded !== "boolean"))
+      || new Set(networks.map(row => row.networkId)).size !== networks.length) throw new Error("Invalid city route networks");
+    result.routeNetworks = networks;
   }
   if (city.sharedMobility !== undefined) {
     const systems = rows("sharedMobility");

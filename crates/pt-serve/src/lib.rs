@@ -2,19 +2,19 @@
 //!
 //! Module layout:
 //! - `app` — transport-agnostic request handlers; MUST NOT import
-//! tiny_http.
+//!   tiny_http.
 //! - `http` — tiny_http seam: dispatcher + adapter. The only home for tiny_http. -
-//! `bundle` — `Generation`: per-bundle immutable state, swap target.
+//!   `bundle` — `Generation`: per-bundle immutable state, swap target.
 //! - `domain` — pure projection
-//! helpers (mode, time) for the scheduled-departures handler.
+//!   helpers (mode, time) for the scheduled-departures handler.
 //! - `ops` — process-scoped:
-//! `ServerCtx`, `ServerConfig`, metrics counters.
+//!   `ServerCtx`, `ServerConfig`, metrics counters.
 //! - `reload` — typed-signal reload runner +
-//! pending-reload latch.
+//!   pending-reload latch.
 //! - `router` — pure path/method → `Route` resolver (no transport types). -
-//! `mmap` — `MmapBytes` newtype + read-only file mapping.
+//!   `mmap` — `MmapBytes` newtype + read-only file mapping.
 //! - `wire` — JSON request/response shapes
-//! for `/plan`.
+//!   for `/plan`.
 //!
 //! `tiny_http` is imported only from `src/http/` and `src/main.rs`.
 //! 2. `app/`, `bundle/`, `ops/`,
