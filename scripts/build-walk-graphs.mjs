@@ -58,11 +58,11 @@ export function pbfCachePath(cityId, dirs = PBF_DIRS) {
   return paths.find((p) => existsSync(p)) ?? paths[paths.length - 1];
 }
 
-export function osmiumCommands(cityId, pbfPath, workDir) {
+export function osmiumCommands(cityId, pbfPath, workDir, extractStrategy = "complete_ways") {
   const clipped = join(workDir, "clipped.osm.pbf");
   const ways = join(workDir, "ways.osm.pbf");
   return [
-    ["extract", "--strategy=complete_ways", "--bbox", CITIES[cityId].bbox.join(","), pbfPath, "-o", clipped, "--overwrite"],
+    ["extract", `--strategy=${extractStrategy}`, "--bbox", CITIES[cityId].bbox.join(","), pbfPath, "-o", clipped, "--overwrite"],
     ["tags-filter", clipped, `w/highway=${WALK_HIGHWAYS.join(",")}`, "-o", ways, "--overwrite"],
     [
       "export", ways, "-f", "geojsonseq", "--geometry-types=linestring",

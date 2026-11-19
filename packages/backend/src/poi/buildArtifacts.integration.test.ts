@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import { createPrivateKey, createPublicKey } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile, symlink } from "node:fs/promises";
+import { brotliDecompressSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -31,7 +32,8 @@ it.runIf(process.env.PT_OSM_BUILDER_INTEGRATION === "1")("builds, signs, install
       <node id="2" version="1" lat="54.6905" lon="25.2805"/>
       <node id="3" version="1" lat="54.6910" lon="25.2810"/>
       <node id="4" version="1" lat="54.6905" lon="25.2805"><tag k="addr:street" v="Fixture street"/><tag k="addr:housenumber" v="1"/><tag k="amenity" v="cafe"/><tag k="name" v="Fixture Cafe"/></node>
-      <way id="10" version="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="highway" v="footway"/><tag k="name" v="Fixture path"/></way>
+      <node id="5" version="1" lat="54.6905" lon="25.2810"><tag k="place" v="suburb"/><tag k="name" v="Fixture district"/></node>
+      <way id="10" version="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="highway" v="primary"/><tag k="name" v="Fixture path"/></way>
     </osm>`);
     const sourceAt = new Date(Math.floor((Date.now() - 86400_000) / 1000) * 1000).toISOString();
     command("osmium", ["cat", xml, "-o", pbf, `--output-header=osmosis_replication_timestamp=${sourceAt}`]);
@@ -41,11 +43,20 @@ it.runIf(process.env.PT_OSM_BUILDER_INTEGRATION === "1")("builds, signs, install
     const signingKey = join(work, "seed"); await writeFile(signingKey, seed.toString("hex"), { mode: 0o600 });
     const data = new Uint8Array(await readFile(pbf));
     const repository = join(work, "repository");
+    const micromapOut = join(work, "web", "micromap");
     const result = await buildReleases({
       cities: ["vilnius"], workDir: join(work, "build"), repository, signingKey, trustedKeys: [publicKey], revision: "real-tool-fixture",
-      producer: join(tools, "pt-producer"), walkBuilder: join(tools, "pt-walk-build"), publisher: join(tools, "pt-artifact-publish"),
+      micromapOut, producer: join(tools, "pt-producer"), walkBuilder: join(tools, "pt-walk-build"), publisher: join(tools, "pt-artifact-publish"),
     }, { snapshot: (url, cache) => refreshSnapshot(url, cache, { fetch: (async () => new Response(data)) as typeof fetch }) });
     expect(result.vilnius.error).toBeUndefined();
+    const micromap = JSON.parse(brotliDecompressSync(await readFile(join(micromapOut, "vilnius.micromap.br"))).toString("utf8"));
+    expect(micromap).toMatchObject({
+      version: 1,
+      cityId: "vilnius",
+      attribution: "© OpenStreetMap contributors (ODbL)",
+      roads: [{ c: "primary", g: expect.any(String) }],
+      places: [{ n: "Fixture district", r: 3 }],
+    });
     const release = result.vilnius.release!;
     const manifest = JSON.parse(await readFile(join(repository, "releases", release, "manifest.json"), "utf8"));
     expect(manifest.source.snapshotAt).toBe(sourceAt);
@@ -55,7 +66,7 @@ it.runIf(process.env.PT_OSM_BUILDER_INTEGRATION === "1")("builds, signs, install
     await writeFile(config, JSON.stringify({ root: installed, source: { kind: "local", directory: repository }, trustedKeys: [publicKey], cities: { vilnius: {} } }));
     command(join(tools, "pt-artifacts"), ["--config", config, "sync"]);
     const state = JSON.parse(command(join(tools, "pt-artifacts"), ["--config", config, "status"]));
-    expect(state.vilnius.release).toBe(release);
+    expect(state.vilnius.activation?.release).toBe(release);
     expect(existsSync(join(installed, "public/releases", release, "walk-graph.ptwg.br"))).toBe(true);
     expect(existsSync(join(installed, "public/releases", release, "private"))).toBe(false);
 

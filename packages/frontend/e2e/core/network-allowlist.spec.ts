@@ -55,13 +55,19 @@ async function freshProfile(page: Page): Promise<RecordedRequest[]> {
   });
   await setFixedDate(page, PTB_MATCHED_FIXED_TIME);
   await serveAlerts(page);
+  await page.route(/^https:\/\/(?:[^/]+\.)?basemaps\.cartocdn\.com\//, (route) =>
+    route.abort(),
+  );
   return recordRequests(page);
 }
 
 async function chooseCity(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: /^Vilnius/ }).click();
-  await expect(page.getByRole("heading", { name: SETUP_HEADING })).toBeVisible();
+  const city = page.getByRole("button", { name: /^Vilnius/ });
+  const setup = page.getByRole("heading", { name: SETUP_HEADING });
+  await expect(city.or(setup)).toBeVisible();
+  if (await city.isVisible()) await city.click();
+  await expect(setup).toBeVisible();
 }
 
 async function finishSetup(page: Page, preset: Preset, mode: StartMode): Promise<void> {
@@ -138,12 +144,17 @@ test.describe("request allowlist @mock-api", () => {
         await finishSetup(page, preset, mode);
         await useApp(page, mode);
 
+        const detailedMap = preset === "recommended" && mode === "Map";
         const active = [
           ...NECESSARY,
           ...(mode === "Map" ? (["map-assets"] as const) : []),
           ...(preset === "recommended" ? LIVE : []),
+          ...(detailedMap ? (["external.detailed-basemap"] as const) : []),
         ];
         expectAllowed(page, requests, active);
+        if (detailedMap) {
+          expect(count(requests, /basemaps\.cartocdn\.com\/gl\//)).toBeGreaterThan(0);
+        }
         if (preset === "recommended") {
           expect(count(requests, /\/api\/[^/]+\/alerts$/)).toBeGreaterThan(0);
         }
@@ -208,7 +219,7 @@ test.describe("request allowlist with the service worker @mock-api", () => {
       expectAllowed(page, requests, [
         ...NECESSARY,
         ...LIVE,
-        ...(mode === "Map" ? (["map-assets"] as const) : []),
+        ...(mode === "Map" ? (["map-assets", "external.detailed-basemap"] as const) : []),
       ]);
     });
   }

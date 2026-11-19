@@ -7,7 +7,9 @@
 //   <out>/<city>/address-search.fst     packed address corpus (PTAS)
 //
 //   node scripts/build-city-osm-artifacts.mjs [--cities vilnius,tricity] [--require]
-//        [--out <dir>] [--producer <pt-producer>] [--intermediate]
+//        [--out <dir>] [--producer <pt-producer>] [--intermediate] [--micromap-out <dir>]
+//
+// --micromap-out also writes <dir>/<city>.micromap.br for the frontend.
 //
 // --intermediate writes address-search.json (the extractor's output) instead
 // of packing it. CI runs that mode, where osmium lives; the backend image
@@ -28,6 +30,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGzip } from "node:zlib";
 import { CITIES, EXPORT_CONFIG, osmiumCommands, pbfCachePath } from "./build-walk-graphs.mjs";
 
+import { writeMicromap } from "./build-micromap.mjs";
+
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXTRACT_SCRIPT = process.env.PT_ADDRESS_EXTRACT_SCRIPT ?? join(REPO_ROOT, "packages/backend/scripts/extract-addr-fixture.ts");
 const LOCAL_TSX = join(REPO_ROOT, "packages/backend/node_modules/.bin/tsx");
@@ -41,6 +45,7 @@ export function parseArgs(argv) {
     cities: null,
     require: false,
     intermediate: false,
+    micromapOut: null,
     out: join(REPO_ROOT, "data/city-osm"),
     producer: process.env.PT_PRODUCER ?? join(REPO_ROOT, "target/release/pt-producer"),
   };
@@ -56,6 +61,7 @@ export function parseArgs(argv) {
       for (const c of args.cities) if (!(c in CITIES)) throw new Error(`unknown city ${c}`);
     } else if (flag === "--require") args.require = true;
     else if (flag === "--out") args.out = resolve(value());
+    else if (flag === "--micromap-out") args.micromapOut = resolve(value());
     else if (flag === "--producer") args.producer = resolve(value());
     else if (flag === "--intermediate") args.intermediate = true;
     else throw new Error(`unknown flag ${flag}`);
@@ -78,7 +84,8 @@ async function buildCity(cityId, pbfPath, args) {
   const work = mkdtempSync(join(tmpdir(), `city-osm-${cityId}-`));
   try {
     writeFileSync(join(work, "export.json"), JSON.stringify(EXPORT_CONFIG));
-    for (const argv of osmiumCommands(cityId, pbfPath, work)) run("osmium", argv);
+    const strategy = args.micromapOut ? "smart" : "complete_ways";
+    for (const argv of osmiumCommands(cityId, pbfPath, work, strategy)) run("osmium", argv);
 
     const dir = join(args.out, cityId);
     mkdirSync(dir, { recursive: true });
@@ -100,6 +107,12 @@ async function buildCity(cityId, pbfPath, args) {
       run(args.producer, ["pack-address-search", "--input", json, "--out", `${address}.tmp`, "--city", cityId]);
     }
     renameSync(`${address}.tmp`, address);
+
+    if (args.micromapOut) {
+      const generatedAt = statSync(pbfPath).mtime.toISOString().slice(0, 10);
+      const report = await writeMicromap(cityId, join(work, "clipped.osm.pbf"), work, args.micromapOut, generatedAt);
+      console.log(JSON.stringify(report));
+    }
 
     console.log(JSON.stringify({ city: cityId, walking_graph_bytes: statSync(graph).size, address_bytes: statSync(address).size }));
   } finally {

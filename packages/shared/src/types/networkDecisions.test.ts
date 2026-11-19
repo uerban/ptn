@@ -179,6 +179,12 @@ describe("onboarding presets", () => {
       "operator.service-alerts": { value: "allowed", source: "setup" },
     };
     expect(matchOnboardingPreset("standard", recommended)).toBe("recommended");
+    expect(
+      matchOnboardingPreset("standard", {
+        ...recommended,
+        "external.detailed-basemap@carto": { value: "allowed", source: "setup" },
+      }),
+    ).toBe("recommended");
     expect(matchOnboardingPreset("strict", {})).toBe("strict");
     expect(matchOnboardingPreset("standard", {})).toBe("custom");
     expect(matchOnboardingPreset("hardened", recommended)).toBe("custom");
