@@ -36,7 +36,7 @@ The required **CI** aggregate rejects any failed/cancelled platform check; a
 prose-only change deliberately skips both source and platform builds.
 
 Also in parallel, **Browser tests** run the core Playwright suite
-(`e2e/core/`) once in Chromium and once in WebKit, against a dev server built
+(`e2e/core/`) in Chromium on Linux and in WebKit on macOS, against a dev server built
 with both browser engines, including arrive-by. A test that passes only on its
 retry fails the job, so flaky tests are reported instead of hidden. The job is
 advisory for now: it is not part of the **CI** aggregate while its run time and

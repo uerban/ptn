@@ -66,12 +66,19 @@ jobs:
     # required result below. A test that passes only on retry fails the job.
     needs: changes
     if: needs.changes.outputs.source == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, webkit]
+        include:
+          - browser: chromium
+            runner: ubuntu-24.04
+          # WebKit on Linux renders the map's WebGL in software; on a shared
+          # runner its page stops painting for tens of seconds, so clicks wait
+          # forever for a stable element. macOS WebKit is also closer to Safari.
+          - browser: webkit
+            runner: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
