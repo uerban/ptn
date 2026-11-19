@@ -1,5 +1,14 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { mockApi } from "../helpers/mock-api";
+
+/** An on-screen keyboard shrinks the visual viewport and leaves the window as it was. */
+async function setKeyboardHeight(page: Page, height: number): Promise<void> {
+  await page.evaluate((keyboard) => {
+    const viewport = window.visualViewport!;
+    Object.defineProperty(viewport, "height", { configurable: true, get: () => window.innerHeight - keyboard });
+    viewport.dispatchEvent(new Event("resize"));
+  }, height);
+}
 
 test.describe("compact place picker @mock-api", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -8,8 +17,8 @@ test.describe("compact place picker @mock-api", () => {
     await mockApi(page);
     await page.route("**/poi/manifest.json", route => route.fulfill({ status: 404, body: "" }));
   });
-  test("fits four complete suggestions in a keyboard-sized viewport with both place actions", async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 360 });
+  test("fits four complete suggestions above the keyboard and brings navigation back when it closes", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 660 });
     await page.goto("/search");
     const destination = page.getByRole("searchbox", { name: "Where to?", exact: true });
     await expect(destination).toBeVisible();
@@ -34,17 +43,21 @@ test.describe("compact place picker @mock-api", () => {
     });
     await destination.fill("Space test");
     await expect(page.getByRole("option")).toHaveCount(6);
+    await expect(page.locator("nav")).toHaveCount(1);
+    await setKeyboardHeight(page, 300);
+    await expect(page.locator("nav")).toHaveCount(0);
     const dimensions = await page.getByRole("option").evaluateAll(elements => ({
       firstTop: elements[0].getBoundingClientRect().top,
-      complete: elements.filter(element => element.getBoundingClientRect().bottom <= window.innerHeight).length,
+      complete: elements.filter(element => element.getBoundingClientRect().bottom <= window.visualViewport!.height).length,
       scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth,
     }));
     expect(dimensions.firstTop).toBeLessThan(130);
     expect(dimensions.complete).toBeGreaterThanOrEqual(4);
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
     await expect(page.getByRole("button", { name: "Choose on map", exact: true })).toBeVisible();
-    await expect(page.locator("nav")).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath("search-picker-compact.png") });
+    await setKeyboardHeight(page, 0);
+    await expect(page.locator("nav")).toHaveCount(1);
   });
   test("GPS swap keeps both journey fields and navigation visible", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 660 });
