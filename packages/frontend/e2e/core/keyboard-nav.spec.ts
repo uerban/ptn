@@ -6,7 +6,7 @@ test.describe("Keyboard navigation @mock-api", () => {
     await mockApi(page);
   });
 
-  test("skip link focuses on Tab and jumps to #main-content on Enter", async ({ page }) => {
+  test("skip link focuses on Tab and jumps to #main-content on Enter", async ({ page, browserName }) => {
     await page.goto("/");
 
     const skipLink = page.getByTestId("skip-link");
@@ -16,7 +16,9 @@ test.describe("Keyboard navigation @mock-api", () => {
     await page.evaluate(() => {
       (document.body as HTMLElement).focus();
     });
-    await page.keyboard.press("Tab");
+    // WebKit on macOS, like Safari by default, tabs only to form controls;
+    // Option+Tab also reaches links.
+    await page.keyboard.press(browserName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab");
 
     await expect(skipLink).toBeFocused();
     await expect(skipLink).toBeVisible();

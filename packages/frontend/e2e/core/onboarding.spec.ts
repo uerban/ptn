@@ -91,7 +91,7 @@ test.describe("first-run setup @mock-api", () => {
     await page.goto("/");
     await chooseCity(page);
     await openSetupOptions(page);
-    await page.getByText("What strict privacy changes").click();
+    await page.getByText("Why the privacy level matters").click();
     await expect(page.getByText("History is kept for 7 days.")).toBeVisible();
     await startWithLevel(page, "strict");
     await expectInApp(page);
