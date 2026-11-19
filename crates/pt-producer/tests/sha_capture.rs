@@ -1,15 +1,9 @@
-use std::io::Write;
-use std::net::{SocketAddr, TcpListener};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+mod common;
 
-fn pick_free_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
-}
+use std::io::Write;
+use std::net::SocketAddr;
+use std::process::Command;
+use std::time::{Duration, Instant};
 
 fn http_status(addr: SocketAddr, path: &str) -> Option<u16> {
     use std::io::Read;
@@ -32,20 +26,13 @@ fn http_status(addr: SocketAddr, path: &str) -> Option<u16> {
 fn producer_emits_sha256_provenance_line() {
     let fixture =
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tiny-gtfs.zip");
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
     let bin = env!("CARGO_BIN_EXE_pt-producer");
-    let mut child = Command::new(bin)
-        .arg("--gtfs-path")
+    let mut cmd = Command::new(bin);
+    cmd.arg("--gtfs-path")
         .arg(&fixture)
-        .arg("--listen-addr")
-        .arg(addr.to_string())
         .arg("--idle-after-ingestion")
-        .arg("30")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn producer");
+        .arg("30");
+    let (mut child, addr) = common::spawn_on_ephemeral_port(&mut cmd);
 
     let deadline = Instant::now() + Duration::from_secs(30);
     while Instant::now() < deadline {

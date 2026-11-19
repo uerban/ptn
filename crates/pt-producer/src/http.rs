@@ -56,6 +56,10 @@ impl ReadinessServer {
         })
     }
 
+    pub fn local_addr(&self) -> SocketAddr {
+        self.server.server_addr().to_ip().expect("TCP listener")
+    }
+
     pub fn ready_flag(&self) -> &Arc<AtomicBool> {
         &self.ready
     }

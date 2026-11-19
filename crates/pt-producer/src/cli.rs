@@ -59,6 +59,7 @@ pub struct Args {
     pub gtfs_path: Vec<PathBuf>,
 
     /// HTTP listen address; mirrors the Node backend contract.
+    /// Port 0 binds an OS-assigned port and reports it on stdout.
     #[arg(long, default_value = "0.0.0.0:3000")]
     pub listen_addr: SocketAddr,
 
