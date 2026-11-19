@@ -548,7 +548,7 @@
   "arriveBy.limited_recovery": "Ändra tidsgränsen eller sökinställningarna för att prova en annan sökning.",
   "arriveBy.latest_found": "Senaste avgång visas. Söker efter övriga alternativ…",
   "arriveBy.complete": "Ankomst kl. {time}: senaste avgång först, därefter efter avgångstid.",
-  "arriveBy.none": "Ingen resa som börjar inom 4 timmar före {time} kommer fram i tid.",
+  "arriveBy.none": "Ingen kommande resa inom sökperioden kommer fram senast {time}.",
   "arriveBy.leave_now_action": "Visa resor som avgår just nu",
   "arriveBy.failed": "Sökningen efter ankomsttid misslyckades ({code}).",
   "arriveBy.retry": "Försök igen",

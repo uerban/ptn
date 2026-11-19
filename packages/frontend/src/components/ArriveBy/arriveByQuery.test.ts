@@ -1,5 +1,5 @@
 import { seedLegacyCityProjection } from "../../test-helpers/cityData.ts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../db/index.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
@@ -34,7 +34,28 @@ beforeEach(async () => {
   vi.mocked(router.resolveTime).mockClear();
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("prepareArriveBy", () => {
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-12T05:00:00+03:00"));
+  });
+
+  it("only searches departures still boardable at request time without moving the deadline", async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-12T08:13:00.200+03:00"));
+    const result = await prepareArriveBy(ORIGIN, DEST, Date.parse("2026-10-12T10:00:00+03:00"), router);
+    expect(result.kind === "ready" && result.prepared.input.scope).toMatchObject({
+      windowStart: 29581, windowEnd: 36001, arrivalDeadline: 36000,
+    });
+  });
+
+  it("does not dispatch an elapsed deadline", async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-12T10:00:00.200+03:00"));
+    expect(await prepareArriveBy(ORIGIN, DEST, Date.parse("2026-10-12T10:00:00+03:00"), router))
+      .toEqual({ kind: "expired" });
+    expect(router.resolveTime).not.toHaveBeenCalled();
+  });
+
   it("builds the early-4h scope for the deadline from the planner's stops and settings", async () => {
     const deadline = Date.parse("2026-10-12T10:00:00+03:00");
     const result = await prepareArriveBy(ORIGIN, DEST, deadline, router);
@@ -85,7 +106,7 @@ describe("prepareArriveBy", () => {
 
   it("reports endpoints with no reachable stop and does not resolve the time", async () => {
     const far = { kind: "mappoint" as const, lat: 55.5, lon: 26.5 };
-    expect(await prepareArriveBy(ORIGIN, far, Date.now(), router)).toEqual({ kind: "no-stops" });
+    expect(await prepareArriveBy(ORIGIN, far, Date.now() + 3_600_000, router)).toEqual({ kind: "no-stops" });
     expect(router.resolveTime).not.toHaveBeenCalled();
   });
 });

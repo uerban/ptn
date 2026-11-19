@@ -575,7 +575,7 @@
   "arriveBy.limited_recovery": "Change the deadline or search settings to try a different search.",
   "arriveBy.latest_found": "Latest departure shown. Finding the other options…",
   "arriveBy.complete": "Arriving by {time}: latest departure first, then by departure time.",
-  "arriveBy.none": "No journey starting in the 4 hours before {time} arrives in time.",
+  "arriveBy.none": "No upcoming journey in the search window arrives by {time}.",
   "arriveBy.leave_now_action": "Show journeys leaving now",
   "arriveBy.failed": "The arrive-by search failed ({code}).",
   "arriveBy.retry": "Try again",
