@@ -5,6 +5,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   mockApi,
+  mockApiAtServiceTime,
   PTB_MATCHED_FIXED_TIME,
   PTB_MATCHED_STOP_QUERY,
 } from "../helpers/mock-api";
@@ -233,7 +234,7 @@ test.describe("Service alerts @mock-api", () => {
 
   test("the map strip marks affected lines", async ({ page }) => {
     await seedProfile(page, { decisions: RECOMMENDED_DECISIONS });
-    await mockApi(page, { realtime: "departures, alerts" });
+    await mockApiAtServiceTime(page, { realtime: "departures, alerts" });
     await serveAlerts(page);
     await page.goto("/");
 
