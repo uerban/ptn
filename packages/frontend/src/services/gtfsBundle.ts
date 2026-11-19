@@ -57,6 +57,8 @@ export interface RaptorBundleWire {
     agencyId?: string;
     /** GTFS `route_type`; absent on bundles stored by older builds. */
     routeType?: number;
+    /** GTFS network of this route, when the feed assigns one. */
+    networkId?: string;
     stopIds: string[];
     trips: Array<{
       tripId: string;
@@ -127,6 +129,8 @@ export interface RaptorBundleWire {
     fromTripId?: string;
     toTripId?: string;
   }>;
+  // GTFS networks used by this bundle's routes. Absent on older bundles.
+  networks?: Array<{ id: string; name?: string }>;
   // GTFS frequencies.txt rows keyed by PTB global trip ordinal. Absent on
   // feeds without frequencies.txt.
   frequencies?: Array<{
