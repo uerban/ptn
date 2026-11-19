@@ -114,7 +114,8 @@ describe("useTripStart", () => {
     // Nothing is requested before the user's choice.
     expect(calls.request).not.toHaveBeenCalled();
     expect(calls.notify).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(screen.getByTestId("trip-start-confirm"));
+    // Finding the dialog does not wait for its passive focus effect.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("trip-start-confirm")));
 
     fireEvent.click(screen.getByTestId("trip-start-confirm"));
     expect(calls.request).toHaveBeenCalledWith("navigation");
