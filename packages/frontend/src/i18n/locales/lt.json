@@ -555,7 +555,7 @@
   "arriveBy.limited_recovery": "Pakeiskite terminą arba paieškos nustatymus, kad išbandytumėte kitokią paiešką.",
   "arriveBy.latest_found": "Rodomas artimiausias išvykimas. Ieškoma kitų variantų…",
   "arriveBy.complete": "Atvykimas per {time}: pirmiausia rodomi naujausi išvykimai, po to – pagal išvykimo laiką.",
-  "arriveBy.none": "Nė viena kelionė, prasidedanti per 4 valandas iki {time}, nepasieks tikslo laiku.",
+  "arriveBy.none": "Nė viena būsima kelionė paieškos laikotarpiu nepasieks tikslo iki {time}.",
   "arriveBy.leave_now_action": "Rodyti dabar išvykstančius reisus",
   "arriveBy.failed": "Paieška pagal atvykimo laiką nepavyko ({code}).",
   "arriveBy.retry": "Pabandykite dar kartą",

@@ -367,11 +367,22 @@ describe("Arrive-by results", () => {
     expect(runs).toHaveLength(1);
   });
 
+  it("offers leaving now for an expired deadline without starting a search", async () => {
+    render(<Page />);
+    chooseArriveBy();
+    await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
+    vi.mocked(prepareArriveBy).mockResolvedValue({ kind: "expired" });
+    fireEvent.click(screen.getByTestId("arrive-by-apply"));
+    expect(await screen.findByTestId("arrive-by-notice")).toHaveTextContent("No upcoming journey");
+    expect(runs).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Show journeys leaving now" })).toBeInTheDocument();
+  });
+
   it("says when no journey meets the deadline and offers leaving now", async () => {
     render(<Page />);
     await applyDefault();
     emit(state("complete", []));
-    await waitFor(() => expect(screen.getByTestId("arrive-by-notice")).toHaveTextContent("No journey starting in the 4 hours"));
+    await waitFor(() => expect(screen.getByTestId("arrive-by-notice")).toHaveTextContent("No upcoming journey in the search window"));
     fireEvent.click(screen.getByRole("button", { name: "Show journeys leaving now" }));
     expect(screen.getByTestId("normal-results")).toBeInTheDocument();
     expect(useArriveByUi.getState()).toMatchObject({ mode: "leave", appliedMs: null });

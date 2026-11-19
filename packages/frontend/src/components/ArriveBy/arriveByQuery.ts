@@ -32,7 +32,8 @@ export interface ArriveByPrepared {
 
 export type ArriveByPrepareResult =
   | { readonly kind: "ready"; readonly prepared: ArriveByPrepared }
-  | { readonly kind: "no-stops" };
+  | { readonly kind: "no-stops" }
+  | { readonly kind: "expired" };
 
 /**
  * The engine's mobility profiles. A vision-impaired rider has no engine
@@ -51,6 +52,10 @@ export async function prepareArriveBy(
   router: PtRouterHandle,
   caller: ArriveByCaller = "apply",
 ): Promise<ArriveByPrepareResult> {
+  const earliestDepartureUnix = Math.ceil(Date.now() / 1000);
+  const deadlineUnix = Math.floor(deadlineMs / 1000);
+  if (earliestDepartureUnix > deadlineUnix) return { kind: "expired" };
+
   const { raptorIndex } = useGtfsDataStore.getState();
   if (!raptorIndex) throw new Error("GTFS data not loaded");
   const start = performance.now();
@@ -79,10 +84,13 @@ export async function prepareArriveBy(
     markArriveBy(ARRIVE_BY_MARKS.prepared, { caller, start, stopsRead, reachable, stops: table.rows.length });
     return { kind: "no-stops" };
   }
-  const windowStart = await router.resolveTime(Math.floor(deadlineMs / 1000) - ARRIVE_BY_WINDOW_SECS);
+  const nominalStartUnix = deadlineUnix - ARRIVE_BY_WINDOW_SECS;
+  const windowStart = await router.resolveTime(nominalStartUnix);
   const resolveTime = performance.now();
+  const scope = arriveByScope(windowStart, entryStops, exitStops);
   const input: ArriveBySearchInput = {
-    scope: arriveByScope(windowStart, entryStops, exitStops),
+    // Keep the same service-day frame and deadline while excluding past departures.
+    scope: { ...scope, windowStart: scope.windowStart + Math.max(0, earliestDepartureUnix - nominalStartUnix) },
     mobilityProfile: engineMobility(mobilityProfile),
     excludedModes: excludedModes.flatMap(transportModeToRouteTypes),
     excludedRouteIds: excludedRouteIdsForGroups(raptorIndex.routes, city.routeGroups ?? [], excludedRouteGroupsByCity[city.id] ?? []),

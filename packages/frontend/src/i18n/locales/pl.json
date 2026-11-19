@@ -542,7 +542,7 @@
   "arriveBy.limited_recovery": "Zmień termin lub ustawienia wyszukiwania, żeby spróbować innego wyszukiwania.",
   "arriveBy.latest_found": "Wyświetlany jest najpóźniejszy odjazd. Szukam innych opcji…",
   "arriveBy.complete": "Przyjazd o {time}: najpierw najpóźniejsze odjazdy, potem według godziny odjazdu.",
-  "arriveBy.none": "Żadna podróż rozpoczynająca się w ciągu 4 godzin przed godziną {time} nie dotrze na czas.",
+  "arriveBy.none": "Żadna nadchodząca podróż w przedziale wyszukiwania nie dotrze do {time}.",
   "arriveBy.leave_now_action": "Pokaż trasy odjeżdżające teraz",
   "arriveBy.failed": "Wyszukiwanie według godziny przyjazdu nie powiodło się ({code}).",
   "arriveBy.retry": "Spróbuj jeszcze raz",

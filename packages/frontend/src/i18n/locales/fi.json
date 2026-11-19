@@ -550,7 +550,7 @@
   "arriveBy.limited_recovery": "Muuta aikarajaa tai hakuasetuksia kokeillaksesi erilaista hakua.",
   "arriveBy.latest_found": "Näytetään seuraava lähtö. Etsitään muita vaihtoehtoja…",
   "arriveBy.complete": "Saapuu klo {time}: ensin uusimmat lähdöt, sitten lähtöajan mukaan.",
-  "arriveBy.none": "Mikään matka, joka alkaa 4 tuntia ennen {time}, ei saavu ajoissa.",
+  "arriveBy.none": "Yksikään hakuajanjakson tuleva matka ei saavu perille viimeistään klo {time}.",
   "arriveBy.leave_now_action": "Näytä juuri lähtevät matkat",
   "arriveBy.failed": "Saapumisaikahaku epäonnistui ({code}).",
   "arriveBy.retry": "Yritä uudelleen",
