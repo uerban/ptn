@@ -1,4 +1,4 @@
-import { toggleRouteGroupSelection, type RouteGroup } from "../services/routeGroups.ts";
+import { effectiveExcludedRouteGroups, isRouteGroupExcluded, toggleRouteGroupSelection, type RouteGroup } from "../services/routeGroups.ts";
 import { create } from "zustand";
 import { LOOSE_POI_CATEGORIES, sanitizePoiCategories, type LoosePoiCategory } from "../config/poiCategories.ts";
 import { persist } from "zustand/middleware";
@@ -143,6 +143,8 @@ interface SettingsState {
   /** Global explicit opt-ins that take precedence over a city default. */
   enabledModes: TransportMode[];
   excludedRouteGroupsByCity: Record<string, string[]>;
+  /** Default-off route groups the rider explicitly turned on, per city. */
+  enabledRouteGroupsByCity: Record<string, string[]>;
   getOffAlarmEnabled: boolean;
   etaCardsEnabled: boolean;
   etaCardsLayout: EtaCardsLayout;
@@ -393,6 +395,7 @@ export const useSettingsStore = create<SettingsState>()(
       excludedModes: [],
       enabledModes: [],
       excludedRouteGroupsByCity: {},
+      enabledRouteGroupsByCity: {},
       getOffAlarmEnabled: true,
       etaCardsEnabled: true,
       etaCardsLayout: "rows" satisfies EtaCardsLayout,
@@ -590,11 +593,21 @@ export const useSettingsStore = create<SettingsState>()(
         const defaults = (activeCity.id === cityId ? activeCity : CITIES.find(city => city.id === cityId))?.defaultExcludedModes ?? [];
         const effective = effectiveExcludedModes(state, defaults);
         const wasExcluded = effective.includes(group.parentMode);
-        const next = toggleRouteGroupSelection(effective, state.excludedRouteGroupsByCity[cityId] ?? [], group, groups);
+        const stored = state.excludedRouteGroupsByCity[cityId] ?? [];
+        const enabled = state.enabledRouteGroupsByCity[cityId] ?? [];
+        const current = effectiveExcludedRouteGroups(groups, stored, enabled);
+        const next = toggleRouteGroupSelection(effective, current, group, groups);
+        // City defaults stay derived: only the rider's own choices are persisted.
+        const implied = current.filter(id => !stored.includes(id) && id !== group.id);
+        const excludedGroups = next.excludedGroups.filter(id => !implied.includes(id));
+        const nowExcluded = isRouteGroupExcluded(group, next.excludedGroups);
+        const enabledGroups = enabled.filter(id => id !== group.id);
+        if (!nowExcluded && group.defaultExcluded) enabledGroups.push(group.id);
         return {
           excludedModes: wasExcluded ? state.excludedModes.filter(mode => mode !== group.parentMode) : state.excludedModes,
           enabledModes: wasExcluded ? [...new Set([...state.enabledModes, group.parentMode])] : state.enabledModes,
-          excludedRouteGroupsByCity: {...state.excludedRouteGroupsByCity, [cityId]: next.excludedGroups},
+          excludedRouteGroupsByCity: {...state.excludedRouteGroupsByCity, [cityId]: excludedGroups},
+          enabledRouteGroupsByCity: {...state.enabledRouteGroupsByCity, [cityId]: enabledGroups},
         };
       }),
       toggleMode: (mode) => set((state) => {
@@ -703,6 +716,12 @@ export const useSettingsStore = create<SettingsState>()(
             ? stored.mapDetailMode
             : current.mapDetailMode,
           excludedRouteGroupsByCity: Object.entries(stored?.excludedRouteGroupsByCity ?? {}).reduce<Record<string, string[]>>((result, [city, value]) => {
+            if (!Array.isArray(value)) return result;
+            const owner = canonicalCityId(city);
+            result[owner] = [...new Set([...(result[owner] ?? []), ...value.filter((item): item is string => typeof item === "string")])];
+            return result;
+          }, {}),
+          enabledRouteGroupsByCity: Object.entries(stored?.enabledRouteGroupsByCity ?? {}).reduce<Record<string, string[]>>((result, [city, value]) => {
             if (!Array.isArray(value)) return result;
             const owner = canonicalCityId(city);
             result[owner] = [...new Set([...(result[owner] ?? []), ...value.filter((item): item is string => typeof item === "string")])];

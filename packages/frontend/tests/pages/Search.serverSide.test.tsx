@@ -183,4 +183,35 @@ describe("vehicle-class filter controls", () => {
       useSettingsStore.setState({ excludedModes: [], excludedRouteGroupsByCity: {} });
     }
   });
+
+  it("derives chips from feed networks and honours a default-off network until opted in", async () => {
+    vi.useRealTimers();
+    const { CITIES } = await import("../../src/config/cities.ts");
+    const { useCityStore } = await import("../../src/stores/cityStore.ts");
+    const { useSettingsStore } = await import("../../src/stores/settingsStore.ts");
+    const { useGtfsDataStore } = await import("../../src/stores/gtfsDataStore.ts");
+    const originalCity = useCityStore.getState().activeCity;
+    const originalIndex = useGtfsDataStore.getState().raptorIndex;
+    const city = { ...CITIES[0]!, routeGroups: undefined, routeNetworks: [{ networkId: "night", defaultExcluded: true }] };
+    useCityStore.setState({ activeCity: city });
+    useSettingsStore.setState({ preferredAdapter: "motis", excludedModes: [], excludedRouteGroupsByCity: {}, enabledRouteGroupsByCity: {} });
+    useGtfsDataStore.setState({ raptorIndex: {
+      routes: [{ id: "a", mode: "BUS", networkId: "day" }, { id: "b", mode: "BUS", networkId: "night" }],
+      networks: [{ id: "day", name: "Day" }, { id: "night", name: "Night" }],
+    } as unknown as NonNullable<typeof originalIndex> });
+    const view = render(<MemoryRouter initialEntries={["/search?toName=Park"]}><SearchPage /></MemoryRouter>);
+    try {
+      const night = view.getByTestId("route-group-night:BUS");
+      expect(view.getByTestId("route-group-day:BUS")).toHaveAttribute("aria-pressed", "true");
+      expect(night).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(night);
+      expect(night).toHaveAttribute("aria-pressed", "true");
+      expect(useSettingsStore.getState().enabledRouteGroupsByCity[city.id]).toEqual(["night:BUS"]);
+    } finally {
+      view.unmount();
+      useCityStore.setState({ activeCity: originalCity });
+      useGtfsDataStore.setState({ raptorIndex: originalIndex });
+      useSettingsStore.setState({ excludedModes: [], excludedRouteGroupsByCity: {}, enabledRouteGroupsByCity: {} });
+    }
+  });
 });

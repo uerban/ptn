@@ -1,5 +1,5 @@
 import { effectiveExcludedModes } from "../../stores/settingsStore.ts";
-import { excludedRouteIdsForGroups } from "../../services/routeGroups.ts";
+import { excludedRouteIdsForCity } from "../../services/routeGroups.ts";
 /**
  * The arrive-by request for two endpoints and a deadline, resolved the way
  * the normal planner resolves its query: the same settings, the same
@@ -58,7 +58,7 @@ export async function prepareArriveBy(
   arriveByRouteColors().catch(() => {});
   const table = await arriveByStopTable();
   const stopsRead = performance.now();
-  const { mobilityProfile, walkSpeedMps, maxWalkSecs, runToCatch, excludedRouteGroupsByCity } = useSettingsStore.getState();
+  const { mobilityProfile, walkSpeedMps, maxWalkSecs, runToCatch } = useSettingsStore.getState();
   const city = useCityStore.getState().activeCity;
   const excludedModes = effectiveExcludedModes(useSettingsStore.getState(), city.defaultExcludedModes);
   const orchestrator = new SearchOrchestrator({
@@ -85,7 +85,7 @@ export async function prepareArriveBy(
     scope: arriveByScope(windowStart, entryStops, exitStops),
     mobilityProfile: engineMobility(mobilityProfile),
     excludedModes: excludedModes.flatMap(transportModeToRouteTypes),
-    excludedRouteIds: excludedRouteIdsForGroups(raptorIndex.routes, city.routeGroups ?? [], excludedRouteGroupsByCity[city.id] ?? []),
+    excludedRouteIds: excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState()),
     // The engine's transfer walks at the rider's pace and the profile's
     // minimum transfer, as the normal planner's query (`SearchOrchestrator`).
     walkSpeedMps: riderWalkSpeedMps(mobilityProfile, walkSpeedMps),

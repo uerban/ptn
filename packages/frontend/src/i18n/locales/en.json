@@ -160,7 +160,7 @@
   "settings.preview": "Preview",
   "settings.mode_colors": "Mode Colors",
   "settings.mode_bus": "Bus",
-  "search.vehicle_filter_local": "Use on-device planning for bus and minibus filters.",
+  "search.vehicle_filter_local": "Use on-device planning with route filters.",
   "settings.mode_minibus": "Minibus",
   "settings.mode_tram": "Tram",
   "settings.mode_trolleybus": "Trolleybus",

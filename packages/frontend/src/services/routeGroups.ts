@@ -81,7 +81,7 @@ function buildNetworkGroups(index: RouteNetworkIndex, city: RouteGroupCity): rea
 
 /** Filter groups for a loaded bundle. Feed networks win; `routeGroups` covers bundles without them. */
 export function deriveRouteGroups(index: RouteNetworkIndex | null | undefined, city: RouteGroupCity): readonly RouteGroup[] {
-  if (!index || !index.routes.some((route) => route.networkId)) return city.routeGroups ?? [];
+  if (!index?.routes?.some((route) => route.networkId)) return city.routeGroups ?? [];
   let perCity = derivedGroups.get(index);
   if (!perCity) derivedGroups.set(index, perCity = new WeakMap());
   let groups = perCity.get(city);
@@ -113,6 +113,17 @@ export function excludedRouteIdsForGroups(routes: Iterable<RouteIdentity>, group
     if (group && isRouteGroupExcluded(group, excluded)) ids.push(route.id);
   }
   return [...new Set(ids)].sort();
+}
+/** Route IDs a rider has filtered out of planning in this city. */
+export function excludedRouteIdsForCity(
+  index: RouteNetworkIndex | null | undefined,
+  city: RouteGroupCity & { readonly id: string },
+  settings: { readonly excludedRouteGroupsByCity: Record<string, string[]>; readonly enabledRouteGroupsByCity?: Record<string, string[]> },
+): string[] {
+  if (!index) return [];
+  const groups = deriveRouteGroups(index, city);
+  const excluded = effectiveExcludedRouteGroups(groups, settings.excludedRouteGroupsByCity[city.id] ?? [], settings.enabledRouteGroupsByCity?.[city.id]);
+  return excludedRouteIdsForGroups(index.routes, groups, excluded);
 }
 /** Remove a group's selection; a shared alias stays in force for its other variants. */
 function withoutRouteGroup(excluded: readonly string[], group: RouteGroup, groups: readonly RouteGroup[]): string[] {
