@@ -61,24 +61,16 @@ jobs:
           pnpm typecheck
           pnpm lint
   browser:
-    name: Browser tests (${{ matrix.browser }})
+    name: Browser tests (Chromium)
     # Advisory while its run time and flake rate are measured; not part of the
     # required result below. A test that passes only on retry fails the job.
+    # WebKit is not run here yet: on Linux it renders the map's WebGL in
+    # software and stalls, and on macOS runners Tab skips links and other
+    # map/sheet tests flake. See docs/ci.md.
     needs: changes
     if: needs.changes.outputs.source == 'true'
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - browser: chromium
-            runner: ubuntu-24.04
-          # WebKit on Linux renders the map's WebGL in software; on a shared
-          # runner its page stops painting for tens of seconds, so clicks wait
-          # forever for a stable element. macOS WebKit is also closer to Safari.
-          - browser: webkit
-            runner: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -100,27 +92,25 @@ jobs:
           bindgen="$(awk '/^name = "wasm-bindgen"$/{getline; gsub(/[^0-9.]/,""); print; exit}' Cargo.lock)"
           cargo install wasm-bindgen-cli --locked --version "$bindgen"
           node scripts/build-pt-wasm-arrive-by.mjs
-      - name: Install dependencies and ${{ matrix.browser }}
-        env:
-          BROWSER: ${{ matrix.browser }}
+      - name: Install dependencies and Chromium
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter @pt/shared build
-          pnpm --filter @pt/frontend exec playwright install --with-deps "$BROWSER"
+          pnpm --filter @pt/frontend exec playwright install --with-deps chromium
       - name: Run the core browser suite
         working-directory: packages/frontend
         env:
-          BROWSER: ${{ matrix.browser }}
           # Fail the dev server instead of silently testing without arrive-by.
           PTN_ARRIVE_BY_EXPERIMENT: "1"
+        # Cold-start timing budgets are measured by the regression gates.
         run: >-
-          pnpm exec playwright test --project="pr-$BROWSER" e2e/core/
+          pnpm exec playwright test --project=pr-chromium e2e/core/ --grep-invert @coldstart
           --workers=2 --retries=1 --fail-on-flaky-tests --trace=retain-on-failure
           --reporter=github,list,html
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
-          name: browser-report-${{ matrix.browser }}
+          name: browser-report-chromium
           retention-days: 14
           path: |
             packages/frontend/playwright-report/
