@@ -167,8 +167,9 @@ test.describe("Service alerts @mock-api", () => {
     await page.goto(`/search?${PTB_MATCHED_STOP_QUERY}`);
     const card = page.getByTestId("itinerary-card").first();
     await expect(card).toBeVisible({ timeout: 20_000 });
-    const notes = page.getByTestId("service-alert-trip-notes").first();
-    await expect(notes).toContainText("Line diverted around the old town", { timeout: 10_000 });
+    // One strip above the results; a severe alert is never folded away.
+    await expect(page.getByTestId("route-alerts-summary")).toContainText("Line diverted around the old town", { timeout: 10_000 });
+    await expect(page.getByTestId("route-alert-marker").first()).toBeVisible();
 
     await card.click();
     const explainer = page.getByTestId("trip-start-explainer");
@@ -195,11 +196,11 @@ test.describe("Service alerts @mock-api", () => {
     await expect(page.getByTestId("itinerary-card").first()).toBeVisible({ timeout: 20_000 });
     const offer = page.getByTestId("service-alerts-offer");
     await expect(offer).toContainText("Service alerts are available for");
-    await expect(page.getByTestId("service-alert-trip-notes")).toHaveCount(0);
+    await expect(page.getByTestId("route-alerts-summary")).toHaveCount(0);
     expect(calls).toEqual([]);
 
     await offer.getByRole("button", { name: "Turn on" }).click();
-    await expect(page.getByTestId("service-alert-trip-notes").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("route-alerts-summary")).toBeVisible({ timeout: 10_000 });
     expect(calls.length).toBeGreaterThan(0);
     await expect(offer).toHaveCount(0);
   });

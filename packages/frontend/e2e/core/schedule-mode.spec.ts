@@ -17,10 +17,8 @@ test.describe("Schedule-only mode", () => {
     // Should show schedule view, not map
     await expect(page.locator("section[aria-label='Text mode']")).toBeVisible({ timeout: 10_000 });
 
-    // Should have Plan trip button
-    await expect(
-      page.getByRole("link", { name: /plan trip/i }).or(page.getByRole("button", { name: /plan trip/i }))
-    ).toBeVisible();
+    // Trip planning is reached from the bottom navigation, as in the map view.
+    await expect(page.getByRole("navigation").getByRole("link", { name: "Search", exact: true })).toBeVisible();
 
     // Should NOT have map canvas
     await expect(page.locator("canvas.maplibregl-canvas")).not.toBeVisible();
