@@ -11,7 +11,7 @@
 //!
 //! Fixtures emitted (mirror the / traps that tiny.ptb cannot express):
 //!   - `equal-alight-tie.ptb`  — 2 routes E→P / E→Q, equal alightSecs, 0 transfers
-//! (the Pareto-tie array-order pin; mirrors reconstruct.rs
+//!     (the Pareto-tie array-order pin; mirrors reconstruct.rs
 //!     `equal_alight_preserves_array_order_through_stable_sort`).
 //!   - `express-skip.ptb`      — 1 route, EXPRESS trip skips a middle stop via the
 //!     `-1` sentinel, a later LOCAL trip serves it (alt-trip fallback fires).
@@ -20,7 +20,7 @@
 //!   - `footpath.ptb` + `footpath-transfers.bin` — 1 route to s1, plus a PTFT
 //!     transfer table with footpath edges s1→s2 (raw 60 → FLOOR at
 //!     `RAPTOR_MIN_TRANSFER_SECS` = 120) and s1→s3 (raw 200 → wheelchair RESCALE
-//! 200→313). The footpath-relaxation profile, now CI-gated (was
+//!     200→313). The footpath-relaxation profile, now CI-gated (was
 //!     Vilnius-deferred): both the floor and the wheelchair-rescale are asserted
 //!     Rust==TS over the SAME bytes. PTFT byte layout re-implemented here (mirror
 //!     of `crates/pt-core/src/engine/testkit.rs::build_ptft`).

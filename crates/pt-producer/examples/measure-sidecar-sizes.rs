@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let extract_root = tempfile::tempdir()?;
     let feed_dir = if path.extension().and_then(|e| e.to_str()) == Some("zip") {
         // extract_all(&[zip], out_dir) creates out_dir/feed-0/ and extracts there.
-        let feed_dirs = pt_producer::source::extract_all(&[path.clone()], extract_root.path())?;
+        let feed_dirs = pt_producer::source::extract_all(std::slice::from_ref(&path), extract_root.path())?;
         feed_dirs
             .into_iter()
             .next()

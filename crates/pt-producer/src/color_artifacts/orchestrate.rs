@@ -97,9 +97,9 @@ mod tests {
     /// 3. Those bytes match calling `read_inputs` +
     ///    `cluster_route_colors`/`compute_palettes`/`compute_label_anchors`
     ///    + `encode_*` directly in the test on the same bundle bytes — this
-    ///    proves `orchestrate.rs` threads the right data through the right
-    ///    functions in the right order (the thing this task actually owns),
-    ///    without re-deriving stage correctness.
+    ///      proves `orchestrate.rs` threads the right data through the right
+    ///      functions in the right order (the thing this task actually owns),
+    ///      without re-deriving stage correctness.
     /// 4. The returned SHA-256 hashes equal `sha256(bytes actually on
     ///    disk)`, catching any fsync/rehash/staleness bug.
     #[test]

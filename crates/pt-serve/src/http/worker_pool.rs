@@ -203,14 +203,14 @@ impl WorkerPool {
     /// working together:
     ///
     /// 1. [`Self::stop_accepting`] must be called BEFORE `join` (the
-    /// [`crate::ops::DrainController`] does this in stage 3). Workers observe the stop flag on
-    /// their next `recv_timeout(100ms)` tick and exit the loop.
+    ///    [`crate::ops::DrainController`] does this in stage 3). Workers observe the stop flag on
+    ///    their next `recv_timeout(100ms)` tick and exit the loop.
     /// 2. For workers currently pinned to
-    /// an in-flight request: the per-request watchdog fires the `timed_out` flag at exactly
-    /// `request_timeout` (registered when the request was dispatched); the dispatcher drops the
-    /// `tiny_http::Request` without responding; the dispatch frame returns and the recv loop
-    /// re-checks the stop flag. The per-request watchdog is configured at registration time, NOT at
-    /// join time — this method takes no timeout argument because it has nothing to do with it.
+    ///    an in-flight request: the per-request watchdog fires the `timed_out` flag at exactly
+    ///    `request_timeout` (registered when the request was dispatched); the dispatcher drops the
+    ///    `tiny_http::Request` without responding; the dispatch frame returns and the recv loop
+    ///    re-checks the stop flag. The per-request watchdog is configured at registration time, NOT at
+    ///    join time — this method takes no timeout argument because it has nothing to do with it.
     ///
     /// The realistic ceiling on `join` is `max(in-flight request_timeout) +
     /// ~100ms` (one recv_timeout cycle).

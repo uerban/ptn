@@ -233,10 +233,10 @@ fn serde_to_validation(path: &Path, e: serde_json::Error) -> ValidationError {
 ///
 /// 1. Delete `*.tmp` siblings of the pointer files. A producer crash between `write tmp →
 /// rename(tmp, final)` leaves a stale tmp behind; the next start reclaims it. We delete
-/// unconditionally — the rename is single-atomic and there is no legitimate ambient `*.tmp` sibling
-/// between publish operations.
+///    unconditionally — the rename is single-atomic and there is no legitimate ambient `*.tmp` sibling
+///    between publish operations.
 /// 2. Walk `<data_root>/.publishing/`. Any subdir whose mtime is older
-/// than 1h AND which is not protected by an actively-held producer lock is deleted (cleanup pass).
+///    than 1h AND which is not protected by an actively-held producer lock is deleted (cleanup pass).
 ///
 ///    The "lock held" check is against `<data_root>/producer.lock` — the
 ///    SINGLE per-data-root producer lock from

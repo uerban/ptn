@@ -7,7 +7,7 @@
 //!    discoverable on its own port.
 //!
 //! 2. **The new `ready_503` plumbing is observable end-to-end**. The aux listener's `/ready`
-//! returns 200 by default; after `set_ready_503()` on the shared `Metrics`, the SAME route returns
+//!    returns 200 by default; after `set_ready_503()` on the shared `Metrics`, the SAME route returns
 //! 503.
 //!
 //! 3. **`stop_accepting()` + `join()` returns**. A pool that hangs on join
