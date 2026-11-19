@@ -7,7 +7,7 @@ import tempfile
 from zoneinfo import ZoneInfo
 
 PUBLIC_FIELDS = ('id', 'name', 'countryCode', 'tz', 'center', 'bbox', 'transitSources',
-                 'routeGroups', 'defaultExcludedModes', 'poiFetchMode', 'sharedMobility',
+                 'routeGroups', 'routeNetworks', 'defaultExcludedModes', 'poiFetchMode', 'sharedMobility',
                  'poiCityIds')
 
 

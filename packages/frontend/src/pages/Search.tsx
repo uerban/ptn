@@ -1473,7 +1473,7 @@ export function SearchPage() {
             aria-pressed={!isExcluded}
             className={vehicleChipClass(isExcluded)}>
             <TransportModeIcon mode={mode} size="sm" />
-            <span>{t(group.labelKey, group.label)}</span>
+            <span>{group.labelKey ? t(group.labelKey, group.label) : group.label}</span>
           </button>;
         });
         const isExcluded = excludedModes.includes(mode);
