@@ -1,13 +1,8 @@
 use pt_producer::http::ReadinessServer;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpStream};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-
-fn pick_free_port() -> SocketAddr {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.local_addr().unwrap()
-}
 
 fn http_get(addr: SocketAddr, path: &str) -> u16 {
     let req = format!("GET {} HTTP/1.0\r\nHost: x\r\n\r\n", path);
@@ -29,8 +24,8 @@ fn http_get(addr: SocketAddr, path: &str) -> u16 {
 
 #[test]
 fn ready_returns_503_then_200_after_flip() {
-    let addr = pick_free_port();
-    let server = ReadinessServer::spawn(addr).unwrap();
+    let server = ReadinessServer::spawn("127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = server.local_addr();
 
     assert_eq!(http_get(addr, "/api/health/ready"), 503);
     assert_eq!(http_get(addr, "/api/health/live"), 200);
@@ -45,8 +40,8 @@ fn ready_returns_503_then_200_after_flip() {
 
 #[test]
 fn liveness_is_independent_of_readiness() {
-    let addr = pick_free_port();
-    let server = ReadinessServer::spawn(addr).unwrap();
+    let server = ReadinessServer::spawn("127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = server.local_addr();
     assert_eq!(http_get(addr, "/api/health/live"), 200);
     assert_eq!(http_get(addr, "/api/health/ready"), 503);
     assert_eq!(http_get(addr, "/api/health/live"), 200);

@@ -1,16 +1,10 @@
-use pt_core::{Reader, PTB_MAGIC, PTB_VERSION_V1};
-use std::net::{SocketAddr, TcpListener};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+mod common;
 
-fn pick_free_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
-}
+use pt_core::{Reader, PTB_MAGIC, PTB_VERSION_V1};
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{Duration, Instant};
 
 fn http_status(addr: SocketAddr, path: &str) -> Option<u16> {
     use std::io::{Read, Write};
@@ -28,22 +22,19 @@ fn fixture_zip() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tiny-gtfs.zip")
 }
 
-fn spawn_producer(fixture: &Path, addr: SocketAddr, out: Option<&Path>) -> std::process::Child {
-    spawn_producer_with_anchor(fixture, addr, out, None)
+fn spawn_producer(fixture: &Path, out: Option<&Path>) -> (std::process::Child, SocketAddr) {
+    spawn_producer_with_anchor(fixture, out, None)
 }
 
 fn spawn_producer_with_anchor(
     fixture: &Path,
-    addr: SocketAddr,
     out: Option<&Path>,
     anchor_date: Option<u32>,
-) -> std::process::Child {
+) -> (std::process::Child, SocketAddr) {
     let bin = env!("CARGO_BIN_EXE_pt-producer");
     let mut cmd = Command::new(bin);
     cmd.arg("--gtfs-path")
         .arg(fixture)
-        .arg("--listen-addr")
-        .arg(addr.to_string())
         .arg("--idle-after-ingestion")
         .arg("30");
     if let Some(p) = out {
@@ -52,25 +43,19 @@ fn spawn_producer_with_anchor(
     if let Some(anchor) = anchor_date {
         cmd.arg("--anchor-date").arg(anchor.to_string());
     }
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn producer")
+    common::spawn_on_ephemeral_port(&mut cmd)
 }
 
 /// Spawn the producer with an explicit UTC timezone for current-format checks.
 fn spawn_current_producer(
     fixture: &Path,
-    addr: SocketAddr,
     out: Option<&Path>,
     anchor_date: u32,
-) -> std::process::Child {
+) -> (std::process::Child, SocketAddr) {
     let bin = env!("CARGO_BIN_EXE_pt-producer");
     let mut cmd = Command::new(bin);
     cmd.arg("--gtfs-path")
         .arg(fixture)
-        .arg("--listen-addr")
-        .arg(addr.to_string())
         .arg("--idle-after-ingestion")
         .arg("30")
         .arg("--anchor-date")
@@ -80,10 +65,7 @@ fn spawn_current_producer(
     if let Some(p) = out {
         cmd.arg("--out").arg(p);
     }
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn producer")
+    common::spawn_on_ephemeral_port(&mut cmd)
 }
 
 fn wait_until_ready(addr: SocketAddr, deadline: Instant) -> bool {
@@ -123,11 +105,9 @@ fn shutdown_producer(mut child: std::process::Child) -> (bool, String, String) {
 
 #[test]
 fn producer_drives_full_pipeline_against_fixture() {
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
     let fixture = fixture_zip();
 
-    let mut child = spawn_producer(&fixture, addr, None);
+    let (mut child, addr) = spawn_producer(&fixture, None);
 
     let deadline = Instant::now() + Duration::from_secs(30);
     let got_ready = wait_until_ready(addr, deadline);
@@ -146,8 +126,6 @@ fn producer_drives_full_pipeline_against_fixture() {
 
 #[test]
 fn producer_persists_valid_ptnb_via_out_flag() {
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
     let fixture = fixture_zip();
     let tmp = tempfile::tempdir().unwrap();
     // nested dir to exercise mkdir -p
@@ -155,7 +133,7 @@ fn producer_persists_valid_ptnb_via_out_flag() {
 
     // Use a fixed --anchor-date so feedStartDate is deterministic in CI.
     // 20260501 matches the tiny-gtfs fixture's calendar.txt min start_date.
-    let child = spawn_producer_with_anchor(&fixture, addr, Some(&dest), Some(20260501));
+    let (child, addr) = spawn_producer_with_anchor(&fixture, Some(&dest), Some(20260501));
     let deadline = Instant::now() + Duration::from_secs(30);
     let got_ready = wait_until_ready(addr, deadline);
     assert!(got_ready, "producer never reached ready=200");
@@ -249,11 +227,9 @@ fn producer_writes_trip_starts_region_matching_prefix_sum() {
     // Sanity: the tiny fixture has 4 trips of 3 rows each.
     assert_eq!(expected, vec![0, 3, 6, 9, 12], "fixture prefix-sum changed");
 
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let dest = tmp.path().join("p1.ptnb");
-    let child = spawn_producer(&fixture_zip(), addr, Some(&dest));
+    let (child, addr) = spawn_producer(&fixture_zip(), Some(&dest));
     let deadline = Instant::now() + Duration::from_secs(30);
     assert!(
         wait_until_ready(addr, deadline),
@@ -279,9 +255,7 @@ fn producer_overwrites_existing_ptnb_at_out_path() {
     // on filesystems with second-resolution mtime.
     std::thread::sleep(Duration::from_millis(1100));
 
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
-    let child = spawn_producer(&fixture, addr, Some(&dest));
+    let (child, addr) = spawn_producer(&fixture, Some(&dest));
     let deadline = Instant::now() + Duration::from_secs(30);
     let got_ready = wait_until_ready(addr, deadline);
     assert!(got_ready, "producer never reached ready=200");
@@ -317,13 +291,11 @@ fn producer_overwrites_existing_ptnb_at_out_path() {
 fn producer_v1_stamps_i32_entry_flags_and_long_span_roundtrips() {
     const LONG_DEP: i64 = 91_800; // 25:30:00 — T4's overnight stop; delta > i16::MAX
 
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let dest = tmp.path().join("producer-v1.ptb");
     // 20260501 matches the fixture calendar's min start_date; T4's service
     // (SA) is in-window for a deterministic emit.
-    let child = spawn_current_producer(&fixture_zip(), addr, Some(&dest), 20260501);
+    let (child, addr) = spawn_current_producer(&fixture_zip(), Some(&dest), 20260501);
     let deadline = Instant::now() + Duration::from_secs(30);
     assert!(
         wait_until_ready(addr, deadline),

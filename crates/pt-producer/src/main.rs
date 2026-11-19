@@ -202,6 +202,9 @@ fn run() -> Result<()> {
     let ready = http.ready_flag().clone();
 
     let stop = idle::install_signal_handler();
+    if args.listen_addr.port() == 0 {
+        println!("[producer] readiness_listen={}", http.local_addr());
+    }
 
     let work_tmp = tempfile::tempdir()?;
 

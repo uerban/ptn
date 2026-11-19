@@ -2,7 +2,6 @@
 //! pool (`0x15` / `0x16`), including the zero-service boundary.
 
 use pt_core::Reader;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -18,14 +17,6 @@ fn tiny_zip() -> PathBuf {
     manifest_dir().join("tests/fixtures/tiny-gtfs.zip")
 }
 
-fn pick_free_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
-}
-
 /// Emit the current PTB over the tiny fixture, returning its bytes.
 fn emit_current() -> Vec<u8> {
     emit_zip_current(tiny_zip())
@@ -36,8 +27,6 @@ fn emit_zip_current(zip: PathBuf) -> Vec<u8> {
     let bin = env!("CARGO_BIN_EXE_pt-producer");
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("emit-v1.ptb");
-    let port = pick_free_port();
-    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
 
     let mut child = Command::new(bin)
         .arg("--gtfs-path")
@@ -47,7 +36,7 @@ fn emit_zip_current(zip: PathBuf) -> Vec<u8> {
         .arg("--anchor-date")
         .arg(ANCHOR_DATE)
         .arg("--listen-addr")
-        .arg(addr.to_string())
+        .arg("127.0.0.1:0")
         .arg("--idle-after-ingestion")
         .arg("0")
         .stdout(Stdio::piped())
@@ -55,11 +44,8 @@ fn emit_zip_current(zip: PathBuf) -> Vec<u8> {
         .spawn()
         .expect("spawn producer");
 
-    // `--idle-after-ingestion 0` makes the producer write the `--out` PTB then exit
-    // on its own; the HTTP readiness wait is best-effort (used only to bound the
-    // poll) — we primarily wait for the process to exit and read the artifact.
+    // Wait for the producer to finish writing the PTB and exit on its own.
     let exit_deadline = Instant::now() + Duration::from_secs(45);
-    let _ = addr; // listen-addr is supplied but we don't require a ready HTTP hit
     loop {
         match child.try_wait().expect("try_wait") {
             Some(s) => {
@@ -71,7 +57,7 @@ fn emit_zip_current(zip: PathBuf) -> Vec<u8> {
             None if Instant::now() >= exit_deadline => {
                 let _ = child.kill();
                 let _ = child.wait();
-                panic!("producer did not exit within 15s");
+                panic!("producer did not exit within 45s");
             }
             None => std::thread::sleep(Duration::from_millis(100)),
         }
