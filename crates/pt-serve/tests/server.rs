@@ -1018,6 +1018,30 @@ fn header(headers: &[(String, String)], name: &str) -> Option<String> {
         .map(|(_, v)| v.clone())
 }
 
+#[test]
+fn route_rt_encoded_ids_preserve_identity_and_existing_guard() {
+    let s = spawn(false);
+    for (encoded, expected) in [
+        ("route-7", "route-7"),
+        ("agency%3A7", "agency:7"),
+        ("route%2D7", "route-7"),
+    ] {
+        let (status, _, body) =
+            ureq_get_full(&format!("{}/api/vilnius/rt/{encoded}", s.base)).unwrap();
+        assert_eq!(status, 200, "{encoded}");
+        let mut reader = pt_serve::rt::protobuf::Reader::new(&body);
+        assert_eq!(reader.read_tag(), Some((1, 2)));
+        assert_eq!(reader.read_length_delimited(), Some(expected.as_bytes()));
+    }
+    for invalid in ["a%2Fb", "a%252Fb", "a%23b", "%E9%9B%AA", "%FF", "bad%"] {
+        let (status, _, body) =
+            ureq_get_full(&format!("{}/api/vilnius/rt/{invalid}", s.base)).unwrap();
+        assert_eq!(status, 400, "{invalid}");
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["error"]["code"], "INVALID_ROUTE_ID", "{invalid}");
+    }
+}
+
 
 
 #[test]

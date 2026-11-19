@@ -388,7 +388,14 @@ pub fn resolve(method: &str, path: &str, city: &str, listener: ListenerKind) -> 
                     if route_id.is_empty() || route_id.contains('/') {
                         Route::NotFound
                     } else {
-                        Route::RouteRt(route_id.to_string())
+                        // Match a single encoded segment, then decode once for
+                        // the handler's existing ID guard and route lookup.
+                        // Invalid UTF-8 stays invalid input to that guard.
+                        let decoded = percent_encoding::percent_decode_str(route_id)
+                            .decode_utf8()
+                            .map(|id| id.into_owned())
+                            .unwrap_or_else(|_| route_id.to_string());
+                        Route::RouteRt(decoded)
                     }
                 }
                 ("GET", "color-config") => Route::ColorConfig,
@@ -650,6 +657,27 @@ mod tests {
             ),
             Route::NotFound
         );
+    }
+
+    #[test]
+    fn route_rt_decodes_the_captured_segment_once() {
+        for (encoded, decoded) in [
+            ("agency%3A7", "agency:7"),
+            ("route%2D7", "route-7"),
+            ("a%252Fb", "a%2Fb"),
+            ("a%2Fb", "a/b"),
+        ] {
+            assert_eq!(
+                resolve(
+                    "GET",
+                    &format!("/api/vilnius/rt/{encoded}"),
+                    "vilnius",
+                    ListenerKind::Public
+                ),
+                Route::RouteRt(decoded.to_string()),
+                "{encoded}"
+            );
+        }
     }
 
     #[test]
