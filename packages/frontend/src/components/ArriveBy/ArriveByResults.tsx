@@ -33,6 +33,7 @@ type View =
   | { readonly kind: "preparing" }
   | { readonly kind: "unavailable" }
   | { readonly kind: "no-stops" }
+  | { readonly kind: "expired" }
   | { readonly kind: "error"; readonly message: string }
   | { readonly kind: "search"; readonly state: ArriveBySearchState; readonly scope: ArriveByMovementScope;
       readonly cards: readonly ArriveByCard[] };
@@ -111,7 +112,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
     void (async () => {
       const result = await prepareArriveBy(origin, destination, deadlineMs, router);
       if (stale) return;
-      if (result.kind === "no-stops") { setView({ kind: "no-stops" }); return; }
+      if (result.kind !== "ready") { setView({ kind: result.kind }); return; }
       const { prepared } = result;
       const scope = prepared.input.scope;
       const search = channel.search(prepared.input, (state) => {
@@ -188,8 +189,8 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
         {leaveNow}
       </>
     ));
-  } else if (view.kind === "search" && view.state.status === "complete" && ordered.length === 0) {
-    body = notice(t("arriveBy.none", "No journey starting in the 4 hours before {time} arrives in time.")
+  } else if (view.kind === "expired" || (view.kind === "search" && view.state.status === "complete" && ordered.length === 0)) {
+    body = notice(t("arriveBy.none", "No upcoming journey in the search window arrives by {time}.")
       .replace("{time}", deadlineText), leaveNow);
   } else {
     const pending = view.kind !== "search" || view.state.status === "pending";

@@ -552,7 +552,7 @@
   "arriveBy.limited_recovery": "Mainiet termiņu vai meklēšanas iestatījumus, lai izmēģinātu citu meklēšanu.",
   "arriveBy.latest_found": "Tiek parādīts nākamais atiešanas laiks. Meklējam citas iespējas…",
   "arriveBy.complete": "Iebraukšana {time} laikā: vispirms jaunākie atiešanas laiki, pēc tam pēc atiešanas laika.",
-  "arriveBy.none": "Neviens brauciens, kas sākas 4 stundas pirms {time}, neieradīsies laikā.",
+  "arriveBy.none": "Neviens gaidāmais brauciens meklēšanas periodā neieradīsies līdz plkst. {time}.",
   "arriveBy.leave_now_action": "Rādīt braucienus, kas sākas tagad",
   "arriveBy.failed": "Meklēšana pēc ierašanās laika neizdevās ({code}).",
   "arriveBy.retry": "Mēģiniet vēlreiz",

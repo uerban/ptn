@@ -549,7 +549,7 @@
   "arriveBy.limited_recovery": "Muuda tähtaega või otsinguseadeid, et proovida teistsugust otsingut.",
   "arriveBy.latest_found": "Näidatakse viimast väljumist. Otsitakse teisi võimalusi…",
   "arriveBy.complete": "Saabumine kell {time}: kõigepealt viimane väljumine, seejärel väljumisaegade järgi.",
-  "arriveBy.none": "Ükski reis, mis algab 4 tundi enne kella {time}, ei jõua õigeks ajaks kohale.",
+  "arriveBy.none": "Ükski otsingu ajavahemikku jääv eelseisev reis ei jõua kohale kella {time}ks.",
   "arriveBy.leave_now_action": "Näita praegu väljuvaid reise",
   "arriveBy.failed": "Otsing „saabumisaeg” ebaõnnestus ({code}).",
   "arriveBy.retry": "Proovi uuesti",
