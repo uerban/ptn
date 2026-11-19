@@ -73,6 +73,22 @@ describe("local address search normalizer", () => {
     expect(addressSearchQueryVariants("Kudirkos aikštė")).not.toContain("aikste kudirkos");
   });
 
+  it("keeps a number-first dotted street initial separate from the house number", () => {
+    expect(addressSearchQueryVariants("5 V. Mykolaičio-Putino g.")).toContain(
+      "v mykolaicio putino gatve 5",
+    );
+    expect(addressSearchQueryVariants("3 A. Juozapavičiaus g.")).toContain(
+      "a juozapaviciaus g 3",
+    );
+    expect(addressSearchQueryVariants("30 J. K. Chodkevičiaus g.")).toContain(
+      "j k chodkeviciaus gatve 30",
+    );
+    // Without the period this remains the existing split house-suffix query.
+    expect(addressSearchQueryVariants("5 V Mykolaičio-Putino g.")).not.toContain(
+      "v mykolaicio putino gatve 5",
+    );
+  });
+
   it("does not display normalized keys as labels", () => {
     const keys = buildAddressSearchKeys("Šeimyniškių g. 12");
 

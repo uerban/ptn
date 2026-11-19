@@ -275,3 +275,56 @@ fn search_keeps_late_exact_house_number_after_prefix_saturation() {
     assert_eq!(data[0]["label"], "Central Square 1");
     assert_eq!(data[1]["label"], "Central Avenue 100");
 }
+
+#[test]
+fn search_separates_number_first_dotted_initial_from_house_suffix() {
+    let rows = vec![
+        pt_geocode::AddrRow {
+            label: "V. Mykolaičio-Putino g. 5".into(),
+            lat: 54.6852776,
+            lon: 25.2688269,
+        },
+        pt_geocode::AddrRow {
+            label: "V. Mykolaičio-Putino g. 5V".into(),
+            lat: 54.68,
+            lon: 25.27,
+        },
+    ];
+    let keys = [
+        ("v mykolaicio putino gatve 5", 0),
+        ("mykolaicio putino gatve 5", 0),
+        ("v mykolaicio putino gatve 5v", 1),
+        ("mykolaicio putino gatve 5v", 1),
+    ]
+    .into_iter()
+    .map(|(key, row_id)| pt_geocode::AddrKey {
+        key: key.into(),
+        row_id,
+    })
+    .collect::<Vec<_>>();
+    let bytes = pt_geocode::AddrIndex::pack(
+        &rows,
+        &keys,
+        &pt_geocode::ArtifactMeta {
+            city_id: Some("vilnius".into()),
+            source: None,
+            generated_at: "2026-11-19T00:00:00Z".into(),
+        },
+    )
+    .unwrap();
+    let (_tmp, generation) = gen_with_corpus(Some(bytes));
+    for (query, expected) in [
+        ("q=5+V.+Mykolai%C4%8Dio-Putino+g.&limit=1", 0),
+        ("q=5+V+Mykolai%C4%8Dio-Putino+g.&limit=1", 1),
+    ] {
+        let Resp::Json { status, body } = pt_serve::app::address_search::search(query, &generation)
+        else {
+            panic!("expected JSON search response")
+        };
+        assert_eq!(status, 200);
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(value["data"][0]["label"], rows[expected].label);
+        assert_eq!(value["data"][0]["lat"], rows[expected].lat);
+        assert_eq!(value["data"][0]["lon"], rows[expected].lon);
+    }
+}

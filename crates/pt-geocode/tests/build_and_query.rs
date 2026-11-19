@@ -405,3 +405,45 @@ fn saturated_token_scan_remains_bounded_and_retains_earliest_prefix_matches() {
     assert_eq!(matches[9].label, "Central Avenue 100009");
     assert!(!matches.iter().any(|m| m.label == "Central Square 1"));
 }
+
+#[test]
+fn number_first_dotted_street_initial_is_not_a_house_suffix() {
+    let rows = vec![
+        row("V. Mykolaičio-Putino g. 5", 54.6852776, 25.2688269),
+        row("V. Mykolaičio-Putino g. 5V", 54.68, 25.27),
+        row("A. Juozapavičiaus g. 3", 54.69, 25.28),
+        row("J. K. Chodkevičiaus g. 30", 54.70, 25.29),
+    ];
+    let keys = vec![
+        key("v mykolaicio putino gatve 5", 0),
+        key("v mykolaicio putino gatve 5v", 1),
+        key("mykolaicio putino gatve 5", 0),
+        key("mykolaicio putino gatve 5v", 1),
+        key("a juozapaviciaus gatve 3", 2),
+        key("j k chodkeviciaus gatve 30", 3),
+    ];
+    let index = AddrIndex::build(&rows, &keys).unwrap();
+    for (query, expected) in [
+        ("5 V. Mykolaičio-Putino g.", 0),
+        ("3 A. Juozapavičiaus g.", 2),
+        ("30 J. K. Chodkevičiaus g.", 3),
+    ] {
+        let hits = index.search_variants(&address_search_query_variants(query), 1);
+        assert_eq!(
+            hits.first().map(|hit| hit.row_id),
+            Some(expected),
+            "{query}: {hits:?}"
+        );
+    }
+    // A genuinely separated house suffix retains its existing interpretation.
+    let hits = index.search_variants(
+        &address_search_query_variants("5 V Mykolaičio-Putino g."),
+        1,
+    );
+    assert_eq!(hits[0].row_id, 1);
+    let hits = index.search_variants(
+        &address_search_query_variants("V. Mykolaičio-Putino g. 5 V"),
+        1,
+    );
+    assert_eq!(hits[0].row_id, 1);
+}

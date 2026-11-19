@@ -186,6 +186,21 @@ function rotateLeadingAddressTerm(text: string): string {
   return [...rest.slice(0, firstNumber), tokens[0]!, ...rest.slice(firstNumber)].join(" ");
 }
 
+// Keep this guard and query rotation aligned with pt-geocode. An explicit
+// dotted street initial distinguishes `5 V. Mykolaičio-Putino g.` from the
+// existing unpunctuated split house-suffix query `5 V Mykolaičio-Putino g.`.
+function rotateNumberBeforeDottedInitial(query: string, normalized: string): string {
+  const [number, dottedInitial] = query.trim().split(/\s+/);
+  if (!number || !dottedInitial?.endsWith(".")) return "";
+  const initial = normalizeAddressSearchText(dottedInitial.slice(0, -1));
+  if (!/^\d+[a-z]?$/.test(normalizeAddressSearchText(number)) || !/^[a-z]$/.test(initial)) {
+    return "";
+  }
+  const tokens = tokensOf(normalized);
+  if (tokens.length < 3) return "";
+  return [...tokens.slice(1), tokens[0]!].join(" ");
+}
+
 /** Normalizes text for local address search.
  *
  * This is intentionally narrower than a full geocoder: Latin diacritic folding,
@@ -219,6 +234,8 @@ export function addressSearchQueryVariants(query: string): string[] {
   // Rotation runs on the SYNONYM form, not the base: `площадь` has to become
   // `aikste` before we can recognize it as a leading address term at all.
   const rotated = rotateLeadingAddressTerm(synonym);
+  const numberRotated = rotateNumberBeforeDottedInitial(query, base);
+  const numberSynonym = replaceAddressTerms(numberRotated);
   return uniqueNonEmpty([
     base,
     synonym,
@@ -226,6 +243,10 @@ export function addressSearchQueryVariants(query: string): string[] {
     stemAddressPhrase(synonym),
     rotated,
     stemAddressPhrase(rotated),
+    numberRotated,
+    numberSynonym,
+    stemAddressPhrase(numberRotated),
+    stemAddressPhrase(numberSynonym),
   ]);
 }
 

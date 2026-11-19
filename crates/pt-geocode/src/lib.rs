@@ -297,6 +297,34 @@ fn rotate_leading_address_term(text: &str) -> String {
     rotated.join(" ")
 }
 
+// A dotted street initial after a leading house number is not its suffix:
+// `5 V. Mykolaičio-Putino g.` also needs the stored name-first key. Keep
+// punctuation as the guard; unpunctuated `5 V` retains split-suffix semantics.
+fn rotate_number_before_dotted_initial(query: &str, normalized: &str) -> String {
+    let mut raw = query.split_whitespace();
+    let (Some(number), Some(initial)) = (raw.next(), raw.next()) else {
+        return String::new();
+    };
+    let Some(initial) = initial.strip_suffix('.') else {
+        return String::new();
+    };
+    let number = normalize_address_search_text(number);
+    let initial = normalize_address_search_text(initial);
+    if !is_numeric_token(&number)
+        || initial.len() != 1
+        || !initial.starts_with(|c: char| c.is_ascii_lowercase())
+    {
+        return String::new();
+    }
+    let tokens: Vec<&str> = tokens_of(normalized).collect();
+    if tokens.len() < 3 {
+        return String::new();
+    }
+    let mut rotated = tokens[1..].to_vec();
+    rotated.push(tokens[0]);
+    rotated.join(" ")
+}
+
 /// Normalizes text for local address search.
 ///
 /// This mirrors the TypeScript normalizer in `@pt/shared/address-search`:
@@ -348,6 +376,8 @@ pub fn address_search_query_variants(query: &str) -> Vec<String> {
     // Rotation runs on the SYNONYM form, not the base: `площадь` has to become
     // `aikste` before it is recognizable as a leading address term at all.
     let rotated = rotate_leading_address_term(&synonym);
+    let number_rotated = rotate_number_before_dotted_initial(query, &base);
+    let number_synonym = replace_address_terms(&number_rotated);
     unique_non_empty([
         base.clone(),
         synonym.clone(),
@@ -355,6 +385,10 @@ pub fn address_search_query_variants(query: &str) -> Vec<String> {
         stem_address_phrase(&synonym),
         rotated.clone(),
         stem_address_phrase(&rotated),
+        number_rotated.clone(),
+        number_synonym.clone(),
+        stem_address_phrase(&number_rotated),
+        stem_address_phrase(&number_synonym),
     ])
 }
 
