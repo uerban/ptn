@@ -294,6 +294,14 @@ describe("Arrive-by toolbar", () => {
     expect(screen.getByTestId("when-status")).toHaveTextContent("When: Leave");
   });
 
+  it("labels the visible results with the applied time while a deadline is still a draft", () => {
+    render(<Page />);
+    chooseArriveBy();
+    expect(screen.getByTestId("normal-results")).toBeInTheDocument();
+    expect(screen.getByTestId("when-summary")).toHaveTextContent("When: Now (Leave now)");
+    expect(screen.getByTestId("arrive-by-apply")).toBeEnabled();
+  });
+
   it("never opens by itself: a restored unapplied Arrive by starts closed, as Leave", () => {
     useArriveByUi.setState({ mode: "arrive-by", draftMs: Date.parse("2026-10-12T07:13:00Z"), appliedMs: null });
     render(<Page />);

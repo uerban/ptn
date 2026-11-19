@@ -177,15 +177,15 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
     try { day = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: tz }).format(ms); } catch { /* keep the date */ }
     return `${day} ${wall.time}`;
   };
-  const deadlineMs = appliedMs ?? draftMs;
+  // The chip describes the visible results, which use only the applied deadline.
   // Short visible label; the spoken name starts with "When:" and contains the
   // visible text word for word (label in name), plus the mode where the
   // short label leaves it implicit.
-  const summary = mode === "arrive-by" && deadlineMs !== null
-    ? t("arriveBy.by_short", "By {time}").replace("{time}", clock(deadlineMs))
+  const summary = appliedMs !== null
+    ? t("arriveBy.by_short", "By {time}").replace("{time}", clock(appliedMs))
     : leaveAtMs !== null ? t("arriveBy.leave_short", "Leave {time}").replace("{time}", clock(leaveAtMs))
     : t("arriveBy.now", "Now");
-  const summaryMode = mode === "arrive-by" && deadlineMs !== null
+  const summaryMode = appliedMs !== null
     ? t("arriveBy.arrive_by", "Arrive by")
     : leaveAtMs === null ? t("arriveBy.leave_now", "Leave now") : null;
 
