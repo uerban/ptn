@@ -52,7 +52,7 @@ describe("QuickSetup", () => {
     // Screen readers say the level once, then its line as the description.
     expect(screen.getByRole("radio", { name: "Strict" }).getAttribute("aria-describedby")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue with Recommended" }));
-    expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended", detailedMap: false });
+    expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended", detailedMap: true });
   });
 
   it("Continue names and applies the chosen level, without moving focus", () => {
@@ -85,27 +85,35 @@ describe("QuickSetup", () => {
     expect(why.contains(screen.getByText(/reveal the city and timetable area/))).toBe(true);
   });
 
-  it("asks the map choice in Map mode, names the recipient, and passes the answer", () => {
+  it("puts Detailed map first and names the recipient while allowing Minimal map", () => {
     const props = renderQuick();
     const detailed = screen.getByRole("radio", { name: /^Detailed map/ });
     const line = document.getElementById(detailed.getAttribute("aria-describedby")!);
     expect(line?.textContent).toMatch(/sends the areas you view to CARTO/);
-    expect((screen.getByRole("radio", { name: /^Minimal map/ }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(detailed);
+    const maps = screen.getAllByRole("radio").filter((radio) => radio.getAttribute("name") === "setup-map");
+    expect(maps[0]).toBe(detailed);
+    expect((detailed as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: /^Minimal map/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue with Recommended" }));
-    expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended", detailedMap: true });
+    expect(props.onChoose).toHaveBeenCalledWith({ presetId: "recommended", detailedMap: false });
   });
 
   it("under Strict the map choice is one line, and switching back restores the pick", () => {
     const props = renderQuick();
-    fireEvent.click(screen.getByRole("radio", { name: /^Detailed map/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Minimal map/ }));
     fireEvent.click(screen.getByRole("radio", { name: /^Strict/ }));
     expect(screen.queryByRole("radio", { name: /^Detailed map/ })).toBeNull();
     expect(screen.getByText(/Strict keeps the map on this device/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue with Strict" }));
     expect(props.onChoose).toHaveBeenLastCalledWith({ presetId: "strict" });
     fireEvent.click(screen.getByRole("radio", { name: /^Recommended/ }));
-    expect((screen.getByRole("radio", { name: /^Detailed map/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Minimal map/ }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("Custom defaults to Minimal map when there is no explicit map choice", () => {
+    renderQuick();
+    fireEvent.click(screen.getByRole("radio", { name: /^Custom/ }));
+    expect((screen.getByRole("radio", { name: /^Minimal map/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("Text mode shows no map choice", () => {
