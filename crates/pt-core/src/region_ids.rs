@@ -15,6 +15,10 @@
 /// permanent allocation, not transitional.
 pub const WINDOW_META: u16 = 0x01;
 
+/// `RouteSideTable` — optional cold route metadata and GTFS networks (`0x23`,
+/// `docs/ptb-region-ids.md` §5, align 4). Omitted when a feed has none of its fields.
+pub const ROUTE_SIDE_TABLE: u16 = 0x23;
+
 /// `StopsSoA` — hot stop columns (`0x40`, FROZEN 2026-06-04).
 pub const STOPS_SOA: u16 = 0x40;
 /// `RoutesSoA` — hot route columns (`0x41`, FROZEN 2026-06-04).
@@ -128,6 +132,7 @@ pub fn region_name_by_id(id: u16) -> &'static str {
         WINDOW_META => "windowMeta",
         STOPS_SOA => "stopsSoA",
         ROUTES_SOA => "routesSoA",
+        ROUTE_SIDE_TABLE => "routeSideTable",
         STOP_INDEX => "stopIndex",
         SERVICE_BITFIELD_POOL => "serviceBitfieldPool",
         SERVICE_TO_BITFIELD => "serviceToBitfield",

@@ -111,7 +111,7 @@ from mapped bytes; cold regions are decoded at load time or used for rendering.
 | `0x20` | `Transfers` | Reserved | cold→hot | 1 | Reserved variable-row transfer allocation; published bundles use fixed 32 B rows at `0xF8` |
 | `0x21` | `FootTransfers` | Reserved | hot | 4 | Derived same-station footpath CSR |
 | `0x22` | `StopSideTable` | Reserved | cold | 4 | Reserved sparse stop optionals (stop_code, platform_code, level_id, …) |
-| `0x23` | `RouteSideTable` | Reserved | cold | 4 | Reserved sparse route optionals (desc, url, sort_order, network_id) |
+| `0x23` | `RouteSideTable` | v1/v2 | cold | 4 | Optional route description, URL, sort order and GTFS network; omitted when a feed has none. See §5 |
 | `0x30` | `FeedMeta` | Reserved | cold | 4 | `feed_info` + `agency` singleton |
 | `0x31` | `Translations` | Reserved | cold | 4 | Reserved translations allocation |
 | `0x32` | `Languages` | Reserved | cold | 4 | language table for `Translations` |
@@ -145,3 +145,23 @@ an error.
 Region payloads use the natural alignment listed in §4. In particular,
 TripTimes and the v2 time/commitment regions require 8-byte alignment, while
 32-bit columns require 4-byte alignment. Payloads do not require page alignment.
+
+## 5. `0x23 RouteSideTable`
+
+The region is optional and little-endian. Version 1 has this layout:
+
+```
+header (16 B): version u16 = 1, reserved u16 = 0, route_count u32, network_count u32, reserved u32 = 0
+networks:      id_idx u32[network_count], name_idx u32[network_count]
+routes:        desc_idx u32[route_count], url_idx u32[route_count],
+               sort_order u32[route_count], network_ord u32[route_count]
+```
+
+`*_idx` values are StringPool indices, where index 0 (the empty string) means
+absent. `sort_order` and `network_ord` use `0xFFFFFFFF` for absent. Routes are in
+`RoutesSoA` order and networks are sorted by ID.
+
+Readers treat an unknown version as an absent region. A version 1 body must have
+the exact expected length, `route_count` equal to `numRoutes`, zero reserved
+fields and in-range indices. Routing does not read this region, so a malformed
+body disables its metadata without rejecting the bundle.
