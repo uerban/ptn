@@ -68,6 +68,7 @@ export const useGuidanceStore = create<GuidanceState>()((set, get) => ({
     set({
       phase: "navigating",
       itinerary,
+      completedItinerary: null,
       currentLegIndex: 0,
       legStatuses: computeLegStatuses(itinerary.legs.length, 0),
       walkingProgress: null,

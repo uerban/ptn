@@ -103,7 +103,11 @@ export function useTripNotifications(): void {
   // prevPhaseRef on, and the itinerary is gone by then.
   const announcedArrivalRef = useRef<Itinerary | null>(null);
   useEffect(() => {
-    if (!notificationsEnabled || !completedItinerary) return;
+    if (!completedItinerary) {
+      announcedArrivalRef.current = null;
+      return;
+    }
+    if (!notificationsEnabled) return;
     if (announcedArrivalRef.current === completedItinerary) return;
     announcedArrivalRef.current = completedItinerary;
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, cleanup } from "@testing-library/react";
 import type { Itinerary } from "@pt/shared";
 import { useTripNotifications } from "../../src/hooks/useTripNotifications.ts";
 import { useGuidanceStore } from "../../src/stores/guidanceStore.ts";
@@ -54,6 +54,7 @@ describe("useTripNotifications — arrival", () => {
   });
 
   afterEach(() => {
+    cleanup();
     useGuidanceStore.getState().reset();
   });
 
@@ -62,6 +63,38 @@ describe("useTripNotifications — arrival", () => {
     act(() => {
       useGuidanceStore.getState().advanceLeg();
     });
+    expect(arrivedCalls()).toEqual([["You've arrived", "You've arrived at Stotis"]]);
+  });
+
+  it("does not announce an old arrival when notifications are enabled during a new trip", () => {
+    useSettingsStore.setState({ tripNotificationsEnabled: false });
+    renderHook(() => useTripNotifications());
+    act(() => useGuidanceStore.getState().advanceLeg());
+    expect(useGuidanceStore.getState().completedItinerary).toBe(trip);
+    act(() => useGuidanceStore.getState().startNavigation(trip));
+    act(() => useSettingsStore.setState({ tripNotificationsEnabled: true }));
+    expect(arrivedCalls()).toEqual([]);
+    act(() => useGuidanceStore.getState().advanceLeg());
+    expect(arrivedCalls()).toEqual([["You've arrived", "You've arrived at Stotis"]]);
+  });
+
+  it("announces completion each time the same itinerary is navigated", () => {
+    renderHook(() => useTripNotifications());
+    act(() => useGuidanceStore.getState().advanceLeg());
+    expect(arrivedCalls()).toHaveLength(1);
+    act(() => useGuidanceStore.getState().startNavigation(trip));
+    act(() => useGuidanceStore.getState().advanceLeg());
+    expect(arrivedCalls()).toEqual([
+      ["You've arrived", "You've arrived at Stotis"],
+      ["You've arrived", "You've arrived at Stotis"],
+    ]);
+  });
+
+  it("does not repeat an arrival when notification settings toggle after completion", () => {
+    renderHook(() => useTripNotifications());
+    act(() => useGuidanceStore.getState().advanceLeg());
+    act(() => useSettingsStore.setState({ tripNotificationsEnabled: false }));
+    act(() => useSettingsStore.setState({ tripNotificationsEnabled: true }));
     expect(arrivedCalls()).toEqual([["You've arrived", "You've arrived at Stotis"]]);
   });
 
