@@ -19,6 +19,18 @@ function config(capture: (record: PipelineCapture) => void): SearchConfig {
 }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 describe("linked search observations", () => {
+  it.each(["fastest", "least_walking", "fewest_transfers"] as const)("links the requested %s ranking to composition", async ranking => {
+    let record!: PipelineCapture;
+    const output = await new SearchOrchestrator(config(r => {record = r;})).search({...query, ranking});
+    expect(record.composition.input.ranking).toBe(ranking);
+    expect(await replaySearchPipeline(record)).toEqual(output);
+    for (const other of ["fastest", "least_walking", "fewest_transfers"] as const) {
+      if (other === ranking) continue;
+      const changed = clone(record);
+      changed.query.ranking = other;
+      await expect(replaySearchPipeline(changed)).rejects.toThrow("Search stage mismatch: ranking");
+    }
+  });
   it("captures actual orchestrator stages and replays them without live planners/providers", async () => {
     let record!: PipelineCapture;
     const reachObserver = vi.fn(), compositionObserver = vi.fn(), finalizationObserver = vi.fn();
