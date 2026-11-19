@@ -16,7 +16,7 @@
 pub const WINDOW_META: u16 = 0x01;
 
 /// `RouteSideTable` — optional cold route metadata and GTFS networks (`0x23`,
-/// `docs/ptb-region-ids.md` §5, align 4). Omitted when a feed has none of its fields.
+/// `docs/ptb-region-ids.md` §6, align 4). Omitted when a feed has none of its fields.
 pub const ROUTE_SIDE_TABLE: u16 = 0x23;
 
 /// `StopsSoA` — hot stop columns (`0x40`, FROZEN 2026-06-04).

@@ -111,7 +111,7 @@ from mapped bytes; cold regions are decoded at load time or used for rendering.
 | `0x20` | `Transfers` | Reserved | cold→hot | 1 | Reserved variable-row transfer allocation; published bundles use fixed 32 B rows at `0xF8` |
 | `0x21` | `FootTransfers` | Reserved | hot | 4 | Derived same-station footpath CSR |
 | `0x22` | `StopSideTable` | Reserved | cold | 4 | Reserved sparse stop optionals (stop_code, platform_code, level_id, …) |
-| `0x23` | `RouteSideTable` | v1/v2 | cold | 4 | Optional route description, URL, sort order and GTFS network; omitted when a feed has none. See §5 |
+| `0x23` | `RouteSideTable` | v1/v2 | cold | 4 | Optional route description, URL, sort order and GTFS network; omitted when a feed has none. See §6 |
 | `0x30` | `FeedMeta` | Reserved | cold | 4 | `feed_info` + `agency` singleton |
 | `0x31` | `Translations` | Reserved | cold | 4 | Reserved translations allocation |
 | `0x32` | `Languages` | Reserved | cold | 4 | language table for `Translations` |
@@ -146,7 +146,7 @@ Region payloads use the natural alignment listed in §4. In particular,
 TripTimes and the v2 time/commitment regions require 8-byte alignment, while
 32-bit columns require 4-byte alignment. Payloads do not require page alignment.
 
-## 5. `0x23 RouteSideTable`
+## 6. `0x23 RouteSideTable`
 
 The region is optional and little-endian. Version 1 has this layout:
 

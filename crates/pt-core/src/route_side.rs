@@ -1,6 +1,6 @@
 //! `0x23 RouteSideTable`: optional cold route metadata and GTFS networks.
 //!
-//! Layout is specified in `docs/ptb-region-ids.md` §5. Routing never reads this
+//! Layout is specified in `docs/ptb-region-ids.md` §6. Routing never reads this
 //! region, so hosts decode it on demand and malformed data cannot block a bundle.
 
 use alloc::vec::Vec;
