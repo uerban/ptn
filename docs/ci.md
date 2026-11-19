@@ -4,7 +4,7 @@ Routine checks and release preparation have different costs and purposes.
 
 | Workflow | Trigger | Required work |
 | --- | --- | --- |
-| **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed |
+| **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed; advisory browser tests |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
 | **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Sole main build: build/test source, build all installable platforms, validate native/Docker fresh-host lifecycle, security scans and retain archives |
 | **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
@@ -34,6 +34,13 @@ checks execute through QEMU; ARMv6 also checks trusted local TLS and hard-float
 attributes. These checks use cached Rust dependencies and pinned Linux compilers.
 The required **CI** aggregate rejects any failed/cancelled platform check; a
 prose-only change deliberately skips both source and platform builds.
+
+Also in parallel, **Browser tests** run the core Playwright suite
+(`e2e/core/`) once in Chromium and once in WebKit, against a dev server built
+with both browser engines, including arrive-by. A test that passes only on its
+retry fails the job, so flaky tests are reported instead of hidden. The job is
+advisory for now: it is not part of the **CI** aggregate while its run time and
+flake rate are measured. On failure it uploads the Playwright report and traces.
 
 Routine checks do not fetch reference-city OSM/GTFS inputs, package release
 archives or run deployment lifecycle checks. Those remain mandatory during
