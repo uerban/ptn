@@ -125,7 +125,10 @@ beforeEach(() => {
   installRouter();
   performance.clearMarks();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("Arrive-by toolbar", () => {
   it("fills the default from the initial Recommended page and warms that query once, in Leave now (H75)", async () => {
@@ -321,10 +324,26 @@ describe("Arrive-by toolbar", () => {
 });
 
 describe("Arrive-by results", () => {
+  it("switches the applied search to closest arrival and renders its result", async () => {
+    vi.stubEnv("VITE_PTN_CLOSEST_ARRIVAL", "1");
+    render(<Page />);
+    await applyDefault();
+    const control = screen.getByRole("button", { name: "Closest arrival" });
+    fireEvent.click(control);
+    expect(control).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(runs).toHaveLength(2));
+    expect(runs[0]!.cancelled).toBe(true);
+    expect(runs[1]!.input.objective).toBe("closest-arrival");
+    emit(state("complete", [option("C5", 33000, 2400, [])]));
+    await waitFor(() => expect(cardTexts()).toEqual([expect.stringContaining("C5")]));
+    expect(screen.getByRole("status")).toHaveTextContent("Closest arrival by");
+  });
+
   it("shows loading, then the latest card, then every option latest first", async () => {
     render(<Page />);
     await applyDefault();
     expect(screen.queryByTestId("normal-results")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Closest arrival" })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Finding the latest departure");
     expect(cardTexts()).toHaveLength(0);
     emit(state("latest", [LATEST]));

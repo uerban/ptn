@@ -8,12 +8,13 @@
  * package. Source snapshots stay alive even while disabled (for re-enable);
  * freeing an owner does not shrink a WASM runtime's linear-memory high water.
  */
-import { decodeArriveByJourneys, type ArriveByJourneyOption, type ArriveByMovementScope } from "./temporalArriveByJourneys.ts";
+import { decodeArriveByJourneys, decodeClosestArrivalJourney, type ArriveByJourneyOption, type ArriveByMovementScope } from "./temporalArriveByJourneys.ts";
 import { isArriveByResourceLimit, ARRIVE_BY_SELECTORS, type ArriveByFailure, type ArriveBySelector } from "./temporalArriveByResults.ts";
 
 export interface RawArriveByOwner {
   prepare(query: unknown, options: unknown): unknown;
   run_winner_journeys(goal: string, suffix: string): unknown;
+  run_latest_arrival_bucket?(): unknown;
   /** H58 backward scan: the latest departure only, never a journey. Builds
    * without it cannot serve `latestStage: "reverse-scan"`. */
   latestDeparture?(query: unknown, windowStart: number, windowEnd: number, arrivalDeadline: number): unknown;
@@ -29,7 +30,7 @@ export type ArriveByOwnerFactory = (ptb: Uint8Array, ptft: Uint8Array, mode: str
 export interface ArriveByOwnerRequest {
   readonly generation: number;
   readonly scope: ArriveByMovementScope;
-  readonly goal: ArriveBySelector | "portfolio";
+  readonly goal: ArriveBySelector | "portfolio" | "closest-arrival";
   /** `reverse-scan` (latest departure, fewest transfers or least walking):
    * find the departure D by a backward scan (H58 latest; H81 the latest
    * departure reaching the selector's optimum), then certify it with the exact
@@ -121,8 +122,8 @@ function validate(req: ArriveByOwnerRequest): void {
   keys(req, [...(req.excludedRouteIds === undefined ? [] : ["excludedRouteIds"]), "generation", "scope", "goal", "latestStage", "prefixPolicy", "walkingTransferBounds", "durationBound",
     "mobilityProfile", "excludedModes", "walkSpeedMps", "minTransferSecs"]);
   integer(req.generation, 1);
-  check(req.goal === "portfolio" || ARRIVE_BY_SELECTORS.includes(req.goal), "invalid selector");
-  check(req.latestStage === "full-window" || req.latestStage === "reverse-scan" && SCAN_GOALS.includes(req.goal),
+  check(req.goal === "portfolio" || req.goal === "closest-arrival" || ARRIVE_BY_SELECTORS.includes(req.goal), "invalid selector");
+  check(req.latestStage === "full-window" || req.latestStage === "reverse-scan" && req.goal !== "closest-arrival" && SCAN_GOALS.includes(req.goal),
     "invalid latest stage");
   check(req.prefixPolicy === "duration-rebuild" || req.prefixPolicy === "timetable-prepared", "invalid prefix policy");
   check(typeof req.walkingTransferBounds === "boolean", "invalid bound flag");
@@ -346,16 +347,30 @@ export class ArriveByWorkerOwner {
       const prepared = window === s ? options
         : boundedFastest ? { ...options, arrivalDeadline: window.arrivalDeadline }
         : { ...options, windowStart: window.windowStart, windowEnd: window.windowEnd, prefixCertificate: "duration" };
+      const closest = req.goal === "closest-arrival";
       stage = "prepare"; code = "PreparationFailed"; marks.prepareStart = now();
-      try { owner.prepare(query, prepared); } finally { marks.prepareEnd = now(); }
+      try {
+        owner.prepare(query, closest ? { ...prepared, validation: "checked", traversal: "latest-arrival",
+          prefixSetup: "rebuild", prefixCertificate: "duration", walkingBound: false, transferBound: false } : prepared);
+      } finally { marks.prepareEnd = now(); }
       // WASM tags typed resource limits; search/replay integrity errors remain
       // unclassified. Never infer recoverability from the message text.
       stage = "search"; code = "WinnerJourneyFailed"; marks.searchStart = now();
       let raw: unknown;
-      try { raw = owner.run_winner_journeys(req.goal, "row-prefix"); } finally { marks.searchEnd = now(); }
+      try {
+        if (closest) {
+          check(typeof owner.run_latest_arrival_bucket === "function", "owner has no closest-arrival search");
+          raw = owner.run_latest_arrival_bucket();
+        } else raw = owner.run_winner_journeys(req.goal, "row-prefix");
+      } finally { marks.searchEnd = now(); }
       stage = "contract"; code = "InvalidMovement"; marks.decodeStart = now();
       let decoded: readonly ArriveByJourneyOption[];
-      try { decoded = decodeArriveByJourneys(raw, window, req.goal); } finally { marks.decodeEnd = now(); }
+      try {
+        if (req.goal === "closest-arrival") {
+          const journey = decodeClosestArrivalJourney(raw, window);
+          decoded = journey === null ? [] : [Object.freeze({ journey, selectors: Object.freeze([]) })];
+        } else decoded = decodeArriveByJourneys(raw, window, req.goal);
+      } finally { marks.decodeEnd = now(); }
       // The scan found D, so the selector must certify a winner departing at D
       // (the decoder holds it to the window) and, for H81, with the optimum.
       // H86: the latest winner itself is in the bounded scope, so a bounded

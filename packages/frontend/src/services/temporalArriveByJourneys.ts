@@ -156,6 +156,18 @@ function decodeJourney(value: unknown, scope: ArriveByMovementScope): ArriveByJo
   return Object.freeze({ point, access, rides, connections, egress });
 }
 
+export function decodeClosestArrivalJourney(value: unknown, scope: ArriveByMovementScope): ArriveByJourney | null {
+  const r = record(value, ["scope", "complete", "requestedWindow", "arrivalDeadline", "journey"]);
+  requireMovement(r.scope === "deadline-latest-arrival-bucket-experiment" && r.complete === true,
+    "incompatible closest-arrival certificate");
+  requireMovement(Array.isArray(r.requestedWindow) && r.requestedWindow.length === 2
+    && r.requestedWindow[0] === scope.windowStart && r.requestedWindow[1] === scope.windowEnd
+    && r.arrivalDeadline === scope.arrivalDeadline, "closest-arrival request mismatch");
+  checkStops(scope.entryStops);
+  checkStops(scope.exitStops);
+  return r.journey === null ? null : decodeJourney(r.journey, scope);
+}
+
 /**
  * Complete selected options in fixed latest-first order. Diagnostics/timings
  * are not consumed as proof. No partial options escape if any journey fails.

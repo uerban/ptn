@@ -36,6 +36,7 @@ export type ArriveByWireRequest =
 export type ArriveByCall = (req: ArriveByWireRequest) => Promise<unknown>;
 
 export interface ArriveBySearchInput {
+  readonly objective?: "closest-arrival";
   readonly scope: ArriveByMovementScope;
   readonly mobilityProfile: ArriveByOwnerRequest["mobilityProfile"];
   /** GTFS route types, as the normal planner's `excludedModes`. */
@@ -259,12 +260,13 @@ export function createArriveByChannel(call: ArriveByCall): ArriveByChannel {
 
   const search = (input: ArriveBySearchInput, onUpdate?: (state: ArriveBySearchState) => void): ArriveBySearch => {
     // Both stages share a copied input snapshot, even if a caller mutates its input.
+    const closest = input.objective === "closest-arrival";
     const latestBody = body(input, LATEST);
     displayed?.invalidate(); displayed = null;
     active?.cancel();
     // A warm-up for another query that has not started yet yields to this
     // search instead of running first (one that has started cannot stop).
-    if (warming && warming.body !== JSON.stringify(latestBody)) {
+    if (warming && (closest || warming.body !== JSON.stringify(latestBody))) {
       void call({ op: "arriveByCancelWarm" }).catch(() => {});
     }
     let cancelled = false, terminal = false;
@@ -332,6 +334,16 @@ export function createArriveByChannel(call: ArriveByCall): ArriveByChannel {
         if (cancelled) return last;
         const generation = state.generation;
         requestGeneration = generation;
+        if (closest) {
+          const reply = await run({ generation, ...latestBody, goal: "closest-arrival", latestStage: "full-window" });
+          if (cancelled) return last;
+          if (!reply.ok) throw new SearchFailure(reply.failure);
+          if (reply.state.generation !== generation || current?.generation !== generation || reply.options.length > 1) {
+            throw new SearchFailure({ stage: "contract", code: "InvalidOwnerReply", message: "closest-arrival reply does not match its request" });
+          }
+          marks.complete = now();
+          return emit(snapshot("complete", reply.options));
+        }
         const latestRequest = { generation, ...latestBody };
         const latest = await latestOutcome(latestRequest);
         if (cancelled) return last;

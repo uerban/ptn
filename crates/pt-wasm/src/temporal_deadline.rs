@@ -131,6 +131,8 @@ enum Traversal {
     Fifo,
     #[serde(rename = "arrival-first")]
     ArrivalFirst,
+    #[serde(rename = "latest-arrival")]
+    LatestArrival,
     #[serde(rename = "guided")]
     Guided,
 }
@@ -139,6 +141,7 @@ impl Traversal {
         match self {
             Self::Fifo => "fifo",
             Self::ArrivalFirst => "arrival-first",
+            Self::LatestArrival => "latest-arrival",
             Self::Guided => "guided",
         }
     }
@@ -353,6 +356,7 @@ impl Options {
         r.traversal = match self.traversal {
             Traversal::Fifo => DeadlineTraversal::Fifo,
             Traversal::ArrivalFirst => DeadlineTraversal::ArrivalFirst,
+            Traversal::LatestArrival => DeadlineTraversal::LatestArrival,
             Traversal::Guided => DeadlineTraversal::Guided,
         };
         r.static_bound = self.static_bound;
@@ -495,6 +499,16 @@ impl From<&R3TransitWitness> for WitnessWire {
         }
     }
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LatestArrivalWire {
+    scope: &'static str,
+    complete: bool,
+    requested_window: [i64; 2],
+    arrival_deadline: i64,
+    journey: Option<journey::JourneyWire>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PointWire {
@@ -1079,6 +1093,40 @@ impl TemporalDeadlineProbe {
     /// Includes binding/setup, exact search, and JS projection. The external
     /// harness measures the whole call, not only these internal core phases.
     pub fn run(&self) -> Result<JsValue, JsError> {
+        if matches!(self.traversal, Traversal::LatestArrival) {
+            return Err(JsError::new(
+                "use run_latest_arrival_bucket for latest arrival",
+            ));
+        }
+        self.run_profile_diagnostic()
+    }
+
+    /// Complete only for the closest feasible destination-arrival bucket.
+    pub fn run_latest_arrival_bucket(&self) -> Result<JsValue, JsValue> {
+        if !matches!(self.traversal, Traversal::LatestArrival) {
+            return Err(JsError::new("latest arrival traversal is not prepared").into());
+        }
+        let (result, movement, _) = self
+            .session
+            .run_latest_arrival_journey()
+            .map_err(|e| failure::query(e, true))?;
+        let journey = movement
+            .as_ref()
+            .map(|j| journey::project_one(self.session.reader(), j))
+            .transpose()
+            .map_err(|e| JsError::new(&e))?;
+        let wire = LatestArrivalWire {
+            scope: "deadline-latest-arrival-bucket-experiment",
+            complete: result.complete,
+            requested_window: [result.window.start, result.window.end],
+            arrival_deadline: result.arrival_deadline,
+            journey,
+        };
+        wire.serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+            .map_err(|e| JsError::new(&format!("latest arrival output: {e}")).into())
+    }
+
+    fn run_profile_diagnostic(&self) -> Result<JsValue, JsError> {
         if self.prefix_mode.is_some() {
             return Err(JsError::new("prefix experiment requires run_winners"));
         }
@@ -1349,6 +1397,9 @@ impl TemporalDeadlineProbe {
 
 impl TemporalDeadlineProbe {
     fn winner_output(&self, goal: &str, suffix: &str, movements: bool) -> Result<JsValue, JsValue> {
+        if matches!(self.traversal, Traversal::LatestArrival) {
+            return Err(JsError::new("latest arrival traversal requires diagnostic run").into());
+        }
         let validation = self
             .validation
             .ok_or_else(|| JsError::new("deadline request is not prepared"))?;

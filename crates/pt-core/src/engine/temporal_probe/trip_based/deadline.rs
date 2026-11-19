@@ -59,6 +59,8 @@ impl DeadlineWitnessComparison {
 pub enum DeadlineTraversal {
     Fifo,
     ArrivalFirst,
+    /// Finish the latest feasible destination-arrival bucket only.
+    LatestArrival,
     Guided,
     /// Scheduling only: prefer later possible boarding boundaries. No queue
     /// early exit or new pruning rule. Concrete occurrences stay distinct:
@@ -83,6 +85,7 @@ type GuidedPriority = Reverse<(Reverse<i64>, i64, u32, u64, u32, usize)>;
 enum Queue {
     Fifo(VecDeque<usize>),
     ArrivalFirst(BinaryHeap<ArrivalPriority>),
+    LatestArrival(BinaryHeap<(i64, usize)>),
     Guided(BinaryHeap<GuidedPriority>),
 }
 impl Queue {
@@ -90,6 +93,7 @@ impl Queue {
         match order {
             DeadlineTraversal::Fifo => Self::Fifo(VecDeque::new()),
             DeadlineTraversal::ArrivalFirst => Self::ArrivalFirst(BinaryHeap::new()),
+            DeadlineTraversal::LatestArrival => Self::LatestArrival(BinaryHeap::new()),
             DeadlineTraversal::Guided
             | DeadlineTraversal::DepartureFirst
             | DeadlineTraversal::DepartureWarmup64
@@ -107,6 +111,7 @@ impl Queue {
                 suffix.rounds,
                 id,
             ))),
+            Self::LatestArrival(q) => q.push((suffix.arrival, id)),
             Self::Guided(q) => q.push(Reverse((
                 Reverse(departure_priority.unwrap_or(i64::MIN)),
                 suffix.arrival,
@@ -121,6 +126,7 @@ impl Queue {
         match self {
             Self::Fifo(q) => q.pop_front(),
             Self::ArrivalFirst(q) => q.pop().map(|Reverse((_, _, _, _, id))| id),
+            Self::LatestArrival(q) => q.pop().map(|(_, id)| id),
             Self::Guided(q) => q.pop().map(|Reverse((_, _, _, _, _, id))| id),
         }
     }
@@ -617,7 +623,8 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static, const WINNERS: bool> Search<'_, B, 
     // vehicle and occurrence. Every kept suffix is already a legal transition
     // chain. Earlier arrival and smaller horizon requirement are distinct.
     fn covers(&self, a: &Suffix, b: &Suffix) -> bool {
-        if a.arrival > b.arrival
+        if self.request.traversal == DeadlineTraversal::LatestArrival && a.arrival != b.arrival
+            || a.arrival > b.arrival
             || a.horizon_latest > b.horizon_latest
             || a.walk > b.walk
             || a.transfers > b.transfers
@@ -1598,6 +1605,11 @@ pub(super) fn validate_request_shape<B: AsRef<[u8]> + Send + Sync + 'static>(
     reader: &Reader<B>,
     request: &DeadlineRequest<'_>,
 ) -> Result<i64, DeadlineError> {
+    if request.traversal == DeadlineTraversal::LatestArrival && request.forward_seeds {
+        return Err(DeadlineError::InvalidRequest(
+            "latest arrival traversal disallows forward seeds",
+        ));
+    }
     if request.raptor_seeds || request.raptor_destination_ordering {
         return Err(DeadlineError::InvalidRequest(
             "production-forward seed experiments have been removed",
@@ -1775,6 +1787,11 @@ fn query_impl_with_prefix<'a, B: AsRef<[u8]> + Send + Sync + 'static, const WINN
     goal: WinnerGoal,
     cached_prefix: Option<&'a CachedPrefix>,
 ) -> Result<QueryOutcome<WINNERS>, DeadlineError> {
+    if WINNERS && request.traversal == DeadlineTraversal::LatestArrival {
+        return Err(DeadlineError::InvalidRequest(
+            "latest arrival traversal cannot certify fixed selectors",
+        ));
+    }
     let entries = entry_walks(reader, &request)?;
     let (optimistic, optimistic_diagnostics) = OptimisticBounds::build(reader, index, &request, 0)?;
     let (prefix, prefix_diagnostics) = if let Some(cached) = cached_prefix {
@@ -1911,6 +1928,16 @@ fn query_impl_with_prefix<'a, B: AsRef<[u8]> + Send + Sync + 'static, const WINN
     };
     while let Some(id) = search.queue.pop() {
         if search.segments[id].active {
+            // Backward expansion preserves the final destination arrival.
+            // Close every equal-arrival suffix before returning its winners.
+            if search.request.traversal == DeadlineTraversal::LatestArrival
+                && search
+                    .points
+                    .first()
+                    .is_some_and(|p| p.destination_arrival_secs > search.segments[id].arrival)
+            {
+                break;
+            }
             search.scan(id)?;
             if warmup_remaining > 0 {
                 warmup_remaining -= 1;

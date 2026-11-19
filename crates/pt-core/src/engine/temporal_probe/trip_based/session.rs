@@ -970,13 +970,49 @@ impl DeadlineSession {
         self.project_preference(search)
     }
 
+    pub fn run_latest_arrival_journey(
+        &self,
+    ) -> Result<
+        (
+            DeadlineResult,
+            Option<DeadlineJourney>,
+            DeadlineJourneyDiagnostics,
+        ),
+        DeadlineError,
+    > {
+        let p = self.prepared.as_ref().ok_or(DeadlineError::InvalidRequest(
+            "deadline request is not prepared",
+        ))?;
+        if p.config.traversal != DeadlineTraversal::LatestArrival {
+            return Err(DeadlineError::InvalidRequest(
+                "latest arrival traversal is not prepared",
+            ));
+        }
+        let result = self.run_checked_with_phases(|_| {})?;
+        let winner = DeadlinePreference::LatestDeparture.from_m4_points(&result.points);
+        let (journey, projection) = self.project_one(winner.as_ref(), &result.diagnostics)?;
+        Ok((result, journey, projection))
+    }
+
     fn project_preference(
         &self,
         search: DeadlinePreferenceResult,
     ) -> Result<DeadlinePreferenceJourneyResult, DeadlineError> {
+        let (journey, projection) =
+            self.project_one(search.winner.as_ref(), &search.diagnostics)?;
+        Ok(DeadlinePreferenceJourneyResult {
+            search,
+            journey,
+            projection,
+        })
+    }
+
+    fn project_one(
+        &self,
+        winner: Option<&crate::engine::temporal_probe::r3::R3Point>,
+        diagnostics: &DeadlineDiagnostics,
+    ) -> Result<(Option<DeadlineJourney>, DeadlineJourneyDiagnostics), DeadlineError> {
         let p = self.prepared.as_ref().expect("successful prepared search");
-        let mut points = [None; 4];
-        points[0] = search.winner.as_ref();
         let (journeys, _, projection) = super::journey::project(
             &self.reader,
             &self.index,
@@ -984,14 +1020,10 @@ impl DeadlineSession {
             &p.query,
             self.transfers.as_ref(),
             &p.config,
-            &search.diagnostics,
-            points,
+            diagnostics,
+            [winner, None, None, None],
         )?;
-        Ok(DeadlinePreferenceJourneyResult {
-            search,
-            journey: journeys.into_iter().next(),
-            projection,
-        })
+        Ok((journeys.into_iter().next(), projection))
     }
 
     /// Native theoretical diagnostic, never an implicit optimization. Seeds

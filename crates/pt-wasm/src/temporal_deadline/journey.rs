@@ -63,7 +63,7 @@ struct DiagnosticsWire {
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct JourneyWire {
+pub(super) struct JourneyWire {
     point: PointWire,
     access: AccessWire,
     rides: Vec<RideWire>,
@@ -110,6 +110,18 @@ struct EgressWire {
     exit_stop_id: String,
     physical_walk_secs: u64,
     caller_walk_secs: u32,
+}
+
+pub(super) fn project_one(
+    reader: &Reader<Vec<u8>>,
+    journey: &DeadlineJourney,
+) -> Result<JourneyWire, String> {
+    Metadata {
+        reader,
+        records: 0,
+        stops: 0,
+    }
+    .journey(journey)
 }
 
 fn kind(k: TransferKind) -> &'static str {

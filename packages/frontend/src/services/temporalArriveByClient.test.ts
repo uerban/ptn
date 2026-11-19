@@ -155,6 +155,7 @@ function outcome(request: ArriveByOwnerRequest, options: unknown[]) {
 const LATEST_OPTIONS = [option(-200, ["latest-departure"])];
 /** One winner per stage; latest and fastest share a journey, as do the other two. */
 const STAGE_OPTIONS: Record<string, unknown[]> = {
+  "closest-arrival": [option(-250, [])],
   "latest-departure": LATEST_OPTIONS, fastest: [option(-200, ["fastest"])],
   "fewest-transfers": [option(-250, ["fewest-transfers"])], "least-walking": [option(-250, ["least-walking"])],
 };
@@ -194,6 +195,21 @@ function record(channel: ReturnType<typeof createArriveByChannel>, input = INPUT
 }
 
 describe("arrive-by channel", () => {
+  it("requests only the full-window closest-arrival certificate", async () => {
+    const goals: string[] = [];
+    const s = scripted({
+      arriveBy: (req) => {
+        if (req.op !== "arriveBy") throw new Error("unexpected operation");
+        goals.push(req.request.goal);
+        expect(req.request).toMatchObject({ latestStage: "full-window", scope: SCOPE });
+        return outcome(req.request, STAGE_OPTIONS["closest-arrival"]!);
+      },
+    });
+    expect(await s.channel.search({ ...INPUT, objective: "closest-arrival" }).done)
+      .toMatchObject({ status: "complete", options: STAGE_OPTIONS["closest-arrival"] });
+    expect(goals).toEqual(["closest-arrival"]);
+  });
+
   it("runs the latest by the reverse scan, then fastest, fewest transfers and least walking, at the reported generation", async () => {
     const s = scripted();
     const r = record(s.channel);

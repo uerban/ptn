@@ -98,6 +98,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
   const runToCatch = useSettingsStore((s) => s.runToCatch);
   const [view, setView] = useState<View>({ kind: "preparing" });
   const [attempt, setAttempt] = useState(0);
+  const [closest, setClosest] = useState(false);
   const originLabel = t("route.origin", "Origin");
   const destinationLabel = t("route.destination", "Destination");
 
@@ -115,7 +116,8 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
       if (result.kind !== "ready") { setView({ kind: result.kind }); return; }
       const { prepared } = result;
       const scope = prepared.input.scope;
-      const search = channel.search(prepared.input, (state) => {
+      const input = closest ? { ...prepared.input, objective: "closest-arrival" as const } : prepared.input;
+      const search = channel.search(input, (state) => {
         if (stale) return;
         if (state.status === "cancelled") {
           sequence++;
@@ -138,7 +140,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
     });
     return () => { stale = true; cancel(); };
   }, [router, origin, destination, deadlineMs, cityId, tz, excludedModes, excludedRouteGroupsByCity, mobilityProfile, walkSpeedMps, maxWalkSecs,
-    runToCatch, attempt, originLabel, destinationLabel]);
+    runToCatch, attempt, originLabel, destinationLabel, closest]);
 
   const ordered = useMemo(() => (view.kind === "search" ? orderArriveByCards(view.cards, ranking) : []), [view, ranking]);
 
@@ -195,12 +197,16 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
   } else {
     const pending = view.kind !== "search" || view.state.status === "pending";
     status = pending
-      ? t("arriveBy.searching", "Finding the latest departure that arrives by {time}…").replace("{time}", deadlineText)
+      ? (closest
+        ? t("arriveBy.closest_searching", "Finding the closest arrival by {time}…")
+        : t("arriveBy.searching", "Finding the latest departure that arrives by {time}…")).replace("{time}", deadlineText)
       : view.state.status === "latest"
         ? t("arriveBy.latest_found", "Latest departure shown. Finding the other options…")
         : view.state.status === "limited"
           ? t("arriveBy.limited", "Latest departure found. Other route options couldn’t be calculated.")
-          : t("arriveBy.complete", "Arriving by {time}: latest departure first, then by departure time.")
+          : (closest
+            ? t("arriveBy.closest_complete", "Closest arrival by {time}")
+            : t("arriveBy.complete", "Arriving by {time}: latest departure first, then by departure time."))
           .replace("{time}", deadlineText);
     body = (
       <>
@@ -215,6 +221,9 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
 
   return (
     <div data-testid="arrive-by-results" data-status={view.kind === "search" ? view.state.status : view.kind}>
+      {import.meta.env.VITE_PTN_CLOSEST_ARRIVAL === "1" && <button type="button" aria-pressed={closest} className={ACTION_CLASS} onClick={() => setClosest((prev) => !prev)}>
+        {t("arriveBy.closest_option", "Closest arrival")}
+      </button>}
       <p role="status" className="px-1 pt-2 pb-1 text-xs text-fg-secondary empty:hidden">{status}</p>
       {body}
     </div>
