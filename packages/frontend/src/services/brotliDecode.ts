@@ -29,8 +29,9 @@ async function importWasmBrotli(): Promise<WasmBrotliDecoder> {
 export async function decompressBrotliBytes(
   buffer: ArrayBuffer,
   loadWasmDecoder: () => Promise<WasmBrotliDecoder> = importWasmBrotli,
+  maxOutputBytes?: number,
 ): Promise<Uint8Array> {
-  return decodeBrotliBytes(buffer, loadWasmDecoder);
+  return decodeBrotliBytes(buffer, loadWasmDecoder, maxOutputBytes);
 }
 
 export async function decompressBrotli(buffer: ArrayBuffer): Promise<string> {

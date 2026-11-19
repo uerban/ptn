@@ -3,7 +3,7 @@
 // ptRouter.worker.ts). Both glue modules ship inside this worker's script; the
 // wasm binaries are fetched only when first instantiated below.
 import * as ptWasm from "@pt/wasm";
-import initBrotli, { decompress as brotliDecompress } from "brotli-dec-wasm/web";
+import initBrotli, { decompress as brotliDecompress, BrotliDecStream } from "brotli-dec-wasm/web";
 import { decodeBrotliBytes, type WasmBrotliDecoder } from "./brotliStream.ts";
 import type { WalkWasmModule } from "./walkGraphClient.ts";
 import { createWalkGraphHost, type WalkGraphRequest } from "./walkGraphWorkerHost.ts";
@@ -33,14 +33,14 @@ const loadPtWasm = once(async () => {
 // Only used where the native Brotli DecompressionStream is missing.
 const loadBrotli = once(async (): Promise<WasmBrotliDecoder> => {
   await initBrotli();
-  return { decompress: brotliDecompress };
+  return { decompress: brotliDecompress, BrotliDecStream };
 });
 
 const scope = self as unknown as WorkerScope;
 const host = createWalkGraphHost({
   fetch: (input, init) => fetch(input, init),
   loadModule: loadPtWasm,
-  decompress: (buffer) => decodeBrotliBytes(buffer, loadBrotli),
+  decompress: (buffer, maxOutputBytes) => decodeBrotliBytes(buffer, loadBrotli, maxOutputBytes),
 });
 
 scope.onmessage = (event) => {

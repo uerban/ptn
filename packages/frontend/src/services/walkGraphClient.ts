@@ -286,7 +286,7 @@ function defaultDeps(): WalkGraphClientDeps | WalkGraphWorkerDeps {
   return {
     fetch: (input, init) => fetch(input, init),
     loadModule: async () => (await import("./walkGraphFallback.ts")).loadWasm(),
-    decompress: async buffer => (await import("./walkGraphFallback.ts")).decompressBrotliBytes(buffer),
+    decompress: async (buffer, maxOutputBytes) => (await import("./walkGraphFallback.ts")).decompressBrotliBytes(buffer, undefined, maxOutputBytes),
   };
 }
 

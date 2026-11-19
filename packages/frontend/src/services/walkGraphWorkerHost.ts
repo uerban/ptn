@@ -47,7 +47,8 @@ export interface WalkGraphHostDeps {
   artifacts?: WalkGraphArtifacts;
   /** The `@pt/wasm` module, initialised (`__wbg_init` already awaited). */
   loadModule: () => Promise<WalkWasmModule>;
-  decompress: (buffer: ArrayBuffer) => Promise<Uint8Array>;
+  /** Managed candidates supply their declared decoded size as an output bound. */
+  decompress: (buffer: ArrayBuffer, maxOutputBytes?: number) => Promise<Uint8Array>;
 }
 
 export interface WalkGraphHost {
@@ -103,7 +104,7 @@ export function createWalkGraphHost(deps: WalkGraphHostDeps): WalkGraphHost {
     if (superseded()) return { status: "superseded" };
     async function construct(value: WalkGraphCandidate): Promise<PtWalkGraphHandle> {
       const head = new Uint8Array(value.compressed);
-      const bytes = hasMagic(head) ? head : await deps.decompress(value.compressed);
+      const bytes = hasMagic(head) ? head : await deps.decompress(value.compressed, value.resource?.decodedBytes);
       if (value.resource && bytes.byteLength !== value.resource.decodedBytes) {
         throw new Error("walk graph decoded size mismatch");
       }
