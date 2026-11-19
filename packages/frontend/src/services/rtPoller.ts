@@ -32,7 +32,8 @@ function pollingAllowed(): boolean {
 export class RtPoller {
   private subscriptions = new Map<string, RtCallback>();
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private starting = false;
+  private running = false;
+  private generation = 0;
   private mode: RtMode = "idle";
 
   subscribe(routeId: string, callback: RtCallback): void {
@@ -57,47 +58,49 @@ export class RtPoller {
   }
 
   start(): void {
-    // `starting` covers the window where the first poll is in flight but no
-    // timer exists yet — without it, two rapid `subscribeRoutes` calls (each
-    // calls `start()`) launch two concurrent poll loops.
-    if (this.timer || this.starting) return;
-    this.starting = true;
-    this.poll().then(() => {
-      if (!this.starting) return; // stop() arrived mid-first-poll
-      this.starting = false;
-      this.scheduleNext();
-    });
+    // A running loop includes its in-flight request, not only its timer.
+    if (this.running) return;
+    this.running = true;
+    const generation = ++this.generation;
+    void this.poll(generation).then(() => this.scheduleNext(generation));
   }
 
   stop(): void {
-    this.starting = false;
+    this.running = false;
+    this.generation++;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
-  private scheduleNext(): void {
+  private isCurrent(generation: number): boolean {
+    return this.running && generation === this.generation;
+  }
+
+  private scheduleNext(generation: number): void {
+    if (!this.isCurrent(generation)) return;
     const base = this.getIntervalMs();
     const jitter = base * 0.3 * (Math.random() * 2 - 1);
     this.timer = setTimeout(async () => {
-      await this.poll();
-      this.scheduleNext();
+      this.timer = null;
+      await this.poll(generation);
+      this.scheduleNext(generation);
     }, Math.round(base + jitter));
   }
 
-  private async poll(): Promise<void> {
-    if (!pollingAllowed()) return;
+  private async poll(generation: number): Promise<void> {
+    if (!this.isCurrent(generation) || !pollingAllowed()) return;
     const entries = [...this.subscriptions.entries()];
     const results = await Promise.allSettled(
       entries.map(async ([routeId, callback]) => {
         const update = await api.fetchRouteRt(routeId);
         // A revocation during the request drops its late result.
-        if (pollingAllowed()) callback(update);
+        if (this.isCurrent(generation) && pollingAllowed()) callback(update);
       }),
     );
     for (let i = 0; i < results.length; i++) {
-      if (results[i].status === "rejected") {
+      if (this.isCurrent(generation) && results[i].status === "rejected") {
         console.warn(`RT poll failed for route ${entries[i][0]}:`, (results[i] as PromiseRejectedResult).reason);
       }
     }
