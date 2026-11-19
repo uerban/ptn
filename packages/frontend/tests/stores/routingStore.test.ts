@@ -256,3 +256,126 @@ it.each([
     expect(search.mock.calls.length>0).toBe(planned);
   } finally {useSettingsStore.setState(settings);search.mockRestore();graph.mockRestore();}
 });
+
+function pendingValue<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+async function overlappingRoutingSearches() {
+  const { useGtfsDataStore } = await import("../../src/stores/gtfsDataStore.ts");
+  const { useRoutingStore } = await import("../../src/stores/routingStore.ts");
+  const { SearchOrchestrator } = await import("../../src/services/searchOrchestrator.ts");
+  const { directWalkCandidate } = await import("../../src/services/directWalkCandidate.ts");
+  await useGtfsDataStore.getState().init("vilnius");
+  const origin: BaseEndpoint = { kind: "stop", stopId: "s1", name: "Stop A", lat: 54.68, lon: 25.28 };
+  const destination: BaseEndpoint = { kind: "stop", stopId: "s2", name: "Stop B", lat: 54.69, lon: 25.28 };
+  const olderResult = directWalkCandidate(origin, destination, {
+    distanceMeters: 1200, coords: [[25.28, 54.68], [25.28, 54.69]], steps: [],
+  }, 28800, 1.25)!;
+  const newerResult = directWalkCandidate(destination, origin, {
+    distanceMeters: 1300, coords: [[25.28, 54.69], [25.28, 54.68]], steps: [],
+  }, 28920, 1.25)!;
+  type Results = Awaited<ReturnType<InstanceType<typeof SearchOrchestrator>["search"]>>;
+  const older = pendingValue<Results>(), newer = pendingValue<Results>();
+  const olderStarted = pendingValue<void>(), newerStarted = pendingValue<void>();
+  const search = vi.spyOn(SearchOrchestrator.prototype, "search")
+    .mockImplementationOnce(() => { olderStarted.resolve(); return older.promise; })
+    .mockImplementationOnce(() => { newerStarted.resolve(); return newer.promise; });
+  const store = useRoutingStore.getState();
+  const olderSearch = store.search(origin, destination, new Date("2026-04-13T08:00:00Z"));
+  await olderStarted.promise;
+  const newerSearch = store.search(destination, origin, new Date("2026-04-13T08:02:00Z"));
+  await newerStarted.promise;
+  return { older, newer, olderSearch, newerSearch, olderResult, newerResult, useRoutingStore,
+    async cleanup() {
+      older.resolve([olderResult]); newer.resolve([newerResult]);
+      await Promise.allSettled([olderSearch, newerSearch]); search.mockRestore();
+    },
+  };
+}
+
+it("keeps newer routing results when an older request finishes last", async () => {
+  const run = await overlappingRoutingSearches();
+  try {
+    run.newer.resolve([run.newerResult]); await run.newerSearch;
+    run.older.resolve([run.olderResult]); await run.olderSearch;
+    expect(run.useRoutingStore.getState().results).toEqual([run.newerResult]);
+  } finally { await run.cleanup(); }
+});
+
+it("keeps the newer consumer's results when both requests settle in one turn", async () => {
+  const run = await overlappingRoutingSearches();
+  try {
+    // This is Search.tsx's contract: read the shared store in search().then().
+    const consumed = run.newerSearch.then(() => run.useRoutingStore.getState().results);
+    run.newer.resolve([run.newerResult]); run.older.resolve([run.olderResult]);
+    expect(await consumed).toEqual([run.newerResult]);
+    await run.olderSearch;
+  } finally { await run.cleanup(); }
+});
+
+it.each(["generic", "engine"])("ignores an obsolete %s failure after newer success", async (kind) => {
+  const run = await overlappingRoutingSearches();
+  const { PtWasmQueryError } = await import("../../src/services/raptorWasm.ts");
+  try {
+    run.newer.resolve([run.newerResult]); await run.newerSearch;
+    run.older.reject(kind === "engine" ? new PtWasmQueryError("old engine") : new Error("old network"));
+    await run.olderSearch;
+    expect(run.useRoutingStore.getState()).toMatchObject({
+      results: [run.newerResult], error: null, engineError: null, engineFailureKind: null, loading: false,
+    });
+  } finally { await run.cleanup(); }
+});
+
+it("does not clear newer loading when an obsolete request reports stale WASM", async () => {
+  const run = await overlappingRoutingSearches();
+  const { StaleWasmInitError } = await import("../../src/services/raptorWasm.ts");
+  const { walkGraphClient } = await import("../../src/services/walkGraphClient.ts");
+  try {
+    run.older.reject(new StaleWasmInitError()); await run.olderSearch.catch(() => {});
+    expect(run.useRoutingStore.getState().loading).toBe(true);
+    expect(walkGraphClient.hasActiveSearch()).toBe(true);
+    run.newer.resolve([run.newerResult]); await run.newerSearch;
+    expect(run.useRoutingStore.getState().results).toEqual([run.newerResult]);
+  } finally { await run.cleanup(); }
+});
+
+it("does not repopulate cleared routing state from pending requests", async () => {
+  const run = await overlappingRoutingSearches();
+  try {
+    run.useRoutingStore.getState().clear();
+    const loadingAfterClear = run.useRoutingStore.getState().loading;
+    run.older.resolve([run.olderResult]); run.newer.resolve([run.newerResult]);
+    await Promise.all([run.olderSearch, run.newerSearch]);
+    expect(run.useRoutingStore.getState().results).toEqual([]);
+    expect(loadingAfterClear).toBe(false);
+  } finally { await run.cleanup(); }
+});
+
+it("still publishes the current request's failure after an older success", async () => {
+  const run = await overlappingRoutingSearches();
+  try {
+    run.older.resolve([run.olderResult]); await run.olderSearch;
+    run.newer.reject(new Error("current network")); await run.newerSearch;
+    expect(run.useRoutingStore.getState()).toMatchObject({ error: "current network", engineError: null, loading: false });
+  } finally { await run.cleanup(); }
+});
+
+it("keeps a newer unloaded-index rejection after older searches complete", async () => {
+  const run = await overlappingRoutingSearches();
+  const { useGtfsDataStore } = await import("../../src/stores/gtfsDataStore.ts");
+  try {
+    useGtfsDataStore.setState({ raptorIndex: null });
+    await run.useRoutingStore.getState().search(
+      { kind: "mappoint", lat: 54.68, lon: 25.28 },
+      { kind: "mappoint", lat: 54.69, lon: 25.28 }, new Date("2026-04-13T08:03:00Z"),
+    );
+    run.older.resolve([run.olderResult]); run.newer.resolve([run.newerResult]);
+    await Promise.all([run.olderSearch, run.newerSearch]);
+    expect(run.useRoutingStore.getState().results).toEqual([]);
+    expect(run.useRoutingStore.getState().error).toMatch(/GTFS data not loaded/);
+  } finally { await run.cleanup(); }
+});

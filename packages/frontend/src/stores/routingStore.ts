@@ -80,6 +80,10 @@ interface RoutingState {
    * `resolveToEntryStops` is invoked once per endpoint as the privacy seam
    * (future milestones apply coarsening / redaction here).
    *
+   * Only the newest request may publish into the shared state. Superseded
+   * requests still settle and release resources; this does not cancel worker
+   * execution. Consumers must retain their own query-lifetime guards.
+   *
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
@@ -90,6 +94,10 @@ interface RoutingState {
   setDestination: (endpoint: BaseEndpoint) => void;
   clear: () => void;
 }
+
+// Results are a single shared slot. A finished obsolete request must not
+// replace a newer search's results/errors or clear its loading state.
+let latestSearchToken = 0;
 
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
   results: [],
@@ -103,6 +111,8 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   destination: null,
 
   async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean }) {
+    const token = ++latestSearchToken;
+    const isCurrent = () => token === latestSearchToken;
     const data = captureCityData();
     const {raptorIndex, loadedCityId} = useGtfsDataStore.getState();
     if (!raptorIndex || (loadedCityId != null && loadedCityId !== useCityStore.getState().activeCity.id)) {
@@ -122,6 +132,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     };
     try {
       const allStops = await data.gtfsStops.toArray();
+      if (!isCurrent()) return;
       const backendAssist = get().backendAssist;
 
       const {
@@ -191,6 +202,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
 
       if (originStops.length === 0 || destStops.length === 0) {
         const route = await optionalPedestrianRoute(() => config.directWalkRoute!(endpointCoord(origin), endpointCoord(destination)));
+        if (!isCurrent()) return;
         data.assertCurrent();
         if (!route) {
           set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });
@@ -218,6 +230,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destStopIds: destination.kind === "stopGroup" ? [...destination.stopIds] : undefined,
       });
 
+      if (!isCurrent()) return;
       data.assertCurrent();
       assertPedestrianCurrent();
       set({ results: itineraries, loading: false,
@@ -226,6 +239,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           : null,
       });
     } catch (err) {
+      if (!isCurrent()) return;
       // Staleness: a reset()/city-switch/refresh invalidated the wasm build
       // mid-search, so THIS search is obsolete and a superseding one is already
       // in flight for the new generation. Do NOT surface an engine/search error.
@@ -284,6 +298,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   },
 
   clear() {
+    ++latestSearchToken;
     set({ results: [], error: null, engineError: null, engineFailureKind: null, loading: false });
   },
 }));
