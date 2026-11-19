@@ -5,6 +5,7 @@ pub mod feed_info;
 pub mod frequencies;
 pub mod identity;
 pub mod inseat;
+pub mod networks;
 pub mod stop_sequences;
 pub mod transfers;
 
@@ -14,6 +15,7 @@ pub use counts::{run_pass1, run_pass1_union, Pass1Result};
 pub use feed_info::{parse_feed_info, FeedInfo};
 pub use frequencies::{parse_frequencies, FrequenciesResult, FrequencyRow};
 pub use inseat::{derive_for_build, derive_inseat_rules, TripForDerivation, MAX_LAYOVER_SECS};
+pub use networks::NetworkAttrs;
 pub use stop_sequences::{TripEndpoint, TripStopTriple};
 pub use transfers::{parse_transfers, TransferRow, TransfersResult};
 
