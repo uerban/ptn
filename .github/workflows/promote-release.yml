@@ -26,6 +26,13 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Ensure GitHub CLI is available
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gh
+          fi
+          gh --version
       - name: Copy exact RC bytes and evidence; never dispatch a build
         env:
           GH_TOKEN: ${{ github.token }}
