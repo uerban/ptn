@@ -31,9 +31,10 @@ export function useFirstRideLive(itinerary: Itinerary | null): {
  * another surface on the same route.
  */
 export function useRetainRoutes(routeIds: readonly string[]): void {
-  const key = [...new Set(routeIds)].sort().join("|");
+  const key = JSON.stringify([...new Set(routeIds)].sort());
   useEffect(() => {
-    if (!key) return;
-    return useRtStore.getState().retainRoutes(key.split("|"));
+    const ids: string[] = JSON.parse(key);
+    if (!ids.length) return;
+    return useRtStore.getState().retainRoutes(ids);
   }, [key]);
 }
