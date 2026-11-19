@@ -154,7 +154,7 @@
   "settings.preview": "Förhandsgranskning",
   "settings.mode_colors": "Lägesfärger",
   "settings.mode_bus": "Buss",
-  "search.vehicle_filter_local": "Använd ruttplanering på enheten för buss- och minibussfilter.",
+  "search.vehicle_filter_local": "Använd planering direkt på enheten med ruttfilter.",
   "settings.mode_minibus": "Minibuss",
   "settings.mode_tram": "Spårvagn",
   "settings.mode_trolleybus": "Trådbuss",

@@ -159,7 +159,7 @@
   "settings.preview": "Предпросмотр",
   "settings.mode_colors": "Цвета видов транспорта",
   "settings.mode_bus": "Автобус",
-  "search.vehicle_filter_local": "Для фильтрации автобусов и маршруток используйте планирование на устройстве.",
+  "search.vehicle_filter_local": "Используйте планирование маршрутов на устройстве с помощью фильтров маршрутов.",
   "settings.mode_minibus": "Маршрутка",
   "settings.mode_tram": "Трамвай",
   "settings.mode_trolleybus": "Троллейбус",

@@ -152,7 +152,7 @@
   "settings.preview": "Podgląd",
   "settings.mode_colors": "Kolory środków transportu",
   "settings.mode_bus": "Autobus",
-  "search.vehicle_filter_local": "Filtry autobusów i minibusów wymagają planowania na urządzeniu.",
+  "search.vehicle_filter_local": "Korzystaj z planowania na urządzeniu z filtrami tras.",
   "settings.mode_minibus": "Mikrobus",
   "settings.mode_tram": "Tramwaj",
   "settings.mode_trolleybus": "Trolejbus",
