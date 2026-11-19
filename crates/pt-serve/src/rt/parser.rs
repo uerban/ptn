@@ -34,9 +34,6 @@ use crate::rt::protobuf::Reader;
 use jiff::civil::Date;
 use std::collections::HashMap;
 
-pub const MAX_DELAY_SECONDS: i32 = 1800;
-pub const MIN_DELAY_SECONDS: i32 = -1800;
-
 /// A predicted time with no delay (`StopTimeEvent.time` only), at the last
 /// served stop that carries a prediction — waiting for the poll cycle to turn
 /// it into a delay against the bundle (`rt::resolve`). Never published: the
@@ -75,18 +72,6 @@ pub enum ParseError {
     /// to catch this the same way `pollOne`'s try/catch does — mark the feed
     /// failed, keep its last-good state.
     Malformed,
-}
-
-/// Clamp to the same +/-1800s bound Node enforces. Unlike the JS version,
-/// there is no `Number.isFinite` branch here: `delay` is decoded straight
-/// from a protobuf `int32` into a Rust `i32`, which cannot represent NaN or
-/// Infinity — that JS branch guards against a defensive case that's
-/// structurally unreachable once the value is a real `i32` (same category
-/// of intentional non-verbatim divergence as PTFT's Dijkstra heap: the
-/// *behavior* being guarded against JS `Number()` coercion doesn't exist in
-/// this type system, so there's nothing to port).
-fn clamp_delay(v: i32) -> i32 {
-    v.clamp(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS)
 }
 
 pub fn parse_trip_updates_buffer(data: &[u8]) -> Result<HashMap<String, TripUpdate>, ParseError> {
@@ -251,7 +236,7 @@ fn parse_trip_update(
         tid,
         start_date,
         TripUpdate {
-            delay_seconds: clamp_delay(last_delay.or(trip_delay).unwrap_or(0)),
+            delay_seconds: last_delay.or(trip_delay).unwrap_or(0),
             // A removed trip is not shown as cancelled: `deleted` alone.
             cancelled: !deleted && (descriptor_cancelled || all_stops_skipped),
             deleted,
@@ -449,11 +434,11 @@ mod tests {
     }
 
     #[test]
-    fn clamps_extreme_positive_and_negative_delays() {
+    fn preserves_large_positive_and_negative_delays() {
         let data = include_bytes!("../../tests/fixtures/rt/clamp_cases.bin");
         let updates = parse_trip_updates_buffer(data).unwrap();
-        assert_eq!(updates["trip-positive"].delay_seconds, 1800);
-        assert_eq!(updates["trip-negative"].delay_seconds, -1800);
+        assert_eq!(updates["trip-positive"].delay_seconds, 7200);
+        assert_eq!(updates["trip-negative"].delay_seconds, -7200);
     }
 
     #[test]
@@ -465,11 +450,11 @@ mod tests {
     }
 
     #[test]
-    fn clamps_one_second_past_boundary() {
+    fn preserves_delays_one_second_past_old_boundary() {
         let data = include_bytes!("../../tests/fixtures/rt/clamp_cases.bin");
         let updates = parse_trip_updates_buffer(data).unwrap();
-        assert_eq!(updates["trip-1801"].delay_seconds, 1800);
-        assert_eq!(updates["trip-minus-1801"].delay_seconds, -1800);
+        assert_eq!(updates["trip-1801"].delay_seconds, 1801);
+        assert_eq!(updates["trip-minus-1801"].delay_seconds, -1801);
     }
 
     #[test]
@@ -569,13 +554,10 @@ mod tests {
     }
 
     #[test]
-    fn trip_level_delay_is_clamped_like_any_other() {
+    fn preserves_large_trip_level_delay() {
         let data = include_bytes!("../../tests/fixtures/rt/delay_cases.bin");
         let updates = parse_trip_updates_buffer(data).unwrap();
-        assert_eq!(
-            updates["trip-level-clamped"].delay_seconds,
-            MAX_DELAY_SECONDS
-        );
+        assert_eq!(updates["trip-level-clamped"].delay_seconds, 5000);
     }
 
     // ── Predicted times only (D3, ) ───────────────────────────────────

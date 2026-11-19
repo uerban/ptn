@@ -2,31 +2,6 @@ import type { FastifyBaseLogger } from "fastify";
 import type { GtfsStore } from "./store.ts";
 
 const FEED_FETCH_TIMEOUT_MS = 15_000;
-const MAX_DELAY_SECONDS = 1800;
-const MIN_DELAY_SECONDS = -1800;
-
-function clampDelaySeconds(
-  delaySeconds: number,
-  ctx: { tripId: string; cancelled: boolean; logger?: FastifyBaseLogger },
-): number {
-  if (!Number.isFinite(delaySeconds)) {
-    ctx.logger?.debug(
-      { tripId: ctx.tripId, rawDelay: delaySeconds },
-      "GTFS-RT non-finite delaySeconds coerced to 0",
-    );
-    return 0;
-  }
-  if (delaySeconds > MAX_DELAY_SECONDS || delaySeconds < MIN_DELAY_SECONDS) {
-    const clamped = Math.min(MAX_DELAY_SECONDS, Math.max(MIN_DELAY_SECONDS, delaySeconds));
-    ctx.logger?.debug(
-      { tripId: ctx.tripId, rawDelay: delaySeconds, clamped, cancelled: ctx.cancelled },
-      "GTFS-RT delaySeconds clamped",
-    );
-    return clamped;
-  }
-  return delaySeconds;
-}
-
 export interface TripUpdate {
   delaySeconds: number;
   cancelled: boolean;
@@ -69,15 +44,21 @@ export async function parseTripUpdatesBuffer(
       entity.tripUpdate.trip?.scheduleRelationship ===
       transit_realtime.TripDescriptor.ScheduleRelationship.CANCELED;
 
-    let delaySeconds = 0;
+    let delaySeconds = entity.tripUpdate.delay ?? 0;
     const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate ?? [];
     if (stopTimeUpdates.length > 0) {
       const last = stopTimeUpdates[stopTimeUpdates.length - 1];
-      delaySeconds = Number(last.departure?.delay ?? last.arrival?.delay ?? 0);
+      delaySeconds = Number(last.departure?.delay ?? last.arrival?.delay ?? delaySeconds);
+    }
+
+    if (!Number.isInteger(delaySeconds) || delaySeconds < -2147483648 || delaySeconds > 2147483647) {
+      logger?.debug({ tripId, delaySeconds }, "Invalid GTFS-RT delay");
+      if (!cancelled) continue;
+      delaySeconds = 0;
     }
 
     const update: TripUpdate = {
-      delaySeconds: clampDelaySeconds(delaySeconds, { tripId, cancelled, logger }),
+      delaySeconds,
       cancelled,
     };
 

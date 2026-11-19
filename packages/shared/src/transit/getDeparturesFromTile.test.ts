@@ -436,6 +436,44 @@ describe("getDeparturesFromTile", () => {
 
   // ── Real-time merge ───────────────────────────────────────────────────────
 
+  it.each([
+    { hour: 9, minute: 37, delaySeconds: 5880 },
+    { hour: 7, minute: 0, delaySeconds: -3540 },
+  ])("includes off-window trips predicted one minute from now ($delaySeconds s)", ({
+    hour, minute, delaySeconds,
+  }) => {
+    const tile = mkSingleTripTile({
+      tripId: "T1",
+      routeId: "R1",
+      routeShortName: "1",
+      mode: "BUS",
+      headsign: "Downtown",
+      serviceId: "SVC_DAILY",
+      stopId: "S1",
+      departureSec: 8 * 3600,
+      activeDays: [true, true, true, true, true, true, true],
+    });
+    const now = new Date(2026, 4, 4, hour, minute);
+    const rt = { tripId: "T1", delaySeconds, cancelled: false };
+    const args = { tile, stopId: "S1", now, limit: 1, lookAheadHours: 0.5 };
+
+    expect(getDeparturesFromTile(args).departures).toEqual([]);
+    expect(getDeparturesFromTile({
+      ...args,
+      realtimeUpdates: new Map([["T1|20260504", rt], ["T1", rt]]),
+    }).departures).toEqual([
+      expect.objectContaining({
+        delaySeconds,
+        predictedTime: new Date(now.getTime() + 60_000).toISOString(),
+      }),
+    ]);
+    expect(getDeparturesFromTile({
+      ...args,
+      now: new Date(2026, 4, 5, hour, minute),
+      realtimeUpdates: new Map([["T1|20260504", rt], ["T1", rt]]),
+    }).departures).toEqual([]);
+  });
+
   it("applies a date-scoped RT update (`tripId|YYYYMMDD` key) to predictedTime/delaySeconds", () => {
     const tile = mkSingleTripTile({
       tripId: "T1",
