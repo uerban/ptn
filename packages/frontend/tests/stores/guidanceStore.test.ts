@@ -204,8 +204,7 @@ describe("RT integration", () => {
     parkRtPolling();
   });
 
-  it("subscribes to RT routes on startNavigation", () => {
-    const subscribeSpy = vi.spyOn(useRtStore.getState(), "subscribeRoutes");
+  it("sets RT mode to navigating on startNavigation", () => {
     const setModeSpy = vi.spyOn(useRtStore.getState(), "setMode");
 
     useGuidanceStore.getState().startNavigation(mockItinerary);
@@ -243,6 +242,6 @@ it("starts a walk-only itinerary without subscribing a transit route", () => {
   useGuidanceStore.getState().startNavigation(itinerary);
   expect(useGuidanceStore.getState().phase).toBe("navigating");
   expect(useGuidanceStore.getState().legStatuses).toEqual(["current"]);
-  expect(subscribe).not.toHaveBeenCalled();
+  expect(subscribe).toHaveBeenCalledWith([]);
  } finally {subscribe.mockRestore();useGuidanceStore.getState().reset();}
 });

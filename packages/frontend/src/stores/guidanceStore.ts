@@ -86,9 +86,9 @@ export const useGuidanceStore = create<GuidanceState>()((set, get) => ({
         itinerary.legs.filter((leg) => leg.tripId && leg.routeId).map((leg) => leg.routeId!),
       ),
     ];
-    if (routeIds.length > 0) {
-      useRtStore.getState().subscribeRoutes(routeIds);
-    }
+    // Replace guidance's previous routes even for a walk-only itinerary.
+    // The RT store preserves routes independently retained by other surfaces.
+    useRtStore.getState().subscribeRoutes(routeIds);
     useRtStore.getState().setMode("navigating");
   },
 
