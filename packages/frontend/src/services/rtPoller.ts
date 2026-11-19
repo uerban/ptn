@@ -10,6 +10,7 @@ import {
 
 type RtMode = "idle" | "navigating" | "transfer";
 type RtCallback = (update: RtRouteUpdate) => void;
+type RtSubscription = { callback: RtCallback };
 
 const INTERVALS: Record<RtMode, number> = {
   idle: RT_CLIENT_IDLE_INTERVAL_MS,
@@ -30,14 +31,17 @@ function pollingAllowed(): boolean {
 }
 
 export class RtPoller {
-  private subscriptions = new Map<string, RtCallback>();
+  private subscriptions = new Map<string, RtSubscription>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private generation = 0;
   private mode: RtMode = "idle";
 
   subscribe(routeId: string, callback: RtCallback): void {
-    this.subscriptions.set(routeId, callback);
+    // Reconciliation may repeat a still-active hold. Preserve that identity,
+    // but a replacement or remove/re-add gets a new subscription lifetime.
+    if (this.subscriptions.get(routeId)?.callback === callback) return;
+    this.subscriptions.set(routeId, { callback });
   }
 
   unsubscribe(routeId: string): void {
@@ -93,14 +97,19 @@ export class RtPoller {
     if (!this.isCurrent(generation) || !pollingAllowed()) return;
     const entries = [...this.subscriptions.entries()];
     const results = await Promise.allSettled(
-      entries.map(async ([routeId, callback]) => {
+      entries.map(async ([routeId, subscription]) => {
         const update = await api.fetchRouteRt(routeId);
-        // A revocation during the request drops its late result.
-        if (this.isCurrent(generation) && pollingAllowed()) callback(update);
+        // Neither a stopped loop, released hold nor revoked permission owns
+        // this late response. A re-added identical callback is a new hold.
+        if (this.isCurrent(generation)
+            && this.subscriptions.get(routeId) === subscription
+            && pollingAllowed()) subscription.callback(update);
       }),
     );
     for (let i = 0; i < results.length; i++) {
-      if (this.isCurrent(generation) && results[i].status === "rejected") {
+      const [routeId, subscription] = entries[i];
+      if (this.isCurrent(generation) && this.subscriptions.get(routeId) === subscription
+          && results[i].status === "rejected") {
         console.warn(`RT poll failed for route ${entries[i][0]}:`, (results[i] as PromiseRejectedResult).reason);
       }
     }
