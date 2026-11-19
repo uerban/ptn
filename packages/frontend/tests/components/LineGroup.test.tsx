@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { I18nContext } from "../../src/i18n/index.ts";
@@ -122,6 +122,9 @@ describe("LineGroup", () => {
   });
 
   it("shows waits of an hour or more as hours and minutes, not a clock time", () => {
+    // The row also shows the departure's own clock time: keep it clear of 1:xx and 11:xx.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 5, 15, 9, 0) });
+    onTestFinished(() => { vi.useRealTimers(); });
     const deps = [{ ...baseDep, scheduledTime: new Date(Date.now() + 69.5 * 60_000).toISOString() }];
     const { container } = render(
       <LineGroup routeShortName="1" routeColor="e53935" mode="BUS" headsign="Centre" departures={deps} />,

@@ -207,13 +207,14 @@ describe("Arrive-by toolbar", () => {
     await waitFor(() => expect(channel.warm).toHaveBeenCalledTimes(1));
   });
 
-  it("is one summary button beside the filters until opened", () => {
+  it("is one summary button beside the sort chip until opened", () => {
     render(<MemoryRouter><ArriveByToolbar origin={ORIGIN} destination={DEST} recommended={[]} recommendedInitial
-      filters={<button type="button">Bus</button>} /></MemoryRouter>);
+      sort={<button type="button">Fastest</button>} filters={<button type="button">Bus</button>} /></MemoryRouter>);
     const summary = screen.getByTestId("when-summary");
     expect(summary).toHaveTextContent("When: Now (Leave now)");
     expect(summary).toHaveAttribute("aria-expanded", "false");
-    expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Bus" }));
+    expect(summary.parentElement).toContainElement(screen.getByRole("button", { name: "Fastest" }));
+    expect(summary.parentElement).not.toContainElement(screen.getByRole("button", { name: "Bus" }));
     expect(screen.queryByRole("button", { name: "Arrive by" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("leave-in15")).not.toBeInTheDocument();
     fireEvent.click(summary);
@@ -324,8 +325,11 @@ describe("Arrive-by results", () => {
     emit(state("complete", [LATEST, FAST, FEW]));
     await waitFor(() => expect(order()).toEqual(["L1", "F2", "W3"]));
     expect(screen.getByRole("status")).toHaveTextContent("latest departure first");
-    const shown = performance.getEntriesByName(ARRIVE_BY_MARKS.shown) as PerformanceMark[];
-    expect(shown.map((m) => (m.detail as { status: string }).status)).toEqual(["latest", "complete"]);
+    // The mark follows the paint, so it can land just after the cards appear.
+    await waitFor(() => {
+      const shown = performance.getEntriesByName(ARRIVE_BY_MARKS.shown) as PerformanceMark[];
+      expect(shown.map((m) => (m.detail as { status: string }).status)).toEqual(["latest", "complete"]);
+    });
   });
 
   it("marks the applied search's page steps (H73) without changing what it shows", async () => {
