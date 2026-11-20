@@ -87,7 +87,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; directRouteId?: string }) => Promise<RtComposedItinerary[] | void>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -110,7 +110,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   origin: null,
   destination: null,
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; directRouteId?: string }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -158,7 +158,18 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         role: "destination",
       });
 
-      const searchCityId = useCityStore.getState().activeCity.id;
+      const city = useCityStore.getState().activeCity;
+      const searchCityId = city.id;
+      const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
+      if (probe && opts?.directRouteId) {
+        const directRouteId = opts.directRouteId;
+        if (excludedRouteIds.includes(directRouteId)) return;
+        // Other lines can dominate the result set even when a later trip on
+        // this direct line is viable. Keep the rider's existing exclusions.
+        for (const route of raptorIndex.routes) {
+          if (route.id !== directRouteId) excludedRouteIds.push(route.id);
+        }
+      }
       const config: SearchConfig = {
         raptorIndex,
         cityId: useCityStore.getState().activeCity.id,
@@ -189,7 +200,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         mobilityProfile,
         runToCatch,
         excludedModes: excludedModes.length > 0 ? excludedModes : undefined,
-        excludedRouteIds: excludedRouteIdsForCity(raptorIndex, useCityStore.getState().activeCity, useSettingsStore.getState()),
+        excludedRouteIds,
         feedTz: useCityStore.getState().activeCity.tz,
         backendAssist: {
           enabled: backendAssist,

@@ -65,7 +65,7 @@ interface RouteResultsProps {
   /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
   departAt?: Date | null;
   arriveByMs?: number;
-  findLaterPlans?: (at: Date, signal: AbortSignal) => Promise<Itinerary[]>;
+  findLaterPlans?: (at: Date, signal: AbortSignal, directRouteId?: string) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */

@@ -837,9 +837,9 @@ export function SearchPage() {
     () => (paginationTime ?? new Date()).toISOString(),
     [paginationTime, fromLat, fromLon, toLat, toLon],
   );
-  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal): Promise<Itinerary[]> => {
+  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal, directRouteId?: string): Promise<Itinerary[]> => {
     if (!fromEndpoint || !toEndpoint) return [];
-    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal });
+    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, directRouteId });
     if (!results || signal.aborted) return [];
     return convertRaptorResults(results, at, { lat: fromEndpoint.lat, lon: fromEndpoint.lon },
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
@@ -1898,7 +1898,8 @@ export function SearchPage() {
           />
         ) : ArriveByResults ? (
           // Opt-in build only: an applied arrive-by deadline replaces the list.
-          <ArriveByResults origin={fromEndpoint} destination={toEndpoint} onSelect={handleItinerarySelect}>
+          <ArriveByResults origin={fromEndpoint} destination={toEndpoint} onSelect={handleItinerarySelect}
+            findLaterPlans={findLaterPlans}>
             {normalResults}
           </ArriveByResults>
         ) : (

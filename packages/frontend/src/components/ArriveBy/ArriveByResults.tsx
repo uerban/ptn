@@ -40,10 +40,11 @@ type View =
 
 const ACTION_CLASS = "w-full min-h-12 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
-export function ArriveByResults({ origin, destination, onSelect, children }: ArriveByResultsProps) {
+export function ArriveByResults({ origin, destination, onSelect, findLaterPlans, children }: ArriveByResultsProps) {
   const appliedMs = useArriveByUi((s) => s.appliedMs);
   if (appliedMs === null || !origin || !destination) return <>{children}</>;
-  return <AppliedArriveBy origin={origin} destination={destination} deadlineMs={appliedMs} onSelect={onSelect} />;
+  return <AppliedArriveBy origin={origin} destination={destination} deadlineMs={appliedMs} onSelect={onSelect}
+    findLaterPlans={findLaterPlans} />;
 }
 
 /** `status` only labels the H73 mark. An update without options has no
@@ -81,8 +82,9 @@ function markNextFrame(status: string): void {
   requestAnimationFrame(() => setTimeout(() => markArriveBy(ARRIVE_BY_MARKS.frame, { status }), 0));
 }
 
-function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
+function AppliedArriveBy({ origin, destination, deadlineMs, onSelect, findLaterPlans }: {
   origin: BaseEndpoint; destination: BaseEndpoint; deadlineMs: number; onSelect: (itinerary: Itinerary) => void;
+  findLaterPlans?: ArriveByResultsProps["findLaterPlans"];
 }) {
   const { t, locale } = useTranslation();
   const router = useGtfsDataStore((s) => s.ptRouter);
@@ -211,7 +213,8 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
     body = (
       <>
         <RouteResults itineraries={ordered.map((c) => c.itinerary)} onSelect={onSelect} loading={pending}
-          origin={origin} destination={destination} feedTz={tz} arriveByMs={deadlineMs} />
+          origin={origin} destination={destination} feedTz={tz} arriveByMs={deadlineMs}
+          findLaterPlans={view.kind === "search" && view.state.status === "complete" ? findLaterPlans : undefined} />
         {view.kind === "search" && view.state.status === "limited" && notice(
           t("arriveBy.limited_recovery", "Change the deadline or search settings to try a different search."), leaveNow,
         )}

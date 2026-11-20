@@ -24,6 +24,7 @@ export interface ArriveByResultsProps {
   readonly origin: BaseEndpoint | null;
   readonly destination: BaseEndpoint | null;
   readonly onSelect: (itinerary: Itinerary) => void;
+  readonly findLaterPlans?: (at: Date, signal: AbortSignal, directRouteId?: string) => Promise<Itinerary[]>;
   /** Search's normal results, shown while no arrive-by deadline is applied. */
   readonly children: ReactNode;
 }

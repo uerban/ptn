@@ -12,6 +12,8 @@ import type {
 } from "../../services/temporalArriveByClient.ts";
 import type { ArriveByJourneyOption } from "../../services/temporalArriveByJourneys.ts";
 import type { ArriveByFailure, ArriveBySelector } from "../../services/temporalArriveByResults.ts";
+import { serverTime } from "../../services/serverTime.ts";
+import { arriveByItinerary } from "./arriveByItineraries.ts";
 import { ArriveByResults } from "./ArriveByResults.tsx";
 import { ArriveByToolbar } from "./ArriveByToolbar.tsx";
 import { ARRIVE_BY_MARKS, type ArriveByCardsMark } from "./arriveByMarks.ts";
@@ -324,6 +326,47 @@ describe("Arrive-by toolbar", () => {
 });
 
 describe("Arrive-by results", () => {
+  it("probes only after results settle and opens a later plan within the original deadline", async () => {
+    vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
+    const deadline = Date.parse("2026-10-12T07:00:00Z");
+    const nowMs = Date.parse("2026-10-12T06:12:00Z");
+    const clock = vi.spyOn(serverTime, "now").mockReturnValue(nowMs);
+    const ctx = {
+      serviceDate: SCOPE.serviceDate, tz: TZ, origin: ORIGIN, destination: DEST,
+      labels: { origin: "A", destination: "B" }, stops: new Map(), headsigns: new Map(),
+      routeColors: new Map(), runToCatchStops: new Set<string>(),
+    };
+    const makePlan = (name: string, depart: number, duration: number) => {
+      const candidate = arriveByItinerary(option(name, depart, duration, []), ctx);
+      candidate.legs[0].routeId = LATEST.journey.rides[0].routeId;
+      return candidate;
+    };
+    const overrun = makePlan("overrun", 33200, 3000);
+    const viable = makePlan("later", 33600, 2400);
+    const findLaterPlans = vi.fn(async () => [overrun, viable]);
+    const onSelect = vi.fn();
+    useArriveByUi.setState({ appliedMs: deadline });
+    try {
+      render(<MemoryRouter>
+        <ArriveByResults origin={ORIGIN} destination={DEST} onSelect={onSelect} findLaterPlans={findLaterPlans}>
+          <div />
+        </ArriveByResults>
+      </MemoryRouter>);
+      await waitFor(() => expect(runs).toHaveLength(1));
+      emit(state("latest", [LATEST]));
+      await waitFor(() => expect(order()).toEqual(["L1"]));
+      expect(findLaterPlans).not.toHaveBeenCalled();
+      emit(state("complete", [LATEST]));
+      fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
+      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), LATEST.journey.rides[0].routeId);
+      expect(onSelect).toHaveBeenCalledWith(viable);
+      expect(runs).toHaveLength(1);
+      expect(runs[0].cancelled).toBe(false);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("switches the applied search to closest arrival and renders its result", async () => {
     vi.stubEnv("VITE_PTN_CLOSEST_ARRIVAL", "1");
     render(<Page />);

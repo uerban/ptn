@@ -17,7 +17,7 @@ interface Props {
   departAtMs?: number;
   arriveByMs?: number;
   feedTz?: string;
-  findLaterPlans?: (at: Date, signal: AbortSignal) => Promise<Itinerary[]>;
+  findLaterPlans?: (at: Date, signal: AbortSignal, directRouteId?: string) => Promise<Itinerary[]>;
 }
 
 export function LaterJourney({
@@ -47,18 +47,21 @@ export function LaterJourney({
     });
   });
   const retainedLater = later !== null && itineraries.includes(later);
-  const boardingMs = display.firstTransitDepartureMs;
+  const primaryLeaveMs = Date.parse(primary.departureTime);
   useEffect(() => {
-    if (!findLaterPlans || !needsFallback || retainedLater || !Number.isFinite(boardingMs)) return;
+    if (!findLaterPlans || !needsFallback || retainedLater || !Number.isFinite(primaryLeaveMs)) return;
     const controller = new AbortController();
-    // A single local replan after the missed boarding. The complete planner
-    // chooses fresh access, transfers and egress for this departure floor.
-    const departureFloor = Math.max(serverTime.now(), departAtMs ?? -Infinity, boardingMs + 1_000);
-    void findLaterPlans(new Date(departureFloor), controller.signal).then((plans) => {
+    // Keep enough time for access to another boarding while skipping the
+    // original door departure. The selector still requires a later ride.
+    const departureFloor = Math.max(serverTime.now(), departAtMs ?? -Infinity, primaryLeaveMs + 1_000);
+    if (arriveByMs !== undefined && departureFloor >= arriveByMs) return;
+    const rides = primary.legs.filter((leg) => leg.mode !== "WALK");
+    const directRouteId = rides.length === 1 ? rides[0].routeId : undefined;
+    void findLaterPlans(new Date(departureFloor), controller.signal, directRouteId).then((plans) => {
       if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, plans });
     }, () => {});
     return () => controller.abort();
-  }, [findLaterPlans, needsFallback, primary, retainedLater, boardingMs, departAtMs]);
+  }, [findLaterPlans, needsFallback, primary, retainedLater, primaryLeaveMs, departAtMs, arriveByMs]);
 
   if (!later) return null;
   const departure = formatTime(later.departureTime, formattingLocale, feedTz);
