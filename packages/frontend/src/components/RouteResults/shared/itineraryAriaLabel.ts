@@ -220,7 +220,14 @@ export function itineraryAriaLabel(
           const hop = t("route.aria_leg", "{vehicle} to {stop}")
             .replace("{vehicle}", vehicle)
             .replace("{stop}", leg.to.name);
-          return i === 0 ? hop : `${then} ${hop}`;
+          const sign = leg.headsign
+            ? t("route.toward_headsign", "toward {headsign}").replace("{headsign}", leg.headsign)
+            : null;
+          const departure = Number.isFinite(Date.parse(leg.departureTime))
+            ? t("route.aria_leg_departure", "departs {time}").replace("{time}", formatTime(leg.departureTime, formattingLocale, feedTz))
+            : null;
+          const details = [hop, sign, departure].filter(Boolean).join(", ");
+          return i === 0 ? details : `${then} ${details}`;
         })
         .join(", "),
     );

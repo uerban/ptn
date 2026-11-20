@@ -4,6 +4,7 @@ import { useTranslation } from "../../i18n/index.ts";
 import { pluralize } from "../../i18n/plurals.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeSize } from "../../utils/appearance.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { TransferRiskBadge } from "./shared/TransferRiskBadge.tsx";
@@ -261,7 +262,7 @@ const AccessibleCard = memo(function AccessibleCard({
       {/* Stop-by-stop transit leg rows + transfer/buffer wait rows */}
       {display.segments.length > 0 && (
         <div className="flex flex-col gap-2">
-          {renderAccessibleSegmentRows(display.segments, hideBufferChrome)}
+          {renderAccessibleSegmentRows(display.segments, hideBufferChrome, feedTz)}
         </div>
       )}
 
@@ -308,6 +309,7 @@ const AccessibleCard = memo(function AccessibleCard({
 function renderAccessibleSegmentRows(
   segments: Segment[],
   hideBufferChrome: boolean,
+  feedTz?: string,
 ): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   for (let i = 0; i < segments.length; i++) {
@@ -336,7 +338,7 @@ function renderAccessibleSegmentRows(
         break;
       }
       case "ride": {
-        rows.push(<AccessibleLegRow key={`ride-${i}`} leg={s.leg} />);
+        rows.push(<AccessibleLegRow key={`ride-${i}`} leg={s.leg} feedTz={feedTz} />);
         break;
       }
       case "walk": {
@@ -355,7 +357,7 @@ function renderAccessibleSegmentRows(
   return rows;
 }
 
-function AccessibleLegRow({ leg }: { leg: Leg }) {
+function AccessibleLegRow({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
   const { t, locale } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
   // intermediateStops = count BETWEEN board and alight stops, exclusive.
@@ -374,6 +376,7 @@ function AccessibleLegRow({ leg }: { leg: Leg }) {
         size="md"
       />
       <div className="flex-1 min-w-0">
+        <LegDeparture leg={leg} feedTz={feedTz} />
         <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
           <span>
             {t("route.off_at_long", "Off at")}{" "}

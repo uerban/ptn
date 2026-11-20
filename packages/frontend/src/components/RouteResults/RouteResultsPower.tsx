@@ -6,6 +6,7 @@ import { getBadgeSize } from "../../utils/appearance.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { resolveRouteColor } from "../../utils/routeColor.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { ItineraryBar } from "./shared/ItineraryBar.tsx";
@@ -271,6 +272,7 @@ const PowerCard = memo(function PowerCard({
           segments={display.segments}
           leadingMin={leadingMin}
           leaveTime={leaveTime}
+          feedTz={feedTz}
           showLeadingToken={showLeadingToken}
         />
         {/* Power keeps the buffer to the leave token above; only a catch
@@ -346,6 +348,7 @@ interface LegStripProps {
   leadingMin: number;
   leaveTime: string;
   showLeadingToken: boolean;
+  feedTz?: string;
 }
 
 function LegStrip({
@@ -353,6 +356,7 @@ function LegStrip({
   leadingMin,
   leaveTime,
   showLeadingToken,
+  feedTz,
 }: LegStripProps) {
   const { t } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
@@ -381,13 +385,14 @@ function LegStrip({
       }
       firstRideEmitted = true;
       nodes.push(
-        <span key={i} className="inline-flex items-center gap-1">
+        <span key={i} className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1">
           <LineBadge
             mode={seg.leg.mode}
             label={seg.leg.routeShortName}
             routeColor={seg.leg.routeColor}
             size="sm"
           />
+          <LegDeparture leg={seg.leg} feedTz={feedTz} />
           <span className="text-[0.625rem] text-fg-muted tabular-nums">
             <span className="opacity-50" aria-hidden>
               ▸

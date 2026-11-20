@@ -23,7 +23,7 @@ describe("Search vehicle filters", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     const bus = screen.getByRole("button", { name: "Bus" });
     expect(bus).toHaveAttribute("aria-pressed", "true");
-    expect(bus).not.toHaveTextContent("Bus");
+    expect(bus).toHaveTextContent("Bus");
     fireEvent.click(bus);
     expect(bus).toHaveAttribute("aria-pressed", "false");
     expect(useSettingsStore.getState().excludedModes).toContain("BUS");

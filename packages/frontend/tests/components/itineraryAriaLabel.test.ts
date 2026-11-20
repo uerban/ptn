@@ -73,7 +73,7 @@ describe("route distinctions", () => {
 
   it("labels each comparison independently of list order and omits cancelled routes", () => {
     expect(routeDistinctions([direct, quick, { ...quick, durationSeconds: 1, cancelled: true }], t))
-      .toEqual([["Fewest transfers", "Least walking"], ["Fastest"], []]);
+      .toEqual([["Fewest transfers"], ["Fastest"], []]);
   });
 
   it("only shows labels for metrics that differ between available routes", () => {
@@ -91,7 +91,7 @@ describe("itineraryAriaLabel — clause order", () => {
     expect(out.startsWith("Fastest. Leave in 5 min. ")).toBe(true);
     expect(out).toBe(
       "Fastest. Leave in 5 min. Board here. " +
-        "Bus 42 to Stop B, then Tram 5 to Stop C. " +
+        "Bus 42 to Stop B, departs 10:00, then Tram 5 to Stop C, departs 10:20. " +
         "35 min, arrives 10:35. 1 transfer, 320 m walking.",
     );
   });

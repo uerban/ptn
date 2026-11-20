@@ -17,16 +17,19 @@ const OPTIONS: readonly (readonly [RankingCriteria, string, string])[] = [
 ];
 
 interface SortChipProps {
+  readonly arriveBy?: boolean;
   readonly value: RankingCriteria;
   readonly onChange: (value: RankingCriteria) => void;
 }
 
-export function SortChip({ value, onChange }: SortChipProps) {
+export function SortChip({ value, onChange, arriveBy = false }: SortChipProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const current = OPTIONS.find(([option]) => option === value) ?? OPTIONS[0];
-  const sortLabel = t("search.sort", "Sort");
+  const sortLabel = arriveBy
+    ? t("search.sort_tie_breaker", "Tie-breaker")
+    : t("search.sort", "Sort");
 
   return (
     <>
@@ -49,6 +52,11 @@ export function SortChip({ value, onChange }: SortChipProps) {
             className="relative flex max-h-[85dvh] flex-col rounded-t-2xl bg-surface-raised text-fg shadow-lg">
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-[min(1rem,16px)] pt-3 pb-2">
               <h2 className="text-base font-semibold">{sortLabel}</h2>
+              <p className="text-sm text-fg-secondary">
+                {arriveBy
+                  ? t("search.sort_arrive_by_help", "Journeys with the latest departure appear first. This preference breaks departure-time ties between the remaining journeys.")
+                  : t("search.sort_departure_help", "This preference ranks the journeys found. You may see the same journey under every preference.")}
+              </p>
               <div className="space-y-1" role="group" aria-label={sortLabel}>
                 {OPTIONS.map(([option, key, fallback]) => {
                   const active = option === value;

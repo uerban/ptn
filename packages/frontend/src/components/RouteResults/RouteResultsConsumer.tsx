@@ -5,6 +5,7 @@ import { pluralize } from "../../i18n/plurals.ts";
 import { computeEcoScore } from "../../utils/ecoScore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeSize } from "../../utils/appearance.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { ItineraryBar } from "./shared/ItineraryBar.tsx";
@@ -224,7 +225,7 @@ const ConsumerCard = memo(function ConsumerCard({
       <BoardingLine segments={display.segments} />
 
       <div className="flex items-center gap-1 flex-wrap">
-        {renderLegChipsWithWaits(display.segments, t)}
+        {renderLegChipsWithWaits(display.segments, t, feedTz)}
       </div>
 
       {/* Live delay callout when a route is running late */}
@@ -320,6 +321,7 @@ const ConsumerCard = memo(function ConsumerCard({
 function renderLegChipsWithWaits(
   segments: Segment[],
   t: ReturnType<typeof useTranslation>["t"],
+  feedTz?: string,
 ) {
   const chips: React.ReactNode[] = [];
   let chipIdx = 0;
@@ -354,13 +356,13 @@ function renderLegChipsWithWaits(
       );
     } else {
       // ride or walk — render the existing LegChip
-      chips.push(<LegChip key={`leg-${chipIdx++}`} leg={s.leg} />);
+      chips.push(<LegChip key={`leg-${chipIdx++}`} leg={s.leg} feedTz={feedTz} />);
     }
   }
   return chips;
 }
 
-function LegChip({ leg }: { leg: Leg }) {
+function LegChip({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
   const { t } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
   const isWalk = leg.mode === "WALK";
@@ -383,14 +385,7 @@ function LegChip({ leg }: { leg: Leg }) {
         routeColor={leg.routeColor}
         size="sm"
       />
-      {leg.headsign && (
-        <span
-          className="min-w-0 text-xs text-fg-muted truncate max-w-[min(7.5rem,100%)]"
-          title={leg.headsign}
-        >
-          › {leg.headsign}
-        </span>
-      )}
+      <LegDeparture leg={leg} feedTz={feedTz} />
       <LiveLegBadge leg={leg} compact size={badgeSize} />
     </span>
   );

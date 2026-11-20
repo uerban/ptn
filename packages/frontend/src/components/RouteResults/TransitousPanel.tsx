@@ -120,11 +120,14 @@ export function TransitousPanel({
             </p>
             <ol className="space-y-1">
               {it.legs.map((leg, i) => (
-                <li key={i} className="text-sm flex items-center gap-2">
+                <li key={i} className="text-sm flex flex-wrap items-center gap-x-2 gap-y-0">
                   <span className="font-medium" style={leg.routeColor ? { color: leg.routeColor } : undefined}>
                     {leg.routeShortName ?? t(`mode.${leg.mode.toLowerCase()}`, leg.mode)}
                   </span>
                   <span className="text-fg-muted">
+                    {leg.headsign && (
+                      <>{t("route.toward_headsign", "toward {headsign}").replace("{headsign}", leg.headsign)} · </>
+                    )}
                     {fmtTime(leg.departIso, feedTz, formattingLocale)} {leg.fromName} → {fmtTime(leg.arriveIso, feedTz, formattingLocale)} {leg.toName}
                   </span>
                 </li>

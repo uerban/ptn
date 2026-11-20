@@ -59,7 +59,7 @@ const inputClass = "min-h-12 w-full min-w-0 px-3 text-sm rounded-lg border borde
 
 const summaryClass = searchChipClass("idle");
 
-export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, sort, filters }: ArriveByToolbarProps) {
+export function ArriveByToolbar({ origin, destination, recommended, recommendedInitial, departAt, onDepartAt, sort, arriveBySort, filters }: ArriveByToolbarProps) {
   const { t, locale } = useTranslation();
   const cityId = useCityStore((s) => s.activeCity.id);
   const tz = useCityStore((s) => s.activeCity.tz) ?? deviceTz();
@@ -266,7 +266,7 @@ export function ArriveByToolbar({ origin, destination, recommended, recommendedI
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
-        {sort}
+        {appliedMs !== null && origin && destination ? arriveBySort : sort}
       </div>
       {filters}
       </div>

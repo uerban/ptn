@@ -91,9 +91,8 @@ describe.each(VARIANTS)("RouteResults list semantics — variant=%s", (variant) 
     renderResults([makeItinerary()]);
     const card = screen.getByTestId("itinerary-card");
     const label = card.getAttribute("aria-label") ?? "";
-    // Index 0 is the fastest result in every variant; the ranking cue and the
-    // leg chain come before the trip's duration and cost.
-    expect(label.startsWith("Fastest.")).toBe(true);
+    // A single result has no comparison badge.
+    expect(label).not.toContain("Fastest");
     // The fixture boards where the trip starts, so the short form fires.
     expect(label).toContain("Board here");
     expect(label.indexOf("Bus 42 to Stop B")).toBeLessThan(
@@ -101,7 +100,7 @@ describe.each(VARIANTS)("RouteResults list semantics — variant=%s", (variant) 
     );
     // Reachable by accessible name — i.e. the label really is the AX name.
     expect(
-      screen.getByRole("button", { name: /^Fastest\. Board here\. Bus 42 to Stop B/ }),
+      screen.getByRole("button", { name: /^Board here\. Bus 42 to Stop B/ }),
     ).toBe(card);
   });
 

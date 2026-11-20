@@ -1484,7 +1484,9 @@ export function SearchPage() {
       })}
     />
   ) : null;
-  const sortChip = <SortChip value={ranking} onChange={setRanking} />;
+  const showingTransitous = transitousProps && (engineError ||
+    (!loading && !searchError && !serverEmpty && itineraries.length === 0));
+  const sortChip = showingTransitous ? null : <SortChip value={ranking} onChange={setRanking} />;
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-y-auto bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
@@ -1616,6 +1618,7 @@ export function SearchPage() {
             departAt={paginationTime}
             onDepartAt={setPaginationTime}
             sort={sortChip}
+            arriveBySort={<SortChip value={ranking} onChange={setRanking} arriveBy />}
             filters={vehicleFilters}
           />
         )}
@@ -1623,7 +1626,7 @@ export function SearchPage() {
         {/* Route-only controls return after place picking. */}
         {!activeField && !ArriveByToolbar && (
           <div className="space-y-1.5">
-            <div className="flex">{sortChip}</div>
+            {sortChip && <div className="flex">{sortChip}</div>}
             {vehicleFilters}
           </div>
         )}

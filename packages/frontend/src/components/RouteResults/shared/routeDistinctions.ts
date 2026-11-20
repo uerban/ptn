@@ -3,7 +3,6 @@ import type { Itinerary } from "@pt/shared";
 const COMPARISONS = [
   ["durationSeconds", "search.fastest", "Fastest"],
   ["transfers", "search.fewest_transfers", "Fewest transfers"],
-  ["walkingDistanceMeters", "search.least_walking", "Least walking"],
 ] as const;
 
 export function routeDistinctions(
