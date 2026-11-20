@@ -38,7 +38,7 @@ function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
 }
 
 describe("RouteResults", () => {
-  it("opens the exact later plan after a missed departure, within the arrival deadline", () => {
+  it("opens the exact later plan after a missed departure, within the arrival deadline", async () => {
     vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
     const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse("2026-03-03T10:01:00Z"));
     const primary = makeItinerary();
@@ -57,10 +57,12 @@ describe("RouteResults", () => {
       }],
     });
     const onSelect = vi.fn();
-    const renderResults = (deadline: string) => (
+    const findLaterPlans = vi.fn(async () => [later]);
+    const renderResults = (deadline: string, retainLater = true) => (
       <BrowserRouter>
-        <RouteResults itineraries={[primary, later]} onSelect={onSelect}
-          feedTz="UTC" arriveByMs={Date.parse(deadline)} />
+        <RouteResults itineraries={retainLater ? [primary, later] : [primary]} onSelect={onSelect}
+          feedTz="UTC" arriveByMs={Date.parse(deadline)}
+          findLaterPlans={retainLater ? undefined : findLaterPlans} />
       </BrowserRouter>
     );
     try {
@@ -69,6 +71,11 @@ describe("RouteResults", () => {
       rerender(renderResults("2026-03-03T10:23:00Z"));
       fireEvent.click(screen.getByRole("button", { name: /also leaves at .* arrives at/i }));
       expect(onSelect).toHaveBeenCalledWith(later);
+      rerender(renderResults("2026-03-03T10:23:00Z", false));
+      fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
+      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date("2026-03-03T10:01:00Z"), expect.any(AbortSignal));
+      expect(onSelect).toHaveBeenCalledTimes(2);
+      expect(onSelect).toHaveBeenLastCalledWith(later);
     } finally {
       now.mockRestore();
       vi.unstubAllEnvs();

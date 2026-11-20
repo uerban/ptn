@@ -65,6 +65,7 @@ interface RouteResultsProps {
   /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
   departAt?: Date | null;
   arriveByMs?: number;
+  findLaterPlans?: (at: Date, signal: AbortSignal) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */
@@ -102,6 +103,7 @@ export function RouteResults({
   onNext,
   departAt,
   arriveByMs,
+  findLaterPlans,
   origin,
   destination,
   feedTz,
@@ -280,7 +282,7 @@ export function RouteResults({
   const afterPrimary = import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" ? (
     <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
       bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
-      arriveByMs={arriveByMs} feedTz={feedTz} />
+      arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />
   ) : null;
 
   return (

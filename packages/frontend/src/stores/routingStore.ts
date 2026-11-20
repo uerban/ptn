@@ -87,7 +87,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean }) => Promise<void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal }) => Promise<RtComposedItinerary[] | void>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -110,18 +110,20 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   origin: null,
   destination: null,
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean }) {
-    const token = ++latestSearchToken;
-    const isCurrent = () => token === latestSearchToken;
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal }) {
+    const probe = opts?.probe;
+    const token = probe ? latestSearchToken : ++latestSearchToken;
+    const isCurrent = () => token === latestSearchToken && !probe?.aborted;
+    if (!isCurrent()) return;
     const data = captureCityData();
     const {raptorIndex, loadedCityId} = useGtfsDataStore.getState();
     if (!raptorIndex || (loadedCityId != null && loadedCityId !== useCityStore.getState().activeCity.id)) {
-      set({ error: "GTFS data not loaded. Please wait for sync to complete.", loading: false,
+      if (!probe) set({ error: "GTFS data not loaded. Please wait for sync to complete.", loading: false,
         results: [], engineError: null, engineFailureKind: null });
       return;
     }
 
-    set({ loading: true, error: null, engineError: null, engineFailureKind: null, results: [] });
+    if (!probe) set({ loading: true, error: null, engineError: null, engineFailureKind: null, results: [] });
 
     const releaseWalkGraph = walkGraphClient.retainForSearch();
     let pedestrianGeneration: number | undefined;
@@ -193,7 +195,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           enabled: backendAssist,
           plan: api.plan.bind(api),
         },
-        stopPlanner: opts?.remote
+        stopPlanner: !probe && opts?.remote
           ? makeRemoteStopPlanner(api.plan.bind(api))
           : undefined,
       };
@@ -203,7 +205,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         if (!isCurrent()) return;
         data.assertCurrent();
         if (!route) {
-          set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });
+          if (!probe) set({ error: "No transit stops within walking distance of origin or destination, and no pedestrian route available.", loading: false });
           return;
         }
         const routeProvider = config.directWalkRoute!;
@@ -231,13 +233,14 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       if (!isCurrent()) return;
       data.assertCurrent();
       assertPedestrianCurrent();
+      if (probe) return itineraries;
       set({ results: itineraries, loading: false,
         error: itineraries.length === 0 && (originStops.length === 0 || destStops.length === 0)
           ? "No transit stops within walking distance of origin or destination, and no pedestrian route available."
           : null,
       });
     } catch (err) {
-      if (!isCurrent()) return;
+      if (probe || !isCurrent()) return;
       // Staleness: a reset()/city-switch/refresh invalidated the wasm build
       // mid-search, so THIS search is obsolete and a superseding one is already
       // in flight for the new generation. Do NOT surface an engine/search error.

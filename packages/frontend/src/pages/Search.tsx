@@ -837,6 +837,14 @@ export function SearchPage() {
     () => (paginationTime ?? new Date()).toISOString(),
     [paginationTime, fromLat, fromLon, toLat, toLon],
   );
+  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal): Promise<Itinerary[]> => {
+    if (!fromEndpoint || !toEndpoint) return [];
+    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal });
+    if (!results || signal.aborted) return [];
+    return convertRaptorResults(results, at, { lat: fromEndpoint.lat, lon: fromEndpoint.lon },
+      { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
+  }, [fromEndpoint, toEndpoint, feedTz, endpointLabels, cityId, ranking, excludedModes, excludedRouteGroupsByCity]);
+
   const transitousQueryKey =
     fromLat != null && fromLon != null && toLat != null && toLon != null
       ? `${fromLat}:${fromLon}:${toLat}:${toLon}:${transitousDepartAtIso}`
@@ -1525,6 +1533,7 @@ export function SearchPage() {
         onEarlier={paginationTime !== null ? handleEarlier : undefined}
         onLater={handleLater}
         onNext={handleNext}
+        findLaterPlans={routingMode === "on-device" ? findLaterPlans : undefined}
         departAt={paginationTime}
         origin={fromEndpoint}
         destination={toEndpoint}

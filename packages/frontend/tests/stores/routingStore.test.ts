@@ -52,6 +52,36 @@ afterEach(async () => {
 });
 
 describe("useRoutingStore.search", () => {
+  it("returns a local probe without replacing the active search or dispatching remotely", async () => {
+    const { useGtfsDataStore } = await import("../../src/stores/gtfsDataStore.ts");
+    const { useRoutingStore } = await import("../../src/stores/routingStore.ts");
+    const { SearchOrchestrator } = await import("../../src/services/searchOrchestrator.ts");
+    const { api } = await import("../../src/services/api.ts");
+    await useGtfsDataStore.getState().init("vilnius");
+
+    const search = vi.spyOn(SearchOrchestrator.prototype, "search");
+    const expected: Awaited<ReturnType<SearchOrchestrator["search"]>> = [];
+    search.mockResolvedValue(expected);
+    const endpoint: BaseEndpoint = { kind: "stop", stopId: "s1", name: "Stop A", lat: 54.68, lon: 25.28 };
+    const at = new Date("2026-04-13T08:00:00Z");
+    const controller = new AbortController();
+    const activeState = useRoutingStore.getState();
+    try {
+      expect(await activeState.search(endpoint, endpoint, at, { probe: controller.signal })).toBe(expected);
+      expect(search).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ departureTime: at, originStopId: "s1" }));
+      expect(useRoutingStore.getState()).toBe(activeState);
+      expect(api.plan).not.toHaveBeenCalled();
+      search.mockImplementationOnce(async () => {
+        controller.abort();
+        return expected;
+      });
+      expect(await activeState.search(endpoint, endpoint, at, { probe: controller.signal })).toBeUndefined();
+      expect(useRoutingStore.getState()).toBe(activeState);
+    } finally {
+      search.mockRestore();
+    }
+  });
+
   it("rejects a foreign resident index before the city lifecycle effect runs", async () => {
     const {useGtfsDataStore} = await import("../../src/stores/gtfsDataStore.ts");
     const {useCityStore} = await import("../../src/stores/cityStore.ts");
