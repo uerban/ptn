@@ -12,6 +12,7 @@ import {
   rawTableText,
   resetPersonalStorage,
 } from "../../src/test-helpers/personalStorage.ts";
+import { serverTime } from "../../src/services/serverTime.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
 
 function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
@@ -37,6 +38,43 @@ function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
 }
 
 describe("RouteResults", () => {
+  it("opens the exact later plan after a missed departure, within the arrival deadline", () => {
+    vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
+    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse("2026-03-03T10:01:00Z"));
+    const primary = makeItinerary();
+    Object.assign(primary.legs[0], {
+      tripId: "missed", routeId: "42", boardStopIdx: 0, alightStopIdx: 1,
+      patternStopIds: ["A", "B"],
+      from: { ...primary.legs[0].from, stopId: "A" },
+      to: { ...primary.legs[0].to, stopId: "B" },
+    });
+    const later = makeItinerary({
+      departureTime: "2026-03-03T10:08:00Z",
+      arrivalTime: "2026-03-03T10:23:00Z",
+      legs: [{
+        ...primary.legs[0], tripId: "later",
+        departureTime: "2026-03-03T10:08:00Z", arrivalTime: "2026-03-03T10:23:00Z",
+      }],
+    });
+    const onSelect = vi.fn();
+    const renderResults = (deadline: string) => (
+      <BrowserRouter>
+        <RouteResults itineraries={[primary, later]} onSelect={onSelect}
+          feedTz="UTC" arriveByMs={Date.parse(deadline)} />
+      </BrowserRouter>
+    );
+    try {
+      const { rerender } = render(renderResults("2026-03-03T10:22:00Z"));
+      expect(screen.queryByRole("button", { name: /also leaves at/i })).toBeNull();
+      rerender(renderResults("2026-03-03T10:23:00Z"));
+      fireEvent.click(screen.getByRole("button", { name: /also leaves at .* arrives at/i }));
+      expect(onSelect).toHaveBeenCalledWith(later);
+    } finally {
+      now.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("shows loading skeleton when loading", () => {
     const { container } = render(
       <BrowserRouter>

@@ -461,6 +461,7 @@
   "search.earlier": "Earlier",
   "search.landmark_badge": "Landmark",
   "search.later": "Later",
+  "search.later_journey": "Also leaves at {departure} · arrives at {arrival}",
   "search.next": "Next",
   "search.live": "LIVE",
   "search.poi_badge": "POI",

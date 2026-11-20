@@ -17,6 +17,7 @@ import { TransitousPanel, type TransitousPanelProps } from "./TransitousPanel.ts
 import { RouteResultsConsumer } from "./RouteResultsConsumer.tsx";
 import { RouteResultsPower } from "./RouteResultsPower.tsx";
 import { RouteResultsAccessible } from "./RouteResultsAccessible.tsx";
+import { LaterJourney } from "./shared/LaterJourney.tsx";
 import { LeaveFloorContext } from "./shared/leaveFloor.ts";
 import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
 import { legTargets } from "../../hooks/useServiceAlertSelection.ts";
@@ -63,6 +64,7 @@ interface RouteResultsProps {
   onNext?: () => void;
   /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
   departAt?: Date | null;
+  arriveByMs?: number;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */
@@ -99,6 +101,7 @@ export function RouteResults({
   onLater,
   onNext,
   departAt,
+  arriveByMs,
   origin,
   destination,
   feedTz,
@@ -274,6 +277,12 @@ export function RouteResults({
     );
   }
 
+  const afterPrimary = import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" ? (
+    <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
+      bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
+      arriveByMs={arriveByMs} feedTz={feedTz} />
+  ) : null;
+
   return (
     <>
     <div ref={listRef} className="pt-2" onKeyDown={handleResultsKeyDown}>
@@ -294,6 +303,7 @@ export function RouteResults({
           bufferSeconds={bufferSeconds}
           runSpeedRatio={runSpeedRatio}
           feedTz={feedTz}
+          afterPrimary={afterPrimary}
         />
       ) : variant === "accessible" ? (
         <RouteResultsAccessible
@@ -303,6 +313,7 @@ export function RouteResults({
           bufferSeconds={bufferSeconds}
           runSpeedRatio={runSpeedRatio}
           feedTz={feedTz}
+          afterPrimary={afterPrimary}
         />
       ) : (
         <RouteResultsConsumer
@@ -312,9 +323,11 @@ export function RouteResults({
           bufferSeconds={bufferSeconds}
           runSpeedRatio={runSpeedRatio}
           feedTz={feedTz}
+          afterPrimary={afterPrimary}
         />
       )}
       </LeaveFloorContext.Provider>
+
 
       {canSavePair && (
         <div className="px-3 pt-1 pb-2 space-y-2">

@@ -211,7 +211,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
     body = (
       <>
         <RouteResults itineraries={ordered.map((c) => c.itinerary)} onSelect={onSelect} loading={pending}
-          origin={origin} destination={destination} feedTz={tz} />
+          origin={origin} destination={destination} feedTz={tz} arriveByMs={deadlineMs} />
         {view.kind === "search" && view.state.status === "limited" && notice(
           t("arriveBy.limited_recovery", "Change the deadline or search settings to try a different search."), leaveNow,
         )}

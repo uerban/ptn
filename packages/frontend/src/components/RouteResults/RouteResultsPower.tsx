@@ -34,6 +34,7 @@ import { RouteAlertMarker, RouteAlertsSummary, useListAlerts } from "../ServiceA
 const EMPTY_OVERRIDES = {};
 
 interface Props {
+  afterPrimary?: React.ReactNode;
   itineraries: Itinerary[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
@@ -50,6 +51,7 @@ interface Props {
  * transit leg. Live delay banner at the top when any route is affected.
  */
 export function RouteResultsPower({
+  afterPrimary,
   itineraries,
   onSelect,
   referenceNowMs,
@@ -128,6 +130,7 @@ export function RouteResultsPower({
               feedTz={feedTz}
             />
             <RouteAlertMarker entries={alerts.perItinerary[i] ?? []} />
+            {i === 0 && afterPrimary}
           </li>
         ))}
       </ul>

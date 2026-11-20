@@ -441,6 +441,7 @@
   "search.earlier": "Anksčiau",
   "search.landmark_badge": "Orientyras",
   "search.later": "Vėliau",
+  "search.later_journey": "Taip pat išvyksta {departure} · atvyksta {arrival}",
   "search.results": "Maršrutų rezultatai",
   "search.save_pair": "Įrašyti šią porą",
   "search.save_pair_error": "Nepavyko įrašyti — bandykite dar kartą",

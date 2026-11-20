@@ -29,6 +29,7 @@ import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 
 interface Props {
+  afterPrimary?: React.ReactNode;
   itineraries: Itinerary[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
@@ -45,6 +46,7 @@ interface Props {
  * leg row with route badges, headsigns, and transfer/walking meta.
  */
 export function RouteResultsConsumer({
+  afterPrimary,
   itineraries,
   onSelect,
   referenceNowMs,
@@ -89,6 +91,7 @@ export function RouteResultsConsumer({
               feedTz={feedTz}
             />
             <RouteAlertMarker entries={alerts.perItinerary[i] ?? []} />
+            {i === 0 && afterPrimary}
           </li>
         ))}
       </ul>

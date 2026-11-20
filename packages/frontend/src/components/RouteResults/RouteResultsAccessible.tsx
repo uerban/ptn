@@ -26,6 +26,7 @@ import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
 import { RouteAlertsForResult, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
 
 interface Props {
+  afterPrimary?: React.ReactNode;
   itineraries: Itinerary[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
@@ -42,6 +43,7 @@ interface Props {
  * body text, prominent fastest indicator.
  */
 export function RouteResultsAccessible({
+  afterPrimary,
   itineraries,
   onSelect,
   referenceNowMs,
@@ -125,6 +127,7 @@ export function RouteResultsAccessible({
             />
             {/* After the card, inside its list item: each alert stays with its route. */}
             <RouteAlertsForResult entries={alerts.perItinerary[i] ?? []} index={i} firstAt={alerts.firstAt} />
+            {i === 0 && afterPrimary}
           </li>
         ))}
       </ul>
