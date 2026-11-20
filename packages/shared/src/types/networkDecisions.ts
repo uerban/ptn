@@ -248,9 +248,12 @@ export function matchOnboardingPreset(
   for (const id of ["recommended", "strict"] as const) {
     const preset = ONBOARDING_PRESETS[id];
     if (preset.level !== level) continue;
-    const keys = Object.keys(decisions);
     const expected = Object.entries(preset.decisions);
-    if (keys.length !== expected.length) continue;
+    const setupMap = decisions["external.detailed-basemap@carto"];
+    // Recommended can also include the Detailed map selected during setup.
+    const includesSetupMap =
+      id === "recommended" && setupMap?.source === "setup" && setupMap.value === "allowed";
+    if (Object.keys(decisions).length !== expected.length + Number(includesSetupMap)) continue;
     if (expected.every(([flowId, value]) => decisions[flowId]?.value === value)) {
       return id;
     }

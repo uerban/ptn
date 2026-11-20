@@ -17,6 +17,7 @@ export type RequestGroup =
   | "shell"
   | "transit-data"
   | "map-assets"
+  | "external.detailed-basemap"
   | "operator.realtime"
   | "operator.service-alerts"
   | "operator.nearby-stop-centroid"
@@ -104,7 +105,7 @@ export const REQUEST_RULES: readonly Rule[] = [
 ];
 
 /**
- * The group of a request, `external` for another origin, or `unknown` for an
+ * The group of a request, `external` for an unlisted origin, or `unknown` for an
  * unlisted path on the app origin. A page load (`document`) is the app shell
  * whatever its path, since the app's routes all serve the same page.
  */
@@ -114,7 +115,14 @@ export function classifyAppRequest(
   resourceType?: string,
 ): RequestGroup | "external" | "unknown" {
   const url = new URL(rawUrl, appOrigin);
-  if (url.origin !== new URL(appOrigin).origin) return "external";
+  if (url.origin !== new URL(appOrigin).origin) {
+    const cartoHost = "basemaps.cartocdn.com";
+    if (
+      url.protocol === "https:" &&
+      (url.hostname === cartoHost || url.hostname.endsWith(`.${cartoHost}`))
+    ) return "external.detailed-basemap";
+    return "external";
+  }
   if (resourceType === "document") return "shell";
   return REQUEST_RULES.find((rule) => rule.matches(url))?.group ?? "unknown";
 }

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockApiAtServiceTime } from "../helpers/mock-api";
+import { mockApi } from "../helpers/mock-api";
 
 // Mount a controlled real TransitMap over the fixture app. This isolates the
 // presentation contract from timetable timing while exercising MapLibre and
@@ -7,7 +7,9 @@ import { mockApiAtServiceTime } from "../helpers/mock-api";
 test("urban stop exit fades card and dot together without accepting clicks @mock-api", async ({ page }) => {
   const vite = await page.request.get("/@vite/client");
   test.skip(!vite.ok() || !(await vite.text()).includes("vite"), "Controlled component harness requires the Vite development server");
-  await mockApiAtServiceTime(page);
+  const serviceTime = new Date("2026-05-05T12:00:00+03:00");
+  await page.clock.install({ time: serviceTime });
+  await mockApi(page, { catalogNow: serviceTime });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).__ptnMap);
@@ -66,18 +68,30 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   });
   expect(badgeUpdate.text).toContain("B");
   expect(badgeUpdate.writes).toBe(0);
-  const result = await page.evaluate(async () => {
+  // Advance virtual frames explicitly so slow rendering cannot skip a
+  // 200 ms fade between the start and the opacity assertion.
+  const pauseFrames = async () => {
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 1_000);
+  };
+  await pauseFrames();
+  await page.evaluate(() => {
+    (window as any).__fadeHarness.render(false);
+  });
+  await page.clock.runFor(32);
+  await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
-    h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     const el = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"]')!;
-    const inert = el.inert;
     el.querySelector<HTMLElement>(".cursor-pointer")?.click();
     // An unchanged background refresh must not cancel this exit.
     void h.refresh();
     h.map.jumpTo({ bearing: 1 });
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    return { inert, clicks: h.clicks, opacity: Number(el.style.opacity),
+  });
+  await page.clock.runFor(32);
+  const result = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
+    const el = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"]')!;
+    return { inert: el.inert, clicks: h.clicks, opacity: Number(el.style.opacity),
       dotOpacity: h.map.getFeatureState({ source: "stops-source", id: "fade-stop" }).exitOpacity };
   });
   expect(result.inert).toBe(true);
@@ -85,6 +99,8 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   expect(result.opacity).toBeGreaterThan(0);
   expect(result.opacity).toBeLessThan(1);
   expect(result.dotOpacity).toBeCloseTo(result.opacity);
+  await page.clock.runFor(200);
+  await page.clock.resume();
   await expect(marker).toHaveCount(0);
 
   await page.evaluate(() => (window as any).__fadeHarness.render(true));
@@ -107,25 +123,34 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   // Reactivate while an exit is still running; preserve the DOM marker and
   // cancel its old retirement rather than remounting after 200 ms.
   await restore();
-  const reactivated = await page.evaluate(async () => {
+  await pauseFrames();
+  await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
-    const original = document.querySelector('[data-fade-harness] [data-stop-id="fade-stop"]');
+    h.original = document.querySelector('[data-fade-harness] [data-stop-id="fade-stop"]');
     h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  });
+  await page.clock.runFor(32);
+  await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
     h.render(true, [{routeId: "reactivated", shortName: "R", mode: "BUS"}]);
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  await page.clock.runFor(32);
+  const reactivated = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
     const current = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"]')!;
-    return {same: current === original, inert: current.inert, opacity: Number(current.style.opacity), text: current.textContent};
+    return {same: current === h.original, inert: current.inert, opacity: Number(current.style.opacity), text: current.textContent};
   });
   expect(reactivated).toMatchObject({same: true, inert: false, opacity: 1});
   expect(reactivated.text).toContain("R");
-  await page.waitForTimeout(250);
+  await page.clock.runFor(250);
+  await page.clock.resume();
   await expect(marker).toHaveCount(1);
 
   // The dot can be wholly outside while its existing card still intersects
   // the viewport. That visible card must fade rather than vanish immediately.
   await restore();
-  const edge = await page.evaluate(async () => {
+  await pauseFrames();
+  await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
     const map = h.map, canvas = map.getCanvas();
     const card = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"] .cursor-pointer')!;
@@ -136,22 +161,31 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
     const targetY = bottom >= 24 ? -Math.max(12, bottom / 2) : canvas.clientHeight + Math.max(12, -top / 2);
     const center = map.unproject([canvas.clientWidth / 2, canvas.clientHeight / 2 + point.y - targetY]);
     map.jumpTo({center});
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  });
+  await page.clock.runFor(32);
+  const edgePosition = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
+    const map = h.map, viewport = map.getCanvas().getBoundingClientRect();
+    const card = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"] .cursor-pointer')!;
     const actual = map.project([h.stop.location.lon, h.stop.location.lat]);
     const currentRect = card.getBoundingClientRect();
     const intersects = currentRect.right > viewport.left && currentRect.left < viewport.right && currentRect.bottom > viewport.top && currentRect.top < viewport.bottom;
     h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    const el = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"]');
-    return {dotOutside: actual.y < -9 || actual.y > canvas.clientHeight + 9, intersects,
-      attached: !!el, inert: el?.inert, opacity: el ? Number(el.style.opacity) : 0};
+    return {dotOutside: actual.y < -9 || actual.y > map.getCanvas().clientHeight + 9, intersects};
   });
-  expect(edge.dotOutside).toBe(true);
-  expect(edge.intersects).toBe(true);
+  await page.clock.runFor(32);
+  const edge = await page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>('[data-fade-harness] [data-stop-id="fade-stop"]');
+    return {attached: !!el, inert: el?.inert, opacity: el ? Number(el.style.opacity) : 0};
+  });
+  expect(edgePosition.dotOutside).toBe(true);
+  expect(edgePosition.intersects).toBe(true);
   expect(edge.attached).toBe(true);
   expect(edge.inert).toBe(true);
   expect(edge.opacity).toBeGreaterThan(0);
   expect(edge.opacity).toBeLessThan(1);
+  await page.clock.runFor(200);
+  await page.clock.resume();
   await expect(marker).toHaveCount(0);
 
   // A rendered symbol label also counts when both its dot and HTML card
@@ -167,22 +201,33 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
     return map.getLayer("stops-label") && map.queryRenderedFeatures(undefined, {layers: ["stops-label"]})
       .some((feature: any) => feature.properties.id === "fade-stop");
   });
-  const labelEdge = await page.evaluate(async () => {
-    const h = (window as any).__fadeHarness, map = h.map, canvas = map.getCanvas();
+  await page.evaluate(async () => {
+    const h = (window as any).__fadeHarness, map = h.map;
+    const canvas = map.getCanvas();
     const point = map.project([h.stop.location.lon, h.stop.location.lat]);
     map.jumpTo({center: map.unproject([canvas.clientWidth / 2, canvas.clientHeight / 2 + point.y + 12])});
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  await pauseFrames();
+  const labelPosition = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness, map = h.map, canvas = map.getCanvas();
     const visible = (layer: string) => map.queryRenderedFeatures([[0, 0], [canvas.clientWidth, canvas.clientHeight]], {layers: [layer]})
       .some((feature: any) => feature.properties.id === "fade-stop");
     const labelVisible = visible("stops-label"), dotVisible = visible("stops-dot");
     h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    return {labelVisible, dotVisible, opacity: map.getFeatureState({source: "stops-source", id: "fade-stop"}).exitOpacity};
+    return {labelVisible, dotVisible};
   });
-  expect(labelEdge.labelVisible).toBe(true);
-  expect(labelEdge.dotVisible).toBe(false);
-  expect(labelEdge.opacity).toBeGreaterThan(0);
-  expect(labelEdge.opacity).toBeLessThan(1);
+  await page.clock.runFor(32);
+  const labelOpacity = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
+    return h.map.getFeatureState({source: "stops-source", id: "fade-stop"}).exitOpacity;
+  });
+  expect(labelPosition.labelVisible).toBe(true);
+  expect(labelPosition.dotVisible).toBe(false);
+  expect(labelOpacity).toBeGreaterThan(0);
+  expect(labelOpacity).toBeLessThan(1);
+  await page.clock.runFor(200);
+  await page.clock.resume();
   await page.waitForFunction(() => !(window as any).__fadeHarness.map.queryRenderedFeatures(undefined, {layers: ["stops-label"]})
     .some((feature: any) => feature.properties.id === "fade-stop"));
 
@@ -198,25 +243,31 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   expect(offscreenCount).toBe(0);
 
   await restore();
-  const panExitCount = await page.evaluate(async () => {
+  await pauseFrames();
+  await page.evaluate(() => (window as any).__fadeHarness.render(false));
+  await page.clock.runFor(32);
+  await expect(marker).toBeAttached();
+  await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
-    h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     h.map.panBy([h.map.getCanvas().clientWidth * .75, 0], {duration: 0});
-    for (let i = 0; i < 3; i++) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    h.map.jumpTo({center: [h.stop.location.lon, h.stop.location.lat]});
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    return document.querySelectorAll('[data-fade-harness] [data-stop-id="fade-stop"]').length;
   });
-  expect(panExitCount).toBe(0);
+  await page.clock.runFor(64);
+  await expect(marker).toHaveCount(0);
+  await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
+    h.map.jumpTo({center: [h.stop.location.lon, h.stop.location.lat]});
+  });
+  await page.clock.runFor(32);
+  await expect(marker).toHaveCount(0);
+  await page.clock.resume();
 
   await restore();
-  await page.evaluate(async () => {
-    const h = (window as any).__fadeHarness;
-    h.render(false);
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    h.replaceCity();
-  });
+  await pauseFrames();
+  await page.evaluate(() => (window as any).__fadeHarness.render(false));
+  await page.clock.runFor(32);
+  await expect(marker).toBeAttached();
+  await page.evaluate(() => (window as any).__fadeHarness.replaceCity());
+  await page.clock.runFor(32);
+  await page.clock.resume();
   await expect(marker).toHaveCount(0);
-
 });

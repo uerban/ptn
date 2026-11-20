@@ -132,6 +132,23 @@ Both paths use the previously built PWA. Follow the
 packaging. [Validation results](examples/VALIDATION.md) identify any remaining
 release blockers; a successful compile alone does not certify hosting.
 
+## Build Minimal Map from OSM
+
+With Node and osmium-tool, generate a city map from the same cached extract
+used by the other OSM builders. The city IDs and extract sources are listed in
+[`config/osm-cities.json`](config/osm-cities.json).
+
+```sh
+node scripts/build-walk-graphs.mjs --fetch-missing --cities vilnius
+node scripts/build-micromap.mjs vilnius packages/frontend/public/micromap
+```
+
+The second command writes `vilnius.micromap.br` so the frontend build can
+serve it at `/micromap/vilnius.micromap.br`. To use an existing extract, set
+`PT_PBF_DIRS` to its directory and keep the source filename from the city
+catalog. The signed OSM builder can generate the map in the same run using
+[`micromapOut`](examples/native/README.md#prepare-osm-data-locally).
+
 ## Docker hosting
 
 The [reference Docker guide](docker/README.md) runs the installable archive

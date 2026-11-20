@@ -19,7 +19,7 @@ for (const [entry, output] of entries) {
     banner: {js: 'import {createRequire as __createRequire} from "node:module"; const require = __createRequire(import.meta.url);'},
   });
 }
-for (const path of ["scripts/build-city-osm-artifacts.mjs", "scripts/build-walk-graphs.mjs", "config/osm-cities.json", "packages/backend/src/poi/osmTags.yaml"]) {
+for (const path of ["scripts/build-city-osm-artifacts.mjs", "scripts/build-walk-graphs.mjs", "scripts/build-micromap.mjs", "scripts/lib/micromap", "config/osm-cities.json", "packages/backend/src/poi/osmTags.yaml"]) {
   await mkdir(resolve(out, path, ".."), {recursive: true});
-  await cp(resolve(root, path), resolve(out, path));
+  await cp(resolve(root, path), resolve(out, path), {recursive: true});
 }

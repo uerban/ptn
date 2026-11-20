@@ -101,7 +101,7 @@ export function QuickSetup(props: QuickSetupProps) {
     detailed: useId(),
   };
   // Kept while Strict hides the map choice, so switching back restores it.
-  const [mapPick, setMapPick] = useState<"minimal" | "detailed">("minimal");
+  const [mapOverride, setMapOverride] = useState<"minimal" | "detailed" | null>(null);
   const providerName =
     getBasemapProvider(SETUP_DETAILED_MAP.providerId)?.name ?? SETUP_DETAILED_MAP.providerId;
   const [level, setLevel] = useState<SetupLevel>("recommended");
@@ -113,6 +113,7 @@ export function QuickSetup(props: QuickSetupProps) {
       ? text(recommendedSummaryKey(props.realtimeKinds), { city: cityName })
       : text(value === "strict" ? "setup.level.strictLine" : "setup.level.customLine");
 
+  const mapPick = mapOverride ?? (level === "recommended" ? "detailed" : "minimal");
   const asksMap = setupAsksMap(level, startMode);
   const proceed = () => {
     const map = asksMap ? { detailedMap: mapPick === "detailed" } : {};
@@ -279,14 +280,14 @@ export function QuickSetup(props: QuickSetupProps) {
             <legend className="mb-1 text-base font-medium text-fg">
               {text("setup.map.legend")}
             </legend>
-            {(["minimal", "detailed"] as const).map((value) => (
+            {(["detailed", "minimal"] as const).map((value) => (
               <label key={value} className={choiceCard}>
                 <input
                   type="radio"
                   name="setup-map"
                   value={value}
                   checked={mapPick === value}
-                  onChange={() => setMapPick(value)}
+                  onChange={() => setMapOverride(value)}
                   aria-describedby={ids[value]}
                   className="mt-1 shrink-0 accent-accent"
                 />

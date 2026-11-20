@@ -57,6 +57,13 @@ walking graph, addresses and POIs, validates and signs a catalog, and writes
 `../osm-build/repository`. It needs space for the extract and intermediate
 files. A missing or failed required component prevents host initialization.
 
+To also regenerate Minimal Map from the same OSM extract, add
+`"micromapOut": "/absolute/path/to/archive/web/micromap"` to `builder.json`
+before running the builder. It writes `<city>.micromap.br` as a static web
+asset, which the app loads from `/micromap/`. On a separate build host,
+use a staging directory and copy the generated files to `web/micromap/`
+on the web host.
+
 Preserve `osm-build/signing-key.pem` privately for future updates. The host
 needs only the repository and the public key from `artifact-source.json`.
 Never copy the signing key into a web root or a runtime container.

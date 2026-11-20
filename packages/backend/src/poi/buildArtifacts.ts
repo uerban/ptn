@@ -28,6 +28,8 @@ export interface BuilderConfig {
   producer?: string;
   walkBuilder?: string;
   publisher?: string;
+  /** Directory for optional static frontend micromaps. */
+  micromapOut?: string;
   cityTimeoutMs?: number;
   /** Source URL -> local PBF used instead of downloading it. */
   pinnedSources?: Record<string, { path: string; sha256: string }>;
@@ -119,7 +121,12 @@ async function buildCity(config: BuilderConfig, city: string, snapshot: SourceSn
     const publisher = config.publisher ?? join(ROOT, "target/release/pt-artifact-publish");
     const timeout = config.cityTimeoutMs ?? 1800_000;
     const tools = { osmium: (await run("osmium", ["--version"])).split("\n")[0], node: process.version };
-    await run(process.execPath, [join(ROOT, "scripts/build-city-osm-artifacts.mjs"), "--cities", city, "--require", "--out", join(work, "inputs"), "--producer", producer], env, timeout);
+    const extractArgs = [
+      join(ROOT, "scripts/build-city-osm-artifacts.mjs"),
+      "--cities", city, "--require", "--out", join(work, "inputs"), "--producer", producer,
+    ];
+    if (config.micromapOut) extractArgs.push("--micromap-out", config.micromapOut);
+    await run(process.execPath, extractArgs, env, timeout);
     const components: Record<string, Component> = {};
     const add = async (name: string, path: string, format: string, version: number, compression: string, decodedBytes: number) => {
       const sha256 = await checksum(path);
