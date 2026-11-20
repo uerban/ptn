@@ -20,6 +20,7 @@ import {
 import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay.ts";
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
@@ -39,7 +40,7 @@ interface Props {
 /**
  * Variant C — "Accessibility-forward". Each transit leg renders as its own
  * inset row with explicit "Off at <stop>" copy. Larger hit targets, larger
- * body text, prominent fastest indicator.
+ * body text and prominent route distinctions.
  */
 export function RouteResultsAccessible({
   itineraries,
@@ -52,6 +53,8 @@ export function RouteResultsAccessible({
   const { t } = useTranslation();
   const mobility = useSettingsStore((s) => s.mobilityProfile);
   const alerts = useListAlerts(itineraries);
+
+  const distinctions = routeDistinctions(itineraries, t);
 
   return (
     <div className="flex flex-col gap-3 px-3 pb-3">
@@ -116,7 +119,7 @@ export function RouteResultsAccessible({
             )}
             <AccessibleCard
               it={it}
-              fastest={i === 0}
+              distinctions={distinctions[i]}
               onSelect={onSelect}
               referenceNowMs={referenceNowMs}
               bufferSeconds={bufferSeconds}
@@ -134,7 +137,7 @@ export function RouteResultsAccessible({
 
 interface AccessibleCardProps {
   it: Itinerary;
-  fastest: boolean;
+  distinctions: readonly string[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
   bufferSeconds: number;
@@ -145,7 +148,7 @@ interface AccessibleCardProps {
 
 const AccessibleCard = memo(function AccessibleCard({
   it,
-  fastest,
+  distinctions,
   onSelect,
   referenceNowMs,
   bufferSeconds,
@@ -192,7 +195,7 @@ const AccessibleCard = memo(function AccessibleCard({
     formattingLocale,
     referenceNowMs,
     feedTz,
-    fastest,
+    distinctions,
     nextDepartureInMin,
   });
 
@@ -202,17 +205,14 @@ const AccessibleCard = memo(function AccessibleCard({
       aria-label={ariaLabel}
       onClick={handleClick}
       className={`w-full text-left rounded-2xl bg-surface-raised p-4 flex flex-col gap-3
-        border ${fastest ? "border-accent" : "border-divider"}
+        border ${distinctions.length ? "border-accent" : "border-divider"}
         hover:border-accent transition-colors`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          {fastest && (
-            <div className="text-[0.6875rem] font-bold tracking-widest text-accent mb-0.5">
-              ★ {t("route.fastest_label", "FASTEST")}
-              {stepFree
-                ? ` · ${t("route.step_free", "STEP-FREE")}`
-                : ""}
+          {(distinctions.length > 0 || stepFree) && (
+            <div className="text-[0.6875rem] font-bold text-accent mb-0.5">
+              {(stepFree ? [...distinctions, t("route.step_free", "STEP-FREE")] : distinctions).join(" · ")}
             </div>
           )}
           <div className="text-2xl font-bold tabular-nums -tracking-tight">

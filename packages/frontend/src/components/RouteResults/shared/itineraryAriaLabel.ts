@@ -18,8 +18,8 @@ export interface ItineraryAriaLabelContext {
   referenceNowMs: number;
   /** Feed/agency tz (IANA); when set, the arrival time renders in the feed tz. */
   feedTz?: string;
-  /** Marks the card the variant renders with the "fastest" chrome. */
-  fastest?: boolean;
+  /** Comparative labels visible on the card. */
+  distinctions?: readonly string[];
   /** Minutes until the same line next leaves, when this departure is a likely miss. */
   nextDepartureInMin?: number | null;
 }
@@ -41,14 +41,14 @@ function clause(s: string): string {
  * Why an author-supplied name at all: every variant's card is one `<button>`,
  * and a button is a leaf in the accessibility tree — VoiceOver concatenates
  * the whole subtree into one utterance with no way to stop partway. Left to
- * name-from-content that utterance follows the *visual* order (fastest chrome,
+ * name-from-content that utterance follows the *visual* order (route distinctions,
  * big duration numeral, badge glyphs, per-leg rows, live callouts), so the
  * rider has to sit through the entire card before hearing whether they need to
  * move. `aria-label` wins over name-from-content, which lets us order the same
  * facts by how soon the rider needs them:
  *
  *   1. anything that invalidates the trip (cancelled / miss risk / live delay)
- *   2. "Fastest", the ranking cue that decides which card to take
+ *   2. How the route compares with the other options
  *   3. when to start walking
  *   4. what to board and where to get off
  *   5. how long it takes and when it lands
@@ -64,7 +64,7 @@ export function itineraryAriaLabel(
   display: ItineraryDisplay,
   ctx: ItineraryAriaLabelContext,
 ): string {
-  const { t, locale, formattingLocale, referenceNowMs, feedTz, fastest } = ctx;
+  const { t, locale, formattingLocale, referenceNowMs, feedTz, distinctions = [] } = ctx;
   const parts: string[] = [];
 
   // 1. Trust / urgency. At most one fires — these are ordered by how badly
@@ -98,7 +98,7 @@ export function itineraryAriaLabel(
   }
 
   // 2. Ranking cue.
-  if (fastest) parts.push(t("route.aria_fastest", "Fastest"));
+  parts.push(...distinctions);
 
   // 3. When to move. Derived from recommendedDepartureMs (not
   //    leadingWaitSeconds) so a rider who turned the pre-stop buffer off still

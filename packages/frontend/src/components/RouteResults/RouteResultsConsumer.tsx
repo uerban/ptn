@@ -26,6 +26,7 @@ import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 
 interface Props {
@@ -54,6 +55,8 @@ export function RouteResultsConsumer({
 }: Props) {
   const { t } = useTranslation();
   const alerts = useListAlerts(itineraries);
+  const distinctions = routeDistinctions(itineraries, t);
+
   return (
     <div className="flex flex-col gap-2.5 px-3 pb-3">
       {/* One tz indicator per surface — renders nothing for a local verified user. */}
@@ -81,7 +84,7 @@ export function RouteResultsConsumer({
             )}
             <ConsumerCard
               it={it}
-              fastest={i === 0}
+              distinctions={distinctions[i]}
               onSelect={onSelect}
               referenceNowMs={referenceNowMs}
               bufferSeconds={bufferSeconds}
@@ -98,8 +101,7 @@ export function RouteResultsConsumer({
 
 interface ConsumerCardProps {
   it: Itinerary;
-  /** Index-0 card; surfaced in the accessible name only (no consumer chrome). */
-  fastest: boolean;
+  distinctions: readonly string[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
   bufferSeconds: number;
@@ -110,7 +112,7 @@ interface ConsumerCardProps {
 
 const ConsumerCard = memo(function ConsumerCard({
   it,
-  fastest,
+  distinctions,
   onSelect,
   referenceNowMs,
   bufferSeconds,
@@ -163,7 +165,7 @@ const ConsumerCard = memo(function ConsumerCard({
     formattingLocale,
     referenceNowMs,
     feedTz,
-    fastest,
+    distinctions,
     nextDepartureInMin,
   });
 
@@ -193,6 +195,9 @@ const ConsumerCard = memo(function ConsumerCard({
         </div>
       </div>
 
+      {distinctions.length > 0 && (
+        <div className="text-xs font-semibold text-accent">{distinctions.join(" · ")}</div>
+      )}
       <ItineraryBar
         itinerary={it}
         segments={display.segments}

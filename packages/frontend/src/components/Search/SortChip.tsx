@@ -30,16 +30,12 @@ export function SortChip({ value, onChange }: SortChipProps) {
 
   return (
     <>
-      {/* Sized to its label, but it counts as 10rem when the row decides to
-          wrap: a long label may lose its last letters to stay beside the time
-          chip, never so many that two choices look alike. */}
       <button type="button" className={`${searchChipClass("idle")} min-w-0 max-w-max shrink! grow basis-40`} data-testid="sort-summary"
         aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        <span className="sr-only">{`${sortLabel}: `}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="shrink-0 text-accent">
           <path d="M7 4v16M7 4l-3 3M7 4l3 3" /><path d="M17 20V4M17 20l-3-3M17 20l3-3" />
         </svg>
-        <span className="min-w-0 truncate">{t(current[1], current[2])}</span>
+        <span className="min-w-0 whitespace-normal text-left">{sortLabel}: {t(current[1], current[2])}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={`shrink-0 text-fg-muted transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
