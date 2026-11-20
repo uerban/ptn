@@ -89,9 +89,8 @@ describe("Keyboard navigation — RouteResults", () => {
     renderResults([makeItinerary(1)]);
     const card = screen.getByTestId("itinerary-card");
     const name = card.getAttribute("aria-label") ?? "";
-    // Ranking cue and what to board come before duration and cost, so a
-    // screen-reader user can act without hearing the whole card.
-    expect(name.startsWith("Fastest. Board here. Bus 42 to Stop B.")).toBe(true);
+    // What to board comes before duration and cost.
+    expect(name.startsWith("Board here. Bus 42 to Stop B, departs ")).toBe(true);
     expect(name.indexOf("Bus 42")).toBeLessThan(name.indexOf("1 transfer"));
   });
 

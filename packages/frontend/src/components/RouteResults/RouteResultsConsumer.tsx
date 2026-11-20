@@ -5,6 +5,7 @@ import { pluralize } from "../../i18n/plurals.ts";
 import { computeEcoScore } from "../../utils/ecoScore.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeSize } from "../../utils/appearance.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { ItineraryBar } from "./shared/ItineraryBar.tsx";
@@ -26,6 +27,7 @@ import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 
 interface Props {
@@ -54,6 +56,8 @@ export function RouteResultsConsumer({
 }: Props) {
   const { t } = useTranslation();
   const alerts = useListAlerts(itineraries);
+  const distinctions = routeDistinctions(itineraries, t);
+
   return (
     <div className="flex flex-col gap-2.5 px-3 pb-3">
       {/* One tz indicator per surface — renders nothing for a local verified user. */}
@@ -81,7 +85,7 @@ export function RouteResultsConsumer({
             )}
             <ConsumerCard
               it={it}
-              fastest={i === 0}
+              distinctions={distinctions[i]}
               onSelect={onSelect}
               referenceNowMs={referenceNowMs}
               bufferSeconds={bufferSeconds}
@@ -98,8 +102,7 @@ export function RouteResultsConsumer({
 
 interface ConsumerCardProps {
   it: Itinerary;
-  /** Index-0 card; surfaced in the accessible name only (no consumer chrome). */
-  fastest: boolean;
+  distinctions: readonly string[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
   bufferSeconds: number;
@@ -110,7 +113,7 @@ interface ConsumerCardProps {
 
 const ConsumerCard = memo(function ConsumerCard({
   it,
-  fastest,
+  distinctions,
   onSelect,
   referenceNowMs,
   bufferSeconds,
@@ -163,7 +166,7 @@ const ConsumerCard = memo(function ConsumerCard({
     formattingLocale,
     referenceNowMs,
     feedTz,
-    fastest,
+    distinctions,
     nextDepartureInMin,
   });
 
@@ -193,6 +196,9 @@ const ConsumerCard = memo(function ConsumerCard({
         </div>
       </div>
 
+      {distinctions.length > 0 && (
+        <div className="text-xs font-semibold text-accent">{distinctions.join(" · ")}</div>
+      )}
       <ItineraryBar
         itinerary={it}
         segments={display.segments}
@@ -219,7 +225,7 @@ const ConsumerCard = memo(function ConsumerCard({
       <BoardingLine segments={display.segments} />
 
       <div className="flex items-center gap-1 flex-wrap">
-        {renderLegChipsWithWaits(display.segments, t)}
+        {renderLegChipsWithWaits(display.segments, t, feedTz)}
       </div>
 
       {/* Live delay callout when a route is running late */}
@@ -315,6 +321,7 @@ const ConsumerCard = memo(function ConsumerCard({
 function renderLegChipsWithWaits(
   segments: Segment[],
   t: ReturnType<typeof useTranslation>["t"],
+  feedTz?: string,
 ) {
   const chips: React.ReactNode[] = [];
   let chipIdx = 0;
@@ -349,13 +356,13 @@ function renderLegChipsWithWaits(
       );
     } else {
       // ride or walk — render the existing LegChip
-      chips.push(<LegChip key={`leg-${chipIdx++}`} leg={s.leg} />);
+      chips.push(<LegChip key={`leg-${chipIdx++}`} leg={s.leg} feedTz={feedTz} />);
     }
   }
   return chips;
 }
 
-function LegChip({ leg }: { leg: Leg }) {
+function LegChip({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
   const { t } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
   const isWalk = leg.mode === "WALK";
@@ -378,14 +385,7 @@ function LegChip({ leg }: { leg: Leg }) {
         routeColor={leg.routeColor}
         size="sm"
       />
-      {leg.headsign && (
-        <span
-          className="min-w-0 text-xs text-fg-muted truncate max-w-[min(7.5rem,100%)]"
-          title={leg.headsign}
-        >
-          › {leg.headsign}
-        </span>
-      )}
+      <LegDeparture leg={leg} feedTz={feedTz} />
       <LiveLegBadge leg={leg} compact size={badgeSize} />
     </span>
   );

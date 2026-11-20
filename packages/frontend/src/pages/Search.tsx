@@ -2,7 +2,7 @@ import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
 import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
 import { liveLocation } from "../services/liveLocation.ts";
 import { useTripStart } from "../components/Guidance/TripStartExplainer.tsx";
-import { deriveRouteGroups, effectiveExcludedRouteGroups, excludedRouteIdsForCity, isRouteGroupExcluded, routeGroupFor, type RouteGroup } from "../services/routeGroups.ts";
+import { deriveRouteGroups, effectiveExcludedRouteGroups, excludedRouteIdsForCity, isRouteGroupExcluded, routeGroupFor } from "../services/routeGroups.ts";
 import { Fragment, useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RouteResults } from "../components/RouteResults/RouteResults.tsx";
@@ -21,7 +21,7 @@ import { DEFAULT_WALK_SPEED_MPS } from "@pt/shared/constants";
 import { serviceDayOriginUnix, unixToServiceDate } from "@pt/shared/time";
 import type { Itinerary, Leg, LegPlace, LatLon, TransportMode, BaseEndpoint } from "@pt/shared";
 import type { RtComposedItinerary } from "../services/rtOverlay.ts";
-import { TransportModeIcon, MODE_CONFIG } from "../components/TransportModeIcon.tsx";
+import { MODE_CONFIG } from "../components/TransportModeIcon.tsx";
 import { db, type PoiIndexRecord } from "../db/index.ts";
 import Dexie from "dexie";
 import { ErrorBoundary } from "../components/ErrorBoundary.tsx";
@@ -58,7 +58,7 @@ import { forgetRecent, recordRecent, type RecentTarget } from "../services/recen
 import { savePlace } from "../services/saves.ts";
 import { RecentRow } from "../components/Search/RecentRow.tsx";
 import { RecentNotice, type RecentNoticeState } from "../components/Search/RecentNotice.tsx";
-import { searchBadgeChipClass, searchChipClass } from "../components/Search/searchChip.ts";
+import { VehicleFilters, type VehicleFilter } from "../components/Search/VehicleFilters.tsx";
 import { SortChip } from "../components/Search/SortChip.tsx";
 import { ArriveByResults, ArriveByToolbar } from "../components/ArriveBy/arriveByEntry.ts";
 import { resolveTransitLegDisplay } from "../services/legEnrichment.ts";
@@ -315,7 +315,6 @@ function serviceDateYmdFor(departureTime: Date, feedTz: string | undefined): num
   return unixToServiceDate(Math.floor(departureTime.getTime() / 1000), tz);
 }
 
-const vehicleChipClass = (excluded: boolean): string => searchChipClass(excluded ? "off" : "on");
 
 function suggestionKey(suggestion: SearchSuggestion): string {
   return suggestion.kind === "stop" ? `stop:${suggestion.stopId}` :
@@ -1463,47 +1462,31 @@ export function SearchPage() {
     </>
   );
 
-  // Vehicle filters, on their own row under the time and sort chips. A mode
-  // is its badge alone, so every mode stays in sight; route groups share their
-  // mode's badge and keep their names.
   const vehicleFilters = (availableModes.length >= 2 || availableRouteGroups.length >= 2) ? (
-    <div
-      className="flex flex-wrap gap-1.5"
-      role="group"
-      aria-label={t("search.filter_modes", "Filter by vehicle type")}
-    >
-      {availableModes.flatMap((mode) => {
-        const children = availableRouteGroups.filter((g) => g.parentMode === mode);
-        if (children.length > 0) return children.map((group: RouteGroup) => {
-          const isExcluded = excludedModes.includes(mode) || isRouteGroupExcluded(group, effectiveRouteGroupExclusions);
-          return <button key={`group-${group.id}`} data-testid={`route-group-${group.id}`}
-            onClick={() => toggleRouteGroup(cityId, group, cityRouteGroups)}
-            aria-pressed={!isExcluded}
-            className={vehicleChipClass(isExcluded)}>
-            <TransportModeIcon mode={mode} size="sm" />
-            <span>{group.labelKey ? t(group.labelKey, group.label) : group.label}</span>
-          </button>;
-        });
-        const isExcluded = excludedModes.includes(mode);
-        const config = MODE_CONFIG[mode];
-        const name = t(`settings.mode_${mode.toLowerCase()}`, config.label);
-        return (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => toggleMode(mode)}
-            aria-pressed={!isExcluded}
-            aria-label={name}
-            className={searchBadgeChipClass(isExcluded)}
-            title={name}
-          >
-            <TransportModeIcon mode={mode} size="sm" />
-          </button>
-        );
+    <VehicleFilters label={t("search.filter_modes", "Filter by vehicle type")}
+      items={availableModes.flatMap((mode): VehicleFilter[] => {
+        const children = availableRouteGroups.filter((group) => group.parentMode === mode);
+        if (children.length > 0) return children.map((group) => ({
+          id: `group-${group.id}`,
+          groupId: group.id,
+          mode,
+          label: group.labelKey ? t(group.labelKey, group.label) : group.label,
+          excluded: excludedModes.includes(mode) || isRouteGroupExcluded(group, effectiveRouteGroupExclusions),
+          onClick: () => toggleRouteGroup(cityId, group, cityRouteGroups),
+        }));
+        return [{
+          id: mode,
+          mode,
+          label: t(`settings.mode_${mode.toLowerCase()}`, MODE_CONFIG[mode].label),
+          excluded: excludedModes.includes(mode),
+          onClick: () => toggleMode(mode),
+        }];
       })}
-    </div>
+    />
   ) : null;
-  const sortChip = <SortChip value={ranking} onChange={setRanking} />;
+  const showingTransitous = transitousProps && (engineError ||
+    (!loading && !searchError && !serverEmpty && itineraries.length === 0));
+  const sortChip = showingTransitous ? null : <SortChip value={ranking} onChange={setRanking} />;
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-y-auto bg-surface search-picker" data-active-field={activeField ?? undefined} data-single-field={activeFieldOnly || undefined}>
@@ -1635,6 +1618,7 @@ export function SearchPage() {
             departAt={paginationTime}
             onDepartAt={setPaginationTime}
             sort={sortChip}
+            arriveBySort={<SortChip value={ranking} onChange={setRanking} arriveBy />}
             filters={vehicleFilters}
           />
         )}
@@ -1642,7 +1626,7 @@ export function SearchPage() {
         {/* Route-only controls return after place picking. */}
         {!activeField && !ArriveByToolbar && (
           <div className="space-y-1.5">
-            <div className="flex">{sortChip}</div>
+            {sortChip && <div className="flex">{sortChip}</div>}
             {vehicleFilters}
           </div>
         )}

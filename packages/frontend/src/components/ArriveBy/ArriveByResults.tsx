@@ -200,7 +200,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect }: {
         ? t("arriveBy.latest_found", "Latest departure shown. Finding the other options…")
         : view.state.status === "limited"
           ? t("arriveBy.limited", "Latest departure found. Other route options couldn’t be calculated.")
-          : t("arriveBy.complete", "Arriving by {time}: latest departure first, then by departure time.")
+          : t("arriveBy.ordered_results", "Arrive by {time}. Latest departure first. Your preference breaks departure-time ties between the remaining journeys.")
           .replace("{time}", deadlineText);
     body = (
       <>

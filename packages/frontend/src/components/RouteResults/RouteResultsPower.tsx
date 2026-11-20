@@ -6,6 +6,7 @@ import { getBadgeSize } from "../../utils/appearance.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { useColorConfigStore } from "../../stores/colorConfigStore.ts";
 import { resolveRouteColor } from "../../utils/routeColor.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { ItineraryBar } from "./shared/ItineraryBar.tsx";
@@ -19,6 +20,7 @@ import {
 } from "./shared/itineraryDisplay.ts";
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { LeaveHint } from "./shared/LeaveHint.tsx";
 import {
   peakDelayMinutes,
@@ -66,6 +68,8 @@ export function RouteResultsPower({
     .sort((a, b) => b.minutes - a.minutes);
   const topDelay = delays[0];
   const alerts = useListAlerts(itineraries);
+
+  const distinctions = routeDistinctions(itineraries, t);
 
   return (
     <div className="font-mono">
@@ -120,7 +124,7 @@ export function RouteResultsPower({
             )}
             <PowerCard
               it={it}
-              fastest={i === 0}
+              distinctions={distinctions[i]}
               onSelect={onSelect}
               referenceNowMs={referenceNowMs}
               bufferSeconds={bufferSeconds}
@@ -137,7 +141,7 @@ export function RouteResultsPower({
 
 interface PowerCardProps {
   it: Itinerary;
-  fastest: boolean;
+  distinctions: readonly string[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
   bufferSeconds: number;
@@ -148,7 +152,7 @@ interface PowerCardProps {
 
 const PowerCard = memo(function PowerCard({
   it,
-  fastest,
+  distinctions,
   onSelect,
   referenceNowMs,
   bufferSeconds,
@@ -226,7 +230,7 @@ const PowerCard = memo(function PowerCard({
     formattingLocale,
     referenceNowMs,
     feedTz,
-    fastest,
+    distinctions,
     nextDepartureInMin,
   });
 
@@ -236,7 +240,7 @@ const PowerCard = memo(function PowerCard({
       aria-label={ariaLabel}
       onClick={handleClick}
       className={`w-full text-left grid items-start gap-2 px-3.5 py-3 text-xs border-b border-divider
-        ${fastest ? "bg-accent/5" : "hover:bg-surface-overlay"}`}
+        ${distinctions.length ? "bg-accent/5" : "hover:bg-surface-overlay"}`}
       style={{
         gridTemplateColumns: "70px 1fr 60px",
         borderLeft: `3px solid ${stripeColor}`,
@@ -249,11 +253,6 @@ const PowerCard = memo(function PowerCard({
         <div className="text-[0.625rem] text-fg-muted tabular-nums">
           → {formatTime(span.arrivalTime, formattingLocale, feedTz)}
         </div>
-        {fastest && (
-          <div className="mt-1 text-[0.5625rem] tracking-widest text-accent font-bold">
-            ★ {t("route.fastest_label", "FASTEST")}
-          </div>
-        )}
         {risk && (
           <div className="mt-1">
             <TransferRiskBadge kind={risk} compact />
@@ -262,6 +261,9 @@ const PowerCard = memo(function PowerCard({
       </div>
 
       <div className="min-w-0 space-y-1.5">
+        {distinctions.length > 0 && (
+          <div className="text-[0.625rem] font-bold text-accent">{distinctions.join(" · ")}</div>
+        )}
         <BoardingLine
           segments={display.segments}
           className="text-[0.625rem] text-fg-muted"
@@ -270,6 +272,7 @@ const PowerCard = memo(function PowerCard({
           segments={display.segments}
           leadingMin={leadingMin}
           leaveTime={leaveTime}
+          feedTz={feedTz}
           showLeadingToken={showLeadingToken}
         />
         {/* Power keeps the buffer to the leave token above; only a catch
@@ -345,6 +348,7 @@ interface LegStripProps {
   leadingMin: number;
   leaveTime: string;
   showLeadingToken: boolean;
+  feedTz?: string;
 }
 
 function LegStrip({
@@ -352,6 +356,7 @@ function LegStrip({
   leadingMin,
   leaveTime,
   showLeadingToken,
+  feedTz,
 }: LegStripProps) {
   const { t } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
@@ -380,13 +385,14 @@ function LegStrip({
       }
       firstRideEmitted = true;
       nodes.push(
-        <span key={i} className="inline-flex items-center gap-1">
+        <span key={i} className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1">
           <LineBadge
             mode={seg.leg.mode}
             label={seg.leg.routeShortName}
             routeColor={seg.leg.routeColor}
             size="sm"
           />
+          <LegDeparture leg={seg.leg} feedTz={feedTz} />
           <span className="text-[0.625rem] text-fg-muted tabular-nums">
             <span className="opacity-50" aria-hidden>
               ▸

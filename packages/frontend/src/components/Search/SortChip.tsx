@@ -17,29 +17,28 @@ const OPTIONS: readonly (readonly [RankingCriteria, string, string])[] = [
 ];
 
 interface SortChipProps {
+  readonly arriveBy?: boolean;
   readonly value: RankingCriteria;
   readonly onChange: (value: RankingCriteria) => void;
 }
 
-export function SortChip({ value, onChange }: SortChipProps) {
+export function SortChip({ value, onChange, arriveBy = false }: SortChipProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const current = OPTIONS.find(([option]) => option === value) ?? OPTIONS[0];
-  const sortLabel = t("search.sort", "Sort");
+  const sortLabel = arriveBy
+    ? t("search.sort_tie_breaker", "Tie-breaker")
+    : t("search.sort", "Sort");
 
   return (
     <>
-      {/* Sized to its label, but it counts as 10rem when the row decides to
-          wrap: a long label may lose its last letters to stay beside the time
-          chip, never so many that two choices look alike. */}
       <button type="button" className={`${searchChipClass("idle")} min-w-0 max-w-max shrink! grow basis-40`} data-testid="sort-summary"
         aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        <span className="sr-only">{`${sortLabel}: `}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="shrink-0 text-accent">
           <path d="M7 4v16M7 4l-3 3M7 4l3 3" /><path d="M17 20V4M17 20l-3-3M17 20l3-3" />
         </svg>
-        <span className="min-w-0 truncate">{t(current[1], current[2])}</span>
+        <span className="min-w-0 whitespace-normal text-left">{sortLabel}: {t(current[1], current[2])}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={`shrink-0 text-fg-muted transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -53,6 +52,11 @@ export function SortChip({ value, onChange }: SortChipProps) {
             className="relative flex max-h-[85dvh] flex-col rounded-t-2xl bg-surface-raised text-fg shadow-lg">
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-[min(1rem,16px)] pt-3 pb-2">
               <h2 className="text-base font-semibold">{sortLabel}</h2>
+              <p className="text-sm text-fg-secondary">
+                {arriveBy
+                  ? t("search.sort_arrive_by_help", "Journeys with the latest departure appear first. This preference breaks departure-time ties between the remaining journeys.")
+                  : t("search.sort_departure_help", "This preference ranks the journeys found. You may see the same journey under every preference.")}
+              </p>
               <div className="space-y-1" role="group" aria-label={sortLabel}>
                 {OPTIONS.map(([option, key, fallback]) => {
                   const active = option === value;

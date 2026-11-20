@@ -324,7 +324,7 @@ describe("Arrive-by results", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Latest departure shown");
     emit(state("complete", [LATEST, FAST, FEW]));
     await waitFor(() => expect(order()).toEqual(["L1", "F2", "W3"]));
-    expect(screen.getByRole("status")).toHaveTextContent("latest departure first");
+    expect(screen.getByRole("status")).toHaveTextContent(/latest departure first/i);
     // The mark follows the paint, so it can land just after the cards appear.
     await waitFor(() => {
       const shown = performance.getEntriesByName(ARRIVE_BY_MARKS.shown) as PerformanceMark[];

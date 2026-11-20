@@ -6,6 +6,7 @@ import type { ConnectionStatus } from "./connectionStatus.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { useTripDelay } from "../../stores/rtStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
+import { LegDeparture } from "../RouteResults/shared/LegDeparture.tsx";
 import { ServiceAlertNote } from "../ServiceAlerts/ServiceAlertItem.tsx";
 
 interface LegRowProps {
@@ -43,6 +44,7 @@ export function LegRow({
   const isWalking = leg.mode === "WALK" || leg.mode === "BIKE" || leg.mode === "SCOOTER";
   const depTime = new Date(leg.departureTime);
   const arrTime = new Date(leg.arrivalTime);
+  const showPlannedDeparture = !isWalking && (status === "upcoming" || status === "future");
   const showWalkingProgress = status === "current" && isWalking && !!walkingProgress;
   const showTransitProgress = status === "current" && !isWalking && !!transitProgress;
 
@@ -87,22 +89,31 @@ export function LegRow({
 
         {/* Time and destination */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-fg-muted" style={{ fontSize: "var(--variant-meta-text-size)" }}>
-            <span>{formatTime(depTime)}</span>
-            {leg.approximate && !isWalking && (
-              <span
-                className="text-fg-secondary"
-                title={t(
-                  "guidance.approximate_title",
-                  "Approximate frequency-based departure",
-                )}
-              >
-                {t("guidance.approximate", "approx.")}
-              </span>
-            )}
-            <span>-</span>
-            <span>{formatTime(arrTime)}</span>
-          </div>
+          {showPlannedDeparture ? (
+            <>
+              <LegDeparture leg={leg} feedTz={feedTz} />
+              <div className="text-fg-secondary break-words" style={{ fontSize: "var(--variant-primary-text-size)" }}>
+                {leg.to.name} · {formatTime(arrTime)}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-fg-muted" style={{ fontSize: "var(--variant-meta-text-size)" }}>
+              <span>{formatTime(depTime)}</span>
+              {leg.approximate && !isWalking && (
+                <span
+                  className="text-fg-secondary"
+                  title={t(
+                    "guidance.approximate_title",
+                    "Approximate frequency-based departure",
+                  )}
+                >
+                  {t("guidance.approximate", "approx.")}
+                </span>
+              )}
+              <span>-</span>
+              <span>{formatTime(arrTime)}</span>
+            </div>
+          )}
 
           {/* Status-specific info */}
           {showWalkingProgress && <WalkingLegInfo progress={walkingProgress} />}
@@ -111,7 +122,7 @@ export function LegRow({
           )}
           {/* Also on a current leg with no progress yet — a ride that has not
               left, a walk before the first fix — so the row still says where. */}
-          {!showWalkingProgress && !showTransitProgress && (
+          {!showPlannedDeparture && !showWalkingProgress && !showTransitProgress && (
             <div className="text-fg-secondary truncate" style={{ fontSize: "var(--variant-primary-text-size)" }}>
               {leg.headsign ?? leg.to.name}
             </div>

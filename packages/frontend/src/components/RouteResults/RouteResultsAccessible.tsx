@@ -4,6 +4,7 @@ import { useTranslation } from "../../i18n/index.ts";
 import { pluralize } from "../../i18n/plurals.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeSize } from "../../utils/appearance.ts";
+import { LegDeparture } from "./shared/LegDeparture.tsx";
 import { LineBadge } from "./shared/LineBadge.tsx";
 import { LiveLegBadge } from "./shared/LiveBadge.tsx";
 import { TransferRiskBadge } from "./shared/TransferRiskBadge.tsx";
@@ -20,6 +21,7 @@ import {
 import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay.ts";
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
@@ -39,7 +41,7 @@ interface Props {
 /**
  * Variant C — "Accessibility-forward". Each transit leg renders as its own
  * inset row with explicit "Off at <stop>" copy. Larger hit targets, larger
- * body text, prominent fastest indicator.
+ * body text and prominent route distinctions.
  */
 export function RouteResultsAccessible({
   itineraries,
@@ -52,6 +54,8 @@ export function RouteResultsAccessible({
   const { t } = useTranslation();
   const mobility = useSettingsStore((s) => s.mobilityProfile);
   const alerts = useListAlerts(itineraries);
+
+  const distinctions = routeDistinctions(itineraries, t);
 
   return (
     <div className="flex flex-col gap-3 px-3 pb-3">
@@ -116,7 +120,7 @@ export function RouteResultsAccessible({
             )}
             <AccessibleCard
               it={it}
-              fastest={i === 0}
+              distinctions={distinctions[i]}
               onSelect={onSelect}
               referenceNowMs={referenceNowMs}
               bufferSeconds={bufferSeconds}
@@ -134,7 +138,7 @@ export function RouteResultsAccessible({
 
 interface AccessibleCardProps {
   it: Itinerary;
-  fastest: boolean;
+  distinctions: readonly string[];
   onSelect: (it: Itinerary) => void;
   referenceNowMs: number;
   bufferSeconds: number;
@@ -145,7 +149,7 @@ interface AccessibleCardProps {
 
 const AccessibleCard = memo(function AccessibleCard({
   it,
-  fastest,
+  distinctions,
   onSelect,
   referenceNowMs,
   bufferSeconds,
@@ -192,7 +196,7 @@ const AccessibleCard = memo(function AccessibleCard({
     formattingLocale,
     referenceNowMs,
     feedTz,
-    fastest,
+    distinctions,
     nextDepartureInMin,
   });
 
@@ -202,17 +206,14 @@ const AccessibleCard = memo(function AccessibleCard({
       aria-label={ariaLabel}
       onClick={handleClick}
       className={`w-full text-left rounded-2xl bg-surface-raised p-4 flex flex-col gap-3
-        border ${fastest ? "border-accent" : "border-divider"}
+        border ${distinctions.length ? "border-accent" : "border-divider"}
         hover:border-accent transition-colors`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          {fastest && (
-            <div className="text-[0.6875rem] font-bold tracking-widest text-accent mb-0.5">
-              ★ {t("route.fastest_label", "FASTEST")}
-              {stepFree
-                ? ` · ${t("route.step_free", "STEP-FREE")}`
-                : ""}
+          {(distinctions.length > 0 || stepFree) && (
+            <div className="text-[0.6875rem] font-bold text-accent mb-0.5">
+              {(stepFree ? [...distinctions, t("route.step_free", "STEP-FREE")] : distinctions).join(" · ")}
             </div>
           )}
           <div className="text-2xl font-bold tabular-nums -tracking-tight">
@@ -261,7 +262,7 @@ const AccessibleCard = memo(function AccessibleCard({
       {/* Stop-by-stop transit leg rows + transfer/buffer wait rows */}
       {display.segments.length > 0 && (
         <div className="flex flex-col gap-2">
-          {renderAccessibleSegmentRows(display.segments, hideBufferChrome)}
+          {renderAccessibleSegmentRows(display.segments, hideBufferChrome, feedTz)}
         </div>
       )}
 
@@ -308,6 +309,7 @@ const AccessibleCard = memo(function AccessibleCard({
 function renderAccessibleSegmentRows(
   segments: Segment[],
   hideBufferChrome: boolean,
+  feedTz?: string,
 ): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   for (let i = 0; i < segments.length; i++) {
@@ -336,7 +338,7 @@ function renderAccessibleSegmentRows(
         break;
       }
       case "ride": {
-        rows.push(<AccessibleLegRow key={`ride-${i}`} leg={s.leg} />);
+        rows.push(<AccessibleLegRow key={`ride-${i}`} leg={s.leg} feedTz={feedTz} />);
         break;
       }
       case "walk": {
@@ -355,7 +357,7 @@ function renderAccessibleSegmentRows(
   return rows;
 }
 
-function AccessibleLegRow({ leg }: { leg: Leg }) {
+function AccessibleLegRow({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
   const { t, locale } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
   // intermediateStops = count BETWEEN board and alight stops, exclusive.
@@ -374,6 +376,7 @@ function AccessibleLegRow({ leg }: { leg: Leg }) {
         size="md"
       />
       <div className="flex-1 min-w-0">
+        <LegDeparture leg={leg} feedTz={feedTz} />
         <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
           <span>
             {t("route.off_at_long", "Off at")}{" "}

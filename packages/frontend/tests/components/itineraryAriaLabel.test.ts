@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Itinerary } from "@pt/shared";
 import { itineraryAriaLabel } from "../../src/components/RouteResults/shared/itineraryAriaLabel.ts";
+import { routeDistinctions } from "../../src/components/RouteResults/shared/routeDistinctions.ts";
 import { deriveItineraryDisplay } from "../../src/components/RouteResults/shared/itineraryDisplay.ts";
 import { ms, place, ride, walk, itinerary as buildItinerary } from "./shared-fixtures.ts";
 
@@ -13,7 +14,7 @@ function label(
   it: Itinerary,
   opts: {
     bufferSeconds?: number;
-    fastest?: boolean;
+    distinctions?: readonly string[];
     referenceNowMs?: number;
     runSpeedRatio?: number;
     nextDepartureInMin?: number;
@@ -36,7 +37,7 @@ function label(
     formattingLocale: "en-GB",
     referenceNowMs,
     feedTz: "UTC",
-    fastest: opts.fastest ?? false,
+    distinctions: opts.distinctions,
     nextDepartureInMin: opts.nextDepartureInMin,
   });
 }
@@ -66,16 +67,31 @@ function transferTrip(overrides: Partial<Itinerary> = {}): Itinerary {
   return { ...base, walkingDistanceMeters: 320, ...overrides };
 }
 
+describe("route distinctions", () => {
+  const quick = transferTrip({ durationSeconds: 600 });
+  const direct = transferTrip({ durationSeconds: 900, transfers: 0, walkingDistanceMeters: 100 });
+
+  it("labels each comparison independently of list order and omits cancelled routes", () => {
+    expect(routeDistinctions([direct, quick, { ...quick, durationSeconds: 1, cancelled: true }], t))
+      .toEqual([["Fewest transfers"], ["Fastest"], []]);
+  });
+
+  it("only shows labels for metrics that differ between available routes", () => {
+    expect(routeDistinctions([quick], t)).toEqual([[]]);
+    expect(routeDistinctions([quick, { ...quick, transfers: 2 }], t)).toEqual([["Fewest transfers"], []]);
+  });
+});
+
 describe("itineraryAriaLabel — clause order", () => {
   it("orders the label by how soon the rider needs each fact", () => {
-    const out = label(transferTrip(), { fastest: true });
+    const out = label(transferTrip(), { distinctions: ["Fastest"] });
 
     // The whole point of the author-supplied name: the rider can act on the
     // first two clauses without hearing the rest.
     expect(out.startsWith("Fastest. Leave in 5 min. ")).toBe(true);
     expect(out).toBe(
       "Fastest. Leave in 5 min. Board here. " +
-        "Bus 42 to Stop B, then Tram 5 to Stop C. " +
+        "Bus 42 to Stop B, departs 10:00, then Tram 5 to Stop C, departs 10:20. " +
         "35 min, arrives 10:35. 1 transfer, 320 m walking.",
     );
   });
@@ -91,7 +107,7 @@ describe("itineraryAriaLabel — clause order", () => {
   });
 
   it("emits exactly one terminating period and no empty clauses", () => {
-    const out = label(transferTrip(), { fastest: true });
+    const out = label(transferTrip(), { distinctions: ["Fastest"] });
     expect(out.endsWith(".")).toBe(true);
     expect(out).not.toMatch(/\.\./);
     expect(out).not.toMatch(/\.\s+\./);
@@ -294,7 +310,7 @@ describe("itineraryAriaLabel — urgency leads", () => {
   }
 
   it("leads with the miss-risk warning, ahead of the fastest cue", () => {
-    const out = label(missTrip(), { fastest: true });
+    const out = label(missTrip(), { distinctions: ["Fastest"] });
     expect(
       out.startsWith("Live delay may cause you to miss a transfer. Fastest."),
     ).toBe(true);
