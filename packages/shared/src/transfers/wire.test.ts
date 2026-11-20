@@ -1,3 +1,4 @@
+import { deepStrictEqual } from "node:assert/strict";
 import { describe, it, expect } from "vitest";
 import { encode, decode, type TransferEdge } from "./wire.js";
 
@@ -64,7 +65,7 @@ describe("transfers wire format — round-trip", () => {
     expect(out.stopIds).toEqual(ids);
   });
 
-  it("round-trips a large random graph (1000 stops, ~16 edges each)", () => {
+  it("round-trips a large random graph (1000 stops, up to 16 edges each)", () => {
     const N = 1000;
     const ids: string[] = [];
     for (let i = 0; i < N; i++) ids.push(`stop-${i}`);
@@ -87,23 +88,22 @@ describe("transfers wire format — round-trip", () => {
       }
       edges.push(row);
     }
-    const bytes = encode(ids, edges);
-    const out = decode(bytes);
-    expect(out.stopIds).toEqual(ids);
-    expect(out.adj.offsets[N]).toBe(out.adj.neighborIx.length);
-    // every neighbor in range, every per-stop slice sorted asc
-    for (let i = 0; i < N; i++) {
-      const lo = out.adj.offsets[i];
-      const hi = out.adj.offsets[i + 1];
-      let prev = -1;
-      for (let k = lo; k < hi; k++) {
-        expect(out.adj.neighborIx[k]).toBeGreaterThanOrEqual(0);
-        expect(out.adj.neighborIx[k]).toBeLessThan(N);
-        expect(out.adj.neighborIx[k]).not.toBe(i);
-        expect(out.adj.walkSecs[k]).toBeGreaterThanOrEqual(prev);
-        prev = out.adj.walkSecs[k];
+    const expectedOffsets = [0];
+    const expectedNeighbors: number[] = [];
+    const expectedWalks: number[] = [];
+    for (const row of edges) {
+      for (const { neighborIdx, walkSecs } of [...row].sort((a, b) => a.walkSecs - b.walkSecs)) {
+        expectedNeighbors.push(neighborIdx);
+        expectedWalks.push(walkSecs);
       }
+      expectedOffsets.push(expectedNeighbors.length);
     }
+
+    const out = roundTrip(ids, edges);
+    deepStrictEqual(out.stopIds, ids);
+    deepStrictEqual(out.adj.offsets, Uint32Array.from(expectedOffsets));
+    deepStrictEqual(out.adj.neighborIx, Uint32Array.from(expectedNeighbors));
+    deepStrictEqual(out.adj.walkSecs, Uint32Array.from(expectedWalks));
   });
 
   it("encodes walkSecs values that span varint widths (1-byte, 2-byte, 3-byte)", () => {
@@ -145,6 +145,12 @@ describe("transfers wire format — encode validation", () => {
     ).toThrow(/out-of-range/);
   });
 
+  it("rejects walkSecs above the unsigned 32-bit range", () => {
+    expect(() =>
+      encode(["a", "b"], [[{ neighborIdx: 1, walkSecs: 0x100000000 }], []]),
+    ).toThrow(/walkSecs/);
+  });
+
   it("rejects invalid walkSecs", () => {
     expect(() =>
       encode(["a", "b"], [[{ neighborIdx: 1, walkSecs: -1 }], []]),
@@ -159,6 +165,15 @@ describe("transfers wire format — encode validation", () => {
 });
 
 describe("transfers wire format — decode validation", () => {
+  it("preserves the maximum walkSecs and rejects a larger on-wire value", () => {
+    const bytes = encode(["a", "b"], [[{ neighborIdx: 1, walkSecs: 0xffffffff }], []]);
+    expect(decode(bytes).adj.walkSecs[0]).toBe(0xffffffff);
+
+    // Replace only the five-byte duration with the next unsigned integer.
+    bytes.set([0x80, 0x80, 0x80, 0x80, 0x10], 10);
+    expect(() => decode(bytes)).toThrow(/walkSecs/);
+  });
+
   it("rejects buffers that are too short for the header", () => {
     expect(() => decode(new Uint8Array(2))).toThrow(/truncated/);
   });

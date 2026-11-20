@@ -41,6 +41,7 @@
 
 const MAGIC = Object.freeze([0x50, 0x54, 0x46, 0x54] as const); // "PTFT"
 const VERSION = 1;
+const MAX_U32 = 0xffffffff;
 
 /** One outgoing footpath edge from a stop. */
 export interface TransferEdge {
@@ -113,7 +114,7 @@ export function encode(
       if (
         !Number.isInteger(e.walkSecs) ||
         e.walkSecs < 0 ||
-        !Number.isFinite(e.walkSecs)
+        e.walkSecs > MAX_U32
       ) {
         throw new Error(
           `transfers.encode: stop index ${i} has invalid walkSecs ${e.walkSecs}`,
@@ -228,6 +229,9 @@ export function decode(bytes: Uint8Array): DecodedTransfers {
       flatNeighbors.push(neighborRes.value);
       const walkRes = readVarint(bytes, pos);
       pos = walkRes.next;
+      if (walkRes.value > MAX_U32) {
+        throw new Error(`transfers.decode: invalid walkSecs ${walkRes.value} at stop index ${i}`);
+      }
       // Enforce the per-stop walkSecs-ascending invariant `encode()`
       // guarantees (see the format doc above): the same bytes feed the Rust
       // engine, and a consumer relying on the sorted contract would silently
