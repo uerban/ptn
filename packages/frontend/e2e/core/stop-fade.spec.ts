@@ -55,19 +55,22 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   const marker = page.locator('[data-fade-harness] [data-stop-id="fade-stop"]');
   await expect(marker).toBeAttached();
   await page.waitForFunction(() => (window as any).__fadeHarness.map?.getSource("stops-source"));
-  const badgeUpdate = await page.evaluate(async () => {
+  const finishBadgeUpdate = await page.evaluateHandle(() => {
     const h = (window as any).__fadeHarness;
     const source = h.map.getSource("stops-source");
-    const nativeSetData = source.setData.bind(source);
+    const nativeSetData = source.setData;
     let writes = 0;
-    source.setData = (...args: any[]) => { writes++; return nativeSetData(...args); };
+    source.setData = (...args: any[]) => { writes++; return nativeSetData.apply(source, args); };
     h.render(true, [{routeId: "badge-route", shortName: "B", mode: "BUS"}]);
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    source.setData = nativeSetData;
-    return {writes, text: document.querySelector('[data-fade-harness] [data-stop-id="fade-stop"]')?.textContent};
+    return () => {
+      source.setData = nativeSetData;
+      return writes;
+    };
   });
-  expect(badgeUpdate.text).toContain("B");
-  expect(badgeUpdate.writes).toBe(0);
+  // Marker content is committed independently of the map frame count.
+  await expect(marker).toContainText("B");
+  expect(await finishBadgeUpdate.evaluate((finish) => finish())).toBe(0);
+  await finishBadgeUpdate.dispose();
   // Advance virtual frames explicitly so slow rendering cannot skip a
   // 200 ms fade between the start and the opacity assertion.
   const pauseFrames = async () => {
