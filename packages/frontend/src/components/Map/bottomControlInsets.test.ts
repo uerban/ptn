@@ -33,4 +33,17 @@ describe("chipInsets", () => {
   test("no attribution: bottom gap only", () => {
     expect(chipInsets(MAP, null, [], false)).toEqual({ bottom: 8, right: 0 });
   });
+
+  test("a hidden control (compass at north) is not measured", () => {
+    // `display: none` reports an all-zero rect; it must not claim the map width.
+    const HIDDEN = { top: 0, bottom: 0, left: 0, right: 0 };
+    expect(chipInsets(MAP, ATTRIB_COLLAPSED, [ZOOM, LOCATE, HIDDEN], false)).toEqual({
+      bottom: 10,
+      right: 47,
+    });
+    expect(chipInsets(MAP, ATTRIB_EXPANDED, [ZOOM, LOCATE, HIDDEN], true)).toEqual({
+      bottom: 56,
+      right: 47,
+    });
+  });
 });

@@ -37,8 +37,11 @@ export function chipInsets(
   controls: readonly Box[],
   attribExpanded: boolean,
 ): ChipInsets {
+  // A control that is `display: none` (the compass at north) reports a zero
+  // rect: measuring it would claim the whole map width and collapse the strip.
+  const shown = (b: Box) => b.right > b.left && b.bottom > b.top;
   const clearOf = (boxes: readonly Box[]) =>
-    boxes.reduce((max, b) => Math.max(max, map.right - b.left + GAP), 0);
+    boxes.filter(shown).reduce((max, b) => Math.max(max, map.right - b.left + GAP), 0);
   if (!attrib) return { bottom: GAP, right: clearOf(controls) };
   if (attribExpanded) {
     return { bottom: map.bottom - attrib.top + GAP, right: clearOf(controls) };
