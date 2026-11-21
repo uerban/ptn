@@ -181,6 +181,15 @@ impl<P: FeedPayload> FeedPoller<P> {
 }
 
 impl FeedPoller<TripUpdates> {
+    /// Drop TripUpdates after 90 seconds without a successful feed response.
+    /// Failed attempts update health but do not extend a prediction's lifetime.
+    pub fn expire_unavailable_updates(&mut self, now_ms: u64) {
+        const MAX_OUTAGE_AGE_MS: u64 = 90_000;
+        self.last_good_by_url.retain(|url, _| {
+            now_ms.saturating_sub(self.last_success_by_url[url]) < MAX_OUTAGE_AGE_MS
+        });
+    }
+
     /// Merges all per-feed maps into one superset. Feeds later in the
     /// configured URL order win on key collisions — a colliding tripId
     /// across two feeds indicates a feed misconfiguration, so this is a

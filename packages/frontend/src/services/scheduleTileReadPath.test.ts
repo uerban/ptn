@@ -597,66 +597,59 @@ describe("departuresForStop", () => {
 
 
 
-  // (a) tile-ok + rt-ok dual-entry (bare tripId + tripId|YYYYMMDD): live rows carry
-  //     predictedTime; unmatched departure stays scheduled (no predictedTime).
-  it("(a) rt-tile 200: matched departure has predictedTime; unmatched stays scheduled", async () => {
+  it("shows a heavily delayed departure and reverts to the timetable after expiry", async () => {
     vi.resetModules();
-    const shared = await import("@pt/shared/transit");
-    const getDepSpy = vi
-      .spyOn(shared, "getDeparturesFromTile")
-      .mockReturnValue({
-        departures: [
-          { tripId: "T1", routeId: "R1", scheduledTime: "2026-06-10T12:00:00Z", predictedTime: "2026-06-10T12:02:00Z", delaySeconds: 120, cancelled: false, headsign: "Downtown", mode: "BUS" } as unknown as import("@pt/shared").Departure,
-          { tripId: "T2", routeId: "R1", scheduledTime: "2026-06-10T12:10:00Z", cancelled: false, headsign: "Downtown", mode: "BUS" } as unknown as import("@pt/shared").Departure,
-        ],
-        serviceState: "active",
-      });
-
-    const { departuresForStop } = await import("./scheduleTileReadPath.ts");
+    const { departuresForStop, RT_TILE_REUSE_MS } = await import("./scheduleTileReadPath.ts");
 
     const stopId = "STOP-PARIS";
     await seedStopInStops(stopId, PARIS.lat, PARIS.lon);
-    const cellKey = cellKeyFor(PARIS);
-
-    fetchManifestMock.mockResolvedValue(manifestResult(HASH));
-    getDecodedTileMock.mockResolvedValue(okTile(tileWithStop(stopId)));
-
-    const rtBody: RtTileResponse = {
-      bundleHash: HASH,
-      generatedAt: Date.now(),
-      trips: [
-        // bare key
-        { tripId: "T1", delaySeconds: 120, cancelled: false },
-        // date-scoped key — matches when getDeparturesFromTile looks up `T2|20260610`
-        { tripId: "T2", startDate: "20260610", delaySeconds: 300, cancelled: false },
-      ],
+    const baseline = tileWithStop(stopId);
+    const tile: DecodedScheduleTile = {
+      ...baseline,
+      stringTable: [...baseline.stringTable, "T2"],
+      trips: [...baseline.trips, { tripIdIx: 2, routeIx: 0, serviceIx: 0, headsignIx: 1 }],
+      stops: {
+        [stopId]: {
+          tripIxs: Uint32Array.from([0, 1]),
+          departureSecs: Uint32Array.from([12 * 3600 + 23 * 60, 14 * 3600 + 10 * 60]),
+        },
+      },
     };
-    fetchRtTileMock.mockResolvedValue({ status: 200, body: rtBody });
+    fetchManifestMock.mockResolvedValue(manifestResult(HASH));
+    getDecodedTileMock.mockResolvedValue(okTile(tile));
 
-    const r = await departuresForStop({ stopId, now: NOW });
+    const clock = vi.spyOn(Date, "now");
+    try {
+      clock.mockReturnValue(NOW.getTime());
+      const live = { tripId: "T1", delaySeconds: 5880, cancelled: false };
+      fetchRtTileMock.mockResolvedValue({
+        status: 200,
+        body: { bundleHash: HASH, generatedAt: Date.now(), trips: [
+          live, { ...live, startDate: "20260610" },
+        ] },
+      });
+      const query = { stopId, now: NOW, limit: 2 };
+      expect(await departuresForStop(query)).toMatchObject({
+        state: "ok",
+        departures: [
+          { tripId: "T1", predictedTime: "2026-06-10T12:01:00.000Z", delaySeconds: 5880 },
+          { tripId: "T2", scheduledTime: "2026-06-10T12:10:00.000Z" },
+        ],
+      });
+      expect(fetchRtTileMock).toHaveBeenCalledWith(HASH, "6km", cellKeyFor(PARIS));
 
-    expect(r.state).toBe("ok");
-    if (r.state !== "ok") return;
-    // Matched departure (T1) carries predictedTime.
-    expect(r.departures[0]!.predictedTime).toBe("2026-06-10T12:02:00Z");
-    // Unmatched departure (T2 bare, no startDate) stays scheduled.
-    expect(r.departures[1]!.predictedTime).toBeUndefined();
-
-    // getDeparturesFromTile was called with realtimeUpdates containing both keys.
-    expect(getDepSpy).toHaveBeenCalledTimes(1);
-    const callArgs = getDepSpy.mock.calls[0]![0];
-    expect(callArgs.realtimeUpdates).toBeDefined();
-    expect(callArgs.realtimeUpdates!.has("T1")).toBe(true);
-    expect(callArgs.realtimeUpdates!.has("T2|20260610")).toBe(true);
-    // tz threaded through
-    expect(callArgs.tz).toBe("Europe/Paris");
-    // rt_tile_unavailable NOT emitted
-    expect(reportTelemetryMock).not.toHaveBeenCalledWith("rt_tile_unavailable", expect.anything());
-
-    // rt-tile fetched at the resolved (post-cascade) coords
-    expect(fetchRtTileMock).toHaveBeenCalledWith(HASH, "6km", cellKey);
-
-    getDepSpy.mockRestore();
+      clock.mockReturnValue(NOW.getTime() + RT_TILE_REUSE_MS);
+      fetchRtTileMock.mockResolvedValue({
+        status: 200,
+        body: { bundleHash: HASH, generatedAt: Date.now(), trips: [] },
+      });
+      expect(await departuresForStop(query)).toMatchObject({
+        state: "ok",
+        departures: [{ tripId: "T2", predictedTime: undefined }],
+      });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   // (b) tile-ok + rt non-200: all-scheduled (realtimeUpdates undefined), one
