@@ -11,6 +11,7 @@ import sys
 import time
 import urllib.request
 from hosting_fixture import change_stop_label
+from served_version import check_served_version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -85,6 +86,7 @@ def main():
         https = f"https://localhost:{tls_port}"
         start([args.caddy, "run", "--config", str(bundle / "examples/native/Caddyfile"), "--adapter", "caddyfile"], "web-http", env={**environment, "PTN_SITE": http})
         generation = ready(http)
+        served_version = check_served_version(http, bundle)
         with (evidence / "probe.json").open("w") as output:
             subprocess.run([sys.executable, str(ROOT / "scripts/hosting-probe.py"), str(state / "vilnius.zip")], stdout=output, check=True)
         browser = ["node", str(ROOT / "scripts/verify-hosting.mjs")]
@@ -128,7 +130,8 @@ def main():
         run(browser + [http, str(evidence / "probe.json"), str(evidence / "browser-restarted")], "browser-restarted")
         (evidence / "result.json").write_text(json.dumps({"bootstrap": True, "http": True, "localCATLS": True,
              "reload": True, "failedRefreshPreservedGeneration": True, "restart": True,
-             "initialGeneration": generation, "newGeneration": new_generation}, indent=2) + "\n")
+             "initialGeneration": generation, "newGeneration": new_generation,
+             "servedVersion": served_version}, indent=2) + "\n")
         print("PASS: extracted archive bootstrap, browser HTTP/TLS, reload, failed refresh, restart")
     finally:
         for process in reversed(processes):
