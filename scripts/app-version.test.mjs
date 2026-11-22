@@ -137,6 +137,16 @@ describe("computeAppVersion on a fixture repository", () => {
     assert.equal(version(dir, { PT_VERSION: "refs/heads/main" }), "0.2.3");
   });
 
+  test("the CLI reads the repository in its working directory", () => {
+    const script = fileURLToPath(new URL("./app-version.mjs", import.meta.url));
+    const out = execFileSync(process.execPath, [script, commits.c], {
+      cwd: dir,
+      env: { ...ENV, PT_VERSION_MAIN_REF: "main" },
+      encoding: "utf8",
+    });
+    assert.equal(out, "0.2.1\n");
+  });
+
   test("inherited git discovery variables do not redirect the repository", () => {
     const other = mkdtempSync(join(tmpdir(), "app-version-other-"));
     try {

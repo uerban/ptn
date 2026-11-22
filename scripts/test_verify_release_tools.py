@@ -49,6 +49,24 @@ class ToolValidationTests(unittest.TestCase):
                     tools.main()
                 smoke.assert_not_called()
 
+    def test_expected_version_must_match_release_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = self.bundle(Path(directory))
+            for recorded, ok in [('0.2.44', True), ('0.2.43', False), (None, False)]:
+                metadata = {'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl'}
+                if recorded:
+                    metadata['version'] = recorded
+                (bundle / 'release.json').write_text(json.dumps(metadata))
+                with patch('sys.argv', ['verify', '--bundle', str(bundle), '--revision', REV, '--version', '0.2.44']), \
+                        patch.object(tools, 'verify_tools') as smoke:
+                    if ok:
+                        tools.main()
+                        smoke.assert_called_once()
+                    else:
+                        with self.assertRaises(AssertionError):
+                            tools.main()
+                        smoke.assert_not_called()
+
     def test_direct_mode_rejects_wrong_binary_architecture_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

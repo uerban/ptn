@@ -5,6 +5,7 @@ import struct
 import sys
 import tarfile
 import hashlib
+import json
 from unittest.mock import patch
 import tempfile
 import unittest
@@ -126,10 +127,30 @@ class ArchiveContents(unittest.TestCase):
                 path.write_text(content)
             for filename in package.TRANSIT_DOCS:
                 (root / "docs" / filename).write_text("transit guide")
-            with patch.object(package, "ROOT", root), patch.object(sys, "argv", ["package-release.py", "--platform", "linux-x86_64", "--bin-dir", str(binaries), "--out", str(root / "out")]), patch.object(package.subprocess, "check_output", side_effect=["a" * 40, b""]), patch("builtins.print"):
+            with patch.object(package, "ROOT", root), patch.object(sys, "argv", ["package-release.py", "--platform", "linux-x86_64", "--bin-dir", str(binaries), "--out", str(root / "out")]), patch.object(package.subprocess, "check_output", side_effect=["a" * 40, b""]), patch.dict(package.os.environ, {"PT_VERSION": "0.2.44"}), patch("builtins.print"):
                 package.main()
             with tarfile.open(root / "out/ptn-linux-x86_64.tar.gz") as archive:
                 checksums = archive.extractfile("ptn-linux-x86_64/SHA256SUMS").read().decode()
+                metadata = json.load(archive.extractfile("ptn-linux-x86_64/release.json"))
+                self.assertEqual((metadata["version"], metadata["revision"]), ("0.2.44", "a" * 40))
                 for relative in ["scripts/verify-transit-installation.py", "examples/native/gtfs.py", "examples/native/prebuilt.py", "examples/native/prebuilt.md", "examples/native/config.prebuilt.example.json", "docs/gtfs-sources.md", *["bin/" + name for name in package.BINARIES], *["docs/" + name for name in package.TRANSIT_DOCS]]:
                     content = archive.extractfile("ptn-linux-x86_64/" + relative).read()
                     self.assertIn(hashlib.sha256(content).hexdigest() + "  " + relative, checksums)
+
+
+class ApplicationVersion(unittest.TestCase):
+    def test_injected_version_wins_over_git(self):
+        with patch.dict(package.os.environ, {"PT_VERSION": "0.2.44-dev+0459991f"}), patch.object(package.subprocess, "check_output") as run:
+            self.assertEqual(package.app_version(), "0.2.44-dev+0459991f")
+        run.assert_not_called()
+
+    def test_without_injection_the_version_is_derived(self):
+        with patch.dict(package.os.environ, {"PT_VERSION": ""}), patch.object(package.subprocess, "check_output", return_value="0.2.0-dev\n") as run:
+            self.assertEqual(package.app_version(), "0.2.0-dev")
+        self.assertEqual(run.call_args.args[0], ["node", "scripts/app-version.mjs"])
+
+    def test_version_shape(self):
+        for value in ["0.2.44", "1.0.0-dev", "0.3.0-dev+0459991f"]:
+            self.assertTrue(package.VERSION_PATTERN.fullmatch(value), value)
+        for value in ["v0.2.44", "0.2", "0.2.3-rc.4", "01.2.3", "0.2.3-dev+XYZ"]:
+            self.assertFalse(package.VERSION_PATTERN.fullmatch(value), value)

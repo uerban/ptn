@@ -155,9 +155,10 @@ export function computeAppVersion({ cwd, packageJson, rev = "HEAD", env = proces
   return `${xy}.0-dev+${short}`;
 }
 
-// CLI: node scripts/app-version.mjs [rev]
+// CLI: node scripts/app-version.mjs [rev], run from the repository root.
+// The repository is the working directory, not the script's own checkout, so
+// CI can run a current copy of this script against an older source revision.
 const isCli = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isCli) {
-  const root = resolve(fileURLToPath(import.meta.url), "../..");
-  process.stdout.write(`${computeAppVersion({ cwd: root, rev: process.argv[2] ?? "HEAD" })}\n`);
+  process.stdout.write(`${computeAppVersion({ cwd: process.cwd(), rev: process.argv[2] ?? "HEAD" })}\n`);
 }
