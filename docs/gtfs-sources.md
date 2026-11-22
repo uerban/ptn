@@ -148,7 +148,8 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
 ```
 
 - `prefer` (`origin` by default) picks which candidate is tried first. The
-  other is the fallback. A mirror needs `identity`. Attribution and terms
+  other is the fallback. A mirror needs `identity`, and a mirror-first source
+  also needs `freshness`. Attribution and terms
   always belong to the publisher, never to the mirror.
 - Fallback on DNS, connection and timeout failures, truncated bodies, HTTP 5xx,
   401, 403, 404 and 429, a dropped TLS connection, a response that is not a
@@ -163,9 +164,12 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   stale candidate is skipped; when every candidate is stale, the freshest valid
   one is used and `retrieval.json` marks it `stale`. A mirror without a
   readable version is skipped; an origin without one is accepted with a warning.
-- A mirror file older than the last accepted version is skipped. If no other
+- A mirror file older than the last accepted version is skipped (sources with
+  `freshness` only; without it, an origin-first mirror is bounded by identity
+  and the seven-day coverage rule). If no other
   candidate is usable, the city fails and keeps the previous candidate. The
-  floor is the newer of `latest-validated.json` and `freshnessFloors`
+  floor is the newer of `latest-validated.json` (its version, or the floor it
+  was checked against when it had none) and `freshnessFloors`
   (`{"<sourceId>": "YYYY-MM-DD"}`) in the host configuration, so a configured
   floor can raise it but never lower it. Origin data is authoritative and only
   warns.
@@ -174,11 +178,12 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   `credentials` (`["EXAMPLE_API_KEY"]`); otherwise the origin is skipped with a
   warning. Runtime names (`PT_FEEDS_*`, `PTN_*`, `GITHUB_TOKEN`, `GH_TOKEN`,
   `HOME`, `PATH`, `SSH_AUTH_SOCK`) are refused, and so is an origin URL that
-  already sets the parameter. It is never written to caches, metadata, results, failures or
+  already sets the parameter. An `auth.env` is hidden from transformation
+  steps, so it cannot also be in `requiredEnvironment`. It is never written to caches, metadata, results, failures or
   logs, is removed (with `PT_FEEDS_TOKEN`) from the environment of
   transformation steps and the validator, and is not sent across a cross-host redirect. Values must match
   `[A-Za-z0-9._~-]{8,256}`; a missing or malformed value skips the origin.
-- `budget` counts origin requests per `auth.env` name before they are sent,
+- `budget` (`days` at most 400) counts origin requests per `auth.env` name before they are sent,
   including failures and HTTP 304. Each source counts only its own window, and
   the ledger keeps 400 days of history, so sources that share a credential
   with different windows never erase each other's requests. The ledger lives in `PT_FEEDS_BUDGET_DIR`

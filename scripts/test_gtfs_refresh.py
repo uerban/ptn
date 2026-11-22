@@ -943,6 +943,34 @@ class PrepareV2(RecipeCase):
                 {"id": "a", "url": "https://p.example/f.zip?k=x", "auth": {"queryParam": "k", "env": "KEY"}}
             )
 
+    def test_recipe_shape_guards(self):
+        mirror = {"operator": "M", "url": "https://m.example/f.zip"}
+        base = {"id": "a", "url": "https://p.example/f.zip", "mirror": mirror, "identity": {"agencyNames": ["A"]}}
+        with self.assertRaisesRegex(ValueError, "mirror-first source needs freshness"):
+            gtfs.check_source(dict(base, prefer="mirror"))
+        gtfs.check_source(base)
+        auth = {"queryParam": "k", "env": "SOME_KEY"}
+        with self.assertRaisesRegex(ValueError, "at most 400"):
+            gtfs.check_source({"id": "a", "url": "https://p.example/f.zip", "auth": auth, "budget": {"requests": 1, "days": 401}})
+        with self.assertRaisesRegex(ValueError, "auth needs"):
+            gtfs.check_source({"id": "a", "url": "https://p.example/f.zip", "auth": {"queryParam": 5, "env": "K"}})
+        definition = self.definition([{"id": "one", "url": "https://source.example/one", "auth": auth}])
+        definition["schemaVersion"] = 2
+        definition["requiredEnvironment"] = ["SOME_KEY"]
+        with self.assertRaisesRegex(ValueError, "cannot also be requiredEnvironment"):
+            self.run_prepare(self.recipe_config(definition))
+
+    def test_floor_survives_a_versionless_accepted_run(self):
+        today = self.today()
+        self.mirror_version = today.isoformat()
+        config = self.v2()
+        self.run_prepare(config)
+        self.mirror_version = urllib.error.HTTPError("u", 503, "down", {}, None)
+        self.version = "not-a-date"
+        accepted = self.run_prepare(config)["feeds"][0]["retrieval"]
+        self.assertEqual(accepted["freshness"]["value"], None)
+        self.assertEqual(gtfs.freshness_floor({}, self.state, "one"), today.isoformat())
+
     def test_schema_1_refuses_every_schema_2_key(self):
         for key, value in (("freshness", {}), ("identity", {}), ("prefer", "origin"), ("budget", {})):
             definition = self.definition([{"id": "one", "url": "https://source.example/one", key: value}])

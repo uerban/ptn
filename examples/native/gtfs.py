@@ -107,7 +107,8 @@ class Redirect(urllib.request.HTTPRedirectHandler):
 TRANSPORT_STATUS = {401, 403, 404, 429}
 
 
-# Certificate and protocol failures stop an origin; a dropped TLS stream does not.
+# Certificate failures stop an origin; other TLS errors (dropped stream,
+# handshake or protocol failure) fall back like any connection failure.
 TLS_HARD = (ssl.SSLCertVerificationError, ssl.CertificateError)
 
 
@@ -592,10 +593,16 @@ def recipe(config, state, attempt):
     require(re.fullmatch("[a-z0-9_-]+", name), "invalid recipe name")
     definition = json.loads((root / "recipes" / (name + ".json")).read_text())
     require(definition.get("schemaVersion") in {1, 2}, "unsupported recipe schema")
+    SECRET_ENVIRONMENT.clear()
     if definition["schemaVersion"] == 2:
         for source in definition.get("sources", []):
             check_source(source)
             if "auth" in source:
+                require(
+                    source["auth"]["env"]
+                    not in definition.get("requiredEnvironment", []),
+                    "auth env is hidden from steps; it cannot also be requiredEnvironment",
+                )
                 SECRET_ENVIRONMENT.add(source["auth"]["env"])
     else:
         require(
@@ -711,6 +718,10 @@ def check_source(source):
             mirror["url"] != source["url"], "mirror must differ from the origin url"
         )
         require("identity" in source, "a source with a mirror needs identity")
+        require(
+            source.get("prefer", "origin") == "origin" or "freshness" in source,
+            "a mirror-first source needs freshness",
+        )
     require(
         source.get("prefer", "origin") in {"origin", "mirror"},
         "prefer must be origin or mirror",
@@ -721,6 +732,7 @@ def check_source(source):
         require(
             isinstance(auth, dict)
             and set(auth) == {"queryParam", "env"}
+            and all(isinstance(auth[k], str) for k in auth)
             and re.fullmatch("[A-Za-z0-9_-]{1,64}", auth["queryParam"])
             and ENVIRONMENT_NAME.fullmatch(auth["env"]),
             "auth needs queryParam and an upper-case env name",
@@ -745,6 +757,10 @@ def check_source(source):
             and set(budget) == {"requests", "days"}
             and all(type(budget[k]) is int and budget[k] > 0 for k in budget),
             "budget needs positive integer requests and days",
+        )
+        require(
+            budget["days"] <= LEDGER_RETENTION_DAYS,
+            f"budget days must be at most {LEDGER_RETENTION_DAYS}",
         )
         require("auth" in source, "budget applies to credentialed origins")
     if "freshness" in source:
@@ -888,14 +904,21 @@ def freshness_floor(config, state, source_id):
             ) from None
     pointer = state / "latest-validated.json"
     try:
-        result = json.loads(Path(json.loads(pointer.read_text())["result"]).read_text())
+        target = json.loads(pointer.read_text())
+        path = Path(target["result"])
+        require(digest(path) == target["sha256"], "validated result changed")
+        result = json.loads(path.read_text())
         for record in result.get("feeds", []):
             if record.get("sourceId") == source_id:
-                value = ((record.get("retrieval") or {}).get("freshness") or {}).get(
-                    "value"
-                )
-                if value:
-                    values.append(date.fromisoformat(value))
+                retrieval = record.get("retrieval") or {}
+                # An accepted candidate without a readable version keeps the
+                # floor it was checked against, so the floor never drops.
+                for value in (
+                    (retrieval.get("freshness") or {}).get("value"),
+                    retrieval.get("floor"),
+                ):
+                    if value:
+                        values.append(date.fromisoformat(value))
     except (OSError, ValueError, KeyError, TypeError):
         pass
     return max(values).isoformat() if values else None
@@ -1046,7 +1069,11 @@ def acquire(source, state, *, today, floor, credentials=()):
         return accept(kind, raw, retrieval, fresh)
     raise SourceError(
         f"{source['id']}: no usable candidate ("
-        + ", ".join(f"{a['candidate']} {a.get('outcome')}" for a in attempts)
+        + ", ".join(
+            f"{a['candidate']} {a.get('outcome')}"
+            + (f" {a['httpStatus']}" if a.get("outcome") == "http" else "")
+            for a in attempts
+        )
         + ")"
     )
 
