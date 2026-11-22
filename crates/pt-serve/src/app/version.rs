@@ -299,7 +299,16 @@ pub fn version(gen: &Generation, _ctx: &ServerCtx) -> Resp {
         ptb_version = ptb_version,
         city = json_string(&gen.city_slug),
     );
-    json_response(200, body)
+    // Same headers as the Node backend sends on every response, so hosting
+    // checks can compare the served version without knowing the server.
+    Resp::WithHeaders {
+        inner: Box::new(json_response(200, body)),
+        headers: vec![
+            ("X-App-Version", env!("PT_SERVE_APP_VERSION").to_string()),
+            ("X-App-Commit", env!("PT_SERVE_GIT_SHA").to_string()),
+            ("X-API-Version", "1".to_string()),
+        ],
+    }
 }
 
 /// Minimal JSON string escaper (no serde dep needed for these trivial payloads).
@@ -385,6 +394,7 @@ mod tests {
     fn body_of(resp: Resp) -> String {
         match resp {
             Resp::Json { body, .. } => body,
+            Resp::WithHeaders { inner, .. } => body_of(*inner),
             _ => panic!("expected Resp::Json"),
         }
     }
@@ -429,8 +439,16 @@ mod tests {
         .expect("Generation::from_paths over tiny-service-pool.ptb");
         let ctx = ServerCtx::new(gen, test_config(), Metrics::new());
         let gen_now = ctx.current_generation();
-        let body = body_of(version(&gen_now, &ctx));
+        let resp = version(&gen_now, &ctx);
         let app_version = env!("PT_SERVE_APP_VERSION");
+        match &resp {
+            Resp::WithHeaders { headers, .. } => assert!(
+                headers.contains(&("X-App-Version", app_version.to_string())),
+                "/version must send X-App-Version; headers: {headers:?}"
+            ),
+            _ => panic!("/version must carry app headers"),
+        }
+        let body = body_of(resp);
         assert!(
             body.contains(&format!(r#""version":"{app_version}""#)),
             "/version must carry PT_SERVE_APP_VERSION; body: {body}"
