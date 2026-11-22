@@ -1,10 +1,13 @@
 """Refresh failures must never replace the last validated candidate."""
 
-from datetime import date, timedelta
+from concurrent.futures import ProcessPoolExecutor
+from datetime import date, datetime, timedelta, timezone
+import http.client
 import importlib.util
 import io
 import json
 from pathlib import Path
+import ssl
 import tarfile
 import tempfile
 import unittest
@@ -52,7 +55,7 @@ def archive(path, definition, extra=None):
     return path
 
 
-class Refresh(unittest.TestCase):
+class RecipeCase(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -76,6 +79,29 @@ class Refresh(unittest.TestCase):
         ):
             return gtfs.prepare(config or self.config, self.state, validator=self.feed)
 
+    def recipe_config(self, definition, extra=None):
+        path = archive(self.root / "recipe.tar.gz", definition, extra)
+        return {
+            "gtfsRecipe": {
+                "archive": str(path),
+                "sha256": gtfs.digest(path),
+                "name": "test",
+            },
+            "city": "riga",
+            "timezone": "Europe/Riga",
+        }
+
+    def definition(self, sources):
+        return {
+            "schemaVersion": 1,
+            "city": "riga",
+            "timezone": "Europe/Riga",
+            "requiredSourceIds": [s["id"] for s in sources],
+            "sources": sources,
+        }
+
+
+class Refresh(RecipeCase):
     def test_failure_preserves_prior_pointer_and_retains_attempt(self):
         first = self.run_prepare()
         pointer = (self.state / "latest-validated.json").read_bytes()
@@ -101,27 +127,6 @@ class Refresh(unittest.TestCase):
         first = self.run_prepare()
         Path(first["feeds"][0]["path"]).write_bytes(b"bad")
         self.assertFalse(self.run_prepare()["feeds"][0]["reusedPreparation"])
-
-    def recipe_config(self, definition, extra=None):
-        path = archive(self.root / "recipe.tar.gz", definition, extra)
-        return {
-            "gtfsRecipe": {
-                "archive": str(path),
-                "sha256": gtfs.digest(path),
-                "name": "test",
-            },
-            "city": "riga",
-            "timezone": "Europe/Riga",
-        }
-
-    def definition(self, sources):
-        return {
-            "schemaVersion": 1,
-            "city": "riga",
-            "timezone": "Europe/Riga",
-            "requiredSourceIds": [s["id"] for s in sources],
-            "sources": sources,
-        }
 
     def test_multifeed_namespaces_colliding_ids_and_preserves_times(self):
         sources = [
@@ -446,6 +451,415 @@ class HTTP(unittest.TestCase):
                     ),
                     "https://data.gov.lv/october",
                 )
+
+
+def versioned(path, version=None, agencies=("Synthetic",), feed_id="SE-x"):
+    base = fixture(path.with_name(path.name + ".base"))
+    with zipfile.ZipFile(base) as incoming, zipfile.ZipFile(path, "w") as z:
+        for name in incoming.namelist():
+            if name != "agency.txt":
+                z.writestr(name, incoming.read(name))
+        z.writestr(
+            "agency.txt",
+            "agency_id,agency_name,agency_url,agency_timezone\n"
+            + "".join(f"{'a' if i == 0 else f'a{i}'},{n},https://example.org,Europe/Riga\n" for i, n in enumerate(agencies)),
+        )
+        if version is not None:
+            z.writestr(
+                "feed_info.txt",
+                "feed_publisher_name,feed_publisher_url,feed_lang,feed_id,feed_version\n"
+                f"P,https://example.org,sv,{feed_id},{version}\n",
+            )
+    return path
+
+
+ORIGIN = "https://origin.example/feed.zip"
+MIRROR = "https://mirror.example/latest.zip"
+
+
+class Sources(unittest.TestCase):
+    """Schema 2: origin plus mirror, freshness, identity, budget, floor."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.state = self.root / "state"
+        self.today = date(2026, 11, 22)
+        self.responses, self.calls = {}, []
+        environment = patch.dict(gtfs.os.environ, {"PT_FEEDS_BUDGET_DIR": str(self.root / "budget")})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def serve(self, url, value):
+        self.responses[url] = value
+
+    def fake_fetch(self, url, directory, *, allow_http=False, query_secret=None, **kwargs):
+        self.calls.append((url, query_secret))
+        value = self.responses[url]
+        if isinstance(value, BaseException):
+            raise value
+        return value, {"url": url, "sha256": gtfs.digest(value), "httpStatus": 200}
+
+    def zip(self, name, **kwargs):
+        return versioned(self.root / name, **kwargs)
+
+    def source(self, **extra):
+        source = {
+            "id": "sl",
+            "url": ORIGIN,
+            "mirror": {"operator": "Mirror Org", "url": MIRROR},
+            "prefer": "mirror",
+            "freshness": {"signal": "feed_info.feed_version", "format": "%Y-%m-%d", "maxAgeDays": 0},
+            "identity": {"feedInfo": {"feed_id": "SE-x"}, "agencyNames": ["Synthetic"]},
+        }
+        source.update(extra)
+        gtfs.check_source(source)
+        return source
+
+    def acquire(self, source, floor=None):
+        with patch.object(gtfs, "fetch", self.fake_fetch):
+            return gtfs.acquire(source, self.state, today=self.today, floor=floor)
+
+    def test_fresh_mirror_leaves_origin_untouched(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        raw, record = self.acquire(self.source())
+        self.assertEqual([c[0] for c in self.calls], [MIRROR])
+        self.assertEqual(record["candidate"], {"kind": "mirror", "operator": "Mirror Org"})
+        self.assertEqual(record["freshness"]["ageDays"], 0)
+
+    def test_yesterdays_mirror_falls_through_to_origin(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-21"))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        _, record = self.acquire(self.source())
+        self.assertEqual(record["candidate"]["kind"], "origin")
+        self.assertEqual([a["outcome"] for a in record["attempts"]], ["stale", "accepted"])
+
+    def test_all_stale_uses_freshest_and_warns(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-20"))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-21"))
+        _, record = self.acquire(self.source())
+        self.assertEqual(record["candidate"]["kind"], "origin")
+        self.assertTrue(record["freshness"]["stale"])
+        self.assertIn("no fresh candidate", " ".join(record["warnings"]))
+
+    def test_wrong_feed_on_mirror_falls_back_but_origin_is_hard(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22", feed_id="OTHER"))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        self.assertEqual(self.acquire(self.source())[1]["candidate"]["kind"], "origin")
+        self.serve(ORIGIN, self.zip("o2.zip", version="2026-11-22", agencies=("Other",)))
+        with self.assertRaisesRegex(gtfs.SourceError, "origin identity"):
+            self.acquire(self.source(prefer="origin"))
+
+    def test_agency_count_rejects_superset(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22", agencies=("Synthetic", "Extra")))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        source = self.source(identity={"agencyNames": ["Synthetic"], "agencyCount": 1})
+        self.assertEqual(self.acquire(source)[1]["candidate"]["kind"], "origin")
+
+    def test_origin_html_falls_back_to_mirror_with_warning(self):
+        page = self.root / "page.html"
+        page.write_text("<html>maintenance</html>")
+        self.serve(ORIGIN, page)
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        _, record = self.acquire(self.source(prefer="origin"))
+        self.assertEqual(record["candidate"]["kind"], "mirror")
+        self.assertIn("other than a GTFS ZIP", " ".join(record["warnings"]))
+        self.assertIn("mirror used for an origin-first source", record["warnings"])
+
+    def test_transport_failures_fall_back_and_tls_is_hard(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        for error in (
+            urllib.error.HTTPError(ORIGIN, 503, "down", {}, None),
+            urllib.error.HTTPError(ORIGIN, 404, "gone", {}, None),
+            urllib.error.URLError(OSError("refused")),
+            TimeoutError(),
+            http.client.IncompleteRead(b""),
+            ValueError("truncated HTTP response"),
+        ):
+            self.serve(ORIGIN, error)
+            self.assertEqual(self.acquire(self.source(prefer="origin"))[1]["candidate"]["kind"], "mirror")
+        self.serve(ORIGIN, urllib.error.URLError(ssl.SSLError("bad certificate")))
+        with self.assertRaisesRegex(gtfs.SourceError, "tls"):
+            self.acquire(self.source(prefer="origin"))
+        self.serve(ORIGIN, ValueError("HTTPS downgrade redirect refused"))
+        with self.assertRaises(gtfs.SourceError):
+            self.acquire(self.source(prefer="origin"))
+
+    def test_future_or_missing_version_is_unknown(self):
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        source = self.source(identity={"agencyNames": ["Synthetic"]})
+        for version in ("2026-11-24", None, "not-a-date"):
+            self.serve(MIRROR, self.zip(f"m{version}.zip", version=version))
+            self.assertEqual(
+                [a["outcome"] for a in self.acquire(source)[1]["attempts"]],
+                ["freshness-unknown", "accepted"],
+            )
+        self.serve(ORIGIN, self.zip("o-none.zip"))
+        self.serve(MIRROR, urllib.error.HTTPError(MIRROR, 500, "x", {}, None))
+        _, record = self.acquire(source)
+        self.assertIn("origin freshness unknown", record["warnings"])
+
+    def test_mirror_regression_fails_but_origin_is_authoritative(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        with self.assertRaisesRegex(gtfs.SourceError, "older than accepted"):
+            self.acquire(self.source(), floor="2026-11-23")
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        _, record = self.acquire(self.source(prefer="origin"), floor="2026-11-23")
+        self.assertEqual(record["candidate"]["kind"], "origin")
+        self.assertIn("older than accepted", " ".join(record["warnings"]))
+
+    def credentialed(self, **extra):
+        return self.source(
+            auth={"queryParam": "key", "env": "TEST_KEY"},
+            budget={"requests": 2, "days": 30},
+            **extra,
+        )
+
+    def test_missing_or_malformed_credential_skips_origin(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-21"))
+        for value in ("", "secret-value\n", "short"):
+            with patch.dict(gtfs.os.environ, {"TEST_KEY": value}):
+                _, record = self.acquire(self.credentialed())
+            self.assertEqual(record["attempts"][1]["outcome"], "no-credentials")
+            self.assertTrue(record["freshness"]["stale"])
+            self.assertNotIn("secret-value", json.dumps(record))
+
+    def test_budget_exhaustion_uses_stale_mirror_and_counts_every_attempt(self):
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-21"))
+        self.serve(ORIGIN, urllib.error.HTTPError(ORIGIN, 503, "down", {}, None))
+        with patch.dict(gtfs.os.environ, {"TEST_KEY": "secret-value"}):
+            for _ in range(2):
+                self.acquire(self.credentialed())
+            _, record = self.acquire(self.credentialed())
+        self.assertEqual(sum(1 for c in self.calls if c[0] == ORIGIN), 2)
+        self.assertEqual(record["attempts"][1]["outcome"], "no-budget")
+        self.assertTrue(record["freshness"]["stale"])
+        self.assertEqual(self.calls[1][1], ("key", "secret-value"))
+
+    def test_budget_is_shared_per_credential_and_rolls_over(self):
+        directory = self.root / "ledger"
+        budget = {"requests": 2, "days": 30}
+        now = datetime(2026, 11, 22, tzinfo=timezone.utc)
+        self.assertTrue(gtfs.spend_budget(directory, "KEY", budget, now))
+        self.assertTrue(gtfs.spend_budget(directory, "KEY", budget, now))
+        self.assertFalse(gtfs.spend_budget(directory, "KEY", budget, now))
+        self.assertTrue(gtfs.spend_budget(directory, "OTHER", budget, now))
+        later = now + timedelta(days=31)
+        self.assertTrue(gtfs.spend_budget(directory, "KEY", budget, later))
+        self.assertEqual(len((directory / "KEY.ledger").read_text().splitlines()), 1)
+
+    def test_concurrent_spend_never_exceeds_budget(self):
+        directory = self.root / "ledger"
+        budget = {"requests": 5, "days": 30}
+        with ProcessPoolExecutor(4) as pool:
+            granted = list(pool.map(spend, [str(directory)] * 20, [budget] * 20))
+        self.assertEqual(sum(granted), 5)
+
+    def test_shape_validation(self):
+        good = self.source()
+        bad = [
+            {**good, "unknown": 1},
+            {**good, "mirror": {"operator": "M", "url": "http://mirror.example/x.zip"}},
+            {**good, "mirror": {"operator": "M", "url": ORIGIN}},
+            {**good, "prefer": "fastest"},
+            {k: v for k, v in good.items() if k != "identity"},
+            {"id": "x", "discovery": {"kind": "riga-ckan-monthly-v1", "url": ORIGIN}, "mirror": good["mirror"]},
+            {"id": "x", "url": ORIGIN, "discovery": {}},
+            {"id": "x", "url": ORIGIN, "budget": {"requests": 1, "days": 1}},
+            {"id": "x", "url": ORIGIN, "auth": {"queryParam": "key", "env": "lower"}},
+            {"id": "x", "url": ORIGIN, "auth": {"queryParam": "key", "env": "K"}, "allowHTTP": True},
+            {**good, "freshness": {"signal": "Last-Modified", "format": "%Y", "maxAgeDays": 0}},
+        ]
+        for source in bad:
+            with self.assertRaises(ValueError, msg=json.dumps(source)):
+                gtfs.check_source(source)
+
+
+def spend(directory, budget):
+    return gtfs.spend_budget(Path(directory), "KEY", budget)
+
+
+class Credentials(unittest.TestCase):
+    class Response(io.BytesIO):
+        status = 200
+        headers = {}
+
+        def __init__(self, data, url):
+            super().__init__(data)
+            self.url = url
+
+        def geturl(self):
+            return self.url
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.work = Path(self.temp.name)
+
+    def test_key_reaches_request_only(self):
+        with patch.object(gtfs.urllib.request, "build_opener") as builder:
+            builder.return_value.open.return_value = self.Response(
+                b"bytes", "https://origin.example/feed.zip?key=s3cret.value~1&x=1"
+            )
+            path, record = gtfs.fetch(
+                "https://origin.example/feed.zip", self.work, query_secret=("key", "s3cret.value~1")
+            )
+            sent = builder.return_value.open.call_args.args[0].full_url
+            self.assertTrue(sent.endswith("?key=s3cret.value~1"))
+            builder.return_value.open.side_effect = urllib.error.HTTPError(sent, 304, "same", {}, None)
+            _, cached = gtfs.fetch(
+                "https://origin.example/feed.zip", self.work, query_secret=("key", "s3cret.value~1")
+            )
+        self.assertEqual(record["resolvedURL"], "https://origin.example/feed.zip")
+        for name in [p.name for p in self.work.iterdir()]:
+            self.assertNotIn("s3cret", name)
+        for text in [p.read_text() for p in self.work.glob("*.json")] + [json.dumps(record), json.dumps(cached)]:
+            self.assertNotIn("s3cret", text)
+
+    def test_errors_never_carry_key(self):
+        failures = [
+            urllib.error.HTTPError("https://origin.example/f?key=s3cret-value", 403, "no", {}, None),
+            http.client.InvalidURL("URL can't contain control characters. 'key=s3cret-value'"),
+            urllib.error.URLError(OSError("s3cret-value")),
+        ]
+        for failure in failures:
+            with patch.object(gtfs.urllib.request, "build_opener") as builder:
+                builder.return_value.open.side_effect = failure
+                with self.assertRaises(gtfs.SourceError) as caught:
+                    gtfs.fetch("https://origin.example/f", self.work, query_secret=("key", "s3cret-value"))
+            error = caught.exception
+            self.assertNotIn("s3cret", str(error))
+            self.assertIsNone(error.__context__)
+            self.assertIsNone(error.__cause__)
+
+    def test_malformed_key_is_refused_before_any_request(self):
+        with patch.object(gtfs.urllib.request, "build_opener") as builder:
+            for value in ("s3cret-value\n", "s3cret value", "short"):
+                with self.assertRaises(ValueError) as caught:
+                    gtfs.fetch("https://origin.example/f", self.work, query_secret=("key", value))
+                self.assertNotIn("s3cret", str(caught.exception))
+            builder.assert_not_called()
+
+    def test_credentialed_cross_host_redirect_refused(self):
+        request = urllib.request.Request("https://origin.example/f?key=s3cret-value")
+        with self.assertRaises(gtfs.SourceError):
+            gtfs.Redirect(True).redirect_request(
+                request, None, 302, "found", {}, "https://elsewhere.example/f?key=s3cret-value"
+            )
+        self.assertIsNotNone(
+            gtfs.Redirect(True).redirect_request(
+                request, None, 302, "found", {}, "https://origin.example/g"
+            )
+        )
+
+    def test_old_call_shapes_still_work(self):
+        with patch.object(gtfs.urllib.request, "build_opener") as builder:
+            builder.return_value.open.return_value = self.Response(b"x", "https://a.example/f")
+            self.assertEqual(gtfs.fetch("https://a.example/f", self.work)[1]["httpStatus"], 200)
+            builder.return_value.open.side_effect = urllib.error.HTTPError("u", 500, "x", {}, None)
+            with self.assertRaises(urllib.error.HTTPError):
+                gtfs.fetch("https://a.example/f", self.work)
+
+    def test_child_processes_lose_credentials(self):
+        with patch.dict(gtfs.os.environ, {"TEST_SCRUB_KEY": "s3cret-value"}):
+            gtfs.SECRET_ENVIRONMENT.add("TEST_SCRUB_KEY")
+            self.addCleanup(gtfs.SECRET_ENVIRONMENT.discard, "TEST_SCRUB_KEY")
+            self.assertNotIn("TEST_SCRUB_KEY", gtfs.child_environment())
+
+
+class PrepareV2(RecipeCase):
+    """Schema 2 recipes through prepare(): floor, coverage, reuse, redaction."""
+
+    def setUp(self):
+        super().setUp()
+        environment = patch.dict(
+            gtfs.os.environ,
+            {"PT_FEEDS_BUDGET_DIR": str(self.root / "budget"), "TEST_KEY": "s3cret-value"},
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.version = None
+        self.mirror_version = None
+
+    def today(self):
+        return gtfs.datetime.now(gtfs.ZoneInfo("Europe/Riga")).date()
+
+    def fake_fetch(self, url, directory, **kwargs):
+        version = self.mirror_version if "mirror" in url else self.version
+        if isinstance(version, BaseException):
+            raise version
+        path = versioned(self.root / f"{abs(hash((url, version)))}.zip", version=version)
+        return path, {"sha256": gtfs.digest(path), "url": url, "checkedAt": "test", "httpStatus": 200}
+
+    def v2(self, **extra):
+        source = {
+            "id": "one",
+            "url": "https://origin.example/feed.zip",
+            "mirror": {"operator": "Mirror Org", "url": "https://mirror.example/latest.zip"},
+            "prefer": "mirror",
+            "auth": {"queryParam": "key", "env": "TEST_KEY"},
+            "freshness": {"signal": "feed_info.feed_version", "format": "%Y-%m-%d", "maxAgeDays": 0},
+            "identity": {"agencyNames": ["Synthetic"]},
+            **extra,
+        }
+        definition = self.definition([source])
+        definition["schemaVersion"] = 2
+        return self.recipe_config(definition)
+
+    def test_floor_from_validated_result_blocks_mirror_regression(self):
+        today = self.today()
+        self.mirror_version = today.isoformat()
+        config = self.v2()
+        first = self.run_prepare(config)
+        self.assertEqual(first["feeds"][0]["retrieval"]["candidate"]["kind"], "mirror")
+        self.mirror_version = (today - timedelta(days=1)).isoformat()
+        self.version = urllib.error.HTTPError("u", 503, "down", {}, None)
+        with self.assertRaisesRegex(gtfs.SourceError, "older than accepted"):
+            self.run_prepare(config)
+        failure = next((self.state / "attempts").glob("*/failure.json")).read_text()
+        self.assertNotIn("s3cret", failure)
+        config["freshnessFloors"] = {"one": (today - timedelta(days=3)).isoformat()}
+        result = self.run_prepare(config)
+        self.assertTrue(result["feeds"][0]["retrieval"]["freshness"]["stale"])
+
+    def test_wiped_state_without_floor_accepts(self):
+        self.mirror_version = (self.today() - timedelta(days=1)).isoformat()
+        self.version = urllib.error.HTTPError("u", 503, "down", {}, None)
+        result = self.run_prepare(self.v2())
+        self.assertNotIn("floor", result["feeds"][0]["retrieval"])
+
+    def test_identical_bytes_reuse_preparation(self):
+        self.mirror_version = self.today().isoformat()
+        config = self.v2()
+        self.run_prepare(config)
+        self.assertTrue(self.run_prepare(config)["feeds"][0]["reusedPreparation"])
+
+    def test_v2_needs_seven_days_from_every_source(self):
+        self.mirror_version = self.today().isoformat()
+        week = [self.today() + timedelta(days=i) for i in range(7)]
+        short = {d.isoformat(): i < 3 for i, d in enumerate(week)}
+        with (
+            patch.object(gtfs, "coverage", return_value=short),
+            self.assertRaisesRegex(ValueError, "coverage"),
+        ):
+            self.run_prepare(self.v2())
+
+    def test_retrieval_and_logs_carry_no_key(self):
+        self.version = self.today().isoformat()
+        self.mirror_version = urllib.error.URLError(OSError("refused"))
+        result = self.run_prepare(self.v2())
+        self.assertEqual(result["feeds"][0]["retrieval"]["candidate"]["kind"], "origin")
+        for path in self.state.rglob("*"):
+            if path.is_file() and path.suffix in {".json", ".log", ".ledger"}:
+                self.assertNotIn("s3cret", path.read_text(), path)
+
+    def test_schema_1_refuses_mirror(self):
+        definition = self.definition(
+            [{"id": "one", "url": "https://o.example/f", "mirror": {"operator": "M", "url": "https://m.example/f"}}]
+        )
+        with self.assertRaisesRegex(ValueError, "schemaVersion 2"):
+            self.run_prepare(self.recipe_config(definition))
 
 
 if __name__ == "__main__":

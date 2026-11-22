@@ -128,6 +128,59 @@ and runs quoting normalization followed by the capture-bound metro repair and
 its direction/timetable contract. Community bytes alone cannot bypass this
 step. The composed recipe still needs a real authenticated acceptance run.
 
+## Mirrors, freshness and request budgets
+
+Recipe `schemaVersion` 2 lets a source name one mirror next to its publisher
+`url` (the origin). Older runtimes refuse schema 2 recipes, so upgrade the
+runtime before the recipe pin. Schema 1 recipes behave exactly as before.
+
+```json
+{
+  "id": "example",
+  "url": "https://publisher.example/gtfs.zip",
+  "auth": {"queryParam": "key", "env": "EXAMPLE_API_KEY"},
+  "budget": {"requests": 40, "days": 30},
+  "mirror": {"operator": "Mirror operator", "url": "https://mirror.example/latest.zip"},
+  "prefer": "mirror",
+  "freshness": {"signal": "feed_info.feed_version", "format": "%Y-%m-%d", "maxAgeDays": 0},
+  "identity": {"feedInfo": {"feed_id": "EX"}, "agencyNames": ["Example Transit"], "agencyCount": 1}
+}
+```
+
+- `prefer` (`origin` by default) picks which candidate is tried first. The
+  other is the fallback. A mirror needs `identity`. Attribution and terms
+  always belong to the publisher, never to the mirror.
+- Fallback on DNS, connection and timeout failures, truncated bodies, HTTP 5xx,
+  401, 403, 404 and 429, and a response that is not a GTFS ZIP. TLS failures
+  and HTTPS-downgrade redirects stop the source.
+- A mirror whose `feed_info` or agencies differ from `identity` is skipped. The
+  origin failing `identity` stops the source: the feed itself changed.
+- `freshness` reads `feed_info.feed_version` as a date and compares it with the
+  local date in the recipe timezone. `maxAgeDays: 0` means today's version. A
+  stale candidate is skipped; when every candidate is stale, the freshest valid
+  one is used and `retrieval.json` marks it `stale`. A mirror without a
+  readable version is skipped; an origin without one is accepted with a warning.
+- A mirror file older than the last accepted version fails the city and keeps
+  the previous candidate. The floor comes from `latest-validated.json` or from
+  `freshnessFloors` (`{"<sourceId>": "YYYY-MM-DD"}`) in the host configuration.
+  Origin data is authoritative and only warns.
+- `auth` adds the named environment variable as a query parameter on origin
+  requests only. It is never written to caches, metadata, results, failures or
+  logs, is removed from the environment of transformation steps and the
+  validator, and is not sent across a cross-host redirect. Values must match
+  `[A-Za-z0-9._~-]{8,256}`; a missing or malformed value skips the origin.
+- `budget` counts origin requests per credential before they are sent,
+  including failures and HTTP 304. The ledger lives in `PT_FEEDS_BUDGET_DIR`
+  (default `<state>/budget`); share one directory between all cities that use
+  the same credential. Manual and dry runs spend the same budget.
+- Schema 2 requires seven days of service from every source, not only from the
+  city as a whole.
+- `retrieval.json` records `candidate`, every `attempts` outcome (no URLs),
+  `freshness`, `floor` and `warnings`.
+
+The first run after upgrading the runtime prepares every source again, because
+reuse is bound to the runtime checksum.
+
 ## Change history
 
 After every successful publication the host keeps a copy of the published
