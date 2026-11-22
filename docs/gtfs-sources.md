@@ -151,9 +151,10 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   other is the fallback. A mirror needs `identity`. Attribution and terms
   always belong to the publisher, never to the mirror.
 - Fallback on DNS, connection and timeout failures, truncated bodies, HTTP 5xx,
-  401, 403, 404 and 429, a response that is not a GTFS ZIP, and a credentialed
-  redirect to another host. TLS failures and HTTPS-downgrade redirects on the
-  origin stop the source; on the mirror they only skip it.
+  401, 403, 404 and 429, a dropped TLS connection, a response that is not a
+  readable GTFS ZIP, and a credentialed redirect to another host. Certificate
+  failures and HTTPS-downgrade redirects on the origin stop the source; on the
+  mirror they only skip it.
 - A mirror whose `feed_info` or agencies differ from `identity`, or cannot be
   read, is skipped. The origin failing either stops the source: the feed itself
   changed.
@@ -169,18 +170,24 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   floor can raise it but never lower it. Origin data is authoritative and only
   warns.
 - `auth` adds the named environment variable as a query parameter on origin
-  requests only. It is never written to caches, metadata, results, failures or
+  requests only, and only when the host configuration lists that name in
+  `credentials` (`["EXAMPLE_API_KEY"]`); otherwise the origin is skipped with a
+  warning. Runtime names (`PT_FEEDS_*`, `PTN_*`, `GITHUB_TOKEN`, `GH_TOKEN`,
+  `HOME`, `PATH`, `SSH_AUTH_SOCK`) are refused, and so is an origin URL that
+  already sets the parameter. It is never written to caches, metadata, results, failures or
   logs, is removed (with `PT_FEEDS_TOKEN`) from the environment of
   transformation steps and the validator, and is not sent across a cross-host redirect. Values must match
   `[A-Za-z0-9._~-]{8,256}`; a missing or malformed value skips the origin.
-- `budget` counts origin requests per credential before they are sent,
+- `budget` counts origin requests per `auth.env` name before they are sent,
   including failures and HTTP 304. Each source counts only its own window, and
   the ledger keeps 400 days of history, so sources that share a credential
   with different windows never erase each other's requests. The ledger lives in `PT_FEEDS_BUDGET_DIR`
   (default `<state>/budget`); share one directory between all cities that use
-  the same credential. Manual and dry runs spend the same budget.
-- Schema 2 requires seven days of service from every source, not only from the
-  city as a whole.
+  the same credential, and give one key one env name everywhere. Manual and dry
+  runs spend the same budget.
+- A source with a `mirror` must have service on each of the next seven days
+  by itself, so a stale mirror cannot hide behind other components. Other
+  sources keep the schema 1 rule. Schema 1 recipes refuse every schema 2 key.
 - `retrieval.json` records `candidate`, every `attempts` outcome (no URLs),
   `freshness`, `floor` and `warnings`.
 

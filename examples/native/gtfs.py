@@ -107,6 +107,10 @@ class Redirect(urllib.request.HTTPRedirectHandler):
 TRANSPORT_STATUS = {401, 403, 404, 429}
 
 
+# Certificate and protocol failures stop an origin; a dropped TLS stream does not.
+TLS_HARD = (ssl.SSLCertVerificationError, ssl.CertificateError)
+
+
 def classify(error):
     """Return (outcome, HTTP status, may fall back). Never inspects URLs."""
     if isinstance(error, SourceError):
@@ -119,11 +123,16 @@ def classify(error):
         )
     if isinstance(error, urllib.error.URLError):
         reason = error.reason
-        if isinstance(reason, (ssl.SSLError, ssl.CertificateError)):
+        if isinstance(reason, TLS_HARD):
             return "tls", None, False
+        if isinstance(reason, ssl.SSLError):
+            return "transport", None, True
         return "connect", None, True
-    if isinstance(error, (ssl.SSLError, ssl.CertificateError)):
+    if isinstance(error, TLS_HARD):
         return "tls", None, False
+    if isinstance(error, ssl.SSLError):
+        # EOF, reset or zero-return mid-handshake or mid-body: a dropped connection.
+        return "transport", None, True
     if isinstance(error, (TimeoutError, http.client.HTTPException, ConnectionError)):
         return "transport", None, True
     if isinstance(error, ValueError):
@@ -591,9 +600,10 @@ def recipe(config, state, attempt):
     else:
         require(
             not any(
-                "mirror" in s or "auth" in s for s in definition.get("sources", [])
+                (V2_SOURCE_KEYS - V1_SOURCE_KEYS) & set(s)
+                for s in definition.get("sources", [])
             ),
-            "mirrors and credentials need recipe schemaVersion 2",
+            "mirrors, credentials, freshness and identity need recipe schemaVersion 2",
         )
     require(
         not definition.get("blockedReason"),
@@ -658,6 +668,16 @@ V2_SOURCE_KEYS = V1_SOURCE_KEYS | {
 }
 
 
+RESERVED_ENVIRONMENT = {
+    "PT_FEEDS_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "HOME",
+    "PATH",
+    "SSH_AUTH_SOCK",
+}
+
+
 def check_source(source):
     """Schema 2 source shape: one origin `url` or `discovery`, optional mirror."""
     unknown = set(source) - V2_SOURCE_KEYS
@@ -679,7 +699,8 @@ def check_source(source):
             isinstance(mirror, dict)
             and set(mirror) == {"operator", "url"}
             and isinstance(mirror["operator"], str)
-            and mirror["operator"].strip(),
+            and mirror["operator"].strip()
+            and isinstance(mirror["url"], str),
             "mirror needs exactly operator and url",
         )
         require(
@@ -704,13 +725,25 @@ def check_source(source):
             and ENVIRONMENT_NAME.fullmatch(auth["env"]),
             "auth needs queryParam and an upper-case env name",
         )
+        require(
+            auth["env"] not in RESERVED_ENVIRONMENT
+            and not auth["env"].startswith(("PT_FEEDS_", "PTN_")),
+            "auth env names a runtime variable",
+        )
+        require(
+            auth["queryParam"]
+            not in urllib.parse.parse_qs(
+                urllib.parse.urlsplit(source["url"]).query, keep_blank_values=True
+            ),
+            "source URL already sets the credential parameter",
+        )
         require(not source.get("allowHTTP"), "credentials require HTTPS")
     if "budget" in source:
         budget = source["budget"]
         require(
             isinstance(budget, dict)
             and set(budget) == {"requests", "days"}
-            and all(isinstance(budget[k], int) and budget[k] > 0 for k in budget),
+            and all(type(budget[k]) is int and budget[k] > 0 for k in budget),
             "budget needs positive integer requests and days",
         )
         require("auth" in source, "budget applies to credentialed origins")
@@ -721,7 +754,7 @@ def check_source(source):
             and set(freshness) == {"signal", "format", "maxAgeDays"}
             and freshness["signal"] == "feed_info.feed_version"
             and isinstance(freshness["format"], str)
-            and isinstance(freshness["maxAgeDays"], int)
+            and type(freshness["maxAgeDays"]) is int
             and freshness["maxAgeDays"] >= 0,
             "freshness needs signal feed_info.feed_version, format and maxAgeDays",
         )
@@ -738,7 +771,7 @@ def check_source(source):
             and isinstance(identity.get("agencyNames", []), list)
             and (
                 "agencyCount" not in identity
-                or isinstance(identity["agencyCount"], int)
+                or type(identity["agencyCount"]) is int
                 and identity["agencyCount"] > 0
             ),
             "invalid identity",
@@ -868,7 +901,7 @@ def freshness_floor(config, state, source_id):
     return max(values).isoformat() if values else None
 
 
-def acquire(source, state, *, today, floor):
+def acquire(source, state, *, today, floor, credentials=()):
     """Fetch a source from its origin and optional mirror; return (raw, retrieval)."""
     mirror = source.get("mirror")
     order = [("origin", source["url"])]
@@ -912,6 +945,10 @@ def acquire(source, state, *, today, floor):
         attempts.append(attempt)
         secret = None
         if kind == "origin" and "auth" in source:
+            if source["auth"]["env"] not in credentials:
+                attempt["outcome"] = "no-credentials"
+                warnings.append("origin credential not allowed by host configuration")
+                continue
             value = os.environ.get(source["auth"]["env"], "")
             if not SECRET_FORMAT.fullmatch(value):
                 attempt["outcome"] = "no-credentials"
@@ -951,7 +988,7 @@ def acquire(source, state, *, today, floor):
         attempt["httpStatus"] = retrieval.get("httpStatus")
         try:
             check_zip(raw)
-        except (ValueError, zipfile.BadZipFile):
+        except Exception:  # noqa: BLE001 - any unreadable archive is "not a GTFS ZIP"
             attempt["outcome"] = "not-zip"
             if kind == "origin":
                 warnings.append("origin returned something other than a GTFS ZIP")
@@ -1172,6 +1209,14 @@ def _prepare(config, state, attempt, validator):
         for s in sources
         if version == 2 and "freshness" in s
     }
+    credentials = config.get("credentials", [])
+    require(
+        isinstance(credentials, list)
+        and all(
+            isinstance(c, str) and ENVIRONMENT_NAME.fullmatch(c) for c in credentials
+        ),
+        "credentials must be a list of environment names",
+    )
     records = []
     for source in sources:
         source_id = source["id"]
@@ -1180,7 +1225,11 @@ def _prepare(config, state, attempt, validator):
         directory.mkdir()
         if version == 2 and "url" in source:
             raw, retrieval = acquire(
-                source, state, today=today, floor=floors.get(source_id)
+                source,
+                state,
+                today=today,
+                floor=floors.get(source_id),
+                credentials=credentials,
             )
         else:
             url = source_url(source, state, directory)
@@ -1301,11 +1350,12 @@ def _prepare(config, state, attempt, validator):
         day: any(r["serviceCoverage"][day] for r in records)
         for day in records[0]["serviceCoverage"]
     }
-    # Schema 2 needs seven days from every source: a stale mirror must not
-    # hide behind other components of the city.
-    per_source = all if version == 2 else any
+    # A source with a mirror needs seven days by itself, so a stale mirror
+    # cannot hide behind other components; other sources keep the city rule.
+    mirrored = {s["id"] for s in sources if version == 2 and "mirror" in s}
     passed = all(
-        not r["canonicalErrors"] and per_source(r["serviceCoverage"].values())
+        not r["canonicalErrors"]
+        and (all if r["sourceId"] in mirrored else any)(r["serviceCoverage"].values())
         for r in records
     ) and all(city_coverage.values())
     result = {

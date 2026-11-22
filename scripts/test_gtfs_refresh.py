@@ -89,6 +89,7 @@ class RecipeCase(unittest.TestCase):
             },
             "city": "riga",
             "timezone": "Europe/Riga",
+            "credentials": ["TEST_KEY"],
         }
 
     def definition(self, sources):
@@ -517,9 +518,11 @@ class Sources(unittest.TestCase):
         gtfs.check_source(source)
         return source
 
-    def acquire(self, source, floor=None):
+    def acquire(self, source, floor=None, credentials=("TEST_KEY",)):
         with patch.object(gtfs, "fetch", self.fake_fetch):
-            return gtfs.acquire(source, self.state, today=self.today, floor=floor)
+            return gtfs.acquire(
+                source, self.state, today=self.today, floor=floor, credentials=credentials
+            )
 
     def test_fresh_mirror_leaves_origin_untouched(self):
         self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
@@ -576,10 +579,12 @@ class Sources(unittest.TestCase):
             TimeoutError(),
             http.client.IncompleteRead(b""),
             ValueError("truncated HTTP response"),
+            ssl.SSLEOFError("EOF occurred in violation of protocol"),
+            urllib.error.URLError(ssl.SSLZeroReturnError("closed")),
         ):
             self.serve(ORIGIN, error)
             self.assertEqual(self.acquire(self.source(prefer="origin"))[1]["candidate"]["kind"], "mirror")
-        self.serve(ORIGIN, urllib.error.URLError(ssl.SSLError("bad certificate")))
+        self.serve(ORIGIN, urllib.error.URLError(ssl.SSLCertVerificationError("bad certificate")))
         with self.assertRaisesRegex(gtfs.SourceError, "tls"):
             self.acquire(self.source(prefer="origin"))
         self.serve(ORIGIN, ValueError("HTTPS downgrade redirect refused"))
@@ -685,7 +690,7 @@ class Sources(unittest.TestCase):
             self.acquire(self.source(prefer="origin"))
 
     def test_mirror_hard_failure_and_credentialed_redirect_fall_back(self):
-        self.serve(MIRROR, urllib.error.URLError(ssl.SSLError("bad certificate")))
+        self.serve(MIRROR, urllib.error.URLError(ssl.SSLCertVerificationError("bad certificate")))
         self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
         _, record = self.acquire(self.source())
         self.assertEqual(record["candidate"]["kind"], "origin")
@@ -897,8 +902,20 @@ class PrepareV2(RecipeCase):
         week = [self.today() + timedelta(days=i) for i in range(7)]
         full = {d.isoformat(): True for d in week}
         short = {d.isoformat(): i < 3 for i, d in enumerate(week)}
-        sources = [{"id": n, "url": f"https://source.example/{n}"} for n in ("one", "two")]
-        for version, expect_pass in ((1, True), (2, False)):
+        plain = {"id": "one", "url": "https://source.example/one"}
+        mirrored = {
+            "id": "two",
+            "url": "https://source.example/two",
+            "mirror": {"operator": "Mirror Org", "url": "https://mirror.example/two.zip"},
+            "identity": {"agencyNames": ["Synthetic"]},
+        }
+        # Only a source with a mirror must cover seven days alone.
+        cases = (
+            (1, [plain, dict(plain, id="two")], True),
+            (2, [plain, dict(plain, id="two")], True),
+            (2, [plain, mirrored], False),
+        )
+        for version, sources, expect_pass in cases:
             definition = self.definition(sources)
             definition["schemaVersion"] = version
             with patch.object(gtfs, "coverage", side_effect=[full, short]):
@@ -907,6 +924,30 @@ class PrepareV2(RecipeCase):
                 else:
                     with self.assertRaisesRegex(ValueError, "coverage"):
                         self.run_prepare(self.recipe_config(definition))
+
+    def test_credentials_need_host_allowlist_and_never_runtime_names(self):
+        self.version = self.today().isoformat()
+        self.mirror_version = (self.today() - timedelta(days=5)).isoformat()
+        config = self.v2(prefer="origin")
+        config["credentials"] = []
+        retrieval = self.run_prepare(config)["feeds"][0]["retrieval"]
+        self.assertIn("origin credential not allowed by host configuration", retrieval["warnings"])
+        self.assertEqual(retrieval["candidate"]["kind"], "mirror")
+        for env in ("PT_FEEDS_TOKEN", "GITHUB_TOKEN", "PTN_REFRESH_KEY"):
+            with self.assertRaisesRegex(ValueError, "runtime variable"):
+                gtfs.check_source(
+                    {"id": "a", "url": "https://p.example/f.zip", "auth": {"queryParam": "k", "env": env}}
+                )
+        with self.assertRaisesRegex(ValueError, "already sets the credential"):
+            gtfs.check_source(
+                {"id": "a", "url": "https://p.example/f.zip?k=x", "auth": {"queryParam": "k", "env": "KEY"}}
+            )
+
+    def test_schema_1_refuses_every_schema_2_key(self):
+        for key, value in (("freshness", {}), ("identity", {}), ("prefer", "origin"), ("budget", {})):
+            definition = self.definition([{"id": "one", "url": "https://source.example/one", key: value}])
+            with self.assertRaisesRegex(ValueError, "schemaVersion 2"):
+                self.run_prepare(self.recipe_config(definition))
 
     def test_retrieval_and_logs_carry_no_key(self):
         self.version = self.today().isoformat()

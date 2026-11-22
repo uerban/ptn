@@ -94,7 +94,8 @@ def verify_sources(work, served, base, validator):
             'sources': [{'id': 'one', 'url': base + '/origin.zip', 'identity': {'agencyNames': ['Synthetic'], 'agencyCount': 1},
                          'mirror': {'operator': 'Acceptance mirror', 'url': base + '/mirror.zip'}, **source}],
         })
-        return {'city': 'riga', 'timezone': 'Europe/Riga', 'gtfsRecipe': {'archive': str(path), 'sha256': gtfs.digest(path), 'name': 'test'}}
+        return {'city': 'riga', 'timezone': 'Europe/Riga', 'credentials': ['ACCEPTANCE_KEY'],
+                'gtfsRecipe': {'archive': str(path), 'sha256': gtfs.digest(path), 'name': 'test'}}
 
     credentialed = {
         'prefer': 'mirror', 'auth': {'queryParam': 'key', 'env': 'ACCEPTANCE_KEY'},
