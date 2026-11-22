@@ -190,12 +190,18 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
 
   // A rendered symbol label also counts when both its dot and HTML card
   // are outside/absent. Exercise the actual MapLibre collision/query result.
+  // Zooming out drops cards through a debounced timer and a frame. Run them on
+  // the paused clock: on a slow runner the resumed clock can lag past the
+  // assertion timeout.
   await restore();
+  await pauseFrames();
   await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
     h.map.jumpTo({zoom: 14.5});
   });
+  await page.clock.runFor(250);
   await expect(marker).toHaveCount(0);
+  await page.clock.resume();
   await page.waitForFunction(() => {
     const map = (window as any).__fadeHarness.map;
     return map.getLayer("stops-label") && map.queryRenderedFeatures(undefined, {layers: ["stops-label"]})
