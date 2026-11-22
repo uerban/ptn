@@ -48,17 +48,32 @@ fn normalized_env_sha() -> Option<String> {
     })
 }
 
+// Mirrors scripts/app-version.mjs without duplicating its Git walk: CI computes
+// the version once and injects PT_VERSION; anything else is a dev build.
+fn injected_version() -> Option<String> {
+    let raw = std::env::var("PT_VERSION").ok()?;
+    let version = raw.trim();
+    if version.is_empty() {
+        return None;
+    }
+    let pattern = regex::Regex::new(
+        r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-dev(\+[0-9a-f]{7,40})?)?$",
+    )
+    .expect("static regex compiles");
+    if !pattern.is_match(version) {
+        println!(
+            "cargo:warning=PT_VERSION={version:?} is not X.Y.N or X.Y.N-dev[+sha]; falling back to a dev version"
+        );
+        return None;
+    }
+    Some(version.to_string())
+}
+
 fn app_version() -> String {
-    let (major, minor) = backend_major_minor();
-    let commit_count = if git_output(&["rev-parse", "--is-shallow-repository"]).as_deref()
-        == Some("true")
-    {
-        None
-    } else {
-        git_output(&["rev-list", "--count", "HEAD"])
-            .filter(|count| !count.is_empty() && count.bytes().all(|byte| byte.is_ascii_digit()))
-    };
-    format!("{major}.{minor}.{}", commit_count.as_deref().unwrap_or("0"))
+    injected_version().unwrap_or_else(|| {
+        let (major, minor) = backend_major_minor();
+        format!("{major}.{minor}.0-dev")
+    })
 }
 
 fn app_commit() -> String {
@@ -92,7 +107,7 @@ fn emit_git_rerun_inputs() {
 
 fn main() {
     // Mirror scripts/build-info.mjs, the production Node/frontend contract:
-    // package major.minor + non-shallow Git commit count, with the same
+    // injected PT_VERSION (else major.minor.0-dev), with the same
     // explicit-SHA/local-Git/unknown commit precedence.
     println!("cargo:rustc-env=PT_SERVE_APP_VERSION={}", app_version());
     println!("cargo:rustc-env=PT_SERVE_GIT_SHA={}", app_commit());
@@ -103,6 +118,7 @@ fn main() {
         .unwrap_or_else(|| jiff::Timestamp::now().to_string());
     println!("cargo:rustc-env=PT_SERVE_BUILT_AT={built_at}");
     emit_git_rerun_inputs();
+    println!("cargo:rerun-if-env-changed=PT_VERSION");
     println!("cargo:rerun-if-env-changed=PT_SERVE_GIT_SHA");
     println!("cargo:rerun-if-env-changed=PT_SERVE_BUILT_AT");
 

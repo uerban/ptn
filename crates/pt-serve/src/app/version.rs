@@ -289,7 +289,7 @@ pub fn version(gen: &Generation, _ctx: &ServerCtx) -> Resp {
     let ptb_version = gen.reader.header().version;
     let body = format!(
         r#"{{"version":{version},"commit":{commit},"builtAt":{built_at},"bundleHash":{bundle_hash},"generationId":{gen_id},"createdAt":{created_at},"manifestSchemaVersionMax":{schema_max},"ptbVersion":{ptb_version},"city":{city}}}"#,
-        version = json_string(env!("CARGO_PKG_VERSION")),
+        version = json_string(env!("PT_SERVE_APP_VERSION")),
         commit = json_string(env!("PT_SERVE_GIT_SHA")),
         built_at = json_string(env!("PT_SERVE_BUILT_AT")),
         bundle_hash = json_string(&bundle_hash),
@@ -413,6 +413,36 @@ mod tests {
         assert!(
             body.contains(r#""ptbVersion":1"#),
             "/version body must carry the live header version; body: {body}"
+        );
+    }
+
+    /// `/version` and the `X-App-Version` header must report the same
+    /// application version, not the Cargo manifest version.
+    #[test]
+    fn version_body_reports_the_app_version() {
+        let gen = Generation::from_paths(
+            &tiny_service_pool_ptb_path(),
+            None,
+            "vilnius".to_string(),
+            pt_core::PatternMode::Off,
+        )
+        .expect("Generation::from_paths over tiny-service-pool.ptb");
+        let ctx = ServerCtx::new(gen, test_config(), Metrics::new());
+        let gen_now = ctx.current_generation();
+        let body = body_of(version(&gen_now, &ctx));
+        let app_version = env!("PT_SERVE_APP_VERSION");
+        assert!(
+            body.contains(&format!(r#""version":"{app_version}""#)),
+            "/version must carry PT_SERVE_APP_VERSION; body: {body}"
+        );
+        let core = app_version.split('-').next().unwrap_or_default();
+        let parts: Vec<&str> = core.split('.').collect();
+        assert!(
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit())),
+            "unexpected app version {app_version:?}"
         );
     }
 
