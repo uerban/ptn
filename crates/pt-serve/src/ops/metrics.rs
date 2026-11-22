@@ -182,7 +182,6 @@ pub struct Metrics {
     // AtomicU64>>` like `reload_total`.
     pub request_timeouts_total: AtomicU64,
 
-
     pub last_good_age_exceeds_retention_total: AtomicU64,
     /// `startup_fallback_active` — `true` when the startup loader fell
     /// back from `current.json` to `last-good.json`. Reflected in `/ready`
@@ -1142,7 +1141,6 @@ pub fn render_body(metrics: &Metrics) -> String {
         metrics.current_generation_id()
     ));
 
-
     body.push_str(
         "# HELP inflight_requests Requests currently dispatched on the public listeners.\n",
     );
@@ -1184,7 +1182,6 @@ pub fn render_body(metrics: &Metrics) -> String {
         "ready_503 {}\n",
         if metrics.ready_503() { 1 } else { 0 }
     ));
-
 
     body.push_str(
         "# HELP request_timeouts_total Requests forcibly closed because their dwell exceeded request_timeout_ms.\n",
@@ -1562,7 +1559,6 @@ Shared_Clean:       1000 kB
         assert!(!m.ready_503());
         assert!(render_body(&m).contains("ready_503 0\n"));
     }
-
 
     #[test]
     fn render_body_emits_operability_surface_on_zero_state() {

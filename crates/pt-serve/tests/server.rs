@@ -18,12 +18,9 @@ fn tiny_ptb_path() -> PathBuf {
 }
 
 fn tiny_transfers_path() -> PathBuf {
-
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../packages/frontend/tests/services/__fixtures__/footpath-transfers.bin")
 }
-
-
 
 #[test]
 fn builds_state_from_tiny_ptb() {
@@ -38,8 +35,6 @@ fn builds_state_from_tiny_ptb() {
     assert!(gen.reader.num_stops() > 0);
     assert!(!gen.bundle_etag.is_empty());
 }
-
-
 
 struct Server {
     child: Child,
@@ -444,8 +439,6 @@ fn ureq_get(url: &str) -> Result<(u16, String), Box<dyn std::error::Error>> {
     }
 }
 
-
-
 #[test]
 fn health_ready_version() {
     let s = spawn(false);
@@ -646,8 +639,6 @@ fn wrong_city_404() {
     );
 }
 
-
-
 /// Blocking POST → (status_code, body_string). Returns Err on connection error.
 fn ureq_post(url: &str, body: &str) -> Result<(u16, String), Box<dyn std::error::Error>> {
     let resp = ureq::post(url)
@@ -832,8 +823,6 @@ fn plan_no_path_is_200_empty_array() {
     assert_eq!(out.trim(), "[]", "no-path body must be empty array");
 }
 
-
-
 /// Return type for the full HTTP helpers: (status, lowercase-headers, raw body).
 type FullResp = Result<(u16, Vec<(String, String)>, Vec<u8>), Box<dyn std::error::Error>>;
 
@@ -1017,8 +1006,6 @@ fn header(headers: &[(String, String)], name: &str) -> Option<String> {
         .find(|(k, _)| k == &name_lower)
         .map(|(_, v)| v.clone())
 }
-
-
 
 #[test]
 fn transfers_fetch_headers_and_304() {
@@ -1233,8 +1220,6 @@ fn gzip_q0_is_not_accepted() {
         "gzip;q=0 must NOT trigger a gzip response"
     );
 }
-
-
 
 #[test]
 fn metrics_exposes_resident_and_plan_counter() {

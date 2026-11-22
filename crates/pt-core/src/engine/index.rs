@@ -1713,8 +1713,6 @@ mod tests {
         );
     }
 
-
-
     /// Unbounded: a one-route bundle with LOCAL [s0,s1,s2,s4] + BRANCH [s0,s1,s3,s4]
     /// → 2 patterns, both from reader_route_idx 0, branch stop only in pattern 1.
     #[test]
@@ -1812,8 +1810,6 @@ mod tests {
         }
     }
 
-
-
     /// `derived_routes_at_stop` under Unbounded: the branch stop (s3 / stop_idx 3)
     /// must appear with `[(pattern_idx=1, reader_route_idx=0)]`; shared stops get
     /// both patterns.  `num_pattern_routes` == 2.
@@ -1876,8 +1872,6 @@ mod tests {
         );
         assert_eq!(idx.max_routes_at_stop(), 2, "max patterns at a single stop");
     }
-
-
 
     /// CoveringMerge: a shorter trip whose stop sequence is a contiguous window of a longer trip
     /// folds into the longer pattern. The folded trip is un-boardable at the covering pattern's

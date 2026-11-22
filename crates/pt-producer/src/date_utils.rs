@@ -182,7 +182,10 @@ mod tests {
         assert!(d >= 20_200_101, "today_yyyymmdd={d} predates 2020");
         // Year component
         let y = d / 10_000;
-        assert!((2020..=2100).contains(&y), "year={y} out of plausible range");
+        assert!(
+            (2020..=2100).contains(&y),
+            "year={y} out of plausible range"
+        );
         // Month [1..12]
         let m = (d / 100) % 100;
         assert!((1..=12).contains(&m), "month={m} out of range");
