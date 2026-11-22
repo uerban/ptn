@@ -40,6 +40,7 @@ AGPL-3.0-or-later.
 pnpm typecheck
 pnpm lint
 pnpm test
+cargo fmt --all --check  # when Rust changed
 cargo test --workspace   # when Rust changed
 ```
 

@@ -805,7 +805,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn within_hours_param_returns_400_invalid_params() {
         let fx = build_fixture(ROUTE_STYLES, LABEL_ANCHORS);

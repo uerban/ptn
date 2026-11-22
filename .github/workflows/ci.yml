@@ -41,6 +41,10 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           cache-profile: release-native
+      - name: Check Rust formatting
+        run: |
+          rustup component add rustfmt
+          cargo fmt --all --check
       - name: Build the browser engine
         working-directory: crates/pt-wasm
         env:

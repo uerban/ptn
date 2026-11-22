@@ -19,7 +19,7 @@ pub struct Query {
     pub entry_stops: Vec<StopWalk>,
     pub exit_stops: Vec<StopWalk>,
     pub departure_secs: i64,
-    pub date: u32, // YYYYMMDD; resolved to active services in-engine
+    pub date: u32,               // YYYYMMDD; resolved to active services in-engine
     pub max_rounds: Option<u32>, // default RAPTOR_MAX_ROUNDS
     pub mobility: Mobility,
     /// Parent GTFS route ordinals excluded before scanning (not pattern ordinals).
@@ -67,7 +67,7 @@ pub enum LegKind {
         reader_route_idx: u32,
         trip_idx: u32,
         route_type: u16,
-        board_stop_idx: u32, // POSITION in route.stop_ids (circular routes)
+        board_stop_idx: u32,  // POSITION in route.stop_ids (circular routes)
         alight_stop_idx: u32, // POSITION, never indexOf
         intermediate_stops: u32,
         /// The scanned pattern's full stop-idx sequence (for frontend leg geometry). Stamped from
