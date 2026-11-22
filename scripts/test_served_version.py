@@ -45,9 +45,13 @@ class ServedVersion(unittest.TestCase):
         self.assertEqual(self.check("0.2.44", "0.2.44", "0.2.44"), "0.2.44")
 
     def test_mismatch_in_body_or_header_fails(self):
-        for body, header in [("0.2.0-dev", "0.2.44"), ("0.2.44", "0.2.0-dev"), ("0.2.44", None)]:
+        for body, header in [("0.2.0-dev", "0.2.44"), ("0.2.44", "0.2.0-dev")]:
             with self.assertRaisesRegex(RuntimeError, "does not match"):
                 self.check("0.2.44", body, header)
+
+    def test_missing_header_fails(self):
+        with self.assertRaisesRegex(RuntimeError, "no X-App-Version header"):
+            self.check("0.2.44", "0.2.44", None)
 
     def test_archive_without_version_is_not_checked(self):
         self.assertIsNone(self.check(None, "0.2.0-dev", "0.2.0-dev"))

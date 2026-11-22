@@ -16,6 +16,8 @@ def check_served_version(url, bundle, context=None):
     with urllib.request.urlopen(url + "/api/vilnius/version", timeout=10, context=context) as response:
         header = response.headers.get("X-App-Version")
         served = json.load(response).get("version")
+    if header is None:
+        raise RuntimeError(f"{url}/api/vilnius/version sent no X-App-Version header (archive version {expected!r})")
     if served != expected or header != expected:
         raise RuntimeError(f"served version {served!r} (header {header!r}) does not match the archive's {expected!r}")
     return served
