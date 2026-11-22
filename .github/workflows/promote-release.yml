@@ -1,15 +1,15 @@
-name: Promote immutable RC to stable draft
-run-name: Promote ${{ inputs.source-rc }} to ${{ inputs.tag }}
+name: Promote prerelease to stable
+run-name: Promote ${{ inputs.source-rc || inputs.tag }} to ${{ inputs.tag }}
 on:
   workflow_dispatch:
     inputs:
-      source-rc:
-        description: Published immutable RC tag (vX.Y.Z-rc.N)
+      tag:
+        description: Published prerelease vX.Y.N to mark stable and latest (or, with source-rc, the legacy stable tag vX.Y.Z)
         required: true
         type: string
-      tag:
-        description: Existing stable tag on the same commit (vX.Y.Z)
-        required: true
+      source-rc:
+        description: Legacy only - published immutable RC tag (vX.Y.Z-rc.N) to copy to a stable draft
+        required: false
         type: string
 permissions:
   contents: write
@@ -33,10 +33,15 @@ jobs:
             sudo apt-get install -y --no-install-recommends gh
           fi
           gh --version
-      - name: Copy exact RC bytes and evidence; never dispatch a build
+      - name: Promote verified release bytes; never dispatch a build
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SOURCE_RC: ${{ inputs.source-rc }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: python3 scripts/promote-release.py "$RELEASE_TAG" --from-rc "$SOURCE_RC"
+        run: |
+          if [ -n "$SOURCE_RC" ]; then
+            python3 scripts/promote-release.py "$RELEASE_TAG" --from-rc "$SOURCE_RC"
+          else
+            python3 scripts/promote-release.py "$RELEASE_TAG"
+          fi

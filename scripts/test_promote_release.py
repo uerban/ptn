@@ -134,5 +134,64 @@ class PromotionTests(unittest.TestCase):
             gh.assert_not_called()
 
 
+    def in_place(self, *, evidence_version='0.2.44', published=None, after=None, check_only=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release = self.files(root)
+            release.update(tag_name='v0.2.44', **(published or {}))
+            runs = [{'status': 'completed', 'conclusion': 'success', 'event': 'workflow_dispatch',
+                     'head_branch': 'main', 'head_sha': REV, 'display_title': f'{title} {REV}',
+                     'path': f'.github/workflows/{workflow}'}
+                    for workflow, title in [('regression.yml', 'Regression gates'), ('release.yml', 'Release validation')]]
+            proof = {'schemaVersion': 1, 'revision': REV, 'passed': True, 'sourceDirty': False,
+                     'runId': '1', 'runner': 'Linux', 'checks': {name: 'success' for name in
+                     ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')}}
+            (root / 'regression.json').write_text(json.dumps(proof))
+            evidence = json.loads((root / 'release-evidence.json').read_text())
+            evidence.update(regressionRunId='1', releaseRunId='2')
+            if evidence_version:
+                evidence['version'] = evidence_version
+            evidence['sha256']['regression.json'] = hashlib.sha256((root / 'regression.json').read_bytes()).hexdigest()
+            (root / 'release-evidence.json').write_text(json.dumps(evidence))
+            for asset in release['assets']:
+                asset['digest'] = 'sha256:' + hashlib.sha256((root / asset['name']).read_bytes()).hexdigest()
+            stable = {**copy.deepcopy(release), 'prerelease': False, **(after or {})}
+            argv = ['promote-release.py', 'v0.2.44'] + (['--check-only'] if check_only else [])
+            with patch.dict('os.environ', GH_REPO='example/ptn'), patch.object(promote, 'api', side_effect=[
+                    release, {'sha': REV}, *runs, stable]), patch.object(promote, 'gh') as gh, \
+                    patch.object(promote.tempfile, 'TemporaryDirectory') as temporary, patch('builtins.print'), \
+                    patch('sys.argv', argv):
+                temporary.return_value.__enter__.return_value = directory
+                promote.main()
+                return [call.args for call in gh.call_args_list]
+
+    def test_release_tag_is_promoted_in_place_without_copying_assets(self):
+        calls = self.in_place()
+        self.assertEqual(calls[0][:3], ('release', 'download', 'v0.2.44'))
+        self.assertEqual(calls[1], ('release', 'edit', 'v0.2.44', '--repo', 'example/ptn', '--prerelease=false', '--latest'))
+        self.assertEqual(len(calls), 2)
+
+    def test_check_only_does_not_edit(self):
+        self.assertEqual([call[:2] for call in self.in_place(check_only=True)], [('release', 'download')])
+
+    def test_in_place_requires_a_published_immutable_prerelease(self):
+        for field, value in [('draft', True), ('prerelease', False), ('immutable', False)]:
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'published immutable prerelease'):
+                self.in_place(published={field: value})
+
+    def test_in_place_requires_matching_evidence_version(self):
+        for recorded in ('0.2.43', None):
+            with self.subTest(recorded=recorded), self.assertRaisesRegex(RuntimeError, 'records version'):
+                self.in_place(evidence_version=recorded)
+
+    def test_flag_change_that_alters_assets_is_reported(self):
+        with self.assertRaisesRegex(RuntimeError, 'unchanged assets'):
+            self.in_place(after={'assets': []})
+
+    def test_release_tag_shape(self):
+        for tag in ('v0.2', 'v0.2.44-rc.1', 'v01.2.3'):
+            with self.subTest(tag=tag), self.assertRaisesRegex(RuntimeError, 'Expected a release tag'):
+                promote.validate_published(self.release(), tag, REV)
+
 if __name__ == '__main__':
     unittest.main()

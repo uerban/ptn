@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Promote validated archives for one exact tag commit; never rebuild partial runs."""
+"""Draft a prerelease from validated archives for one exact tag commit; never rebuild partial runs.
+
+Release tags are vX.Y.N, set by a human on a validated main commit; N must be
+the version the release run derived for that commit (release.json). Legacy
+vX.Y.Z-rc.N tags are still accepted for the 0.2.3 line."""
 import argparse
 import hashlib
 import json
@@ -42,6 +46,25 @@ def validate_regression_proof(proof, revision, run_id):
             or set(checks) != REGRESSION_CHECKS
             or any(value != 'success' for value in checks.values())):
         raise RuntimeError('Regression evidence is incomplete, failed or for another source revision')
+
+
+VERSION_TAG = r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+LEGACY_RC_TAG = r'v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*'
+
+
+def tag_version(tag):
+    """X.Y.N for a release tag, None for a legacy RC tag; anything else is rejected."""
+    if re.fullmatch(VERSION_TAG, tag):
+        return tag[1:]
+    if re.fullmatch(LEGACY_RC_TAG, tag):
+        return None
+    raise RuntimeError('Expected a release tag vX.Y.N (or a legacy vX.Y.Z-rc.N)')
+
+
+def check_archive_version(meta, version, name):
+    if version is not None and meta.get('version') != version:
+        raise RuntimeError(f'{name} was built as version {meta.get("version")!r}, not {version}: '
+                           'tag the main commit whose derived version matches the tag')
 
 
 def eligible_run(run, revision, title, allow_main_push=False):
@@ -98,13 +121,12 @@ def main():
     parser.add_argument('tag')
     parser.add_argument('--check-only', action='store_true')
     args = parser.parse_args()
-    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?', args.tag):
-        raise RuntimeError('Expected a version tag such as v0.1.1')
-    if '-' not in args.tag:
-        raise RuntimeError('Stable releases must be promoted from an immutable RC using promote-release.py')
-    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*', args.tag):
-        raise RuntimeError('Expected an RC tag such as v0.2.0-rc.1')
+    version = tag_version(args.tag)
     repo = os.environ['GH_REPO']
+    if version is not None and api(f'repos/{repo}/git/matching-refs/tags/{args.tag}-rc.'):
+        # A legacy stable tag (its RC line exists): drafting it would dispatch
+        # gates for archives that carry no version. Promote the RC instead.
+        raise RuntimeError(f'{args.tag} is a legacy stable tag; use promote-release.py {args.tag} --from-rc <rc tag>')
     revision = api(f'repos/{repo}/commits/{args.tag}')['sha']
     gate = ensure_validation(repo, revision, 'regression.yml', 'Regression gates',
                              {'regression-proof'}, args.check_only)
@@ -133,8 +155,10 @@ def main():
             meta = json.load(bundle.extractfile(f'ptn-{platform}/release.json'))
         if meta['revision'] != revision or meta['sourceDirty'] or meta['platform'] != platform:
             raise RuntimeError(f'Archive source mismatch: {name}')
+        check_archive_version(meta, version, name)
     notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\nSource commit: {revision}\n\n'
-             'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
+             + (f'Version: {version}\n\n' if version else '')
+             + 'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
              'ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
     (dest / 'regression.json').write_text(json.dumps(proof, indent=2) + '\n')
     hashes = {}
@@ -144,6 +168,7 @@ def main():
     (dest / 'release-evidence.json').write_text(json.dumps({
         'schemaVersion': 1, 'revision': revision, 'releaseRunId': str(run['id']),
         'regressionRunId': str(gate['id']), 'sha256': hashes,
+        **({'version': version} if version else {}),
     }, indent=2) + '\n')
     flags = ['--prerelease']
     gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--draft', *flags,
