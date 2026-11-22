@@ -5,7 +5,8 @@
 //    a generated TS module under packages/backend/src/generated/)
 //
 // Behaviour:
-//  - version is the declared version from <packageDir>/package.json, verbatim
+//  - version comes from scripts/app-version.mjs: PT_VERSION env > X.Y.N derived
+//    from main's first-parent history > X.Y.0-dev (see that file)
 //  - commit precedence: GIT_SHA env build-arg (only when it's a hex SHA — a
 //    non-hex value is rejected, not stamped) > local `git rev-parse` > "unknown"
 //  - short SHA + "-dirty" if working copy has uncommitted changes (git path)
@@ -18,50 +19,10 @@
 // only clean path inside the image, where the partial working tree would make
 // a bare `git status` spuriously read "-dirty".
 
-import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-// git exports its repo-discovery variables into every hook it runs, and they
-// take precedence over `cwd`. Inheriting them means that running this script
-// from a hook (or any git-invoked context) reads whichever repository the hook
-// belongs to rather than `cwd`, and stamps that repo's commit and dirty state
-// into the generated build info.
-//
-// Only the discovery variables are dropped, never GIT_SHA — that is this
-// repo's own build arg and takes precedence over the git walk by design.
-const GIT_DISCOVERY_VARS = [
-  "GIT_DIR",
-  "GIT_COMMON_DIR",
-  "GIT_WORK_TREE",
-  "GIT_INDEX_FILE",
-  "GIT_INDEX_VERSION",
-  "GIT_OBJECT_DIRECTORY",
-  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-  "GIT_NAMESPACE",
-  "GIT_PREFIX",
-  "GIT_CEILING_DIRECTORIES",
-];
-
-function gitEnv() {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !GIT_DISCOVERY_VARS.includes(key)),
-  );
-}
-
-function tryGit(cwd, args) {
-  try {
-    return execFileSync("git", args, {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      env: gitEnv(),
-    }).trim();
-  } catch {
-    return null;
-  }
-}
+import { computeAppVersion, tryGit } from "./app-version.mjs";
 
 // Returns a normalized short SHA from the GIT_SHA env var, or null when it is
 // absent / empty / "unknown" / not a hex commit SHA (so the caller falls
@@ -84,8 +45,7 @@ function shaFromEnv() {
 }
 
 export function readBuildInfo(packageDir) {
-  const pkg = JSON.parse(readFileSync(resolve(packageDir, "package.json"), "utf8"));
-  const version = String(pkg.version ?? "0.0.0");
+  const version = computeAppVersion({ cwd: packageDir, packageJson: resolve(packageDir, "package.json") });
   const builtAt = new Date().toISOString();
 
   const envSha = shaFromEnv();

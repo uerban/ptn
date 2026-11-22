@@ -52,7 +52,7 @@ jobs:
       - name: Build and test source
         run: |
           pnpm install --frozen-lockfile
-          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
+          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs scripts/app-version.test.mjs scripts/build-info.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'
           cargo build --release --locked --workspace
           cargo test --workspace --locked
