@@ -132,7 +132,9 @@ step. The composed recipe still needs a real authenticated acceptance run.
 
 Recipe `schemaVersion` 2 lets a source name one mirror next to its publisher
 `url` (the origin). Older runtimes refuse schema 2 recipes, so upgrade the
-runtime before the recipe pin. Schema 1 recipes behave exactly as before.
+runtime before the recipe pin. Schema 1 recipes fetch as before, but for every
+schema, steps and the validator no longer see `PT_FEEDS_TOKEN` or host
+`credentials`, and `requiredEnvironment` cannot name them.
 
 ```json
 {
@@ -152,7 +154,7 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   also needs `freshness`. Attribution and terms
   always belong to the publisher, never to the mirror.
 - Fallback on DNS, connection and timeout failures, truncated bodies, HTTP 5xx,
-  401, 403, 404 and 429, a dropped TLS connection, a response that is not a
+  400, 401, 403, 404, 408, 410 and 429, a dropped TLS connection, a response that is not a
   readable GTFS ZIP, and a credentialed redirect to another host. Certificate
   failures and HTTPS-downgrade redirects on the origin stop the source; on the
   mirror they only skip it.

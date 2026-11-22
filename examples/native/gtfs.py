@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -104,7 +105,7 @@ class Redirect(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
-TRANSPORT_STATUS = {401, 403, 404, 429}
+TRANSPORT_STATUS = {400, 401, 403, 404, 408, 410, 429}
 
 
 # Certificate failures stop an origin; other TLS errors (dropped stream,
@@ -730,7 +731,8 @@ def check_source(source):
             "a mirror-first source needs freshness",
         )
     require(
-        source.get("prefer", "origin") in {"origin", "mirror"},
+        isinstance(source.get("prefer", "origin"), str)
+        and source.get("prefer", "origin") in {"origin", "mirror"},
         "prefer must be origin or mirror",
     )
     require("prefer" not in source or "mirror" in source, "prefer needs a mirror")
@@ -823,18 +825,27 @@ def table(path, name):
             archive.open(name), encoding="utf-8-sig", errors="replace", newline=""
         )
         return [
-            {k: v for k, v in row.items() if isinstance(k, str)}
+            {
+                same(k): same(v)
+                for k, v in row.items()
+                if isinstance(k, str) and isinstance(v, str)
+            }
             for row in csv.DictReader(text)
         ]
+
+
+def same(text):
+    """Comparison form: Unicode NFC, surrounding whitespace removed."""
+    return unicodedata.normalize("NFC", text).strip()
 
 
 def identity_problem(path, identity):
     info = (table(path, "feed_info.txt") or [{}])[0]
     for field, expected in identity.get("feedInfo", {}).items():
-        if info.get(field) != expected:
+        if info.get(field) != same(expected):
             return f"feed_info.{field} differs"
     agencies = [r.get("agency_name") for r in table(path, "agency.txt") or []]
-    missing = set(identity.get("agencyNames", [])) - set(agencies)
+    missing = {same(n) for n in identity.get("agencyNames", [])} - set(agencies)
     if missing:
         return "expected agency missing"
     if "agencyCount" in identity and len(agencies) != identity["agencyCount"]:
@@ -1261,6 +1272,11 @@ def _prepare(config, state, attempt, validator):
         for s in sources
         if version == 2 and "freshness" in s
     }
+    require(
+        not set(credentials)
+        & (RESERVED_ENVIRONMENT | set(definition.get("requiredEnvironment", []))),
+        "host credentials cannot be reserved or recipe-required variables",
+    )
     # Every host credential stays out of steps, the validator and compaction,
     # whether or not this recipe uses it.
     SECRET_ENVIRONMENT.update(credentials)

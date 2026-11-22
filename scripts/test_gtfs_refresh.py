@@ -702,6 +702,14 @@ class Sources(unittest.TestCase):
             with self.assertRaisesRegex(gtfs.SourceError, "unreadable"):
                 self.acquire(self.source(prefer="origin"))
 
+    def test_identity_ignores_whitespace_and_unicode_form(self):
+        padded = self.root / "padded.zip"
+        with zipfile.ZipFile(padded, "w") as z:
+            z.writestr("agency.txt", "agency_id, agency_name\na,  Zarza\u0328d \n")
+            z.writestr("feed_info.txt", "feed_publisher_name ,feed_lang\n Zarz\u0105d ,pl\n")
+        identity = {"feedInfo": {"feed_publisher_name": "Zarz\u0105d"}, "agencyNames": ["Zarz\u0105d"], "agencyCount": 1}
+        self.assertIsNone(gtfs.identity_problem(padded, identity))
+
     def test_mirror_hard_failure_and_credentialed_redirect_fall_back(self):
         self.serve(MIRROR, urllib.error.URLError(ssl.SSLCertVerificationError("bad certificate")))
         self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
