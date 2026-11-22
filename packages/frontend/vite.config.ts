@@ -312,8 +312,14 @@ export default defineConfig({
   // failure surfaces as `WebAssembly.instantiate(): expected magic word` rather
   // than a 404. Excluding it from the optimizer leaves the entry (and its
   // sibling .wasm) served from node_modules, where both resolve.
+  //
+  // workbox-window is imported only through `virtual:pwa-register/react`,
+  // which the dependency scan does not follow. Found on first page load
+  // instead, it re-optimizes the bundle and reloads the page, destroying the
+  // execution context of whatever e2e test runs first on a cold server.
   optimizeDeps: {
     exclude: ["brotli-dec-wasm"],
+    include: ["workbox-window"],
   },
 
   // Page addresses can name stops, lines and coordinates. The deployment
