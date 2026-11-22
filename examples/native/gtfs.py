@@ -8,7 +8,7 @@ This command prepares candidates; only pt-producer publishes serving generations
 
 import argparse
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import fcntl
 import hashlib
 import http.client
@@ -40,7 +40,8 @@ SECRET_ENVIRONMENT = set()
 
 
 def child_environment():
-    return {k: v for k, v in os.environ.items() if k not in SECRET_ENVIRONMENT}
+    hidden = SECRET_ENVIRONMENT | {"PT_FEEDS_TOKEN"}
+    return {k: v for k, v in os.environ.items() if k not in hidden}
 
 
 class SourceError(OSError):
@@ -95,7 +96,9 @@ class Redirect(urllib.request.HTTPRedirectHandler):
             ):
                 if self.credentialed:
                     raise SourceError(
-                        "credentialed cross-host redirect refused", outcome="redirect"
+                        "credentialed cross-host redirect refused",
+                        transport=True,
+                        outcome="redirect",
                     )
                 redirected.remove_header("Authorization")
         return redirected
@@ -740,6 +743,16 @@ def check_source(source):
             ),
             "invalid identity",
         )
+        require(
+            all(
+                isinstance(v, str) and v
+                for v in [
+                    *identity.get("feedInfo", {}).values(),
+                    *identity.get("agencyNames", []),
+                ]
+            ),
+            "identity values must be non-empty strings",
+        )
 
 
 def table(path, name):
@@ -768,7 +781,7 @@ def freshness_of(path, specification, today):
     try:
         value = (table(path, "feed_info.txt") or [{}])[0].get("feed_version") or ""
         published = datetime.strptime(value, specification["format"]).date()
-    except (ValueError, KeyError, zipfile.BadZipFile):
+    except (ValueError, KeyError, csv.Error, zipfile.BadZipFile):
         return None
     if published > today + timedelta(days=1):
         return None
@@ -785,6 +798,9 @@ def budget_directory(state):
     return Path(configured) if configured else state / "budget"
 
 
+LEDGER_RETENTION_DAYS = 400
+
+
 def spend_budget(directory, name, budget, now=None):
     """Count one origin request before it is sent; False when the window is spent.
 
@@ -797,6 +813,9 @@ def spend_budget(directory, name, budget, now=None):
     with (directory / (name + ".lock")).open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         since = now - timedelta(days=budget["days"])
+        # Keep history for the longest window any source may use, so a source
+        # with a short window never erases what a longer one counts.
+        keep = now - timedelta(days=max(LEDGER_RETENTION_DAYS, budget["days"]))
         entries = []
         if ledger.exists():
             for line in ledger.read_text().splitlines():
@@ -804,9 +823,9 @@ def spend_budget(directory, name, budget, now=None):
                     stamp = datetime.fromisoformat(line.strip())
                 except ValueError:
                     continue
-                if stamp > since:
+                if stamp > keep:
                     entries.append(stamp)
-        if len(entries) >= budget["requests"]:
+        if sum(stamp > since for stamp in entries) >= budget["requests"]:
             return False
         entries.append(now)
         temporary = ledger.with_name(ledger.name + ".tmp")
@@ -819,24 +838,34 @@ def spend_budget(directory, name, budget, now=None):
 
 
 def freshness_floor(config, state, source_id):
-    """Last accepted freshness value: host config first, then the validated result.
+    """Last accepted freshness date: the newer of host config and validated result.
 
     Read regardless of recipe or runtime identity so upgrades keep the floor.
+    A configured floor can raise the floor but never lower it.
     """
-    floors = config.get("freshnessFloors", {})
-    if source_id in floors:
-        return floors[source_id]
+    values = []
+    configured = config.get("freshnessFloors", {})
+    require(isinstance(configured, dict), "freshnessFloors must be an object")
+    if source_id in configured:
+        try:
+            values.append(date.fromisoformat(configured[source_id]))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"freshnessFloors.{source_id} must be YYYY-MM-DD"
+            ) from None
     pointer = state / "latest-validated.json"
     try:
         result = json.loads(Path(json.loads(pointer.read_text())["result"]).read_text())
         for record in result.get("feeds", []):
             if record.get("sourceId") == source_id:
-                return ((record.get("retrieval") or {}).get("freshness") or {}).get(
+                value = ((record.get("retrieval") or {}).get("freshness") or {}).get(
                     "value"
                 )
+                if value:
+                    values.append(date.fromisoformat(value))
     except (OSError, ValueError, KeyError, TypeError):
-        return None
-    return None
+        pass
+    return max(values).isoformat() if values else None
 
 
 def acquire(source, state, *, today, floor):
@@ -850,13 +879,9 @@ def acquire(source, state, *, today, floor):
     specification = source.get("freshness")
     attempts, warnings, stale = [], [], []
 
+    regressed = []
+
     def accept(kind, raw, retrieval, fresh):
-        if fresh and floor and kind == "mirror" and fresh["value"] < floor:
-            raise SourceError(
-                f"{source['id']}: mirror data {fresh['value']} is older than "
-                f"accepted {floor}",
-                outcome="regressed",
-            )
         if fresh and floor and kind == "origin" and fresh["value"] < floor:
             warnings.append(
                 f"origin data {fresh['value']} is older than accepted {floor}"
@@ -915,11 +940,13 @@ def acquire(source, state, *, today, floor):
             )
             if kind == "origin" and status in {401, 403} and secret:
                 warnings.append(f"origin refused credential (HTTP {status})")
-            if not transport:
+            if not transport and kind == "origin":
                 raise SourceError(
                     f"{source['id']}: {kind} {outcome} failure ({type(error).__name__})",
                     outcome=outcome,
                 ) from None
+            if not transport:
+                warnings.append(f"mirror {outcome} failure")
             continue
         attempt["httpStatus"] = retrieval.get("httpStatus")
         try:
@@ -929,18 +956,33 @@ def acquire(source, state, *, today, floor):
             if kind == "origin":
                 warnings.append("origin returned something other than a GTFS ZIP")
             continue
-        if "identity" in source:
-            problem = identity_problem(raw, source["identity"])
-            if problem:
-                attempt["outcome"] = "identity"
-                if kind == "origin":
-                    raise SourceError(
-                        f"{source['id']}: origin identity changed: {problem}"
-                    )
-                continue
-        fresh = None
+        try:
+            problem = (
+                identity_problem(raw, source["identity"])
+                if "identity" in source
+                else None
+            )
+            fresh = freshness_of(raw, specification, today) if specification else None
+        except (ValueError, KeyError, csv.Error, zipfile.BadZipFile) as error:
+            attempt["outcome"] = "unreadable"
+            if kind == "origin":
+                raise SourceError(
+                    f"{source['id']}: origin feed_info/agency unreadable "
+                    f"({type(error).__name__})",
+                    outcome="unreadable",
+                ) from None
+            continue
+        if problem:
+            attempt["outcome"] = "identity"
+            if kind == "origin":
+                raise SourceError(f"{source['id']}: origin identity changed: {problem}")
+            continue
+        if fresh and floor and kind == "mirror" and fresh["value"] < floor:
+            # Never let a mirror move served data backwards; try the next one.
+            attempt["outcome"] = "regressed"
+            regressed.append(fresh["value"])
+            continue
         if specification:
-            fresh = freshness_of(raw, specification, today)
             if fresh is None:
                 if kind == "mirror":
                     attempt["outcome"] = "freshness-unknown"
@@ -952,6 +994,12 @@ def acquire(source, state, *, today, floor):
                 continue
         attempt["outcome"] = "accepted"
         return accept(kind, raw, retrieval, fresh)
+    if not stale and regressed:
+        raise SourceError(
+            f"{source['id']}: mirror data {max(regressed)} is older than "
+            f"accepted {floor}",
+            outcome="regressed",
+        )
     if stale:
         _, kind, raw, retrieval, fresh = max(stale, key=lambda item: item[0])
         warnings.append(f"no fresh candidate; using {kind} data from {fresh['value']}")

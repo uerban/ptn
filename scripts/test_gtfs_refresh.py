@@ -602,6 +602,7 @@ class Sources(unittest.TestCase):
 
     def test_mirror_regression_fails_but_origin_is_authoritative(self):
         self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        self.serve(ORIGIN, urllib.error.HTTPError(ORIGIN, 503, "down", {}, None))
         with self.assertRaisesRegex(gtfs.SourceError, "older than accepted"):
             self.acquire(self.source(), floor="2026-11-23")
         self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
@@ -647,7 +648,51 @@ class Sources(unittest.TestCase):
         self.assertTrue(gtfs.spend_budget(directory, "OTHER", budget, now))
         later = now + timedelta(days=31)
         self.assertTrue(gtfs.spend_budget(directory, "KEY", budget, later))
-        self.assertEqual(len((directory / "KEY.ledger").read_text().splitlines()), 1)
+        self.assertTrue(gtfs.spend_budget(directory, "KEY", budget, later))
+        self.assertFalse(gtfs.spend_budget(directory, "KEY", budget, later))
+
+    def test_short_window_never_erases_long_window_history(self):
+        directory = self.root / "ledger"
+        now = datetime(2026, 11, 22, tzinfo=timezone.utc)
+        long, short = {"requests": 3, "days": 30}, {"requests": 5, "days": 1}
+        for day in range(3):
+            self.assertTrue(gtfs.spend_budget(directory, "KEY", long, now - timedelta(days=day + 2)))
+        self.assertTrue(gtfs.spend_budget(directory, "KEY", short, now))
+        self.assertFalse(gtfs.spend_budget(directory, "KEY", long, now))
+
+    def test_lagging_mirror_below_floor_tries_origin(self):
+        source = self.source(freshness={"signal": "feed_info.feed_version", "format": "%Y-%m-%d", "maxAgeDays": 3})
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-20"))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        _, record = self.acquire(source, floor="2026-11-21")
+        self.assertEqual(record["candidate"]["kind"], "origin")
+        self.assertEqual([a["outcome"] for a in record["attempts"]], ["regressed", "accepted"])
+
+    def test_unreadable_mirror_metadata_is_skipped_origin_is_hard(self):
+        broken = self.zip("broken.zip", version="2026-11-22")
+        with zipfile.ZipFile(broken) as z:
+            members = {n: z.read(n) for n in z.namelist()}
+        members["agency.txt"] = b"agency_id,agency_name\na,Synthetic,extra\n"
+        with zipfile.ZipFile(broken, "w") as z:
+            for name, data in members.items():
+                z.writestr(name, data)
+        self.serve(MIRROR, broken)
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        _, record = self.acquire(self.source())
+        self.assertEqual([a["outcome"] for a in record["attempts"]], ["unreadable", "accepted"])
+        self.serve(ORIGIN, broken)
+        with self.assertRaisesRegex(gtfs.SourceError, "unreadable"):
+            self.acquire(self.source(prefer="origin"))
+
+    def test_mirror_hard_failure_and_credentialed_redirect_fall_back(self):
+        self.serve(MIRROR, urllib.error.URLError(ssl.SSLError("bad certificate")))
+        self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
+        _, record = self.acquire(self.source())
+        self.assertEqual(record["candidate"]["kind"], "origin")
+        self.assertIn("mirror tls failure", record["warnings"])
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-22"))
+        self.serve(ORIGIN, gtfs.SourceError("credentialed cross-host redirect refused", transport=True, outcome="redirect"))
+        self.assertEqual(self.acquire(self.source(prefer="origin"))[1]["candidate"]["kind"], "mirror")
 
     def test_concurrent_spend_never_exceeds_budget(self):
         directory = self.root / "ledger"
@@ -766,6 +811,8 @@ class Credentials(unittest.TestCase):
             gtfs.SECRET_ENVIRONMENT.add("TEST_SCRUB_KEY")
             self.addCleanup(gtfs.SECRET_ENVIRONMENT.discard, "TEST_SCRUB_KEY")
             self.assertNotIn("TEST_SCRUB_KEY", gtfs.child_environment())
+        with patch.dict(gtfs.os.environ, {"PT_FEEDS_TOKEN": "github-token"}):
+            self.assertNotIn("PT_FEEDS_TOKEN", gtfs.child_environment())
 
 
 class PrepareV2(RecipeCase):
@@ -819,9 +866,20 @@ class PrepareV2(RecipeCase):
             self.run_prepare(config)
         failure = next((self.state / "attempts").glob("*/failure.json")).read_text()
         self.assertNotIn("s3cret", failure)
+        # A configured floor can raise the validated floor but never lower it.
         config["freshnessFloors"] = {"one": (today - timedelta(days=3)).isoformat()}
-        result = self.run_prepare(config)
-        self.assertTrue(result["feeds"][0]["retrieval"]["freshness"]["stale"])
+        with self.assertRaisesRegex(gtfs.SourceError, "older than accepted"):
+            self.run_prepare(config)
+        self.assertEqual(
+            gtfs.freshness_floor(
+                {"freshnessFloors": {"one": (today + timedelta(days=1)).isoformat()}},
+                self.state,
+                "one",
+            ),
+            (today + timedelta(days=1)).isoformat(),
+        )
+        with self.assertRaisesRegex(ValueError, "YYYY-MM-DD"):
+            gtfs.freshness_floor({"freshnessFloors": {"one": 20261105}}, self.state, "one")
 
     def test_wiped_state_without_floor_accepts(self):
         self.mirror_version = (self.today() - timedelta(days=1)).isoformat()
@@ -836,14 +894,19 @@ class PrepareV2(RecipeCase):
         self.assertTrue(self.run_prepare(config)["feeds"][0]["reusedPreparation"])
 
     def test_v2_needs_seven_days_from_every_source(self):
-        self.mirror_version = self.today().isoformat()
         week = [self.today() + timedelta(days=i) for i in range(7)]
+        full = {d.isoformat(): True for d in week}
         short = {d.isoformat(): i < 3 for i, d in enumerate(week)}
-        with (
-            patch.object(gtfs, "coverage", return_value=short),
-            self.assertRaisesRegex(ValueError, "coverage"),
-        ):
-            self.run_prepare(self.v2())
+        sources = [{"id": n, "url": f"https://source.example/{n}"} for n in ("one", "two")]
+        for version, expect_pass in ((1, True), (2, False)):
+            definition = self.definition(sources)
+            definition["schemaVersion"] = version
+            with patch.object(gtfs, "coverage", side_effect=[full, short]):
+                if expect_pass:
+                    self.assertTrue(self.run_prepare(self.recipe_config(definition))["passed"])
+                else:
+                    with self.assertRaisesRegex(ValueError, "coverage"):
+                        self.run_prepare(self.recipe_config(definition))
 
     def test_retrieval_and_logs_carry_no_key(self):
         self.version = self.today().isoformat()

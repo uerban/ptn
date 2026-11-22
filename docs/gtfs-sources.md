@@ -151,26 +151,32 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   other is the fallback. A mirror needs `identity`. Attribution and terms
   always belong to the publisher, never to the mirror.
 - Fallback on DNS, connection and timeout failures, truncated bodies, HTTP 5xx,
-  401, 403, 404 and 429, and a response that is not a GTFS ZIP. TLS failures
-  and HTTPS-downgrade redirects stop the source.
-- A mirror whose `feed_info` or agencies differ from `identity` is skipped. The
-  origin failing `identity` stops the source: the feed itself changed.
+  401, 403, 404 and 429, a response that is not a GTFS ZIP, and a credentialed
+  redirect to another host. TLS failures and HTTPS-downgrade redirects on the
+  origin stop the source; on the mirror they only skip it.
+- A mirror whose `feed_info` or agencies differ from `identity`, or cannot be
+  read, is skipped. The origin failing either stops the source: the feed itself
+  changed.
 - `freshness` reads `feed_info.feed_version` as a date and compares it with the
   local date in the recipe timezone. `maxAgeDays: 0` means today's version. A
   stale candidate is skipped; when every candidate is stale, the freshest valid
   one is used and `retrieval.json` marks it `stale`. A mirror without a
   readable version is skipped; an origin without one is accepted with a warning.
-- A mirror file older than the last accepted version fails the city and keeps
-  the previous candidate. The floor comes from `latest-validated.json` or from
-  `freshnessFloors` (`{"<sourceId>": "YYYY-MM-DD"}`) in the host configuration.
-  Origin data is authoritative and only warns.
+- A mirror file older than the last accepted version is skipped. If no other
+  candidate is usable, the city fails and keeps the previous candidate. The
+  floor is the newer of `latest-validated.json` and `freshnessFloors`
+  (`{"<sourceId>": "YYYY-MM-DD"}`) in the host configuration, so a configured
+  floor can raise it but never lower it. Origin data is authoritative and only
+  warns.
 - `auth` adds the named environment variable as a query parameter on origin
   requests only. It is never written to caches, metadata, results, failures or
-  logs, is removed from the environment of transformation steps and the
-  validator, and is not sent across a cross-host redirect. Values must match
+  logs, is removed (with `PT_FEEDS_TOKEN`) from the environment of
+  transformation steps and the validator, and is not sent across a cross-host redirect. Values must match
   `[A-Za-z0-9._~-]{8,256}`; a missing or malformed value skips the origin.
 - `budget` counts origin requests per credential before they are sent,
-  including failures and HTTP 304. The ledger lives in `PT_FEEDS_BUDGET_DIR`
+  including failures and HTTP 304. Each source counts only its own window, and
+  the ledger keeps 400 days of history, so sources that share a credential
+  with different windows never erase each other's requests. The ledger lives in `PT_FEEDS_BUDGET_DIR`
   (default `<state>/budget`); share one directory between all cities that use
   the same credential. Manual and dry runs spend the same budget.
 - Schema 2 requires seven days of service from every source, not only from the
