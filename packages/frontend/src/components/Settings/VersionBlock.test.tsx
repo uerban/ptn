@@ -2,9 +2,11 @@ import { describe, test, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { VersionBlock } from "./VersionBlock.tsx";
 
-vi.mock("../../buildInfo.ts", () => ({
+const mockFrontend = vi.hoisted(() => ({
   buildInfo: { version: "0.1.247", commit: "abcd123", builtAt: "2026-05-04T18:23:11Z" },
 }));
+
+vi.mock("../../buildInfo.ts", () => mockFrontend);
 
 vi.mock("../../i18n/index.ts", () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
@@ -25,6 +27,7 @@ const ORIGINAL_CLIPBOARD = navigator.clipboard;
 
 afterEach(() => {
   cleanup();
+  mockFrontend.buildInfo.version = "0.1.247";
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: ORIGINAL_CLIPBOARD });
   mockBackendState.current = {
     status: "ok",
@@ -37,6 +40,25 @@ describe("VersionBlock", () => {
     render(<VersionBlock />);
     expect(screen.getByText(/v0\.1\.247/).textContent).toContain("abcd123");
     expect(screen.getByText(/v0\.1\.246/).textContent).toContain("cafef00d");
+  });
+
+  test("dev builds hide the +sha build metadata in the UI but keep it in the copy", async () => {
+    mockFrontend.buildInfo.version = "0.2.44-dev+abcd1234";
+    mockBackendState.current = {
+      status: "ok",
+      data: { version: "0.2.44-dev+cafef00d", commit: "cafef00d", builtAt: "2026-05-04T18:18:02Z" },
+    };
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    render(<VersionBlock />);
+    expect(screen.getByTestId("version-frontend").textContent).toContain("v0.2.44-dev · abcd123");
+    expect(screen.getByTestId("version-frontend").textContent).not.toContain("+");
+    expect(screen.getByTestId("version-backend").textContent).toContain("v0.2.44-dev · cafef00d");
+
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect((writeText.mock.calls[0] as unknown as [string])[0]).toContain("Frontend: v0.2.44-dev+abcd1234 (abcd123)");
   });
 
   test("renders builtAt timestamps so freshness is visible even when commit is 'unknown'", () => {

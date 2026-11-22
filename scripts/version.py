@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""List and update source package versions across Rust, WASM, and Node."""
+"""List, raise and report versions across Rust, WASM, and Node.
+
+Manifests carry only major.minor (always as X.Y.0). The patch is derived from
+main's history by scripts/app-version.mjs; `current` prints that version.
+"""
 import argparse
 import json
 from pathlib import Path
@@ -8,15 +12,14 @@ import subprocess
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-# SemVer shared by Cargo and npm; build metadata is deliberately unsupported.
-VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?\Z')
+# Manifests hold major.minor only; the patch digit is always 0.
+VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0\Z')
 
 
 def validate_version(version):
-    match = VERSION.fullmatch(version)
-    if not match or (match[4] and any(part.isdigit() and len(part) > 1 and part[0] == '0'
-                                    for part in match[4].split('.'))):
-        raise ValueError('Use SemVer without a v prefix or build metadata, e.g. 0.1.2 or 0.2.0-rc.1')
+    if not VERSION.fullmatch(version):
+        raise ValueError('Bump major.minor only, as X.Y.0 without a v prefix (e.g. 0.3.0); '
+                         'the patch is derived from main history')
 
 
 def replace_toml_version(text, section, version):
@@ -33,34 +36,9 @@ def replace_toml_version(text, section, version):
     return result
 
 
-def plan(root, manifests, version, selected_crates=None, selected_packages=None):
+def plan(root, manifests, version):
     """Validate all inputs and prepare every edit before writing any file."""
     validate_version(version)
-    if selected_crates or selected_packages:
-        selected_crates = selected_crates or []
-        available = {}
-        for relative in manifests:
-            if relative.endswith('Cargo.toml'):
-                package = tomllib.loads((root / relative).read_text()).get('package')
-                if package:
-                    available[package['name']] = relative
-        unknown = set(selected_crates) - available.keys()
-        if unknown:
-            raise ValueError(f'Unknown workspace crates: {", ".join(sorted(unknown))}')
-        chosen = {available[name] for name in selected_crates}
-        packages = {json.loads((root / p).read_text())['name']: p
-                    for p in manifests if p.endswith('package.json')}
-        unknown_packages = set(selected_packages or []) - packages.keys()
-        if unknown_packages:
-            raise ValueError(f'Unknown packages: {", ".join(sorted(unknown_packages))}')
-        chosen.update(packages[name] for name in selected_packages or [])
-        if 'pt-wasm' in (selected_packages or []):
-            if 'pt-wasm' not in available:
-                raise ValueError('Missing pt-wasm crate manifest')
-            chosen.add(available['pt-wasm'])
-        if 'pt-wasm' in selected_crates or 'pt-wasm' in (selected_packages or []):
-            chosen.add('crates/pt-wasm/pkg-web/package.json')
-        manifests = [p for p in manifests if p in chosen]
     changes = {}
     crates = {}
     for relative in manifests:
@@ -81,8 +59,6 @@ def plan(root, manifests, version, selected_crates=None, selected_packages=None)
             else:
                 crates[data['package']['name']] = data['package']['version']
                 if isinstance(data['package']['version'], dict):
-                    if selected_crates or selected_packages:
-                        raise ValueError(f'{relative} inherits its version; use a synchronized bump')
                     if not data['package']['version'].get('workspace'):
                         raise ValueError(f'Unsupported inherited version: {relative}')
                     continue
@@ -137,17 +113,19 @@ def list_versions(root, manifests):
     return rows
 
 
+def current(root, rev):
+    """The derived application version of `rev`, as the release build computes it."""
+    return subprocess.check_output(['node', 'scripts/app-version.mjs', rev], cwd=root, text=True).strip()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('list', help='List every source package and its current version')
-    update = commands.add_parser('bump', help='Set all versions, or just selected components')
-    update.add_argument('version', help='Explicit release version, without v')
-    update.add_argument('--crate', action='append', dest='crates', metavar='NAME',
-                        help='Rust crate to update (repeatable)')
-    update.add_argument('--package', action='append', dest='packages', metavar='NAME',
-                        help='Node or WASM package to update (repeatable)')
-    update.add_argument('--wasm', action='store_true', help='Update pt-wasm crate and JS package together')
+    show = commands.add_parser('current', help='Print the derived application version (X.Y.N[-dev+sha])')
+    show.add_argument('rev', nargs='?', default='HEAD', help='Commit to describe (default HEAD)')
+    update = commands.add_parser('bump', help='Raise major.minor in every manifest')
+    update.add_argument('version', help='New X.Y.0, without v')
     mode = update.add_mutually_exclusive_group()
     mode.add_argument('--dry-run', action='store_true', help='Show files that would change')
     mode.add_argument('--check', action='store_true', help='Fail if selected versions differ')
@@ -159,16 +137,18 @@ def main():
             for kind, name, version, source in list_versions(ROOT, manifests):
                 print(f'{kind:<8} {name:<24} {version:<18} {source}')
             return
-        crates = (args.crates or []) + (['pt-wasm'] if args.wasm else [])
-        changes = plan(ROOT, manifests, args.version, crates, args.packages)
-    except (ValueError, KeyError, OSError) as error:
+        if args.command == 'current':
+            print(current(ROOT, args.rev))
+            return
+        changes = plan(ROOT, manifests, args.version)
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(2, f'{error}\n')
     for path, content in changes.items():
         print(path.relative_to(ROOT))
         if not args.dry_run and not args.check:
             path.write_text(content)
     if args.check and changes:
-        parser.exit(1, 'Selected release versions do not match.\n')
+        parser.exit(1, 'Manifest versions do not match.\n')
     print(f'{args.version}: {len(changes)} file(s) ' + ('need updating' if args.dry_run or args.check else 'updated'))
 
 

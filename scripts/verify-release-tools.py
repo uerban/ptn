@@ -106,6 +106,7 @@ def main():
     parser.add_argument("--platform", help="Required with --bin-dir; an existing release platform name")
     parser.add_argument("--runner", default="")
     parser.add_argument("--revision", help="Required with --bundle")
+    parser.add_argument("--version", help="Expected application version in release.json (--bundle only)")
     args = parser.parse_args()
     runner = shlex.split(args.runner)
     if args.bin_dir:
@@ -128,6 +129,8 @@ def main():
         assert hashlib.sha256(archive.read_bytes()).hexdigest() == expected
         metadata = json.loads((bundle / "release.json").read_text())
         assert metadata["revision"] == args.revision and metadata["sourceDirty"] is False
+        if args.version:
+            assert metadata.get("version") == args.version, (metadata.get("version"), args.version)
         for line in (bundle / "SHA256SUMS").read_text().splitlines():
             expected, name = line.split("  ", 1)
             assert hashlib.sha256((bundle / name).read_bytes()).hexdigest() == expected, name

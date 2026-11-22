@@ -14,11 +14,31 @@ class ArtifactPolicyTests(unittest.TestCase):
     def artifacts(self):
         return [{'name': name, 'expired': False} for name in sorted(draft.REQUIRED)]
 
-    def test_stable_tag_cannot_dispatch_a_rebuild(self):
-        with patch('sys.argv', ['prepare-release-draft.py', 'v0.2.0']), patch.object(draft, 'gh') as gh:
-            with self.assertRaisesRegex(RuntimeError, 'promoted from an immutable RC'):
+    def test_malformed_tag_is_rejected_before_any_github_call(self):
+        for tag in ('v0.2', 'v0.2.44-rc', 'v01.2.3', '0.2.44', 'v0.2.44-dev+abcdef12'):
+            with self.subTest(tag=tag), patch('sys.argv', ['prepare-release-draft.py', tag]), \
+                    patch.object(draft, 'gh') as gh, self.assertRaisesRegex(RuntimeError, 'Expected a release tag'):
                 draft.main()
             gh.assert_not_called()
+
+    def test_legacy_stable_tag_is_refused_before_any_gate_runs(self):
+        with patch('sys.argv', ['prepare-release-draft.py', 'v0.2.3']), patch.dict('os.environ', GH_REPO='example/ptn'), \
+                patch.object(draft, 'api', return_value=[{'ref': 'refs/tags/v0.2.3-rc.4'}]) as api, \
+                patch.object(draft, 'gh') as gh, self.assertRaisesRegex(RuntimeError, 'legacy stable tag'):
+            draft.main()
+        api.assert_called_once_with('repos/example/ptn/git/matching-refs/tags/v0.2.3-rc.')
+        gh.assert_not_called()
+
+    def test_release_tags_carry_their_version_and_legacy_rc_tags_do_not(self):
+        self.assertEqual(draft.tag_version('v0.2.44'), '0.2.44')
+        self.assertIsNone(draft.tag_version('v0.2.3-rc.4'))
+
+    def test_archive_must_be_built_as_the_tagged_version(self):
+        draft.check_archive_version({'version': '0.2.44'}, '0.2.44', 'ptn-linux-x86_64.tar.gz')
+        draft.check_archive_version({}, None, 'ptn-linux-x86_64.tar.gz')  # legacy RC
+        for meta in ({'version': '0.2.43'}, {'version': '0.2.44-dev+abcdef12'}, {}):
+            with self.subTest(meta=meta), self.assertRaisesRegex(RuntimeError, 'derived version matches'):
+                draft.check_archive_version(meta, '0.2.44', 'ptn-linux-x86_64.tar.gz')
 
     def test_complete_artifacts_are_reused(self):
         self.assertEqual(draft.artifact_state(self.artifacts()), 'ready')

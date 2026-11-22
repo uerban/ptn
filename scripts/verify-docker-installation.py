@@ -12,6 +12,8 @@ import sys
 import time
 import urllib.request
 
+from served_version import check_served_version
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -92,6 +94,7 @@ def main():
         run(["up", "-d"], "up")
         http = f"http://localhost:{http_port}"
         generation = ready(http)
+        served_version = check_served_version(http, ROOT / "release/ptn-linux-x86_64")
         if not args.probe:
             with probe_path.open("w") as output:
                 subprocess.run(command + ["exec", "-T", "transit", "python3", "-", "/var/lib/ptn/vilnius.zip"],
@@ -135,7 +138,8 @@ def main():
         browser(https, "browser-https", True)
         (evidence / "result.json").write_text(json.dumps({"http": True, "localCATLS": True,
             "reload": True, "crossNamespaceRefresh": True, "restart": True,
-            "initialGeneration": generation, "newGeneration": new_generation}, indent=2) + "\n")
+            "initialGeneration": generation, "newGeneration": new_generation,
+            "servedVersion": served_version}, indent=2) + "\n")
         print("PASS: Compose bootstrap, browser HTTP/TLS, reload, cross-namespace refresh, restart")
     finally:
         run(["logs", "--no-color", "--tail", "100"], "container-logs", check=False)

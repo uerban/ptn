@@ -5,6 +5,7 @@
 # The resulting image runs the binary directly — no runtime deps, no shell required.
 ARG RUST_BASE=rust:1.97.1-alpine@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900
 ARG PT_SERVE_GIT_SHA=unknown
+ARG PT_VERSION=
 
 FROM ${RUST_BASE} AS builder
 # HTTP (not HTTPS) so the LAN apt-cacher-ng proxy can cache; integrity is
@@ -15,6 +16,9 @@ RUN --mount=type=cache,id=apk-rust-1.97.1-alpine,target=/var/cache/apk,sharing=l
 WORKDIR /src
 ARG PT_SERVE_GIT_SHA
 ENV PT_SERVE_GIT_SHA=${PT_SERVE_GIT_SHA}
+# PT_VERSION: version from scripts/app-version.mjs; unset → X.Y.0-dev.
+ARG PT_VERSION
+ENV PT_VERSION=${PT_VERSION}
 # CARGO_INCREMENTAL=0: forces a full release build instead of reusing
 # fingerprinted artifacts from the cached /src/target. Incremental codegen
 # isn't byte-deterministic, so a populated target cache could let two builds

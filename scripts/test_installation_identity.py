@@ -64,6 +64,7 @@ class InstallationIdentityTests(unittest.TestCase):
                      io.StringIO('{"status":"ready","servingGenerationId":"initial"}')), \
                  patch.object(verifier.ssl, 'create_default_context'), \
                  patch.object(verifier.time, 'sleep'), \
+                 patch.object(verifier, 'check_served_version', return_value=None), \
                  patch.object(verifier, 'change_stop_label', create=True):
                 with self.assertRaises(ReloadReached):
                     verifier.main()
