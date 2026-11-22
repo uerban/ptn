@@ -4,6 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 import http.client
 import importlib.util
+import csv
 import io
 import json
 from pathlib import Path
@@ -681,13 +682,25 @@ class Sources(unittest.TestCase):
         with zipfile.ZipFile(broken, "w") as z:
             for name, data in members.items():
                 z.writestr(name, data)
+        # A ragged raw row is tolerated: recipe steps repair it later.
+        self.serve(MIRROR, self.zip("m.zip", version="2026-11-20"))
+        self.serve(ORIGIN, broken)
+        self.assertEqual(self.acquire(self.source(prefer="origin"))[1]["candidate"]["kind"], "origin")
         self.serve(MIRROR, broken)
         self.serve(ORIGIN, self.zip("o.zip", version="2026-11-22"))
-        _, record = self.acquire(self.source())
-        self.assertEqual([a["outcome"] for a in record["attempts"]], ["unreadable", "accepted"])
-        self.serve(ORIGIN, broken)
-        with self.assertRaisesRegex(gtfs.SourceError, "unreadable"):
-            self.acquire(self.source(prefer="origin"))
+        real = gtfs.table
+
+        def failing(path, name):
+            if Path(path) == broken:
+                raise csv.Error("line contains NUL")
+            return real(path, name)
+
+        with patch.object(gtfs, "table", failing):
+            _, record = self.acquire(self.source())
+            self.assertEqual([a["outcome"] for a in record["attempts"]], ["unreadable", "accepted"])
+            self.serve(ORIGIN, broken)
+            with self.assertRaisesRegex(gtfs.SourceError, "unreadable"):
+                self.acquire(self.source(prefer="origin"))
 
     def test_mirror_hard_failure_and_credentialed_redirect_fall_back(self):
         self.serve(MIRROR, urllib.error.URLError(ssl.SSLCertVerificationError("bad certificate")))
@@ -959,6 +972,28 @@ class PrepareV2(RecipeCase):
         definition["requiredEnvironment"] = ["SOME_KEY"]
         with self.assertRaisesRegex(ValueError, "cannot also be requiredEnvironment"):
             self.run_prepare(self.recipe_config(definition))
+
+    def test_host_credentials_never_reach_steps(self):
+        with patch.dict(gtfs.os.environ, {"HOST_ONLY_KEY": "abcdefgh12"}):
+            definition = self.definition([{"id": "one", "url": "https://source.example/one"}])
+            config = self.recipe_config(definition)
+            config["credentials"] = ["HOST_ONLY_KEY"]
+            self.run_prepare(config)
+            self.assertNotIn("HOST_ONLY_KEY", gtfs.child_environment())
+            definition["requiredEnvironment"] = ["PT_FEEDS_TOKEN"]
+            with self.assertRaisesRegex(ValueError, "never passed"):
+                self.run_prepare(self.recipe_config(definition))
+
+    def test_floor_follows_an_older_origin_version(self):
+        today = self.today()
+        self.mirror_version = today.isoformat()
+        config = self.v2(prefer="origin")
+        self.version = today.isoformat()
+        self.run_prepare(config)
+        self.version = (today - timedelta(days=2)).isoformat()
+        self.mirror_version = (today - timedelta(days=9)).isoformat()
+        self.run_prepare(config)
+        self.assertEqual(gtfs.freshness_floor({}, self.state, "one"), self.version)
 
     def test_floor_survives_a_versionless_accepted_run(self):
         today = self.today()

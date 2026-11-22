@@ -283,7 +283,10 @@ def _fetch(
                 require(count <= LIMIT, "download exceeds 256 MiB limit")
                 output.write(chunk)
             length = response.headers.get("Content-Length")
-            require(not length or int(length) == count, "truncated HTTP response")
+            require(
+                not length or length.strip().isdigit() and int(length) == count,
+                "truncated HTTP response",
+            )
             output.flush()
             os.fsync(output.fileno())
         sha = digest(temporary)
@@ -617,6 +620,10 @@ def recipe(config, state, attempt):
         definition.get("blockedReason", "blocked recipe"),
     )
     for variable in definition.get("requiredEnvironment", []):
+        require(
+            variable != "PT_FEEDS_TOKEN",
+            "PT_FEEDS_TOKEN is never passed to recipe steps",
+        )
         require(os.environ.get(variable), f"recipe requires {variable}")
     return definition, root, {"archiveSha256": expected, "name": name}
 
@@ -805,10 +812,20 @@ def check_source(source):
 
 
 def table(path, name):
+    """Lenient read of a raw file, before recipe steps repair it.
+
+    Ragged rows and odd bytes are tolerated: only the named columns matter.
+    """
     with zipfile.ZipFile(path) as archive:
         if name not in archive.namelist():
             return None
-        return list(rows(archive, name))
+        text = io.TextIOWrapper(
+            archive.open(name), encoding="utf-8-sig", errors="replace", newline=""
+        )
+        return [
+            {k: v for k, v in row.items() if isinstance(k, str)}
+            for row in csv.DictReader(text)
+        ]
 
 
 def identity_problem(path, identity):
@@ -913,12 +930,11 @@ def freshness_floor(config, state, source_id):
                 retrieval = record.get("retrieval") or {}
                 # An accepted candidate without a readable version keeps the
                 # floor it was checked against, so the floor never drops.
-                for value in (
-                    (retrieval.get("freshness") or {}).get("value"),
-                    retrieval.get("floor"),
-                ):
-                    if value:
-                        values.append(date.fromisoformat(value))
+                value = (retrieval.get("freshness") or {}).get("value") or (
+                    retrieval.get("floor")
+                )
+                if value:
+                    values.append(date.fromisoformat(value))
     except (OSError, ValueError, KeyError, TypeError):
         pass
     return max(values).isoformat() if values else None
@@ -1205,9 +1221,18 @@ def _prepare(config, state, attempt, validator):
         ("gtfsURL" in config) != ("gtfsRecipe" in config),
         "choose exactly one of gtfsURL or gtfsRecipe",
     )
+    credentials = config.get("credentials", [])
+    require(
+        isinstance(credentials, list)
+        and all(
+            isinstance(c, str) and ENVIRONMENT_NAME.fullmatch(c) for c in credentials
+        ),
+        "credentials must be a list of environment names",
+    )
     if "gtfsRecipe" in config:
         definition, root, identity = recipe(config, state, attempt)
     else:
+        SECRET_ENVIRONMENT.clear()
         definition = {
             "city": config.get("city", "vilnius"),
             "timezone": config.get("timezone", "Europe/Vilnius"),
@@ -1236,14 +1261,9 @@ def _prepare(config, state, attempt, validator):
         for s in sources
         if version == 2 and "freshness" in s
     }
-    credentials = config.get("credentials", [])
-    require(
-        isinstance(credentials, list)
-        and all(
-            isinstance(c, str) and ENVIRONMENT_NAME.fullmatch(c) for c in credentials
-        ),
-        "credentials must be a list of environment names",
-    )
+    # Every host credential stays out of steps, the validator and compaction,
+    # whether or not this recipe uses it.
+    SECRET_ENVIRONMENT.update(credentials)
     records = []
     for source in sources:
         source_id = source["id"]

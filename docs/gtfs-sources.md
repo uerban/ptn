@@ -156,8 +156,10 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   readable GTFS ZIP, and a credentialed redirect to another host. Certificate
   failures and HTTPS-downgrade redirects on the origin stop the source; on the
   mirror they only skip it.
-- A mirror whose `feed_info` or agencies differ from `identity`, or cannot be
-  read, is skipped. The origin failing either stops the source: the feed itself
+- `identity` and `freshness` are read leniently from the raw download, before
+  recipe steps (ragged rows and odd bytes are tolerated). A mirror whose
+  `feed_info` or agencies differ from `identity`, or cannot be read at all, is
+  skipped. The origin failing either stops the source: the feed itself
   changed.
 - `freshness` reads `feed_info.feed_version` as a date and compares it with the
   local date in the recipe timezone. `maxAgeDays: 0` means today's version. A
@@ -180,8 +182,8 @@ runtime before the recipe pin. Schema 1 recipes behave exactly as before.
   `HOME`, `PATH`, `SSH_AUTH_SOCK`) are refused, and so is an origin URL that
   already sets the parameter. An `auth.env` is hidden from transformation
   steps, so it cannot also be in `requiredEnvironment`. It is never written to caches, metadata, results, failures or
-  logs, is removed (with `PT_FEEDS_TOKEN`) from the environment of
-  transformation steps and the validator, and is not sent across a cross-host redirect. Values must match
+  logs, is removed (with `PT_FEEDS_TOKEN` and every name in the host
+  `credentials`) from the environment of transformation steps and the validator, and is not sent across a cross-host redirect. Values must match
   `[A-Za-z0-9._~-]{8,256}`; a missing or malformed value skips the origin.
 - `budget` (`days` at most 400) counts origin requests per `auth.env` name before they are sent,
   including failures and HTTP 304. Each source counts only its own window, and
