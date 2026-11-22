@@ -2,8 +2,8 @@
 Copy this file for a release. Replace every {{placeholder}} and remove these
 instructions, unused sections, and rows for platforms not actually attached.
 Describe only changes in the tagged commit compared with the previous release.
-Read component versions from that commit with scripts/version.py list; do not
-assume that every component shares the release tag's version.
+{{VERSION}} is the tag's X.Y.N: the version every component of the tagged
+commit reports (scripts/version.py current <tag>).
 Verify validation claims against the successful run and attached assets.
 Keep limitations specific to what was actually tested. Do not include work
 that exists only on unmerged branches. Edit the draft before publication.
@@ -15,14 +15,6 @@ PTN {{VERSION}} {{ONE_SENTENCE_USER_FACING_SUMMARY}}.
 
 - {{CHANGE_AND_ITS_USER_VISIBLE_EFFECT}}
 - {{FIX_AND_THE_BEHAVIOR_IT_CORRECTS}}
-
-## Component versions
-
-<!-- Include changed components, especially for a crate-specific hotfix. -->
-
-| Component | Previous | Included |
-|---|---|---|
-| {{COMPONENT_NAME}} | {{OLD_VERSION}} | {{NEW_VERSION}} |
 
 ## Downloads and hosting
 

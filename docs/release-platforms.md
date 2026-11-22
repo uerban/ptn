@@ -67,17 +67,52 @@ not require Java. The ARM tool smoke checks do not validate this worker handoff.
 
 ## Versions
 
+Every build reports one application version, in Settings, at `/version`, in
+the `X-App-Version` header and in the archive's `release.json`:
+
+| Build | Version |
+| --- | --- |
+| A commit on main | `X.Y.N` |
+| Any other commit (feature branch, PR) | `X.Y.N-dev+<sha>` |
+| A branch that raises major.minor, not yet merged | `X.Y.0-dev+<sha>` |
+| No usable history (shallow clone, no git) | `X.Y.0-dev` |
+
+`X.Y` comes from the root `package.json`. `N` counts main's first-parent
+commits since the merge that introduced `X.Y`; every merge counts, so numbers
+between releases have gaps by design. For a commit off main, `N` is that of the
+newest main commit it builds on. The same commit always yields the same version.
+`python3 scripts/version.py current [rev]` prints it.
+
+`release.yml` computes the version once from full history and passes it to
+every build as `PT_VERSION`, so all archives of a run agree. Pull request CI
+builds from a shallow clone and shows `X.Y.0-dev`. Image builds outside CI can
+pass the computed value with `--build-arg PT_VERSION=...`.
+
 Download only assets actually listed on the chosen release. `v0.1.0` contains
 the Linux x86_64 archive. The expanded matrix applies to subsequent releases;
 it does not change that tag or its source revision. For build and packaging
 instructions, see the [source README](https://github.com/uerban/ptn#installable-archive).
-Tags with a prerelease suffix, such as `v0.1.1-rc.1`, create a prerelease
-draft. Ordinary version tags create a regular release draft. Both require manual publication.
+
+## Releasing
+
+1. Pick a main commit whose release validation passed. Its version is in that
+   run's summary and in `python3 scripts/version.py current <sha>`.
+2. Tag it `vX.Y.N` with that exact version and push the tag. `draft-release.yml`
+   creates a prerelease draft. It rejects the tag if the archives were built as
+   another version, which also rejects tags on commits that are not on main.
+3. Publish the draft. It stays a prerelease while it is staged.
+4. Promote it by running `promote-release.yml` with `tag: vX.Y.N`. This clears
+   the prerelease flag and marks it latest; the assets and tag do not change.
+
+There are no release branches and no `-rc` tags. A fix for a release is merged
+to main and released under its own, higher `N`. Legacy `vX.Y.Z-rc.N` releases
+are still drafted, and promoted to a stable `vX.Y.Z` draft with
+`source-rc` set.
 
 Build validation runs on pull requests and main; tags do not rebuild. The
-separate `draft-release.yml` workflow resolves the tag to its exact commit and
-reuses the five archives from a successful main validation run. Checksums and
-archive source metadata are checked before creating the draft.
+draft workflow resolves the tag to its exact commit and reuses the five
+archives from a successful main validation run. Checksums, archive source
+metadata and version are checked before creating the draft.
 
 If no validation run exists, or all required artifacts exist but any have
 expired, draft creation dispatches validation for that exact source commit
@@ -85,61 +120,36 @@ and waits. A failed build or missing required artifact fails immediately;
 a partial successful run is never automatically rebuilt. Rerun validation
 explicitly after fixing a partial run. Final archives are retained for 30 days.
 
-For an existing tag (including tags predating this workflow), manually run
-`draft-release.yml` on main with its `tag` input. This does not move the tag.
+For an existing tag, manually run `draft-release.yml` on main with its `tag`
+input. This does not move the tag.
 
-## Bumping release versions
+## Raising major.minor
 
-Run `pnpm version:bump 0.1.2` (or `python3 scripts/version.py bump 0.1.2`)
-before building a new release. This sets the root and workspace JavaScript
-packages, every Rust crate, the tracked WASM package manifest, and workspace
-entries in `Cargo.lock` to the same explicit version. Prereleases such as
-`0.2.0-rc.1` are supported. Use `--dry-run` to preview edits or `--check` to
-fail if the manifests differ from the requested version.
+The patch is never set by hand. To start a new minor or major, raise it on the
+branch that introduces the change:
+
+```sh
+pnpm version:bump 0.3.0        # or: python3 scripts/version.py bump 0.3.0
+python3 scripts/version.py list
+```
+
+This sets the root and workspace JavaScript packages, every Rust crate, the
+tracked WASM package manifest, and workspace entries in `Cargo.lock` to `X.Y.0`.
+Only `X.Y.0` is accepted. Use `--dry-run` to preview edits or `--check` to fail
+if the manifests differ. The branch builds as `X.Y.0-dev+<sha>`; its merge to
+main is `X.Y.0`, and numbering restarts from there.
 
 The pnpm lockfile uses workspace links and does not store these packages' own
 versions, so it needs no version-only update. Dependency versions, toolchain
-pins, and binary/wire-format versions are unchanged. Rebuild WASM from the
-updated crate before packaging; editing its manifest does not rebuild binaries.
-Review and commit the version changes before validation, then tag that
-validated commit. The script does not create commits, tags, or releases.
-
-For a crate-specific hotfix, use:
-
-```sh
-python3 scripts/version.py bump 0.1.2 --crate pt-serve
-python3 scripts/version.py bump 0.1.2 --crate pt-wasm --dry-run
-```
-
-`--crate` can be repeated. Only selected crate manifests and their workspace
-lockfile entries change; selecting `pt-wasm` also updates its tracked JavaScript
-manifest. Other application and crate versions stay unchanged. `--check` checks
-only the selected scope. A subsequent synchronized bump sets everything to its
-explicit target version again. Version bumps do not publish standalone crates
-or create a release; build and validate the resulting commit as usual.
-
-List actual versions read from the source manifests:
-
-```sh
-python3 scripts/version.py list
-python3 scripts/version.py bump 0.1.2 --package @pt/frontend
-python3 scripts/version.py bump 0.1.2 --package @pt/backend
-python3 scripts/version.py bump 0.1.2 --wasm
-```
-
-Use names shown by `list`. Select the root Node package with `--package ptn`.
-`--package` and `--crate` are repeatable and can be combined. WASM's crate
-and JavaScript manifest stay paired, including when selected with
-`--package pt-wasm`. Listing reads source manifests rather than built archives.
+pins, and binary/wire-format versions are unchanged. The script does not create
+commits, tags, or releases.
 
 ## Release notes
 
-Use the [release-notes template](templates/release-notes.md) for both functional
-releases and component hotfixes. Copy it to a temporary file, fill its
-placeholders from the tagged source, compare with the previous release, and
-check the successful validation run and attached assets. Include actual
-component versions for hotfixes; they can differ from the release tag. Remove
-unused sections and template comments before publishing.
+Use the [release-notes template](templates/release-notes.md). Copy it to a
+temporary file, fill its placeholders from the tagged source, compare with the
+previous release, and check the successful validation run and attached assets.
+Remove unused sections and template comments before publishing.
 
 The draft workflow adds basic provenance notes automatically. Replace those
 notes with the reviewed release message before publication:
@@ -147,7 +157,7 @@ notes with the reviewed release message before publication:
 ```sh
 cp docs/templates/release-notes.md /tmp/ptn-release-notes.md
 # Edit /tmp/ptn-release-notes.md and replace all placeholders.
-gh release edit vX.Y.Z --repo uerban/ptn --notes-file /tmp/ptn-release-notes.md
+gh release edit vX.Y.N --repo uerban/ptn --notes-file /tmp/ptn-release-notes.md
 ```
 
 This updates the existing draft. Publish it separately after the release notes
