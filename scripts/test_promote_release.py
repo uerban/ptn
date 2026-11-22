@@ -104,13 +104,16 @@ class PromotionTests(unittest.TestCase):
             (root / 'release-evidence.json').write_text(json.dumps(evidence))
             for asset in release['assets']:
                 asset['digest'] = 'sha256:' + hashlib.sha256((root / asset['name']).read_bytes()).hexdigest()
+            stable_draft = {**release, 'tag_name': 'v0.2.0', 'draft': True}
+            listing = json.dumps([[{'tag_name': 'v0.2.0-rc.1', 'draft': False}, stable_draft]])
             with patch.dict('os.environ', GH_REPO='example/ptn'), patch.object(promote, 'api', side_effect=[
-                    release, {'sha': REV}, {'sha': REV}, *runs, release]), patch.object(promote, 'gh') as gh, \
+                    release, {'sha': REV}, {'sha': REV}, *runs]), \
+                    patch.object(promote, 'gh', side_effect=lambda *args: listing if args[:2] == ('api', '--paginate') else '') as gh, \
                     patch.object(promote.tempfile, 'TemporaryDirectory') as temporary:
                 temporary.return_value.__enter__.return_value = directory
                 with patch('sys.argv', ['promote-release.py', 'v0.2.0', '--from-rc', 'v0.2.0-rc.1']):
                     promote.main()
-                return directory, [call.args for call in gh.call_args_list]
+                return directory, [call.args for call in gh.call_args_list if call.args[0] != 'api']
 
     def test_promotion_copies_every_asset_without_workflow_dispatch(self):
         for events in (('workflow_dispatch', 'workflow_dispatch'), ('workflow_dispatch', 'push')):
@@ -120,6 +123,13 @@ class PromotionTests(unittest.TestCase):
                 uploaded = {Path(arg).name for arg in calls[1] if arg.startswith(directory + '/')}
                 self.assertEqual(uploaded, promote.ARCHIVES | promote.EVIDENCE)
                 self.assertIn('--draft', calls[1])
+
+    def test_stable_draft_is_found_although_tag_lookup_skips_drafts(self):
+        listing = json.dumps([[{'tag_name': 'v0.2.3', 'draft': False}], [{'tag_name': 'v0.2.3', 'draft': True, 'id': 7}]])
+        with patch.object(promote, 'gh', return_value=listing):
+            self.assertEqual(promote.draft_release('example/ptn', 'v0.2.3')['id'], 7)
+        with patch.object(promote, 'gh', return_value='[[]]'), self.assertRaisesRegex(RuntimeError, 'found 0'):
+            promote.draft_release('example/ptn', 'v0.2.3')
 
     def test_regression_proof_from_push_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'trusted exact-commit'):

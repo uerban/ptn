@@ -73,6 +73,15 @@ def verify_downloads(directory, release, revision):
     return evidence
 
 
+def draft_release(repo, tag):
+    """A draft release by tag. /releases/tags/{tag} only returns published releases."""
+    pages = json.loads(gh('api', '--paginate', '--slurp', f'repos/{repo}/releases?per_page=100'))
+    matches = [r for page in pages for r in page if r.get('tag_name') == tag and r.get('draft')]
+    if len(matches) != 1:
+        raise RuntimeError(f'Expected one draft release for {tag}, found {len(matches)}')
+    return matches[0]
+
+
 def verify_evidence(repo, tag, release, revision, directory):
     """Download the release, check its bytes and that its evidence names trusted exact-commit runs."""
     gh('release', 'download', tag, '--repo', repo, '--dir', str(directory))
@@ -146,7 +155,7 @@ def main():
                  'Environment acceptance is recorded separately by operators.')
         gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--draft',
            '--title', args.tag, '--notes', notes, *(str(directory / name) for name in sorted(ARCHIVES | EVIDENCE)))
-        target = api(f'repos/{repo}/releases/tags/{args.tag}')
+        target = draft_release(repo, args.tag)
         source_digests = {a['name']: a['digest'] for a in release['assets']}
         if {a['name']: a.get('digest') for a in target['assets']} != source_digests:
             raise RuntimeError('Uploaded stable assets differ from the RC; leave draft unpublished')
