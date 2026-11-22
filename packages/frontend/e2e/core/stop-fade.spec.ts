@@ -55,19 +55,24 @@ test("urban stop exit fades card and dot together without accepting clicks @mock
   const marker = page.locator('[data-fade-harness] [data-stop-id="fade-stop"]');
   await expect(marker).toBeAttached();
   await page.waitForFunction(() => (window as any).__fadeHarness.map?.getSource("stops-source"));
-  const badgeUpdate = await page.evaluate(async () => {
+  await page.evaluate(() => {
     const h = (window as any).__fadeHarness;
     const source = h.map.getSource("stops-source");
     const nativeSetData = source.setData.bind(source);
-    let writes = 0;
-    source.setData = (...args: any[]) => { writes++; return nativeSetData(...args); };
+    h.setDataWrites = 0;
+    h.restoreSetData = () => { source.setData = nativeSetData; };
+    source.setData = (...args: any[]) => { h.setDataWrites++; return nativeSetData(...args); };
     h.render(true, [{routeId: "badge-route", shortName: "B", mode: "BUS"}]);
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    source.setData = nativeSetData;
-    return {writes, text: document.querySelector('[data-fade-harness] [data-stop-id="fade-stop"]')?.textContent};
   });
-  expect(badgeUpdate.text).toContain("B");
-  expect(badgeUpdate.writes).toBe(0);
+  // The card commits in its own React root on the scheduler, not within a
+  // fixed number of frames, so wait for the badge instead of counting frames.
+  await expect(marker).toContainText("B");
+  const badgeWrites = await page.evaluate(() => {
+    const h = (window as any).__fadeHarness;
+    h.restoreSetData();
+    return h.setDataWrites;
+  });
+  expect(badgeWrites).toBe(0);
   // Advance virtual frames explicitly so slow rendering cannot skip a
   // 200 ms fade between the start and the opacity assertion.
   const pauseFrames = async () => {
