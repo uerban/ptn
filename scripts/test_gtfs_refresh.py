@@ -674,6 +674,86 @@ class Sources(unittest.TestCase):
         self.assertEqual(record["candidate"]["kind"], "origin")
         self.assertEqual([a["outcome"] for a in record["attempts"]], ["regressed", "accepted"])
 
+    def windowed(self, name, first, last, calendar=False):
+        """A feed whose service runs from `first` to `last` (YYYYMMDD), no feed_version."""
+        path = self.zip(name)
+        with zipfile.ZipFile(path) as z:
+            members = {n: z.read(n) for n in z.namelist() if n not in {"calendar.txt", "calendar_dates.txt"}}
+        with zipfile.ZipFile(path, "w") as z:
+            for n, data in members.items():
+                z.writestr(n, data)
+            if calendar:
+                z.writestr(
+                    "calendar.txt",
+                    "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\n"
+                    f"s,1,1,1,1,1,1,1,{first},{last}\n",
+                )
+            else:
+                z.writestr("calendar_dates.txt", f"service_id,date,exception_type\ns,{first},1\ns,{last},1\ns,{last},2\n")
+        return path
+
+    def first_date_source(self, max_age=7):
+        return self.source(
+            prefer="origin",
+            freshness={"signal": "service.firstDate", "maxAgeDays": max_age},
+            identity={"agencyNames": ["Synthetic"]},
+        )
+
+    def test_first_service_date_reads_calendar_and_dates(self):
+        self.assertEqual(
+            gtfs.first_service_date(self.windowed("c.zip", "20261119", "20261203", calendar=True)),
+            date(2026, 11, 19),
+        )
+        self.assertEqual(
+            gtfs.first_service_date(self.windowed("d.zip", "20261123", "20261207")),
+            date(2026, 11, 23),
+        )
+
+    def test_mirror_older_than_served_never_replaces_it(self):
+        # Publisher down; the mirror still has a file published before the served one.
+        self.serve(ORIGIN, urllib.error.URLError(OSError("refused")))
+        self.serve(MIRROR, self.windowed("m.zip", "20261119", "20261203"))
+        with self.assertRaisesRegex(gtfs.SourceError, "mirror data 2026-11-19 is older than accepted 2026-11-21"):
+            self.acquire(self.first_date_source(), floor="2026-11-21")
+
+    def test_newer_shorter_file_counts_as_fresher(self):
+        # Served: a half-year file from 2026-11-01. The mirror's newer file reaches one month.
+        self.serve(ORIGIN, urllib.error.URLError(OSError("refused")))
+        self.serve(MIRROR, self.windowed("m.zip", "20261120", "20261220"))
+        _, record = self.acquire(self.first_date_source(), floor="2026-11-01")
+        self.assertEqual(record["candidate"]["kind"], "mirror")
+        self.assertEqual(record["freshness"]["value"], "2026-11-20")
+        self.assertEqual(record["freshness"]["ageDays"], 2)
+
+    def test_stale_origin_falls_back_to_fresher_mirror(self):
+        self.serve(ORIGIN, self.windowed("o.zip", "20261110", "20270510"))
+        self.serve(MIRROR, self.windowed("m.zip", "20261121", "20261205"))
+        _, record = self.acquire(self.first_date_source(max_age=7))
+        self.assertEqual(record["candidate"]["kind"], "mirror")
+        self.assertEqual([a["outcome"] for a in record["attempts"]], ["stale", "accepted"])
+
+    def test_mirror_without_service_dates_is_skipped(self):
+        empty = self.windowed("m.zip", "", "")
+        with zipfile.ZipFile(empty) as z:
+            members = {n: z.read(n) for n in z.namelist() if n != "calendar_dates.txt"}
+        with zipfile.ZipFile(empty, "w") as z:
+            for n, data in members.items():
+                z.writestr(n, data)
+        self.serve(ORIGIN, urllib.error.URLError(OSError("refused")))
+        self.serve(MIRROR, empty)
+        with self.assertRaisesRegex(gtfs.SourceError, "mirror freshness-unknown"):
+            self.acquire(self.first_date_source())
+
+    def test_first_date_signal_takes_no_format(self):
+        gtfs.check_source(self.first_date_source())
+        for freshness in (
+            {"signal": "service.firstDate", "format": "%Y%m%d", "maxAgeDays": 0},
+            {"signal": "feed_info.feed_version", "maxAgeDays": 0},
+            {"signal": "service.lastDate", "maxAgeDays": 0},
+        ):
+            with self.assertRaises(ValueError, msg=json.dumps(freshness)):
+                self.source(freshness=freshness)
+
     def test_unreadable_mirror_metadata_is_skipped_origin_is_hard(self):
         broken = self.zip("broken.zip", version="2026-11-22")
         with zipfile.ZipFile(broken) as z:
