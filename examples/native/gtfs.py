@@ -361,6 +361,17 @@ def rows(archive, name):
         yield row
 
 
+WEEKDAYS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+
+
 def coverage(path, tz):
     """Evaluate every required component for the next seven local service dates."""
     today = datetime.now(ZoneInfo(tz)).date()
@@ -371,15 +382,7 @@ def coverage(path, tz):
         if "calendar.txt" in archive.namelist():
             for row in rows(archive, "calendar.txt"):
                 for day in days:
-                    weekday = (
-                        "monday",
-                        "tuesday",
-                        "wednesday",
-                        "thursday",
-                        "friday",
-                        "saturday",
-                        "sunday",
-                    )[day.weekday()]
+                    weekday = WEEKDAYS[day.weekday()]
                     if (
                         row["start_date"] <= day.strftime("%Y%m%d") <= row["end_date"]
                         and row[weekday] == "1"
@@ -776,12 +779,21 @@ def check_source(source):
         freshness = source["freshness"]
         require(
             isinstance(freshness, dict)
-            and set(freshness) == {"signal", "format", "maxAgeDays"}
-            and freshness["signal"] == "feed_info.feed_version"
-            and isinstance(freshness["format"], str)
+            and (
+                (
+                    set(freshness) == {"signal", "format", "maxAgeDays"}
+                    and freshness["signal"] == "feed_info.feed_version"
+                    and isinstance(freshness["format"], str)
+                )
+                or (
+                    set(freshness) == {"signal", "maxAgeDays"}
+                    and freshness["signal"] == "service.firstDate"
+                )
+            )
             and type(freshness["maxAgeDays"]) is int
             and freshness["maxAgeDays"] >= 0,
-            "freshness needs signal feed_info.feed_version, format and maxAgeDays",
+            "freshness needs signal feed_info.feed_version with format, or "
+            "service.firstDate, and maxAgeDays",
         )
     if "identity" in source:
         identity = source["identity"]
@@ -853,11 +865,35 @@ def identity_problem(path, identity):
     return None
 
 
+def first_service_date(path):
+    """Earliest date the raw feed schedules service; None without a calendar.
+
+    For publishers whose files start on their publish day this measures how
+    recent a file is. The end date does not: a newer file can cover less.
+    """
+    dates = [
+        row.get("start_date", "")
+        for row in table(path, "calendar.txt") or []
+        if any(row.get(day) == "1" for day in WEEKDAYS)
+    ] + [
+        row.get("date", "")
+        for row in table(path, "calendar_dates.txt") or []
+        if row.get("exception_type") == "1"
+    ]
+    parsed = [datetime.strptime(value, "%Y%m%d").date() for value in dates if value]
+    return min(parsed) if parsed else None
+
+
 def freshness_of(path, specification, today):
-    """Date-based freshness from feed_info.feed_version; None when unknown."""
+    """Date-based freshness from the recipe's signal; None when unknown."""
     try:
-        value = (table(path, "feed_info.txt") or [{}])[0].get("feed_version") or ""
-        published = datetime.strptime(value, specification["format"]).date()
+        if specification["signal"] == "service.firstDate":
+            published = first_service_date(path)
+            if published is None:
+                return None
+        else:
+            value = (table(path, "feed_info.txt") or [{}])[0].get("feed_version") or ""
+            published = datetime.strptime(value, specification["format"]).date()
     except (ValueError, KeyError, csv.Error, zipfile.BadZipFile):
         return None
     if published > today + timedelta(days=1):

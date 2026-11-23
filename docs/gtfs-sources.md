@@ -163,11 +163,19 @@ schema, steps and the validator no longer see `PT_FEEDS_TOKEN` or host
   `feed_info` or agencies differ from `identity`, or cannot be read at all, is
   skipped. The origin failing either stops the source: the feed itself
   changed.
-- `freshness` reads `feed_info.feed_version` as a date and compares it with the
-  local date in the recipe timezone. `maxAgeDays: 0` means today's version. A
+- `freshness` reads a date from the raw download and compares it with the
+  local date in the recipe timezone. `maxAgeDays: 0` means today's version.
+  Two signals exist:
+  - `feed_info.feed_version` with a `format` (`strptime`), for publishers
+    that put a release date there.
+  - `service.firstDate` (no `format`), the earliest service date in
+    `calendar.txt` (rows with at least one weekday) and `calendar_dates.txt`
+    (added dates). Use it only for publishers whose files start on their
+    publish day, such as a rolling two-week window. The last service date is
+    not a signal: a newer file can cover a shorter period than an older one. A
   stale candidate is skipped; when every candidate is stale, the freshest valid
   one is used and `retrieval.json` marks it `stale`. A mirror without a
-  readable version is skipped; an origin without one is accepted with a warning.
+  readable date is skipped; an origin without one is accepted with a warning.
 - A mirror file older than the last accepted version is skipped (sources with
   `freshness` only; without it, an origin-first mirror is bounded by identity
   and the seven-day coverage rule). If no other
