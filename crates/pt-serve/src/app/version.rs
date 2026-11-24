@@ -286,9 +286,12 @@ pub fn version(gen: &Generation, _ctx: &ServerCtx) -> Resp {
     // (`reader.header().version`), NOT the compile-time `pt_core::PTB_VERSION`
     // const. During a v5→v6 cutover (or a rollback) `/version` must report
     // what is actually being served, which only the parsed header knows.
+    // `readerFormat` is the opposite: the newest PTB version this binary
+    // reads (the startup sentinel's value), which deployments compare before
+    // they start a second reader on a shared data root.
     let ptb_version = gen.reader.header().version;
     let body = format!(
-        r#"{{"version":{version},"commit":{commit},"builtAt":{built_at},"bundleHash":{bundle_hash},"generationId":{gen_id},"createdAt":{created_at},"manifestSchemaVersionMax":{schema_max},"ptbVersion":{ptb_version},"city":{city}}}"#,
+        r#"{{"version":{version},"commit":{commit},"builtAt":{built_at},"bundleHash":{bundle_hash},"generationId":{gen_id},"createdAt":{created_at},"manifestSchemaVersionMax":{schema_max},"ptbVersion":{ptb_version},"readerFormat":{reader_format},"apiContract":{api_contract},"city":{city}}}"#,
         version = json_string(env!("PT_SERVE_APP_VERSION")),
         commit = json_string(env!("PT_SERVE_GIT_SHA")),
         built_at = json_string(env!("PT_SERVE_BUILT_AT")),
@@ -297,6 +300,8 @@ pub fn version(gen: &Generation, _ctx: &ServerCtx) -> Resp {
         created_at = json_string(&gen.created_at),
         schema_max = MANIFEST_SCHEMA_VERSION_MAX,
         ptb_version = ptb_version,
+        reader_format = pt_core::PTB_VERSION,
+        api_contract = crate::API_CONTRACT,
         city = json_string(&gen.city_slug),
     );
     // Same headers as the Node backend sends on every response, so hosting
@@ -306,7 +311,7 @@ pub fn version(gen: &Generation, _ctx: &ServerCtx) -> Resp {
         headers: vec![
             ("X-App-Version", env!("PT_SERVE_APP_VERSION").to_string()),
             ("X-App-Commit", env!("PT_SERVE_GIT_SHA").to_string()),
-            ("X-API-Version", "1".to_string()),
+            ("X-API-Version", crate::API_CONTRACT.to_string()),
         ],
     }
 }
@@ -424,6 +429,36 @@ mod tests {
             body.contains(r#""ptbVersion":1"#),
             "/version body must carry the live header version; body: {body}"
         );
+    }
+
+    /// `/version` must report the binary's reader format and API contract,
+    /// which deployments compare before mixing components, and the
+    /// `X-API-Version` header must carry the same contract.
+    #[test]
+    fn version_body_reports_reader_format_and_api_contract() {
+        let gen = Generation::from_paths(
+            &tiny_service_pool_ptb_path(),
+            None,
+            "vilnius".to_string(),
+            pt_core::PatternMode::Off,
+        )
+        .expect("Generation::from_paths over tiny-service-pool.ptb");
+        let ctx = ServerCtx::new(gen, test_config(), Metrics::new());
+        let gen_now = ctx.current_generation();
+        let resp = version(&gen_now, &ctx);
+        match &resp {
+            Resp::WithHeaders { headers, .. } => assert!(
+                headers.contains(&("X-API-Version", crate::API_CONTRACT.to_string())),
+                "/version must send X-API-Version; headers: {headers:?}"
+            ),
+            _ => panic!("/version must carry app headers"),
+        }
+        let body: serde_json::Value =
+            serde_json::from_str(&body_of(resp)).expect("/version body is JSON");
+        // The live v1 fixture does not change the binary's reader format.
+        assert_eq!(body["ptbVersion"], 1);
+        assert_eq!(body["readerFormat"], pt_core::PTB_VERSION);
+        assert_eq!(body["apiContract"], crate::API_CONTRACT);
     }
 
     /// `/version` and the `X-App-Version` header must report the same

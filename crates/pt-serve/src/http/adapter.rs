@@ -227,7 +227,7 @@ pub fn to_tiny_http(resp: Resp) -> ResponseBox {
             let mut headers = vec![
                 hdr("Content-Type", content_type),
                 hdr("Cache-Control", cache_control),
-                hdr("X-API-Version", "1"),
+                hdr("X-API-Version", &crate::API_CONTRACT.to_string()),
             ];
             if let Some(e) = etag.as_deref() {
                 headers.push(hdr("ETag", e));
@@ -382,7 +382,7 @@ fn poi_response_headers() -> [Header; 3] {
     [
         hdr("X-App-Version", env!("PT_SERVE_APP_VERSION")),
         hdr("X-App-Commit", env!("PT_SERVE_GIT_SHA")),
-        hdr("X-API-Version", "1"),
+        hdr("X-API-Version", &crate::API_CONTRACT.to_string()),
     ]
 }
 
