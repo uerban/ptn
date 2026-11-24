@@ -234,6 +234,13 @@ private signing keys and builder scratch data stay on the preparation runner.
 Each validator initializes its own GTFS state and derives its own route probe.
 Both must pass before the installable Linux archive is retained for release.
 
+Every retained Linux archive of a main push is also a staging snapshot. When
+the `STAGING_DISPATCH_REPOSITORY` variable is set, the `staging-snapshot` job
+sends a `ptn_snapshot_published` repository event (token secret
+`STAGING_DISPATCH_TOKEN`) whose payload is only the source commit. The receiver
+downloads that run's archive and verifies its checksum and `release.json`
+revision itself. A snapshot is not a release: it is never tagged or promoted.
+
 ## Build once: prerelease, staging and stable promotion
 
 The release tag is the version the build already carries: never edit an archive

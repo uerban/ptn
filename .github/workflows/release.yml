@@ -504,3 +504,25 @@ jobs:
             release/ptn-linux-x86_64.tar.gz
             release/ptn-linux-x86_64.tar.gz.sha256
           if-no-files-found: error
+
+  staging-snapshot:
+    name: Announce the validated archive as a staging snapshot
+    # Every validated main commit is a staging snapshot: its retained archive
+    # (`ptn-linux-x86_64`, release.json revision = this commit) is the deployable
+    # unit. Only the commit is sent; the receiver downloads and verifies the
+    # archive itself. Inactive until the receiver repository is configured.
+    needs: [validated-archive]
+    if: github.event_name == 'push' && vars.STAGING_DISPATCH_REPOSITORY != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch the snapshot event
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.STAGING_DISPATCH_TOKEN }}
+          TARGET: ${{ vars.STAGING_DISPATCH_REPOSITORY }}
+        run: |
+          gh api --method POST "repos/$TARGET/dispatches" \
+            -f event_type=ptn_snapshot_published \
+            -f "client_payload[sourceSha]=$RELEASE_REVISION"
+          echo "Staging snapshot announced for \`$RELEASE_REVISION\`" >> "$GITHUB_STEP_SUMMARY"
