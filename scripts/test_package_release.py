@@ -121,6 +121,8 @@ class ArchiveContents(unittest.TestCase):
                 "docs/runtime-cities.md": "runtime city discovery",
                 "LICENSE": "license", "LICENSE-MIT": "MIT", "LICENSE-APACHE": "Apache",
                 "THIRD_PARTY_NOTICES.md": "notices",
+                "crates/pt-serve/src/lib.rs": "pub const API_CONTRACT: u16 = 3;\n",
+                "crates/pt-core/src/lib.rs": "pub const PTB_VERSION: u16 = 7;\n",
             }.items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +135,7 @@ class ArchiveContents(unittest.TestCase):
                 checksums = archive.extractfile("ptn-linux-x86_64/SHA256SUMS").read().decode()
                 metadata = json.load(archive.extractfile("ptn-linux-x86_64/release.json"))
                 self.assertEqual((metadata["version"], metadata["revision"]), ("0.2.44", "a" * 40))
+                self.assertEqual((metadata["apiContract"], metadata["readerFormat"]), (3, 7))
                 for relative in ["scripts/verify-transit-installation.py", "examples/native/gtfs.py", "examples/native/prebuilt.py", "examples/native/prebuilt.md", "examples/native/config.prebuilt.example.json", "docs/gtfs-sources.md", *["bin/" + name for name in package.BINARIES], *["docs/" + name for name in package.TRANSIT_DOCS]]:
                     content = archive.extractfile("ptn-linux-x86_64/" + relative).read()
                     self.assertIn(hashlib.sha256(content).hexdigest() + "  " + relative, checksums)
@@ -154,3 +157,31 @@ class ApplicationVersion(unittest.TestCase):
             self.assertTrue(package.VERSION_PATTERN.fullmatch(value), value)
         for value in ["v0.2.44", "0.2", "0.2.3-rc.4", "01.2.3", "0.2.3-dev+XYZ"]:
             self.assertFalse(package.VERSION_PATTERN.fullmatch(value), value)
+
+
+class ReleaseContract(unittest.TestCase):
+    def test_reads_the_constants_of_this_source(self):
+        contract = package.release_contract()
+        self.assertEqual(set(contract), {"apiContract", "readerFormat"})
+        self.assertTrue(all(isinstance(value, int) and value > 0 for value in contract.values()), contract)
+
+    def test_same_source_gives_same_values(self):
+        self.assertEqual(package.release_contract(), package.release_contract())
+
+    def test_missing_constant_is_refused(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            for relative, _ in package.CONTRACT_SOURCES.values():
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text("pub const PTB_VERSION: u16 = 2;\n")
+            with patch.object(package, "ROOT", root), self.assertRaisesRegex(ValueError, "API_CONTRACT"):
+                package.release_contract()
+
+    def test_computed_value_is_refused(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            for relative, name in package.CONTRACT_SOURCES.values():
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(f"pub const {name}: u16 = 1 + 1;\n")
+            with patch.object(package, "ROOT", root), self.assertRaises(ValueError):
+                package.release_contract()

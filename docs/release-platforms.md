@@ -83,6 +83,20 @@ between releases have gaps by design. For a commit off main, `N` is that of the
 newest main commit it builds on. The same commit always yields the same version.
 `python3 scripts/version.py current [rev]` prints it.
 
+Two numbers describe compatibility between components of different builds.
+Both are reported at `/version` and recorded in `release.json`:
+
+- `apiContract`: the HTTP API between the web app and city servers, also sent
+  as `X-API-Version` (`API_CONTRACT` in `crates/pt-serve/src/lib.rs`). Raise
+  it when a change breaks a web app or a city server built at the previous
+  value.
+- `readerFormat`: the newest PTB bundle version the city server reads
+  (`PTB_VERSION` in `crates/pt-core/src/lib.rs`). `/version` also reports
+  `ptbVersion`, the version of the bundle currently served.
+
+A deployment may run the web app and city servers from different builds only
+when their `apiContract` values are equal.
+
 `release.yml` computes the version once from full history and passes it to
 every build as `PT_VERSION`, so all archives of a run agree. Pull request CI
 builds from a shallow clone and shows `X.Y.0-dev`. Image builds outside CI can

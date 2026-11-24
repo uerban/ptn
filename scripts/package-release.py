@@ -93,6 +93,28 @@ def app_version():
     return subprocess.check_output(["node", "scripts/app-version.mjs"], cwd=ROOT, text=True).strip()
 
 
+CONTRACT_SOURCES = {
+    # release.json key: (source file, constant)
+    "apiContract": ("crates/pt-serve/src/lib.rs", "API_CONTRACT"),
+    "readerFormat": ("crates/pt-core/src/lib.rs", "PTB_VERSION"),
+}
+
+
+def release_contract():
+    """The API contract and PTB reader format compiled into this source.
+
+    Deployments compare these before mixing a web app and city servers from
+    different releases, or before starting a second reader on a data root.
+    """
+    contract = {}
+    for key, (relative, name) in CONTRACT_SOURCES.items():
+        match = re.search(rf"^pub const {name}: u16 = ([0-9]+);$", (ROOT / relative).read_text(), re.MULTILINE)
+        if match is None:
+            raise ValueError(f"{relative} does not define `pub const {name}: u16 = <n>;`")
+        contract[key] = int(match.group(1))
+    return contract
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", required=True, choices=PLATFORMS)
@@ -118,6 +140,10 @@ def main():
     version = app_version()
     if not VERSION_PATTERN.fullmatch(version):
         parser.error(f"invalid application version: {version!r}")
+    try:
+        contract = release_contract()
+    except ValueError as error:
+        parser.error(str(error))
     args.out.mkdir(parents=True, exist_ok=True)
     name = f"ptn-{args.platform}"
     with tempfile.TemporaryDirectory() as work:
@@ -146,12 +172,13 @@ def main():
             "For prebuilt transit without feed or OSM builds, use the "
             "[transit installation guide](docs/transit-pack-installation.md).\n\n"
             "Run `sha256sum --check SHA256SUMS` to verify the extracted files. "
-            "`release.json` identifies the version, source revision and platform.\n\n"
+            "`release.json` identifies the version, source revision, platform, API contract "
+            "and bundle reader format.\n\n"
             "[Source and build instructions](https://github.com/uerban/ptn#build).\n"
         )
         (bundle / "release.json").write_text(json.dumps({
             "schemaVersion": 1, "version": version, "revision": revision, "platform": args.platform,
-            "rustTarget": PLATFORMS[args.platform][0],
+            "rustTarget": PLATFORMS[args.platform][0], **contract,
             "sourceDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
         }, indent=2) + "\n")
         lines = []
