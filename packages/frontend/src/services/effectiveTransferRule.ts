@@ -4,9 +4,9 @@ import {transferRuleKey, transferTripScopedKey, transferRouteScopedKey} from "./
 
 /** Mirrors same-stop trip → route → stop precedence; cross-stop footpaths use only unscoped rules. Null forbids
  * transfer; zero waives the floor but never permits boarding before arrival. */
-export function effectiveTransferFloor(index: Pick<RaptorIndex, "transferRules" | "transferRulesTripScoped" | "transferRulesRouteScoped">, from: Pick<RaptorTransitLeg, "toStopId" | "tripId" | "routeId">, to: Pick<RaptorTransitLeg, "fromStopId" | "tripId" | "routeId">, fallback: number): number | null {
+export function effectiveTransferFloor(index: Pick<RaptorIndex, "transferRules" | "transferRulesTripScoped" | "transferRulesRouteScoped">, from: Pick<RaptorTransitLeg, "toStopId" | "tripId" | "routeId">, to: Pick<RaptorTransitLeg, "fromStopId" | "routeId"> & { tripId?: string }, fallback: number): number | null {
   const sameStop = from.toStopId === to.fromStopId;
-  const scoped = sameStop ? index.transferRulesTripScoped?.get(transferTripScopedKey(from.toStopId, to.fromStopId, from.tripId, to.tripId))
+  const scoped = sameStop ? (to.tripId ? index.transferRulesTripScoped?.get(transferTripScopedKey(from.toStopId, to.fromStopId, from.tripId, to.tripId)) : undefined)
     ?? index.transferRulesRouteScoped?.get(transferRouteScopedKey(from.toStopId, to.fromStopId, from.routeId, to.routeId))
     : undefined;
   const rule = scoped ?? index.transferRules?.get(transferRuleKey(from.toStopId, to.fromStopId));

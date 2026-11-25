@@ -25,7 +25,7 @@ export async function probeInterchangeableRide(primary: Itinerary, index: Raptor
   const next = primary.legs[first + 2];
   const board = original?.from.stopId;
   const alight = original?.to.stopId;
-  if (!previous || !original || original.mode === "WALK" || !board || !alight || previous.to.stopId !== board ||
+  if (!previous || !original || original.mode === "WALK" || !board || !alight || previous.to.stopId !== board || !previous.tripId || !previous.routeId ||
     (next && next.mode !== "WALK" && next.from.stopId !== alight) ||
     (next?.mode === "WALK" && primary.legs.length !== first + 3)) return [];
 
@@ -42,7 +42,10 @@ export async function probeInterchangeableRide(primary: Itinerary, index: Raptor
   const options: Itinerary[] = [];
   for (const routeId of routeIds) {
     if (signal.aborted) return [];
-    const candidates = await probe(origin, destination, new Date(Date.parse(previous.arrivalTime) + minTransferSecs * 1000), {
+    const initialFloor = effectiveTransferFloor(index, { toStopId: board, tripId: previous.tripId, routeId: previous.routeId },
+      { fromStopId: board, routeId }, minTransferSecs);
+    if (initialFloor === null) continue;
+    const candidates = await probe(origin, destination, new Date(Date.parse(previous.arrivalTime) + initialFloor * 1000), {
       routeId, boardStopId: board, alightStopId: alight,
     });
     if (signal.aborted) return [];

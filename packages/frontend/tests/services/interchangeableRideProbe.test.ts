@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { probeInterchangeableRide } from "../../src/services/interchangeableRideProbe.ts";
 import type { RaptorIndex } from "../../src/services/raptorIndex.ts";
+import { transferRouteScopedKey, transferTripScopedKey } from "../../src/services/transferRuleKeys.ts";
 import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 
 it("discovers a compatible line using the rider transfer floor and preserves the fixed first ride", async () => {
@@ -11,7 +12,7 @@ it("discovers a compatible line using the rider transfer floor and preserves the
     patternsAtStop: new Map([["s2", [0]]]),
     patterns: [{ id: "ALT", shortName: "4", mode: "TRAM", stopIds: ["s2", "s3"], trips: [] }],
   };
-  const probe = vi.fn(async () => [{ ...primary, legs: [replacement] }]);
+  const probe = vi.fn<Parameters<typeof probeInterchangeableRide>[6]>(async () => [{ ...primary, legs: [replacement] }]);
   const signal = new AbortController().signal;
   const options = await probeInterchangeableRide(primary, index, 120, new Set(), new Set(), signal, probe);
   expect(probe).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ stopId: "s2" }),
@@ -29,4 +30,19 @@ it("discovers a compatible line using the rider transfer floor and preserves the
   expect(withOnward.legs[2]).toBe(safe.legs[2]);
   expect(await probeInterchangeableRide(primary, index, 121, new Set(), new Set(), signal, probe)).toEqual([]);
   expect(await probeInterchangeableRide(primary, index, 120, new Set(["ALT"]), new Set(), signal, probe)).toEqual([]);
+
+  const fixed = primary.legs[0];
+  const routeRule = transferRouteScopedKey("s2", "s2", fixed.routeId!, "ALT");
+  index.transferRulesRouteScoped = new Map([[routeRule, { type: 1 }]]);
+  expect(await probeInterchangeableRide(primary, index, 121, new Set(), new Set(), signal, probe)).toHaveLength(1);
+  expect(probe.mock.lastCall?.[2]).toEqual(new Date(fixed.arrivalTime));
+
+  const tripRule = transferTripScopedKey("s2", "s2", fixed.tripId!, "T3");
+  index.transferRulesTripScoped = new Map([[tripRule, { type: 3 }]]);
+  expect(await probeInterchangeableRide(primary, index, 121, new Set(), new Set(), signal, probe)).toEqual([]);
+
+  index.transferRulesRouteScoped.set(routeRule, { type: 3 });
+  probe.mockClear();
+  expect(await probeInterchangeableRide(primary, index, 120, new Set(), new Set(), signal, probe)).toEqual([]);
+  expect(probe).not.toHaveBeenCalled();
 });
