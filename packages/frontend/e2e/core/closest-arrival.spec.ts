@@ -84,5 +84,5 @@ test("Arrive By respects the Closest arrival flag @mock-api", async ({ page }) =
   expect(page.workers().some((worker) => /ptArriveByOwner\.worker/.test(worker.url()))).toBe(true);
 
   await closest.click();
-  await expect(results.getByRole("status")).toContainText("latest departure first", { timeout: 25_000 });
+  await expect(results.getByRole("status")).toContainText(/latest departure first/i, { timeout: 25_000 });
 });
