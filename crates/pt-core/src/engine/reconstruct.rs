@@ -134,6 +134,7 @@ where
                                 .saturating_sub(1),
                             pattern_stop_ids: route.stop_ids.clone(),
                             approximate: *approximate,
+                            in_seat: false,
                         },
                         from_stop: route.stop_ids[*board_stop_idx as usize],
                         to_stop: cur_stop,
@@ -351,6 +352,7 @@ mod tests {
                 intermediate_stops: 2,
                 pattern_stop_ids: vec![0, 1, 2, 3],
                 approximate: false,
+                in_seat: false,
             }
         );
     }
@@ -482,6 +484,7 @@ mod tests {
                 intermediate_stops: 1,
                 pattern_stop_ids: vec![0, 1, 2, 0],
                 approximate: false,
+                in_seat: false,
             }
         );
     }
@@ -678,6 +681,7 @@ mod tests {
                 intermediate_stops: 0, // 1 - 0 - 1 = 0
                 pattern_stop_ids: vec![0, 1],
                 approximate: false,
+                in_seat: false,
             }
         );
 

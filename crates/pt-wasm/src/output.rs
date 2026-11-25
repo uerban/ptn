@@ -85,6 +85,8 @@ struct WasmTransitLeg {
     /// Mirrors `RaptorTransitLeg.approximate`; omitted for exact scheduled legs.
     #[serde(skip_serializing_if = "is_false")]
     approximate: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    in_seat: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -144,6 +146,7 @@ where
             intermediate_stops,
             pattern_stop_ids,
             approximate,
+            in_seat,
         } => {
             // RouteRec/TripRec carry already-decoded owned Strings (records.rs);
             // there is no `*_id_idx` field to feed back through `reader.string()`.
@@ -193,6 +196,7 @@ where
                 intermediate_stops: *intermediate_stops,
                 pattern_stop_ids: resolved_pattern_stops,
                 approximate: *approximate,
+                in_seat: *in_seat,
             }))
         }
     }
@@ -236,6 +240,7 @@ mod tests {
             intermediate_stops: 3,
             pattern_stop_ids: Vec::new(), // not under test here
             approximate: false,
+            in_seat: false,
         });
         let v = serde_json::to_value(&leg).unwrap();
         assert_eq!(v["type"], "transit");
@@ -266,6 +271,7 @@ mod tests {
                 intermediate_stops: 1,
                 pattern_stop_ids: Vec::new(), // not under test here
                 approximate: false,
+                in_seat: false,
             }))
             .unwrap()
         };
@@ -295,6 +301,7 @@ mod tests {
                 intermediate_stops: 1,
                 pattern_stop_ids: Vec::new(),
                 approximate,
+                in_seat: false,
             }))
             .unwrap()
         };

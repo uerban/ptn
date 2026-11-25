@@ -1,6 +1,7 @@
 {
   "et": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "mode.glyph_bus",
     "mode.glyph_metro",
     "mode.glyph_rail",
@@ -31,6 +32,7 @@
   ],
   "fi": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "mode.glyph_bus",
     "mode.glyph_metro",
     "popup.live",
@@ -59,6 +61,7 @@
     "unit.meters"
   ],
   "lt": [
+    "guidance.stay_on_board",
     "mode.glyph_metro",
     "mode.glyph_tram",
     "popup.live",
@@ -78,6 +81,7 @@
   ],
   "lv": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "mode.glyph_metro",
     "mode.glyph_tram",
     "popup.live",
@@ -108,6 +112,7 @@
     "cardinal.n",
     "cardinal.s",
     "color.cyan",
+    "guidance.stay_on_board",
     "mode.glyph_bus",
     "mode.glyph_ferry",
     "mode.glyph_trolleybus",
@@ -144,6 +149,7 @@
     "cardinal.se",
     "cardinal.sw",
     "cardinal.w",
+    "guidance.stay_on_board",
     "mode.glyph_metro",
     "mode.glyph_tram",
     "mode.glyph_trolleybus",
@@ -173,6 +179,7 @@
   ],
   "ru": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "popup.live",
     "route.aria_leg_departure",
     "search.alternate_arrival",
@@ -195,6 +202,7 @@
     "cardinal.s",
     "color.cyan",
     "color.orange",
+    "guidance.stay_on_board",
     "mode.glyph_bus",
     "mode.glyph_ferry",
     "mode.glyph_trolleybus",
@@ -222,6 +230,7 @@
   ],
   "uk": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "popup.live",
     "route.aria_leg_departure",
     "search.alternate_arrival",
@@ -239,6 +248,7 @@
   ],
   "be": [
     "arriveBy.ordered_results",
+    "guidance.stay_on_board",
     "route.aria_leg_departure",
     "search.alternate_arrival",
     "search.alternate_ride",

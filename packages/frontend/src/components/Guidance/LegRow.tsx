@@ -44,7 +44,7 @@ export function LegRow({
   const isWalking = leg.mode === "WALK" || leg.mode === "BIKE" || leg.mode === "SCOOTER";
   const depTime = new Date(leg.departureTime);
   const arrTime = new Date(leg.arrivalTime);
-  const showPlannedDeparture = !isWalking && (status === "upcoming" || status === "future");
+  const showPlannedDeparture = !isWalking && !leg.inSeat && (status === "upcoming" || status === "future");
   const showWalkingProgress = status === "current" && isWalking && !!walkingProgress;
   const showTransitProgress = status === "current" && !isWalking && !!transitProgress;
 
@@ -115,6 +115,9 @@ export function LegRow({
             </div>
           )}
 
+          {leg.inSeat && <div className="text-sm font-medium text-fg-secondary">
+            {t("guidance.stay_on_board", "Stay on board")}
+          </div>}
           {/* Status-specific info */}
           {showWalkingProgress && <WalkingLegInfo progress={walkingProgress} />}
           {showTransitProgress && (
@@ -136,7 +139,7 @@ export function LegRow({
               </div>
             </>
           )}
-          {status === "upcoming" && connectionStatus && (
+          {status === "upcoming" && !leg.inSeat && connectionStatus && (
             <div role="status" aria-live="assertive" className={`mt-0.5 ${
               connectionStatus.safety === "atRisk"
                 ? "text-danger font-medium"

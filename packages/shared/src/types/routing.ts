@@ -61,6 +61,8 @@ export interface RaptorTransitLeg {
    * GTFS reference: https://gtfs.org/documentation/schedule/reference/#frequenciestxt
    */
   approximate?: boolean;
+  /** Engine-confirmed continuation on the previous vehicle. */
+  inSeat?: boolean;
   /**
    * RT delay already folded into `departSecs`/`arriveSecs` by the overlay at
    * plan time. Absent when the times are scheduled. A later live delay moves

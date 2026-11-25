@@ -431,6 +431,7 @@ mod tests {
                 intermediate_stops: 1,
                 pattern_stop_ids: vec![0, 1, 2],
                 approximate: false,
+                in_seat: false,
             }
         );
     }

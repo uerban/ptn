@@ -126,6 +126,8 @@ export interface Leg {
   routeId?: string;
   /** True for GTFS frequencies.txt exact_times=0 legs; render as approximate/headway-based. */
   approximate?: boolean;
+  /** Stay on the previous vehicle for this leg. */
+  inSeat?: boolean;
   /** Position of boarding stop in the leg's pattern sequence (`patternStopIds`). Transit legs only. */
   boardStopIdx?: number;
   /** Position of alighting stop in the leg's pattern sequence (`patternStopIds`). Transit legs only. */

@@ -68,6 +68,7 @@ pub struct ProjectedTransitLeg {
     /// frontend for transit leg geometry.
     pub pattern_stop_ids: Vec<String>,
     pub approximate: bool,
+    pub in_seat: bool,
 }
 
 /// A projected leg: walk or transit.
@@ -130,6 +131,7 @@ where
                     intermediate_stops,
                     pattern_stop_ids,
                     approximate,
+                    in_seat,
                 } => {
                     let route_id = reader.route(*reader_route_idx as usize)?.route_id;
                     let trip_id = reader.trip(*trip_idx as usize)?.trip_id;
@@ -152,6 +154,7 @@ where
                         intermediate_stops: *intermediate_stops,
                         pattern_stop_ids,
                         approximate: *approximate,
+                        in_seat: *in_seat,
                     })
                 }
             };

@@ -76,6 +76,8 @@ pub enum LegKind {
         /// True when this transit leg boards a GTFS frequencies.txt exact_times=0
         /// headway instance. Concrete secs are routed, but display is approximate.
         approximate: bool,
+        /// This ride continues the prior vehicle without a passenger transfer.
+        in_seat: bool,
     },
 }
 

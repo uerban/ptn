@@ -1657,6 +1657,7 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
                                 .saturating_sub(1),
                             pattern_stop_ids: route.stop_ids.clone(),
                             approximate: l.approximate,
+                            in_seat: l.in_seat,
                         },
                         from_stop: route.stop_ids[l.board_pos as usize],
                         to_stop: l.stop,

@@ -101,7 +101,7 @@ export function interchangeableRide(
       fixedRides++;
       continue;
     }
-    if (replacement) return null;
+    if (replacement || original.inSeat || next.inSeat || primary.legs[i + 1]?.inSeat || candidate.legs[i + 1]?.inSeat) return null;
     replacement = next;
   }
   return fixedRides > 0 ? replacement : null;

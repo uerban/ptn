@@ -252,6 +252,7 @@ export async function convertRaptorResults(
         intermediateStops: leg.intermediateStops,
         routeId: isTransit ? leg.routeId : undefined,
         approximate: isTransit ? leg.approximate : undefined,
+        ...(isTransit && leg.inSeat ? { inSeat: true } : {}),
         ...(isTransit && leg.appliedDelaySeconds !== undefined
           ? { appliedDelaySeconds: leg.appliedDelaySeconds }
           : {}),

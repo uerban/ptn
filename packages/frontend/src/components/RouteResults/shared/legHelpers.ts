@@ -122,7 +122,7 @@ export function toSegments(itinerary: Itinerary): Segment[] {
     if (prev && prev.mode !== "WALK") {
       // Transit → transit; check if we need a synthetic wait
       const wait = waitMinutes(prev, leg);
-      if (wait > 0) {
+      if (wait > 0 && !leg.inSeat) {
         out.push({
           kind: "wait",
           minutes: wait,

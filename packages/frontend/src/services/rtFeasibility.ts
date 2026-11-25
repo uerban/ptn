@@ -19,7 +19,8 @@ export function feasibleRtCandidates(results: RtComposedItinerary[], transferFlo
       if (leg.departSecs < previousArrival) return [];
       if (leg.type === "transit") {
         if (priorTransit && transferFloor) {
-          const floor = transferFloor(priorTransit, leg);
+          const continuation = leg.inSeat && legs.at(-1) === priorTransit;
+          const floor = continuation ? 0 : transferFloor(priorTransit, leg);
           if (floor === null || leg.departSecs < priorTransit.arriveSecs + floor) return [];
         }
         priorTransit = leg;

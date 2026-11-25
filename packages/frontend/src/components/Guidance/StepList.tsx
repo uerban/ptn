@@ -136,7 +136,7 @@ export function StepList({ onLegTap, onClose }: StepListProps) {
       },
     };
     return itinerary.legs.map((leg, i) => {
-      if (i === 0) return null; // first leg has no connection to evaluate
+      if (i === 0 || leg.inSeat) return null; // first leg has no connection to evaluate
       const prevLeg = itinerary.legs[i - 1];
       // Only compute for transit legs that follow another transit leg
       if (leg.mode === "WALK" || leg.mode === "BIKE" || leg.mode === "SCOOTER") return null;

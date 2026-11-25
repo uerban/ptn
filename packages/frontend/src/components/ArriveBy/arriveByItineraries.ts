@@ -75,6 +75,7 @@ export function arriveByItinerary(option: ArriveByJourneyOption, ctx: ArriveByDi
       routeShortName: ride.routeShortName, ...(color ? { routeColor: color } : {}), tripId: ride.tripId,
       ...(headsign ? { headsign } : {}), intermediateStops: w.alightPosition - w.boardPosition - 1,
       routeId: ride.routeId, approximate: ride.approximate,
+      ...(w.inSeat ? { inSeat: true } : {}),
       boardStopIdx: w.boardPosition, alightStopIdx: w.alightPosition, patternStopIds: [...ride.patternStopIds],
     });
   });

@@ -121,7 +121,8 @@ export function applyRtOverlay(
       const current = shiftedLegs[i];
       const next = shiftedLegs[i + 1];
       if (current.type !== "transit" || next.type !== "transit") continue;
-      const floor = transferFloor ? transferFloor(current, next) : minTransferSecs;
+      const floor = next.inSeat ? 0
+        : transferFloor ? transferFloor(current, next) : minTransferSecs;
       if (floor === null || next.departSecs < current.arriveSecs + floor) {
         brokenByDelay = true;
         break;

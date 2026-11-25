@@ -863,10 +863,16 @@ fn derived_block_continuity_is_date_gated_and_committed() {
     let reader = Reader::from_bytes(n.bytes()).unwrap();
     let c = reader.block_derivation_commitment().unwrap();
     assert_eq!(c.pair_date_count, 7, "every date but ordinal 4");
-    assert_eq!(
-        frontier(&run(&n, PatternMode::Off, &query(0, 2, 35000, 3)).unwrap()),
-        vec![(37200, 0)]
-    );
+    let planned = run(&n, PatternMode::Off, &query(0, 2, 35000, 3)).unwrap();
+    assert_eq!(frontier(&planned), vec![(37200, 0)]);
+    assert!(matches!(
+        planned[0].legs[0].kind,
+        LegKind::Transit { in_seat: false, .. }
+    ));
+    assert!(matches!(
+        planned[0].legs[1].kind,
+        LegKind::Transit { in_seat: true, .. }
+    ));
     // Disabled derivation: no in-seat branch.
     n.derive = false;
     assert!(run(&n, PatternMode::Off, &query(0, 2, 35000, 3))

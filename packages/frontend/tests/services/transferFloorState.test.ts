@@ -34,6 +34,16 @@ describe("captured transfer-floor rules",()=>{
   expect(finalizeSearch(earlier,()=>null,(a,b)=>effectiveTransferFloor(index,a,b,120),r=>{record=r;},()=>captureTransferFloorState(index))).toEqual([]);
   expect(replayFinalization(record)).toEqual([]);
  });
+ it("keeps a short certified continuation and rejects an ordinary connection with the same times",()=>{
+  const floor=()=>120;
+  expect(finalizeSearch(input,()=>null,floor)).toEqual([]);
+  const continuation={...input,composed:[{...input.composed[0],transfers:0,legs:[from,{...to,inSeat:true}]}]};
+  let record!:FinalizationCapture;
+  const output=finalizeSearch(continuation,()=>null,floor,r=>{record=r;});
+  expect(output).toHaveLength(1);expect(replayFinalization(record)).toEqual(output);
+  const delay=(tripId:string)=>tripId==="T1"?{delaySeconds:60,cancelled:false}:null;
+  expect(finalizeSearch(continuation,delay,floor)).toEqual([]);
+ });
  it("snapshots after asynchronous walking evidence, at the synchronous floor boundary",async()=>{
   const index={transferRules:new Map([[transferRuleKey("B","X"),{type:1}]])};let record!:CompositionCapture;
   const planned={boardSecs:100,alightSecs:800,transfers:1,legs:[from,{type:"walk" as const,fromStopId:"B",toStopId:"X",departSecs:300,arriveSecs:320},{...to,fromStopId:"X",departSecs:700}]};

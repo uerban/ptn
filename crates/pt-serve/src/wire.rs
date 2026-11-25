@@ -73,7 +73,13 @@ pub enum WireLeg {
         board_stop_idx: u32,
         alight_stop_idx: u32,
         intermediate_stops: u32,
+        #[serde(rename = "inSeat", skip_serializing_if = "is_false")]
+        in_seat: bool,
     },
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Wire itinerary — camelCase mirror of `RaptorItinerary` in `@pt/shared`.
@@ -110,6 +116,7 @@ impl From<ProjectedItinerary> for WireItinerary {
                     board_stop_idx: t.board_stop_idx,
                     alight_stop_idx: t.alight_stop_idx,
                     intermediate_stops: t.intermediate_stops,
+                    in_seat: t.in_seat,
                 },
             })
             .collect();
