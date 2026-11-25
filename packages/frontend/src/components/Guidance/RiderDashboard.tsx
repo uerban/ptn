@@ -44,7 +44,7 @@ export function RiderDashboard({
             {leg.routeShortName}
           </span>
           <span className="text-base font-semibold text-fg truncate">
-            {leg.headsign}
+            {leg.headsign && t("route.toward_headsign", "toward {headsign}").replace("{headsign}", leg.headsign)}
           </span>
         </div>
         <button
