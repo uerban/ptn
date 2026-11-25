@@ -1,3 +1,5 @@
+import { minTransferSecsFor } from "@pt/shared/routing";
+import { probeInterchangeableRide } from "../services/interchangeableRideProbe.ts";
 import type { FirstRideConstraint } from "@pt/shared";
 import { encodePolyline } from "../utils/polyline.ts";
 import { captureCityData, StaleCityDataError, useCityDataStore } from "../services/cityData.ts";
@@ -845,6 +847,19 @@ export function SearchPage() {
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
   }, [fromEndpoint, toEndpoint, feedTz, endpointLabels, cityId, ranking, excludedModes, excludedRouteGroupsByCity]);
 
+  const findInterchangeablePlans = useCallback(async (primary: Itinerary, signal: AbortSignal) => {
+    if (!raptorIndex) return [];
+    const city = useCityStore.getState().activeCity;
+    const settings = useSettingsStore.getState();
+    const routeExclusions = new Set(excludedRouteIdsForCity(raptorIndex, city, settings));
+    return probeInterchangeableRide(primary, raptorIndex, minTransferSecsFor(settings.mobilityProfile),
+      routeExclusions, new Set(excludedModes), signal, async (from, to, at, firstRide) => {
+        const results = await useRoutingStore.getState().search(from, to, at, { probe: signal, firstRide: { ...firstRide, direct: true } });
+        if (!results || signal.aborted) return [];
+        return convertRaptorResults(results, at, from, to, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
+      });
+  }, [raptorIndex, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels]);
+
   const transitousQueryKey =
     fromLat != null && fromLon != null && toLat != null && toLon != null
       ? `${fromLat}:${fromLon}:${toLat}:${toLon}:${transitousDepartAtIso}`
@@ -1534,6 +1549,7 @@ export function SearchPage() {
         onLater={handleLater}
         onNext={handleNext}
         findLaterPlans={routingMode === "on-device" ? findLaterPlans : undefined}
+        findInterchangeablePlans={routingMode === "on-device" ? findInterchangeablePlans : undefined}
         departAt={paginationTime}
         origin={fromEndpoint}
         destination={toEndpoint}

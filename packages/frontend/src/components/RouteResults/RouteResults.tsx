@@ -68,6 +68,7 @@ interface RouteResultsProps {
   /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
   departAt?: Date | null;
   arriveByMs?: number;
+  findInterchangeablePlans?: (primary: Itinerary, signal: AbortSignal) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
@@ -107,6 +108,7 @@ export function RouteResults({
   departAt,
   arriveByMs,
   findLaterPlans,
+  findInterchangeablePlans,
   origin,
   destination,
   feedTz,
@@ -290,7 +292,8 @@ export function RouteResults({
     )}
     {import.meta.env.VITE_PTN_INTERCHANGEABLE_DEPARTURES === "1" && (
       <>
-        <InterchangeableDeparture itineraries={itineraries} onSelect={onSelect}
+        <InterchangeableDeparture key={JSON.stringify(itineraries[0].legs.map((leg) => [leg.tripId, leg.departureTime, leg.arrivalTime]))}
+          itineraries={itineraries} onSelect={onSelect} findPlans={findInterchangeablePlans}
           earliestLeaveMs={Math.max(referenceNowMs, departAt?.getTime() ?? -Infinity)}
           arriveByMs={arriveByMs} feedTz={feedTz} />
         <BranchDepartureWarning itinerary={itineraries[0]} nowMs={referenceNowMs} feedTz={feedTz} />

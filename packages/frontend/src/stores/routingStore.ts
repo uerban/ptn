@@ -236,6 +236,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destination: endpointCoord(destination),
         departureTime,
         ranking,
+        ...(firstRide?.direct ? { maxRounds: 1 } : {}),
         firstRide: firstRide && { routeId: firstRide.routeId, boardStopId: firstRide.boardStopId,
           alightStopId: firstRide.alightStopId },
         originStopId: origin.kind === "stop" ? origin.stopId : undefined,
