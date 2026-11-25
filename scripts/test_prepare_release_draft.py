@@ -95,11 +95,12 @@ class ReleaseNotesTests(unittest.TestCase):
 
     def test_template_renders_provenance_and_keeps_editorial_placeholders(self):
         notes = draft.render_notes(draft.TEMPLATE.read_text(), self.values)
-        self.assertTrue(notes.startswith('PTN 0.2.50 {{SUMMARY}}'))
+        self.assertTrue(notes.startswith('PTN 0.2.50 {{SUMMARY}}\n\n{{ATTENTION}}'))
         self.assertNotIn('<!--', notes)
         self.assertEqual(set(draft.PLACEHOLDER.findall(notes)), set(draft.EDITORIAL))
         for expected in ('https://example.test/runs/2', 'https://example.test/runs/1', 'a' * 40,
-                         '/blob/v0.2.50/docker/README.md', 'compare/v0.2.49...v0.2.50', '* fix: one by @someone in #1'):
+                         '/blob/v0.2.50/docker/README.md', 'compare/v0.2.49...v0.2.50', '* fix: one by @someone in #1',
+                         'upgrading from v0.2.49', 'sha256sum -c'):
             self.assertIn(expected, notes)
 
     def test_unknown_template_placeholder_is_refused(self):
@@ -107,12 +108,32 @@ class ReleaseNotesTests(unittest.TestCase):
             draft.render_notes('PTN {{VERSION}} {{TYPO}}', self.values)
 
     def test_pull_requests_come_from_generated_notes_since_previous_release(self):
-        body = "## What's Changed\n* feat: a by @x in https://example.test/pull/1\n* fix: b by @x in https://example.test/pull/2\n\n**Full Changelog**: ..."
+        body = "## What's Changed\n* feat: a by @x in https://example.test/pull/1\n\n**Full Changelog**: ..."
         with patch.object(draft, 'gh', return_value=json.dumps({'name': 'v0.2.50', 'body': body})) as gh:
             self.assertEqual(draft.pull_requests('example/ptn', 'v0.2.50', 'v0.2.49'),
-                             '* feat: a by @x in https://example.test/pull/1\n* fix: b by @x in https://example.test/pull/2')
+                             '### Features\n\n* feat: a by @x in https://example.test/pull/1')
         self.assertEqual(gh.call_args.args, ('api', '-X', 'POST', 'repos/example/ptn/releases/generate-notes',
                                              '-f', 'tag_name=v0.2.50', '-f', 'previous_tag_name=v0.2.49'))
+
+    def test_pull_requests_are_grouped_by_conventional_type(self):
+        cases = {'feat(gtfs): mirrors': 'Features', 'perf: faster index': 'Features',
+                 'fix(pt-serve): header': 'Fixes', 'Show departures with large delays': 'Fixes',
+                 'feat(api)!: drop v0 routes': 'Breaking changes',
+                 'fix(deps): bump url to 2.5.9 (RUSTSEC-2026-0592)': 'Security and dependencies',
+                 'chore(deps): bump vite': 'Security and dependencies', 'docs: hosting': 'Documentation',
+                 'ci: cache': 'Maintenance', 'test(e2e): flake': 'Maintenance', 'chore: rustfmt': 'Maintenance'}
+        for title, group in cases.items():
+            with self.subTest(title=title):
+                self.assertEqual(draft.pr_group(title), group)
+
+    def test_grouped_list_keeps_order_and_new_contributors(self):
+        body = ("## What's Changed\n* fix: b by @x in u/2\n* feat: a by @y in u/1\n* ci: c by @x in u/3\n\n"
+                "## New Contributors\n* @y made their first contribution in u/1\n\n**Full Changelog**: ...")
+        self.assertEqual(draft.group_pull_requests(body),
+                         '### Features\n\n* feat: a by @y in u/1\n\n### Fixes\n\n* fix: b by @x in u/2\n\n'
+                         '### Maintenance\n\n* ci: c by @x in u/3\n\n'
+                         '### New contributors\n\n* @y made their first contribution in u/1')
+        self.assertEqual(draft.group_pull_requests("## What's Changed\n"), 'No pull requests.')
 
 
 class RegressionGateTests(unittest.TestCase):

@@ -148,14 +148,17 @@ commits, tags, or releases.
 
 The draft workflow renders the [release-notes template](templates/release-notes.md)
 into every `vX.Y.N` draft and titles it `PTN vX.Y.N`. It fills the version,
-download links, validation and regression runs, source commit, merged pull
-requests since the latest stable release, and the compare link.
+download links, checksum instructions, validation and regression runs, source
+commit, the compare link, and the merged pull requests since the latest stable
+release, grouped by Conventional Commits type (breaking changes, security and
+dependencies, features, fixes, documentation, maintenance).
 
-Three placeholders are left for review: `{{SUMMARY}}`, `{{CHANGES}}` and
-`{{UPGRADING}}` (delete the Upgrading section when nothing changes for
-operators). Write the changes for users and self-hosters from the pull request
-list, check every claim against the tagged source and the successful runs, then
-update the release:
+The written part is left as placeholders, explained in the template's comment:
+`{{SUMMARY}}` (opening sentence), `{{ATTENTION}}` (a callout when self-hosters
+must act), `{{RIDERS}}` and `{{SELF_HOSTING}}` (one bolded theme per bullet,
+citing pull requests), and `{{UPGRADING}}`. Delete a placeholder that does not
+apply. Check every claim against the tagged source and the successful runs,
+then update the release:
 
 ```sh
 gh release view vX.Y.N --repo uerban/ptn --json body -q .body > /tmp/ptn-release-notes.md

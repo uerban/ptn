@@ -70,7 +70,7 @@ def check_archive_version(meta, version, name):
 TEMPLATE = Path(__file__).resolve().parent.parent / 'docs' / 'templates' / 'release-notes.md'
 PLACEHOLDER = re.compile(r'\{\{([A-Z_]+)\}\}')
 # Filled by a person before promotion; promote-release.py refuses them.
-EDITORIAL = ('SUMMARY', 'CHANGES', 'UPGRADING')
+EDITORIAL = ('SUMMARY', 'ATTENTION', 'RIDERS', 'SELF_HOSTING', 'UPGRADING')
 
 
 def release_title(tag):
@@ -86,12 +86,49 @@ def render_notes(template, values):
     return PLACEHOLDER.sub(lambda m: values.get(m[1], m[0]), text).strip() + '\n'
 
 
+PR_GROUPS = ('Breaking changes', 'Security and dependencies', 'Features', 'Fixes', 'Documentation', 'Maintenance')
+CONVENTIONAL = re.compile(r'(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<breaking>!)?: ')
+
+
+def pr_group(title):
+    """Group a pull request by its Conventional Commits title; other titles count as fixes."""
+    match = CONVENTIONAL.match(title)
+    kind, scope = (match['type'], match['scope'] or '') if match else ('fix', '')
+    if match and match['breaking']:
+        return 'Breaking changes'
+    if kind == 'security' or scope == 'deps' or re.search(r'\b(RUSTSEC|CVE|GHSA)-', title):
+        return 'Security and dependencies'
+    if kind in ('feat', 'perf'):
+        return 'Features'
+    if kind == 'fix':
+        return 'Fixes'
+    if kind == 'docs':
+        return 'Documentation'
+    return 'Maintenance'
+
+
+def group_pull_requests(body):
+    """GitHub's generated notes, grouped under headings; new contributors are kept."""
+    groups = {name: [] for name in PR_GROUPS}
+    contributors, section = [], None
+    for line in body.splitlines():
+        if line.startswith('## '):
+            section = line[3:].strip()
+        elif line.startswith('* ') and section == 'New Contributors':
+            contributors.append(line)
+        elif line.startswith('* '):
+            groups[pr_group(line[2:].split(' by @')[0])].append(line)
+    parts = [f'### {name}\n\n' + '\n'.join(lines) for name, lines in groups.items() if lines]
+    if contributors:
+        parts.append('### New contributors\n\n' + '\n'.join(contributors))
+    return '\n\n'.join(parts) or 'No pull requests.'
+
+
 def pull_requests(repo, tag, previous):
-    """Merged pull requests between the previous stable release and tag, as GitHub lists them."""
+    """Merged pull requests between the previous stable release and tag."""
     generated = json.loads(gh('api', '-X', 'POST', f'repos/{repo}/releases/generate-notes',
                               '-f', f'tag_name={tag}', '-f', f'previous_tag_name={previous}'))
-    lines = [line for line in generated['body'].splitlines() if line.startswith('* ')]
-    return '\n'.join(lines) or 'No pull requests.'
+    return group_pull_requests(generated['body'])
 
 
 def eligible_run(run, revision, title, allow_main_push=False):

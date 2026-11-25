@@ -1,28 +1,52 @@
 <!--
 Release notes template. The draft workflow (scripts/prepare-release-draft.py)
-renders it into every new draft titled "PTN vX.Y.N": it fills the version,
-tag, previous release, validation runs and merged pull requests, and removes
-these comments. Before promotion, edit the draft and replace the remaining
-placeholders: {{SUMMARY}}, {{CHANGES}} and {{UPGRADING}}. Promotion refuses
-notes that still contain a placeholder.
+renders it into every new draft titled "PTN vX.Y.N". It fills the version,
+tags, validation runs and the grouped pull request list, and removes these
+comments. Before promotion, edit the draft and replace or delete every
+remaining placeholder; promotion refuses notes that still contain one.
 
-- {{SUMMARY}}: one sentence after "PTN X.Y.N", user-facing.
-- {{CHANGES}}: bullets for what users and self-hosters notice, grouped by
-  theme, each with its effect. Use the pull request list as the source. Only
-  changes in the tagged commit compared with the previous release.
-- {{UPGRADING}}: required steps, migrations or compatibility notes. Delete the
-  whole section when there are none.
+- {{SUMMARY}}: the rest of the opening sentence after "PTN X.Y.N": what this
+  release brings, in user terms ("adds service alerts and arrive-by trip
+  planning."). Add a second sentence only for something every reader must know.
+- {{ATTENTION}}: when self-hosters must act before or during the upgrade, one
+  GitHub callout naming the action and pointing to Upgrading:
+    > [!IMPORTANT]
+    > City recipes using mirrors need schemaVersion 2; see Upgrading.
+  Otherwise delete the line.
+- {{RIDERS}}: what people using the app notice. {{SELF_HOSTING}}: what people
+  running PTN notice (configuration, tools, data refresh, API, platforms).
+  One bullet per theme, most important first:
+    - **Theme.** What changed and its visible effect, in plain words. (#90, #96)
+  Describe effects, not implementation. Cite the pull requests from the list
+  below. Delete a section that has nothing for its audience.
+- {{UPGRADING}}: concrete steps, new or changed settings, compatibility and
+  migrations, each with the exact name (`PT_FEEDS_BUDGET_DIR`). Write "No
+  action needed." when there is nothing to do.
 
-Verify every claim against the tagged source and the successful runs. Keep
+Only changes in the tagged commit since the previous stable release. Verify
+every claim against the tagged source and the successful runs, and keep
 limitations specific to what was actually tested.
 -->
 PTN {{VERSION}} {{SUMMARY}}
 
-## Changes
+{{ATTENTION}}
 
-{{CHANGES}}
+## For riders
 
-## Downloads and hosting
+{{RIDERS}}
+
+## For self-hosters
+
+{{SELF_HOSTING}}
+
+## Upgrading
+
+These notes cover upgrading from {{PREVIOUS_TAG}}. When skipping releases, also
+read the Upgrading section of each skipped release.
+
+{{UPGRADING}}
+
+## Downloads
 
 Choose the archive matching your operating system and architecture:
 
@@ -35,18 +59,21 @@ Choose the archive matching your operating system and architecture:
 | macOS Intel | `ptn-darwin-x86_64.tar.gz` |
 
 Each archive includes six native tools, matching PWA assets, a local OSM builder,
-licenses, hosting instructions, and internal checksums. Each download also has
-an accompanying `.sha256` file. No Rust compiler or source checkout is needed
-to use the prebuilt tools. City data is installed separately.
+licenses, hosting instructions, and internal checksums. No Rust compiler or
+source checkout is needed to use the prebuilt tools. City data is installed
+separately.
+
+Verify a download against its `.sha256` file before unpacking:
+
+```sh
+sha256sum -c ptn-linux-x86_64.tar.gz.sha256      # Linux
+shasum -a 256 -c ptn-darwin-arm64.tar.gz.sha256  # macOS
+```
 
 See the [native hosting guide](https://github.com/uerban/ptn/blob/{{TAG}}/examples/native/README.md),
 [Docker hosting guide](https://github.com/uerban/ptn/blob/{{TAG}}/docker/README.md),
 and [platform details](https://github.com/uerban/ptn/blob/{{TAG}}/docs/release-platforms.md)
 for setup, compatibility, and prerequisites.
-
-## Upgrading
-
-{{UPGRADING}}
 
 ## Validation
 
