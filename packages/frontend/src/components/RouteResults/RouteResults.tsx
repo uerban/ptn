@@ -285,7 +285,7 @@ export function RouteResults({
   }
 
   const afterPrimary = <>
-    {import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" && (
+    {(import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" || import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1") && (
       <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
         bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
         arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />

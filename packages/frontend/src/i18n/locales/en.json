@@ -471,6 +471,8 @@
   "search.check_other_departures": "Check other departures",
   "search.alternate_arrival": "Arrives {time}",
   "guidance.stay_on_board": "Stay on board",
+  "search.show_journey_alternatives": "Show alternatives",
+  "search.no_later_journey": "No later journey found",
   "search.alternate_ride": "Take {line} toward {headsign} at {time} instead",
   "search.later_journey": "Also leaves at {departure} · arrives at {arrival}",
   "search.next": "Next",
