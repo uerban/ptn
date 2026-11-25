@@ -148,7 +148,7 @@ class PromotionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             release = self.files(root)
-            release.update(tag_name='v0.2.44', **(published or {}))
+            release.update({'tag_name': 'v0.2.44', 'body': 'PTN 0.2.44 fixes things.', **(published or {})})
             runs = [{'status': 'completed', 'conclusion': 'success', 'event': 'workflow_dispatch',
                      'head_branch': 'main', 'head_sha': REV, 'display_title': f'{title} {REV}',
                      'path': f'.github/workflows/{workflow}'}
@@ -178,7 +178,8 @@ class PromotionTests(unittest.TestCase):
     def test_release_tag_is_promoted_in_place_without_copying_assets(self):
         calls = self.in_place()
         self.assertEqual(calls[0][:3], ('release', 'download', 'v0.2.44'))
-        self.assertEqual(calls[1], ('release', 'edit', 'v0.2.44', '--repo', 'example/ptn', '--prerelease=false', '--latest'))
+        self.assertEqual(calls[1], ('release', 'edit', 'v0.2.44', '--repo', 'example/ptn', '--prerelease=false', '--latest',
+                                    '--title', 'PTN v0.2.44'))
         self.assertEqual(len(calls), 2)
 
     def test_check_only_does_not_edit(self):
@@ -193,6 +194,15 @@ class PromotionTests(unittest.TestCase):
         for recorded in ('0.2.43', None):
             with self.subTest(recorded=recorded), self.assertRaisesRegex(RuntimeError, 'records version'):
                 self.in_place(evidence_version=recorded)
+
+    def test_notes_with_template_placeholders_are_not_promoted(self):
+        for body in ('PTN 0.2.44 {{SUMMARY}}\n\n{{CHANGES}}', '', None):
+            with self.subTest(body=body), self.assertRaisesRegex(RuntimeError, 'placeholders|no release notes'):
+                self.in_place(published={'body': body})
+
+    def test_check_only_also_checks_the_notes(self):
+        with self.assertRaisesRegex(RuntimeError, 'UPGRADING'):
+            self.in_place(published={'body': 'PTN 0.2.44 ok.\n\n{{UPGRADING}}'}, check_only=True)
 
     def test_flag_change_that_alters_assets_is_reported(self):
         with self.assertRaisesRegex(RuntimeError, 'unchanged assets'):

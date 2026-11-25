@@ -146,19 +146,25 @@ commits, tags, or releases.
 
 ## Release notes
 
-Use the [release-notes template](templates/release-notes.md). Copy it to a
-temporary file, fill its placeholders from the tagged source, compare with the
-previous release, and check the successful validation run and attached assets.
-Remove unused sections and template comments before publishing.
+The draft workflow renders the [release-notes template](templates/release-notes.md)
+into every `vX.Y.N` draft and titles it `PTN vX.Y.N`. It fills the version,
+download links, checksum instructions, validation and regression runs, source
+commit, the compare link, and the merged pull requests since the latest stable
+release, grouped by Conventional Commits type (breaking changes, security and
+dependencies, features, fixes, documentation, maintenance).
 
-The draft workflow adds basic provenance notes automatically. Replace those
-notes with the reviewed release message before publication:
+The written part is left as placeholders, explained in the template's comment:
+`{{SUMMARY}}` (opening sentence), `{{ATTENTION}}` (a callout when self-hosters
+must act), `{{RIDERS}}` and `{{SELF_HOSTING}}` (one bolded theme per bullet,
+citing pull requests), and `{{UPGRADING}}`. Delete a placeholder that does not
+apply. Check every claim against the tagged source and the successful runs,
+then update the release:
 
 ```sh
-cp docs/templates/release-notes.md /tmp/ptn-release-notes.md
-# Edit /tmp/ptn-release-notes.md and replace all placeholders.
+gh release view vX.Y.N --repo uerban/ptn --json body -q .body > /tmp/ptn-release-notes.md
+# Replace the placeholders in /tmp/ptn-release-notes.md.
 gh release edit vX.Y.N --repo uerban/ptn --notes-file /tmp/ptn-release-notes.md
 ```
 
-This updates the existing draft. Publish it separately after the release notes
-and assets are ready.
+Notes stay editable after publication. Promotion refuses a release whose notes
+are empty or still contain a placeholder, and sets the title to `PTN vX.Y.N`.
