@@ -34,7 +34,8 @@ describe("RiderDashboard", () => {
       />
     );
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("Central Station")).toBeInTheDocument();
+    // The headsign is the line's direction, not where this rider gets off.
+    expect(screen.getByText("toward Central Station")).toBeInTheDocument();
   });
 
   it("renders upcoming stops list", () => {

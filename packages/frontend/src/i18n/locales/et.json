@@ -255,6 +255,7 @@
   "route.board_from_walk": "Peatusest {stop} · {n} m",
   "route.aria_board_here": "Minge peale selles peatuses",
   "route.aria_leg": "{vehicle} peatuseni {stop}",
+  "route.toward_headsign": "{headsign} suunas",
   "route.aria_then": "seejärel",
   "route.aria_walk_leg": "jalgsi {n} min",
   "route.aria_duration_arrival": "{n} min, saabub {time}",

@@ -122,10 +122,19 @@ export function LegRow({
           )}
           {/* Also on a current leg with no progress yet — a ride that has not
               left, a walk before the first fix — so the row still says where. */}
+          {/* The stop to get off at, never the bare headsign: a headsign alone
+              reads as the destination of the ride, not the line's direction. */}
           {!showPlannedDeparture && !showWalkingProgress && !showTransitProgress && (
-            <div className="text-fg-secondary truncate" style={{ fontSize: "var(--variant-primary-text-size)" }}>
-              {leg.headsign ?? leg.to.name}
-            </div>
+            <>
+              {!isWalking && leg.headsign && (
+                <div className="text-fg-muted truncate" style={{ fontSize: "var(--variant-meta-text-size)" }}>
+                  {t("route.toward_headsign", "toward {headsign}").replace("{headsign}", leg.headsign)}
+                </div>
+              )}
+              <div className="text-fg-secondary truncate" style={{ fontSize: "var(--variant-primary-text-size)" }}>
+                {leg.to.name}
+              </div>
+            </>
           )}
           {status === "upcoming" && connectionStatus && (
             <div role="status" aria-live="assertive" className={`mt-0.5 ${

@@ -124,7 +124,7 @@ function apply(map: maplibregl.Map, index: number, p: Pending): void {
           "line-color": legColor(p.leg),
           "line-width": p.leg.mode === "WALK" ? 4 : 5,
           "line-opacity": opacity,
-          ...(p.leg.mode === "WALK" ? { "line-dasharray": [2, 2] } : {}),
+          ...(lineDash(p) ? { "line-dasharray": lineDash(p) } : {}),
         },
       },
       beforeId,
@@ -133,6 +133,9 @@ function apply(map: maplibregl.Map, index: number, p: Pending): void {
     (src as maplibregl.GeoJSONSource).setData(geojson);
     if (map.getLayer(layerId)) {
       map.setPaintProperty(layerId, "line-opacity", opacity);
+      // A leg can start on straight stop-to-stop lines and resolve to its
+      // shape later (or the other way round after a feed change).
+      if (p.leg.mode !== "WALK") map.setPaintProperty(layerId, "line-dasharray", lineDash(p));
       // Follows a theme switch while guidance is running.
       if (p.leg.mode === "WALK") map.setPaintProperty(layerId, "line-color", legColor(p.leg));
       // If the stops layer mounted after this leg's first enqueue, the
@@ -147,6 +150,17 @@ function apply(map: maplibregl.Map, index: number, p: Pending): void {
       if (map.getLayer(STOPS_LAYER)) map.moveLayer(layerId, STOPS_LAYER);
     }
   }
+}
+
+/**
+ * Walk legs are finely dashed. A transit leg drawn without its feed shape —
+ * straight lines between its stops, or between board and alight alone — is
+ * an approximation of the track, so it gets a long dash: still read as the
+ * ride, never mistaken for the real line or for a walk.
+ */
+function lineDash(p: Pending): [number, number] | undefined {
+  if (p.leg.mode === "WALK") return [2, 2];
+  return p.geom.source === "shape" ? undefined : [3, 1.5];
 }
 
 function paintOpacity(statusOpacity: number, g: LegGeometryResult): number {

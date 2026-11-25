@@ -254,6 +254,7 @@
   "route.board_from_walk": "Pysäkiltä {stop} · {n} m",
   "route.aria_board_here": "Nouse kyytiin tässä",
   "route.aria_leg": "{vehicle} pysäkille {stop}",
+  "route.toward_headsign": "kohti {headsign}",
   "route.aria_then": "sitten",
   "route.aria_walk_leg": "kävely {n} min",
   "route.aria_duration_arrival": "{n} min, saapuu {time}",

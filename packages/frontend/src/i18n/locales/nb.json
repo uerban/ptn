@@ -255,6 +255,7 @@
   "route.board_from_walk": "Fra holdeplass {stop} · {n} m",
   "route.aria_board_here": "Stig på her",
   "route.aria_leg": "{vehicle} til holdeplass {stop}",
+  "route.toward_headsign": "mot {headsign}",
   "route.aria_then": "deretter",
   "route.aria_walk_leg": "gå {n} min",
   "route.aria_duration_arrival": "{n} min, ankomst {time}",
