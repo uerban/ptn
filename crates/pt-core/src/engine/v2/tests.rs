@@ -261,6 +261,41 @@ fn frontier(its: &[Itinerary]) -> Vec<(i64, u32)> {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn first_route_constraint_keeps_onward_routes_available() {
+    let mut net = Net::new(4, 3);
+    net.trip(0, &[(0, 100), (3, 180)]); // Same line, different branch.
+    net.trip(0, &[(0, 120), (1, 200)]);
+    net.trip(1, &[(1, 350), (2, 500)]);
+    net.trip(2, &[(0, 150), (2, 300)]); // Faster, different first line.
+    let reader = Reader::from_bytes(net.bytes()).unwrap();
+    let index = Index::build(&reader, PatternMode::CoveringMerge).unwrap();
+    let mut q = query(0, 2, 90, 2);
+    assert_eq!(
+        frontier(&plan_v2(&reader, &index, None, &q, None).unwrap()),
+        vec![(300, 0)]
+    );
+    let constrained = super::plan_v2_with_first_route(&reader, &index, None, &q, 0).unwrap();
+    assert_eq!(frontier(&constrained), vec![(500, 1)]);
+    let routes: Vec<_> = constrained[0]
+        .legs
+        .iter()
+        .filter_map(|leg| match leg.kind {
+            LegKind::Transit {
+                reader_route_idx, ..
+            } => Some(reader_route_idx),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(routes, vec![0, 1]);
+    q.excluded_routes.push(1);
+    assert!(
+        super::plan_v2_with_first_route(&reader, &index, None, &q, 0)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn reader_and_time_resolution_round_trip() {
     let mut n = Net::new(2, 1);
     n.trip(0, &[(0, 36000), (1, 36600)]);

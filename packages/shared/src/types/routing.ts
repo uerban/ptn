@@ -19,6 +19,8 @@ export interface RaptorQuery {
   excludedModes?: TransportMode[];
   /** Generic hard route exclusions, applied before candidate generation. */
   excludedRouteIds?: string[];
+  /** On-device PTB v2 only. Constrains the first boarding, leaving transfers open. */
+  firstRouteId?: string;
   /** Walking speed (m/s) for the engine's own transfer walks; the entry and
    *  exit walks above already carry it. Absent: the engine profile's speed. */
   walkSpeedMps?: number;

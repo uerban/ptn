@@ -38,6 +38,7 @@ pub struct WasmQuery {
     pub excluded_modes: Option<Vec<u16>>,
     /// Generic route exclusions, resolved before the engine scans any patterns.
     pub excluded_route_ids: Option<Vec<String>>,
+    pub first_route_id: Option<String>,
     /// The rider's walking speed in m/s, for the engine's transfer walks.
     /// Absent: the mobility's speed (wheelchair 0.8, otherwise 1.25).
     pub walk_speed_mps: Option<f64>,
@@ -94,6 +95,18 @@ fn mobility_from_profile(profile: Option<&str>) -> Result<Mobility, JsError> {
     classify_mobility(profile).map_err(|m| JsError::new(&m))
 }
 
+pub(crate) fn resolve_route_id<B>(reader: &Reader<B>, id: &str) -> Result<Option<u32>, JsError>
+where
+    B: AsRef<[u8]> + Send + Sync + 'static,
+{
+    for i in 0..reader.num_routes() {
+        if reader.route_id(i)? == id {
+            return Ok(Some(i as u32));
+        }
+    }
+    Ok(None)
+}
+
 /// Build the engine `Query` from the deserialised WasmQuery + reader.
 pub fn build_engine_query<B>(reader: &Reader<B>, wq: WasmQuery) -> Result<Query, JsError>
 where
@@ -116,13 +129,7 @@ where
             .map_err(|m| JsError::new(&m))?;
     let mut excluded_routes = Vec::new();
     for id in wq.excluded_route_ids.unwrap_or_default() {
-        let mut resolved = None;
-        for i in 0..reader.num_routes() {
-            if reader.route_id(i)? == id.as_str() {
-                resolved = Some(i as u32);
-                break;
-            }
-        }
+        let resolved = resolve_route_id(reader, &id)?;
         excluded_routes.push(
             resolved.ok_or_else(|| JsError::new(&format!("unknown excluded routeId: {id}")))?,
         );

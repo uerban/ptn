@@ -837,9 +837,9 @@ export function SearchPage() {
     () => (paginationTime ?? new Date()).toISOString(),
     [paginationTime, fromLat, fromLon, toLat, toLon],
   );
-  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal, directRouteId?: string): Promise<Itinerary[]> => {
+  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal, firstRide: { routeId: string; direct: boolean }): Promise<Itinerary[]> => {
     if (!fromEndpoint || !toEndpoint) return [];
-    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, directRouteId });
+    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, firstRide });
     if (!results || signal.aborted) return [];
     return convertRaptorResults(results, at, { lat: fromEndpoint.lat, lon: fromEndpoint.lon },
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);

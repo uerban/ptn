@@ -87,7 +87,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; directRouteId?: string }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: { routeId: string; direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -110,7 +110,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   origin: null,
   destination: null,
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; directRouteId?: string }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: { routeId: string; direct: boolean } }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -161,13 +161,13 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       const city = useCityStore.getState().activeCity;
       const searchCityId = city.id;
       const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
-      if (probe && opts?.directRouteId) {
-        const directRouteId = opts.directRouteId;
-        if (excludedRouteIds.includes(directRouteId)) return;
+      const firstRide = probe ? opts?.firstRide : undefined;
+      if (firstRide && excludedRouteIds.includes(firstRide.routeId)) return;
+      if (firstRide?.direct) {
         // Other lines can dominate the result set even when a later trip on
         // this direct line is viable. Keep the rider's existing exclusions.
         for (const route of raptorIndex.routes) {
-          if (route.id !== directRouteId) excludedRouteIds.push(route.id);
+          if (route.id !== firstRide.routeId) excludedRouteIds.push(route.id);
         }
       }
       const config: SearchConfig = {
@@ -235,6 +235,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destination: endpointCoord(destination),
         departureTime,
         ranking,
+        firstRouteId: firstRide?.direct === false ? firstRide.routeId : undefined,
         originStopId: origin.kind === "stop" ? origin.stopId : undefined,
         destStopId: destination.kind === "stop" ? destination.stopId : undefined,
         originStopIds: origin.kind === "stopGroup" ? [...origin.stopIds] : undefined,

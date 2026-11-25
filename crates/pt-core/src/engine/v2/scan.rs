@@ -181,6 +181,7 @@ struct Ctx<'a, B: AsRef<[u8]> + Send + Sync + 'static> {
     walk_speed_mm_s: u32,
     min_transfer: i64,
     excluded_routes: &'a [u32],
+    first_route: Option<u32>,
     excluded_mask: u32,
     origin_unix: i64,
     deadline: i64,
@@ -283,6 +284,30 @@ where
     plan_v2_with(reader, index, transfers, query, abort, true, true).map(|(out, _)| out)
 }
 
+/// Plan with a required parent GTFS route on the first boarding.
+pub fn plan_v2_with_first_route<B>(
+    reader: &Reader<B>,
+    index: &Index,
+    transfers: Option<&Transfers>,
+    query: &Query,
+    first_route: u32,
+) -> Result<Vec<Itinerary>, EngineError>
+where
+    B: AsRef<[u8]> + Send + Sync + 'static,
+{
+    plan_impl(
+        reader,
+        index,
+        transfers,
+        query,
+        None,
+        true,
+        true,
+        Some(first_route),
+    )
+    .map(|(out, _)| out)
+}
+
 /// [`plan_v2`] with the target cutoff and the boarding shortcuts switchable,
 /// also returning how many labels the search created, so the tests can show
 /// neither changes a returned itinerary and bound the size of a search.
@@ -298,7 +323,9 @@ pub(crate) fn plan_v2_with<B>(
 where
     B: AsRef<[u8]> + Send + Sync + 'static,
 {
-    plan_impl(reader, index, transfers, query, abort, cutoff, shortcuts)
+    plan_impl(
+        reader, index, transfers, query, abort, cutoff, shortcuts, None,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -310,6 +337,7 @@ fn plan_impl<'a, B: AsRef<[u8]> + Send + Sync + 'static>(
     abort: Option<&core::sync::atomic::AtomicBool>,
     cutoff: bool,
     shortcuts: bool,
+    first_route: Option<u32>,
 ) -> Result<(Vec<Itinerary>, usize), EngineError> {
     let v2 = index.v2.as_deref().ok_or(EngineError::UnsupportedVersion)?;
     let frame = time::query_frame(reader, query.date, query.departure_secs, v2.max_event_secs)?;
@@ -344,6 +372,7 @@ fn plan_impl<'a, B: AsRef<[u8]> + Send + Sync + 'static>(
         walk_speed_mm_s: query.transfer_walk_speed_mm_s(),
         min_transfer: query.min_transfer_floor_secs(),
         excluded_routes: &query.excluded_routes,
+        first_route,
         excluded_mask,
         origin_unix: frame.origin_unix,
         deadline: frame.timeline(deadline_unix)?,
@@ -806,10 +835,15 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
         let mut limits = core::mem::take(&mut self.buf_limits);
         let uniform = self.uniform_ready(&l);
         for &(r, p) in pairs {
-            if !self.route_allowed(r) {
+            let route = &index.routes[r as usize];
+            if !self.route_allowed(r)
+                || (l.kind == Kind::Origin
+                    && self
+                        .first_route
+                        .is_some_and(|required| required != route.reader_route_idx))
+            {
                 continue;
             }
-            let route = &index.routes[r as usize];
             let p = p as usize;
             cands.clear();
             if let Some(ready) = &uniform {

@@ -103,6 +103,7 @@ export interface SearchQuery {
   departureTime: Date;
   ranking: RankingCriteria;
   maxRounds?: number;
+  firstRouteId?: string;
   /**
    * Stop id the origin coordinate resolves to, when the caller's endpoint
    * was a `stop`-kind endpoint. Used by the OSM-walk override on
@@ -333,6 +334,7 @@ export class SearchOrchestrator {
       mobilityProfile: this.config.mobilityProfile,
       excludedModes: this.config.excludedModes,
       excludedRouteIds: this.config.excludedRouteIds,
+      ...(query.firstRouteId ? { firstRouteId: query.firstRouteId } : {}),
       // The engine's transfer walks at the rider's pace, as the entry and exit
       // walks above, and the profile's minimum transfer.
       walkSpeedMps: riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps),

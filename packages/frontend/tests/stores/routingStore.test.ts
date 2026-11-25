@@ -67,8 +67,10 @@ describe("useRoutingStore.search", () => {
     const controller = new AbortController();
     const activeState = useRoutingStore.getState();
     try {
-      expect(await activeState.search(endpoint, endpoint, at, { probe: controller.signal })).toBe(expected);
-      expect(search).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ departureTime: at, originStopId: "s1" }));
+      expect(await activeState.search(endpoint, endpoint, at, {
+        probe: controller.signal, firstRide: { routeId: "r1", direct: false },
+      })).toBe(expected);
+      expect(search).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ departureTime: at, originStopId: "s1", firstRouteId: "r1" }));
       expect(useRoutingStore.getState()).toBe(activeState);
       expect(api.plan).not.toHaveBeenCalled();
       search.mockImplementationOnce(async () => {

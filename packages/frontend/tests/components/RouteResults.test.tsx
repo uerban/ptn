@@ -73,7 +73,7 @@ describe("RouteResults", () => {
       expect(onSelect).toHaveBeenCalledWith(later);
       rerender(renderResults("2026-03-03T10:23:00Z", false));
       fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
-      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date("2026-03-03T10:01:00Z"), expect.any(AbortSignal), "42");
+      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date("2026-03-03T10:01:00Z"), expect.any(AbortSignal), { routeId: "42", direct: true });
       expect(onSelect).toHaveBeenCalledTimes(2);
       expect(onSelect).toHaveBeenLastCalledWith(later);
     } finally {

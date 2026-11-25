@@ -13,7 +13,7 @@ pub(crate) mod scan;
 pub mod time;
 
 pub use index::{commitment_of, recompute_block_commitment, V2Index};
-pub use scan::plan_v2;
+pub use scan::{plan_v2, plan_v2_with_first_route};
 pub use time::{resolve_time, TimeResolution, ROUTING_HORIZON_SECS};
 
 #[cfg(test)]

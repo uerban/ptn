@@ -108,19 +108,33 @@ impl PtRouter {
             return Err(JsError::new("plan() called on freed PtRouter"));
         }
         let wq = query::deserialize_query(query)?;
+        let first_route = wq
+            .first_route_id
+            .as_deref()
+            .map(|id| {
+                query::resolve_route_id(&self.reader, id)?
+                    .ok_or_else(|| JsError::new(&format!("unknown first routeId: {id}")))
+            })
+            .transpose()?;
         let q = query::build_engine_query(&self.reader, wq)?;
-        let itineraries = pt_core::plan(
-            &self.reader,
-            &self.index,
-            // the prior `transfers: None` hard-wire was the only reason `tests/three_way.mjs`
-            // SKIPPED the 3 footpath-dependent differential tuples. With `set_transfers(buf)`
-            // landed, the host forwards the installed table here; when no table has been installed
-            // (a generation without `transfers.bin`) the engine runs with no stop-to-stop walks at
-            // all: only same-stop transfers and the origin/destination walks remain.
-            self.transfers.as_ref(),
-            &mut self.scan_state,
-            &q,
-        )
+        // Both engines receive the installed footpaths. Legacy PTB v1 keeps
+        // its unrestricted scan; the caller still checks the first ride.
+        let itineraries = match first_route {
+            Some(route) if self.reader.is_v2() => pt_core::engine::v2::plan_v2_with_first_route(
+                &self.reader,
+                &self.index,
+                self.transfers.as_ref(),
+                &q,
+                route,
+            ),
+            _ => pt_core::plan(
+                &self.reader,
+                &self.index,
+                self.transfers.as_ref(),
+                &mut self.scan_state,
+                &q,
+            ),
+        }
         .map_err(|e| JsError::new(&format!("pt-core engine error: {:?}", e)))?;
         output::project(&self.reader, &itineraries)
     }

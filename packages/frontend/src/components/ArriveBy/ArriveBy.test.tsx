@@ -358,7 +358,7 @@ describe("Arrive-by results", () => {
       expect(findLaterPlans).not.toHaveBeenCalled();
       emit(state("complete", [LATEST]));
       fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
-      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), LATEST.journey.rides[0].routeId);
+      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), { routeId: LATEST.journey.rides[0].routeId, direct: true });
       expect(onSelect).toHaveBeenCalledWith(viable);
       expect(runs).toHaveLength(1);
       expect(runs[0].cancelled).toBe(false);

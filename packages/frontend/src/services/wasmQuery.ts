@@ -10,6 +10,7 @@ export interface WasmQuery {
   mobilityProfile?: EngineMobilityProfile;
   excludedModes?: number[];
   excludedRouteIds?: string[];
+  firstRouteId?: string;
   walkSpeedMps?: number;
   minTransferSecs?: number;
 }
@@ -53,6 +54,7 @@ export function toWasmQuery(query: RaptorQuery, date: string): WasmQuery {
     // Empty array means "no exclusion" — pass undefined to match the
     // wasm-side default (panel qa MEDIUM: pinned contract).
     ...(coerced && coerced.length > 0 ? { excludedModes: coerced } : {}),
+    ...(query.firstRouteId ? { firstRouteId: query.firstRouteId } : {}),
     ...(query.excludedRouteIds?.length ? { excludedRouteIds: query.excludedRouteIds } : {}),
   };
 }
