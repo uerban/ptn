@@ -510,9 +510,9 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "pt-artifacts"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "base64",
  "brotli",
@@ -1053,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "pt-core"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "hashbrown 0.15.5",
@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "pt-core-emit"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "pt-core",
  "serde",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "pt-geocode"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "fst",
  "serde",
@@ -1083,7 +1083,7 @@ dependencies = [
 
 [[package]]
 name = "pt-producer"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "brotli",
  "clap",
@@ -1114,7 +1114,7 @@ dependencies = [
 
 [[package]]
 name = "pt-serve"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "arc-swap",
  "base64",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "pt-shared"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "indexmap",
  "jiff",
@@ -1167,14 +1167,14 @@ dependencies = [
 
 [[package]]
 name = "pt-walk"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "pt-wasm"
-version = "0.2.3"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "pt-core",
@@ -1721,9 +1721,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.5.8"
+version = "2.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+checksum = "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
 dependencies = [
  "form_urlencoded",
  "idna",

@@ -191,7 +191,7 @@ describe("RouteResults", () => {
     expect(screen.getAllByTestId("itinerary-card")).toHaveLength(3);
   });
 
-  it("shows headsign next to route name for transit legs", () => {
+  it("shows the route number, headsign and local departure time together", () => {
     const itinerary = makeItinerary({
       legs: [
         {
@@ -208,11 +208,14 @@ describe("RouteResults", () => {
     });
     render(
       <BrowserRouter>
-        <RouteResults itineraries={[itinerary]} onSelect={() => {}} />
+        <RouteResults itineraries={[itinerary]} onSelect={() => {}} feedTz="Europe/Vilnius" />
       </BrowserRouter>
     );
-    expect(screen.getByText("142")).toBeInTheDocument();
-    expect(screen.getByText(/Central Station/)).toBeInTheDocument();
+    const departure = screen.getByText(/toward Central Station/);
+    expect(departure.parentElement).toContainElement(screen.getByText("142"));
+    expect(departure.querySelector("time")).toHaveAttribute("datetime", "2026-03-03T10:00:00Z");
+    expect(departure.querySelector("time")).toHaveTextContent("12:00");
+    expect(screen.getByTestId("itinerary-card")).toHaveAccessibleName(/Bus 142.*toward Central Station, departs 12:00/);
   });
 
   it("does not show headsign for WALK legs", () => {
@@ -238,28 +241,20 @@ describe("RouteResults", () => {
     expect(screen.queryByText(/Should Not Appear/)).not.toBeInTheDocument();
   });
 
-  it("does not show headsign arrow when headsign is absent", () => {
+  it("shows a departure time without a headsign", () => {
     const itinerary = makeItinerary();
     render(
       <BrowserRouter>
         <RouteResults itineraries={[itinerary]} onSelect={() => {}} />
       </BrowserRouter>
     );
-    // Single-leg itinerary with no headsign: no → characters should appear
-    // (→ is used for leg separators and headsign arrows, neither applies here)
-    // The card's time row uses \u2192 (\u2192) as the depart\u2192arrive separator
-    // per spec (matches Power/Accessible variants), so we assert specifically
-    // that the headsign-arrow text doesn't appear, not that \u2192 is absent
-    // from the card entirely. The headsign arrow renders as "\u203a <headsign>"
-    // (chevron + space + headsign) \u2014 not the time-row's surrounding spaces.
-    const headsignSpans = screen.queryAllByText((_content, el) => {
-      return el?.tagName === "SPAN" && /^\u203a\s\S/.test(el.textContent ?? "");
-    });
-    expect(headsignSpans).toHaveLength(0);
+    const card = screen.getByTestId("itinerary-card");
+    expect(card.querySelector("time")).toHaveAttribute("datetime", itinerary.legs[0].departureTime);
+    expect(screen.queryByText(/toward/)).not.toBeInTheDocument();
   });
 
-  it("truncates long headsigns with title attribute", () => {
-    const longHeadsign = "Very Long Destination Name That Should Be Truncated";
+  it("keeps long destination signs readable", () => {
+    const longHeadsign = "Very Long Destination Name That Identifies the Branch";
     const itinerary = makeItinerary({
       legs: [
         {
@@ -279,9 +274,7 @@ describe("RouteResults", () => {
         <RouteResults itineraries={[itinerary]} onSelect={() => {}} />
       </BrowserRouter>
     );
-    const headsignEl = screen.getByTitle(longHeadsign);
-    expect(headsignEl).toBeInTheDocument();
-    expect(headsignEl).toHaveClass("truncate");
+    expect(screen.getByText(new RegExp(longHeadsign))).toHaveClass("break-words");
   });
 
   it("renders multi-leg itinerary with mode arrows", () => {

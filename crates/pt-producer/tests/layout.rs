@@ -35,7 +35,6 @@ fn layout_offsets_are_page_aligned_and_disjoint() {
 
 #[test]
 fn layout_stop_times_region_is_exactly_total_times_row_stride() {
-
     let l = Layout::compute(3, 2, 4, 12, 90, 2, 0, 0);
     assert_eq!(l.length(Region::StopTimes), 12 * 12);
 }

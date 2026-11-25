@@ -80,6 +80,11 @@ COPY config/ ./config/
 # process.env.GIT_SHA; this build stage is discarded, so it never reaches prod.
 ARG GIT_SHA=
 ENV GIT_SHA=${GIT_SHA}
+# PT_VERSION build-arg: the version computed by scripts/app-version.mjs on a
+# full clone. Unset → build-info.mjs derives it from the build context's .git
+# (X.Y.0-dev when that history is shallow or has no main ref).
+ARG PT_VERSION=
+ENV PT_VERSION=${PT_VERSION}
 RUN pnpm --filter @pt/shared build && pnpm --filter @pt/backend build
 
 # ---- Prod-deps stage: strip dev dependencies ----

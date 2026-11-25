@@ -47,6 +47,12 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+// "0.2.44-dev+0459991f" → "0.2.44-dev": the build metadata repeats the commit
+// shown right next to it. The copied feedback block keeps the full version.
+function displayVersion(version: string): string {
+  return version.split("+", 1)[0] ?? version;
+}
+
 function commitClass(commit: string): string {
   return commit.endsWith("-dirty") ? "text-fg-muted italic" : "";
 }
@@ -114,7 +120,7 @@ export function VersionBlock({ onClick }: VersionBlockProps = {}) {
       <div data-testid="version-frontend" className="flex justify-between gap-2">
         <span>Frontend</span>
         <span className="font-mono text-right">
-          v{buildInfo.version} ·{" "}
+          v{displayVersion(buildInfo.version)} ·{" "}
           <span className={commitClass(buildInfo.commit)}>{buildInfo.commit}</span>
           <span className="block text-[0.6875rem] text-fg-muted">
             {formatBuiltAt(buildInfo.builtAt)}
@@ -126,7 +132,7 @@ export function VersionBlock({ onClick }: VersionBlockProps = {}) {
         <span className="font-mono text-right">
           {backend.data ? (
             <>
-              v{backend.data.version} ·{" "}
+              v{displayVersion(backend.data.version)} ·{" "}
               <span className={commitClass(backend.data.commit)}>{backend.data.commit}</span>
               <span className="block text-[0.6875rem] text-fg-muted">
                 {formatBuiltAt(backend.data.builtAt)}

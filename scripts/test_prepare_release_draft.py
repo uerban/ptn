@@ -14,11 +14,31 @@ class ArtifactPolicyTests(unittest.TestCase):
     def artifacts(self):
         return [{'name': name, 'expired': False} for name in sorted(draft.REQUIRED)]
 
-    def test_stable_tag_cannot_dispatch_a_rebuild(self):
-        with patch('sys.argv', ['prepare-release-draft.py', 'v0.2.0']), patch.object(draft, 'gh') as gh:
-            with self.assertRaisesRegex(RuntimeError, 'promoted from an immutable RC'):
+    def test_malformed_tag_is_rejected_before_any_github_call(self):
+        for tag in ('v0.2', 'v0.2.44-rc', 'v01.2.3', '0.2.44', 'v0.2.44-dev+abcdef12'):
+            with self.subTest(tag=tag), patch('sys.argv', ['prepare-release-draft.py', tag]), \
+                    patch.object(draft, 'gh') as gh, self.assertRaisesRegex(RuntimeError, 'Expected a release tag'):
                 draft.main()
             gh.assert_not_called()
+
+    def test_legacy_stable_tag_is_refused_before_any_gate_runs(self):
+        with patch('sys.argv', ['prepare-release-draft.py', 'v0.2.3']), patch.dict('os.environ', GH_REPO='example/ptn'), \
+                patch.object(draft, 'api', return_value=[{'ref': 'refs/tags/v0.2.3-rc.4'}]) as api, \
+                patch.object(draft, 'gh') as gh, self.assertRaisesRegex(RuntimeError, 'legacy stable tag'):
+            draft.main()
+        api.assert_called_once_with('repos/example/ptn/git/matching-refs/tags/v0.2.3-rc.')
+        gh.assert_not_called()
+
+    def test_release_tags_carry_their_version_and_legacy_rc_tags_do_not(self):
+        self.assertEqual(draft.tag_version('v0.2.44'), '0.2.44')
+        self.assertIsNone(draft.tag_version('v0.2.3-rc.4'))
+
+    def test_archive_must_be_built_as_the_tagged_version(self):
+        draft.check_archive_version({'version': '0.2.44'}, '0.2.44', 'ptn-linux-x86_64.tar.gz')
+        draft.check_archive_version({}, None, 'ptn-linux-x86_64.tar.gz')  # legacy RC
+        for meta in ({'version': '0.2.43'}, {'version': '0.2.44-dev+abcdef12'}, {}):
+            with self.subTest(meta=meta), self.assertRaisesRegex(RuntimeError, 'derived version matches'):
+                draft.check_archive_version(meta, '0.2.44', 'ptn-linux-x86_64.tar.gz')
 
     def test_complete_artifacts_are_reused(self):
         self.assertEqual(draft.artifact_state(self.artifacts()), 'ready')
@@ -63,6 +83,57 @@ class ArtifactPolicyTests(unittest.TestCase):
         artifacts.append({'name': 'ptn-linux-x86_64-candidate', 'expired': False})
         with self.assertRaisesRegex(RuntimeError, 'Missing required artifacts: ptn-linux-x86_64'):
             draft.artifact_state(artifacts)
+
+
+class ReleaseNotesTests(unittest.TestCase):
+    values = {'VERSION': '0.2.50', 'TAG': 'v0.2.50', 'PREVIOUS_TAG': 'v0.2.49',
+              'VALIDATION_RUN_URL': 'https://example.test/runs/2', 'REGRESSION_RUN_URL': 'https://example.test/runs/1',
+              'SOURCE_SHA': 'a' * 40, 'SHORT_SHA': 'a' * 7, 'PULL_REQUESTS': '* fix: one by @someone in #1'}
+
+    def test_draft_title_names_the_product(self):
+        self.assertEqual(draft.release_title('v0.2.50'), 'PTN v0.2.50')
+
+    def test_template_renders_provenance_and_keeps_editorial_placeholders(self):
+        notes = draft.render_notes(draft.TEMPLATE.read_text(), self.values)
+        self.assertTrue(notes.startswith('PTN 0.2.50 {{SUMMARY}}\n\n{{ATTENTION}}'))
+        self.assertNotIn('<!--', notes)
+        self.assertEqual(set(draft.PLACEHOLDER.findall(notes)), set(draft.EDITORIAL))
+        for expected in ('https://example.test/runs/2', 'https://example.test/runs/1', 'a' * 40,
+                         '/blob/v0.2.50/docker/README.md', 'compare/v0.2.49...v0.2.50', '* fix: one by @someone in #1',
+                         'upgrading from v0.2.49', 'sha256sum -c'):
+            self.assertIn(expected, notes)
+
+    def test_unknown_template_placeholder_is_refused(self):
+        with self.assertRaisesRegex(RuntimeError, 'unknown placeholders: TYPO'):
+            draft.render_notes('PTN {{VERSION}} {{TYPO}}', self.values)
+
+    def test_pull_requests_come_from_generated_notes_since_previous_release(self):
+        body = "## What's Changed\n* feat: a by @x in https://example.test/pull/1\n\n**Full Changelog**: ..."
+        with patch.object(draft, 'gh', return_value=json.dumps({'name': 'v0.2.50', 'body': body})) as gh:
+            self.assertEqual(draft.pull_requests('example/ptn', 'v0.2.50', 'v0.2.49'),
+                             '### Features\n\n* feat: a by @x in https://example.test/pull/1')
+        self.assertEqual(gh.call_args.args, ('api', '-X', 'POST', 'repos/example/ptn/releases/generate-notes',
+                                             '-f', 'tag_name=v0.2.50', '-f', 'previous_tag_name=v0.2.49'))
+
+    def test_pull_requests_are_grouped_by_conventional_type(self):
+        cases = {'feat(gtfs): mirrors': 'Features', 'perf: faster index': 'Features',
+                 'fix(pt-serve): header': 'Fixes', 'Show departures with large delays': 'Fixes',
+                 'feat(api)!: drop v0 routes': 'Breaking changes',
+                 'fix(deps): bump url to 2.5.9 (RUSTSEC-2026-0592)': 'Security and dependencies',
+                 'chore(deps): bump vite': 'Security and dependencies', 'docs: hosting': 'Documentation',
+                 'ci: cache': 'Maintenance', 'test(e2e): flake': 'Maintenance', 'chore: rustfmt': 'Maintenance'}
+        for title, group in cases.items():
+            with self.subTest(title=title):
+                self.assertEqual(draft.pr_group(title), group)
+
+    def test_grouped_list_keeps_order_and_new_contributors(self):
+        body = ("## What's Changed\n* fix: b by @x in u/2\n* feat: a by @y in u/1\n* ci: c by @x in u/3\n\n"
+                "## New Contributors\n* @y made their first contribution in u/1\n\n**Full Changelog**: ...")
+        self.assertEqual(draft.group_pull_requests(body),
+                         '### Features\n\n* feat: a by @y in u/1\n\n### Fixes\n\n* fix: b by @x in u/2\n\n'
+                         '### Maintenance\n\n* ci: c by @x in u/3\n\n'
+                         '### New contributors\n\n* @y made their first contribution in u/1')
+        self.assertEqual(draft.group_pull_requests("## What's Changed\n"), 'No pull requests.')
 
 
 class RegressionGateTests(unittest.TestCase):

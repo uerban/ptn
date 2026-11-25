@@ -3,7 +3,9 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -80,6 +82,17 @@ def verify_binary(path, platform):
                     raise ValueError(f"{path.name} needs a shared library (DT_NEEDED)")
 
 
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-dev(\+[0-9a-f]{7,40})?)?")
+
+
+def app_version():
+    """The injected PT_VERSION, else the version derived by scripts/app-version.mjs."""
+    injected = os.environ.get("PT_VERSION", "").strip()
+    if injected:
+        return injected
+    return subprocess.check_output(["node", "scripts/app-version.mjs"], cwd=ROOT, text=True).strip()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", required=True, choices=PLATFORMS)
@@ -102,6 +115,9 @@ def main():
     if not list((web / "assets").glob("*.wasm")):
         parser.error("PWA output has no WASM engine")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    version = app_version()
+    if not VERSION_PATTERN.fullmatch(version):
+        parser.error(f"invalid application version: {version!r}")
     args.out.mkdir(parents=True, exist_ok=True)
     name = f"ptn-{args.platform}"
     with tempfile.TemporaryDirectory() as work:
@@ -130,11 +146,11 @@ def main():
             "For prebuilt transit without feed or OSM builds, use the "
             "[transit installation guide](docs/transit-pack-installation.md).\n\n"
             "Run `sha256sum --check SHA256SUMS` to verify the extracted files. "
-            "`release.json` identifies the source revision and platform.\n\n"
+            "`release.json` identifies the version, source revision and platform.\n\n"
             "[Source and build instructions](https://github.com/uerban/ptn#build).\n"
         )
         (bundle / "release.json").write_text(json.dumps({
-            "schemaVersion": 1, "revision": revision, "platform": args.platform,
+            "schemaVersion": 1, "version": version, "revision": revision, "platform": args.platform,
             "rustTarget": PLATFORMS[args.platform][0],
             "sourceDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
         }, indent=2) + "\n")

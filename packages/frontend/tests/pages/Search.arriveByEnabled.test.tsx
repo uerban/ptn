@@ -2,9 +2,10 @@
 // Search draws the Arrive-by choice and keeps its normal results until a
 // deadline is applied.
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { MemoryRouter } from "react-router-dom";
+import { useArriveByUi } from "../../src/components/ArriveBy/arriveByUiStore.ts";
 import { SearchPage } from "../../src/pages/Search.tsx";
 
 vi.mock("../../src/components/ArriveBy/arriveByEntry.ts", async () =>
@@ -26,4 +27,27 @@ describe("Search with the arrive-by experiment", () => {
     expect(screen.getByRole("button", { name: "Arrive by" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByTestId("arrive-by-results")).not.toBeInTheDocument();
   });
+  it("shows the selected sort as a tie-breaker once an Arrive by deadline is applied", () => {
+    render(
+      <MemoryRouter initialEntries={["/search?toLat=54.7&toLon=25.3&toName=Somewhere"]}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByRole("searchbox", { name: "From" }), {
+      target: { value: "54.68, 25.28" },
+    });
+    expect(screen.getByTestId("sort-summary")).toHaveAccessibleName("Sort: Fastest");
+
+    act(() => {
+      useArriveByUi.getState().chooseArriveBy(Date.now() + 60 * 60 * 1000);
+      useArriveByUi.getState().apply();
+    });
+
+    expect(screen.getByTestId("sort-summary")).toHaveAccessibleName("Tie-breaker: Fastest");
+    fireEvent.click(screen.getByTestId("sort-summary"));
+    expect(screen.getByText(/breaks departure-time ties between the remaining journeys/i)).toBeInTheDocument();
+
+    act(() => useArriveByUi.getState().chooseLeaveNow());
+  });
+
 });

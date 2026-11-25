@@ -255,6 +255,7 @@
   "route.board_from_walk": "Z przystanku {stop} · {n} m",
   "route.aria_board_here": "Wsiądź tutaj",
   "route.aria_leg": "{vehicle} do przystanku {stop}",
+  "route.toward_headsign": "w kierunku {headsign}",
   "route.aria_then": "potem",
   "route.aria_walk_leg": "pieszo {n} min",
   "route.aria_duration_arrival": "{n} min, przyjazd {time}",

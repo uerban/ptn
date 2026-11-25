@@ -265,6 +265,7 @@
   "route.board_from_walk": "От остановки {stop} · {n} м",
   "route.aria_board_here": "Садитесь на этой остановке",
   "route.aria_leg": "{vehicle} до остановки {stop}",
+  "route.toward_headsign": "в сторону {headsign}",
   "route.aria_then": "затем",
   "route.aria_walk_leg": "пешком {n} мин",
   "route.aria_duration_arrival": "{n} мин, прибытие {time}",

@@ -8,19 +8,22 @@ This command prepares candidates; only pt-producer publishes serving generations
 
 import argparse
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import fcntl
 import hashlib
+import http.client
 import io
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tarfile
 import tempfile
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,6 +34,26 @@ VALIDATOR_SHA = "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e
 VALIDATOR_URL = "https://github.com/MobilityData/gtfs-validator/releases/download/v8.0.1/gtfs-validator-8.0.1-cli.jar"
 LIMIT = 256 * 1024 * 1024
 EXPANDED_LIMIT = 2 * 1024 * 1024 * 1024
+SECRET_FORMAT = re.compile(r"[A-Za-z0-9._~-]{8,256}")
+ENVIRONMENT_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+# Environment variables holding source credentials; removed from every child.
+SECRET_ENVIRONMENT = set()
+
+
+def child_environment():
+    hidden = SECRET_ENVIRONMENT | {"PT_FEEDS_TOKEN"}
+    return {k: v for k, v in os.environ.items() if k not in hidden}
+
+
+class SourceError(OSError):
+    """A source retrieval failure whose message never contains a URL or secret.
+
+    `transport` marks failures that may fall back to another candidate.
+    """
+
+    def __init__(self, message, *, transport=False, status=None, outcome="error"):
+        super().__init__(message)
+        self.transport, self.status, self.outcome = transport, status, outcome
 
 
 def require(condition, message):
@@ -57,6 +80,10 @@ def write_json(path, value):
 
 
 class Redirect(urllib.request.HTTPRedirectHandler):
+    def __init__(self, credentialed=False):
+        super().__init__()
+        self.credentialed = credentialed
+
     def redirect_request(self, request, *args, **kwargs):
         redirected = super().redirect_request(request, *args, **kwargs)
         if redirected:
@@ -68,12 +95,64 @@ class Redirect(urllib.request.HTTPRedirectHandler):
                 urllib.parse.urlsplit(request.full_url).netloc
                 != urllib.parse.urlsplit(redirected.full_url).netloc
             ):
+                if self.credentialed:
+                    raise SourceError(
+                        "credentialed cross-host redirect refused",
+                        transport=True,
+                        outcome="redirect",
+                    )
                 redirected.remove_header("Authorization")
         return redirected
 
 
-def fetch(url, directory, *, token=None, allow_http=False):
-    """Content-addressed raw cache; conditional hits still verify retained bytes."""
+TRANSPORT_STATUS = {400, 401, 403, 404, 408, 410, 429}
+
+
+# Certificate failures stop an origin; other TLS errors (dropped stream,
+# handshake or protocol failure) fall back like any connection failure.
+TLS_HARD = (ssl.SSLCertVerificationError, ssl.CertificateError)
+
+
+def classify(error):
+    """Return (outcome, HTTP status, may fall back). Never inspects URLs."""
+    if isinstance(error, SourceError):
+        return error.outcome, error.status, error.transport
+    if isinstance(error, urllib.error.HTTPError):
+        return (
+            "http",
+            error.code,
+            error.code >= 500 or error.code in TRANSPORT_STATUS,
+        )
+    if isinstance(error, urllib.error.URLError):
+        reason = error.reason
+        if isinstance(reason, TLS_HARD):
+            return "tls", None, False
+        if isinstance(reason, ssl.SSLError):
+            return "transport", None, True
+        return "connect", None, True
+    if isinstance(error, TLS_HARD):
+        return "tls", None, False
+    if isinstance(error, ssl.SSLError):
+        # EOF, reset or zero-return mid-handshake or mid-body: a dropped connection.
+        return "transport", None, True
+    if isinstance(error, (TimeoutError, http.client.HTTPException, ConnectionError)):
+        return "transport", None, True
+    if isinstance(error, ValueError):
+        text = str(error)
+        if "truncated" in text or "exceeds 256 MiB" in text:
+            return "transport", None, True
+        return "invalid", None, False
+    if isinstance(error, OSError):
+        return "transport", None, True
+    return "error", None, False
+
+
+def fetch(url, directory, *, token=None, allow_http=False, query_secret=None):
+    """Content-addressed raw cache; conditional hits still verify retained bytes.
+
+    `query_secret` is an optional (parameter, value) pair added to the request
+    only: the cache key, metadata and every error message stay free of it.
+    """
     parsed = urllib.parse.urlsplit(url)
     require(
         parsed.scheme == "https" or allow_http and parsed.scheme == "http",
@@ -83,6 +162,19 @@ def fetch(url, directory, *, token=None, allow_http=False):
         parsed.hostname and not parsed.username and not parsed.password,
         "credentials in URLs are not supported",
     )
+    if query_secret is not None:
+        name, value = query_secret
+        require(
+            parsed.scheme == "https"
+            and re.fullmatch("[A-Za-z0-9_-]{1,64}", name)
+            and isinstance(value, str)
+            and SECRET_FORMAT.fullmatch(value),
+            "invalid source credential",
+        )
+        require(
+            name not in urllib.parse.parse_qs(parsed.query, keep_blank_values=True),
+            "source URL already sets the credential parameter",
+        )
     directory.mkdir(parents=True, exist_ok=True)
     key = hashlib.sha256(url.encode()).hexdigest()
     metadata = directory / (key + ".json")
@@ -107,9 +199,69 @@ def fetch(url, directory, *, token=None, allow_http=False):
         )
         headers["Authorization"] = "Bearer " + token
     checked = datetime.now(timezone.utc).isoformat()
-    opener = urllib.request.build_opener(Redirect())
+    if query_secret is None:
+        return _fetch(
+            url,
+            url,
+            directory,
+            metadata,
+            previous,
+            cached,
+            valid,
+            headers,
+            checked,
+            token,
+            False,
+        )
+    request_url = urllib.parse.urlunsplit(
+        parsed._replace(
+            query="&".join(
+                part
+                for part in (parsed.query, urllib.parse.urlencode([query_secret]))
+                if part
+            )
+        )
+    )
     try:
-        response = opener.open(urllib.request.Request(url, headers=headers), timeout=60)
+        return _fetch(
+            url,
+            request_url,
+            directory,
+            metadata,
+            previous,
+            cached,
+            valid,
+            headers,
+            checked,
+            token,
+            True,
+        )
+    except Exception as error:  # noqa: BLE001 - re-raised without its context
+        outcome, status, transport = classify(error)
+        message = f"credentialed request failed: {type(error).__name__}" + (
+            f" HTTP {status}" if status else ""
+        )
+    raise SourceError(message, transport=transport, status=status, outcome=outcome)
+
+
+def _fetch(
+    url,
+    request_url,
+    directory,
+    metadata,
+    previous,
+    cached,
+    valid,
+    headers,
+    checked,
+    token,
+    credentialed,
+):
+    opener = urllib.request.build_opener(Redirect(credentialed))
+    try:
+        response = opener.open(
+            urllib.request.Request(request_url, headers=headers), timeout=60
+        )
     except urllib.error.HTTPError as error:
         if error.code != 304:
             raise
@@ -132,7 +284,10 @@ def fetch(url, directory, *, token=None, allow_http=False):
                 require(count <= LIMIT, "download exceeds 256 MiB limit")
                 output.write(chunk)
             length = response.headers.get("Content-Length")
-            require(not length or int(length) == count, "truncated HTTP response")
+            require(
+                not length or length.strip().isdigit() and int(length) == count,
+                "truncated HTTP response",
+            )
             output.flush()
             os.fsync(output.fileno())
         sha = digest(temporary)
@@ -143,7 +298,7 @@ def fetch(url, directory, *, token=None, allow_http=False):
             "resolvedURL": urllib.parse.urlunsplit(
                 urllib.parse.urlsplit(response.geturl())._replace(query="", fragment="")
             )
-            if token
+            if token or credentialed
             else response.geturl(),
             "sha256": sha,
             "bytes": count,
@@ -206,6 +361,17 @@ def rows(archive, name):
         yield row
 
 
+WEEKDAYS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+
+
 def coverage(path, tz):
     """Evaluate every required component for the next seven local service dates."""
     today = datetime.now(ZoneInfo(tz)).date()
@@ -216,15 +382,7 @@ def coverage(path, tz):
         if "calendar.txt" in archive.namelist():
             for row in rows(archive, "calendar.txt"):
                 for day in days:
-                    weekday = (
-                        "monday",
-                        "tuesday",
-                        "wednesday",
-                        "thursday",
-                        "friday",
-                        "saturday",
-                        "sunday",
-                    )[day.weekday()]
+                    weekday = WEEKDAYS[day.weekday()]
                     if (
                         row["start_date"] <= day.strftime("%Y%m%d") <= row["end_date"]
                         and row[weekday] == "1"
@@ -357,6 +515,7 @@ def validate(path, output, jar):
         ],
         check=True,
         timeout=1800,
+        env=child_environment(),
     )
     report = json.loads((output / "report.json").read_text())
     system = json.loads((output / "system_errors.json").read_text())
@@ -440,12 +599,35 @@ def recipe(config, state, attempt):
     name = specification["name"]
     require(re.fullmatch("[a-z0-9_-]+", name), "invalid recipe name")
     definition = json.loads((root / "recipes" / (name + ".json")).read_text())
-    require(definition.get("schemaVersion") == 1, "unsupported recipe schema")
+    require(definition.get("schemaVersion") in {1, 2}, "unsupported recipe schema")
+    SECRET_ENVIRONMENT.clear()
+    if definition["schemaVersion"] == 2:
+        for source in definition.get("sources", []):
+            check_source(source)
+            if "auth" in source:
+                require(
+                    source["auth"]["env"]
+                    not in definition.get("requiredEnvironment", []),
+                    "auth env is hidden from steps; it cannot also be requiredEnvironment",
+                )
+                SECRET_ENVIRONMENT.add(source["auth"]["env"])
+    else:
+        require(
+            not any(
+                (V2_SOURCE_KEYS - V1_SOURCE_KEYS) & set(s)
+                for s in definition.get("sources", [])
+            ),
+            "mirrors, credentials, freshness and identity need recipe schemaVersion 2",
+        )
     require(
         not definition.get("blockedReason"),
         definition.get("blockedReason", "blocked recipe"),
     )
     for variable in definition.get("requiredEnvironment", []):
+        require(
+            variable != "PT_FEEDS_TOKEN",
+            "PT_FEEDS_TOKEN is never passed to recipe steps",
+        )
         require(os.environ.get(variable), f"recipe requires {variable}")
     return definition, root, {"archiveSha256": expected, "name": name}
 
@@ -480,6 +662,483 @@ def source_url(source, state, directory):
     selected = {url for period, url in candidates if period == latest}
     require(len(selected) == 1, "ambiguous latest Riga resource")
     return selected.pop()
+
+
+V1_SOURCE_KEYS = {
+    "id",
+    "url",
+    "discovery",
+    "allowHTTP",
+    "alwaysPrepare",
+    "attribution",
+    "policyStatus",
+    "policyURL",
+    "steps",
+    "verifyCompaction",
+}
+V2_SOURCE_KEYS = V1_SOURCE_KEYS | {
+    "mirror",
+    "prefer",
+    "auth",
+    "budget",
+    "freshness",
+    "identity",
+}
+
+
+RESERVED_ENVIRONMENT = {
+    "PT_FEEDS_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "HOME",
+    "PATH",
+    "SSH_AUTH_SOCK",
+}
+
+
+def check_source(source):
+    """Schema 2 source shape: one origin `url` or `discovery`, optional mirror."""
+    unknown = set(source) - V2_SOURCE_KEYS
+    require(not unknown, f"unknown source keys: {sorted(unknown)}")
+    require(
+        ("url" in source) != ("discovery" in source),
+        "source needs exactly one of url or discovery",
+    )
+    if "discovery" in source:
+        require(
+            not set(source)
+            & {"mirror", "prefer", "auth", "budget", "freshness", "identity"},
+            "discovery sources take no mirror, credentials or freshness",
+        )
+        return
+    if "mirror" in source:
+        mirror = source["mirror"]
+        require(
+            isinstance(mirror, dict)
+            and set(mirror) == {"operator", "url"}
+            and isinstance(mirror["operator"], str)
+            and mirror["operator"].strip()
+            and isinstance(mirror["url"], str),
+            "mirror needs exactly operator and url",
+        )
+        require(
+            urllib.parse.urlsplit(mirror["url"]).scheme == "https",
+            "mirror must use HTTPS",
+        )
+        require(
+            mirror["url"] != source["url"], "mirror must differ from the origin url"
+        )
+        require("identity" in source, "a source with a mirror needs identity")
+        require(
+            source.get("prefer", "origin") == "origin" or "freshness" in source,
+            "a mirror-first source needs freshness",
+        )
+    require(
+        isinstance(source.get("prefer", "origin"), str)
+        and source.get("prefer", "origin") in {"origin", "mirror"},
+        "prefer must be origin or mirror",
+    )
+    require("prefer" not in source or "mirror" in source, "prefer needs a mirror")
+    if "auth" in source:
+        auth = source["auth"]
+        require(
+            isinstance(auth, dict)
+            and set(auth) == {"queryParam", "env"}
+            and all(isinstance(auth[k], str) for k in auth)
+            and re.fullmatch("[A-Za-z0-9_-]{1,64}", auth["queryParam"])
+            and ENVIRONMENT_NAME.fullmatch(auth["env"]),
+            "auth needs queryParam and an upper-case env name",
+        )
+        require(
+            auth["env"] not in RESERVED_ENVIRONMENT
+            and not auth["env"].startswith(("PT_FEEDS_", "PTN_")),
+            "auth env names a runtime variable",
+        )
+        require(
+            auth["queryParam"]
+            not in urllib.parse.parse_qs(
+                urllib.parse.urlsplit(source["url"]).query, keep_blank_values=True
+            ),
+            "source URL already sets the credential parameter",
+        )
+        require(not source.get("allowHTTP"), "credentials require HTTPS")
+    if "budget" in source:
+        budget = source["budget"]
+        require(
+            isinstance(budget, dict)
+            and set(budget) == {"requests", "days"}
+            and all(type(budget[k]) is int and budget[k] > 0 for k in budget),
+            "budget needs positive integer requests and days",
+        )
+        require(
+            budget["days"] <= LEDGER_RETENTION_DAYS,
+            f"budget days must be at most {LEDGER_RETENTION_DAYS}",
+        )
+        require("auth" in source, "budget applies to credentialed origins")
+    if "freshness" in source:
+        freshness = source["freshness"]
+        require(
+            isinstance(freshness, dict)
+            and (
+                (
+                    set(freshness) == {"signal", "format", "maxAgeDays"}
+                    and freshness["signal"] == "feed_info.feed_version"
+                    and isinstance(freshness["format"], str)
+                )
+                or (
+                    set(freshness) == {"signal", "maxAgeDays"}
+                    and freshness["signal"] == "service.firstDate"
+                )
+            )
+            and type(freshness["maxAgeDays"]) is int
+            and freshness["maxAgeDays"] >= 0,
+            "freshness needs signal feed_info.feed_version with format, or "
+            "service.firstDate, and maxAgeDays",
+        )
+    if "identity" in source:
+        identity = source["identity"]
+        require(
+            isinstance(identity, dict)
+            and set(identity) <= {"feedInfo", "agencyNames", "agencyCount"}
+            and (identity.get("feedInfo") or identity.get("agencyNames")),
+            "identity needs feedInfo or agencyNames",
+        )
+        require(
+            isinstance(identity.get("feedInfo", {}), dict)
+            and isinstance(identity.get("agencyNames", []), list)
+            and (
+                "agencyCount" not in identity
+                or type(identity["agencyCount"]) is int
+                and identity["agencyCount"] > 0
+            ),
+            "invalid identity",
+        )
+        require(
+            all(
+                isinstance(v, str) and v
+                for v in [
+                    *identity.get("feedInfo", {}).values(),
+                    *identity.get("agencyNames", []),
+                ]
+            ),
+            "identity values must be non-empty strings",
+        )
+
+
+def table(path, name):
+    """Lenient read of a raw file, before recipe steps repair it.
+
+    Ragged rows and odd bytes are tolerated: only the named columns matter.
+    """
+    with zipfile.ZipFile(path) as archive:
+        if name not in archive.namelist():
+            return None
+        text = io.TextIOWrapper(
+            archive.open(name), encoding="utf-8-sig", errors="replace", newline=""
+        )
+        return [
+            {
+                same(k): same(v)
+                for k, v in row.items()
+                if isinstance(k, str) and isinstance(v, str)
+            }
+            for row in csv.DictReader(text)
+        ]
+
+
+def same(text):
+    """Comparison form: Unicode NFC, surrounding whitespace removed."""
+    return unicodedata.normalize("NFC", text).strip()
+
+
+def identity_problem(path, identity):
+    info = (table(path, "feed_info.txt") or [{}])[0]
+    for field, expected in identity.get("feedInfo", {}).items():
+        if info.get(field) != same(expected):
+            return f"feed_info.{field} differs"
+    agencies = [r.get("agency_name") for r in table(path, "agency.txt") or []]
+    missing = {same(n) for n in identity.get("agencyNames", [])} - set(agencies)
+    if missing:
+        return "expected agency missing"
+    if "agencyCount" in identity and len(agencies) != identity["agencyCount"]:
+        return f"agency count {len(agencies)} != {identity['agencyCount']}"
+    return None
+
+
+def first_service_date(path):
+    """Earliest date the raw feed schedules service; None without a calendar.
+
+    For publishers whose files start on their publish day this measures how
+    recent a file is. The end date does not: a newer file can cover less.
+    """
+    dates = [
+        row.get("start_date", "")
+        for row in table(path, "calendar.txt") or []
+        if any(row.get(day) == "1" for day in WEEKDAYS)
+    ] + [
+        row.get("date", "")
+        for row in table(path, "calendar_dates.txt") or []
+        if row.get("exception_type") == "1"
+    ]
+    parsed = [datetime.strptime(value, "%Y%m%d").date() for value in dates if value]
+    return min(parsed) if parsed else None
+
+
+def freshness_of(path, specification, today):
+    """Date-based freshness from the recipe's signal; None when unknown."""
+    try:
+        if specification["signal"] == "service.firstDate":
+            published = first_service_date(path)
+            if published is None:
+                return None
+        else:
+            value = (table(path, "feed_info.txt") or [{}])[0].get("feed_version") or ""
+            published = datetime.strptime(value, specification["format"]).date()
+    except (ValueError, KeyError, csv.Error, zipfile.BadZipFile):
+        return None
+    if published > today + timedelta(days=1):
+        return None
+    age = max(0, (today - published).days)
+    return {
+        "value": published.isoformat(),
+        "ageDays": age,
+        "stale": age > specification["maxAgeDays"],
+    }
+
+
+def budget_directory(state):
+    configured = os.environ.get("PT_FEEDS_BUDGET_DIR")
+    return Path(configured) if configured else state / "budget"
+
+
+LEDGER_RETENTION_DAYS = 400
+
+
+def spend_budget(directory, name, budget, now=None):
+    """Count one origin request before it is sent; False when the window is spent.
+
+    One append-only ledger per credential, shared by every source and city
+    that uses it. Failures, timeouts and 304 responses count too.
+    """
+    now = now or datetime.now(timezone.utc)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    ledger = directory / (name + ".ledger")
+    with (directory / (name + ".lock")).open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        since = now - timedelta(days=budget["days"])
+        # Keep history for the longest window any source may use, so a source
+        # with a short window never erases what a longer one counts.
+        keep = now - timedelta(days=max(LEDGER_RETENTION_DAYS, budget["days"]))
+        entries = []
+        if ledger.exists():
+            for line in ledger.read_text().splitlines():
+                try:
+                    stamp = datetime.fromisoformat(line.strip())
+                except ValueError:
+                    continue
+                if stamp > keep:
+                    entries.append(stamp)
+        if sum(stamp > since for stamp in entries) >= budget["requests"]:
+            return False
+        entries.append(now)
+        temporary = ledger.with_name(ledger.name + ".tmp")
+        with temporary.open("w") as stream:
+            stream.write("".join(e.isoformat() + "\n" for e in entries))
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(ledger)
+        return True
+
+
+def freshness_floor(config, state, source_id):
+    """Last accepted freshness date: the newer of host config and validated result.
+
+    Read regardless of recipe or runtime identity so upgrades keep the floor.
+    A configured floor can raise the floor but never lower it.
+    """
+    values = []
+    configured = config.get("freshnessFloors", {})
+    require(isinstance(configured, dict), "freshnessFloors must be an object")
+    if source_id in configured:
+        try:
+            values.append(date.fromisoformat(configured[source_id]))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"freshnessFloors.{source_id} must be YYYY-MM-DD"
+            ) from None
+    pointer = state / "latest-validated.json"
+    try:
+        target = json.loads(pointer.read_text())
+        path = Path(target["result"])
+        require(digest(path) == target["sha256"], "validated result changed")
+        result = json.loads(path.read_text())
+        for record in result.get("feeds", []):
+            if record.get("sourceId") == source_id:
+                retrieval = record.get("retrieval") or {}
+                # An accepted candidate without a readable version keeps the
+                # floor it was checked against, so the floor never drops.
+                value = (retrieval.get("freshness") or {}).get("value") or (
+                    retrieval.get("floor")
+                )
+                if value:
+                    values.append(date.fromisoformat(value))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return max(values).isoformat() if values else None
+
+
+def acquire(source, state, *, today, floor, credentials=()):
+    """Fetch a source from its origin and optional mirror; return (raw, retrieval)."""
+    mirror = source.get("mirror")
+    order = [("origin", source["url"])]
+    if mirror:
+        order.append(("mirror", mirror["url"]))
+        if source.get("prefer") == "mirror":
+            order.reverse()
+    specification = source.get("freshness")
+    attempts, warnings, stale = [], [], []
+
+    regressed = []
+
+    def accept(kind, raw, retrieval, fresh):
+        if fresh and floor and kind == "origin" and fresh["value"] < floor:
+            warnings.append(
+                f"origin data {fresh['value']} is older than accepted {floor}"
+            )
+        if kind == "mirror" and source.get("prefer", "origin") == "origin":
+            warnings.append("mirror used for an origin-first source")
+        record = {
+            **retrieval,
+            "candidate": {
+                "kind": kind,
+                **({"operator": mirror["operator"]} if kind == "mirror" else {}),
+            },
+            "attempts": attempts,
+        }
+        if specification:
+            record["freshness"] = {
+                **(fresh or {"value": None}),
+                "measuredOn": today.isoformat(),
+            }
+        if floor:
+            record["floor"] = floor
+        if warnings:
+            record["warnings"] = warnings
+        return raw, record
+
+    for kind, url in order:
+        attempt = {"candidate": kind}
+        attempts.append(attempt)
+        secret = None
+        if kind == "origin" and "auth" in source:
+            if source["auth"]["env"] not in credentials:
+                attempt["outcome"] = "no-credentials"
+                warnings.append("origin credential not allowed by host configuration")
+                continue
+            value = os.environ.get(source["auth"]["env"], "")
+            if not SECRET_FORMAT.fullmatch(value):
+                attempt["outcome"] = "no-credentials"
+                warnings.append("origin credential missing or malformed")
+                continue
+            secret = (source["auth"]["queryParam"], value)
+            if "budget" in source and not spend_budget(
+                budget_directory(state), source["auth"]["env"], source["budget"]
+            ):
+                attempt["outcome"] = "no-budget"
+                warnings.append("origin request budget spent")
+                continue
+        try:
+            raw, retrieval = fetch(
+                url,
+                state / "raw",
+                allow_http=kind == "origin" and source.get("allowHTTP", False),
+                query_secret=secret,
+            )
+        except Exception as error:  # noqa: BLE001 - classified below
+            outcome, status, transport = classify(error)
+            attempt.update(
+                outcome=outcome,
+                **({"httpStatus": status} if status else {}),
+                error=type(error).__name__,
+            )
+            if kind == "origin" and status in {401, 403} and secret:
+                warnings.append(f"origin refused credential (HTTP {status})")
+            if not transport and kind == "origin":
+                raise SourceError(
+                    f"{source['id']}: {kind} {outcome} failure ({type(error).__name__})",
+                    outcome=outcome,
+                ) from None
+            if not transport:
+                warnings.append(f"mirror {outcome} failure")
+            continue
+        attempt["httpStatus"] = retrieval.get("httpStatus")
+        try:
+            check_zip(raw)
+        except Exception:  # noqa: BLE001 - any unreadable archive is "not a GTFS ZIP"
+            attempt["outcome"] = "not-zip"
+            if kind == "origin":
+                warnings.append("origin returned something other than a GTFS ZIP")
+            continue
+        try:
+            problem = (
+                identity_problem(raw, source["identity"])
+                if "identity" in source
+                else None
+            )
+            fresh = freshness_of(raw, specification, today) if specification else None
+        except (ValueError, KeyError, csv.Error, zipfile.BadZipFile) as error:
+            attempt["outcome"] = "unreadable"
+            if kind == "origin":
+                raise SourceError(
+                    f"{source['id']}: origin feed_info/agency unreadable "
+                    f"({type(error).__name__})",
+                    outcome="unreadable",
+                ) from None
+            continue
+        if problem:
+            attempt["outcome"] = "identity"
+            if kind == "origin":
+                raise SourceError(f"{source['id']}: origin identity changed: {problem}")
+            continue
+        if fresh and floor and kind == "mirror" and fresh["value"] < floor:
+            # Never let a mirror move served data backwards; try the next one.
+            attempt["outcome"] = "regressed"
+            regressed.append(fresh["value"])
+            continue
+        if specification:
+            if fresh is None:
+                if kind == "mirror":
+                    attempt["outcome"] = "freshness-unknown"
+                    continue
+                warnings.append("origin freshness unknown")
+            elif fresh["stale"]:
+                attempt["outcome"] = "stale"
+                stale.append((fresh["value"], kind, raw, retrieval, fresh))
+                continue
+        attempt["outcome"] = "accepted"
+        return accept(kind, raw, retrieval, fresh)
+    if not stale and regressed:
+        raise SourceError(
+            f"{source['id']}: mirror data {max(regressed)} is older than "
+            f"accepted {floor}",
+            outcome="regressed",
+        )
+    if stale:
+        _, kind, raw, retrieval, fresh = max(stale, key=lambda item: item[0])
+        warnings.append(f"no fresh candidate; using {kind} data from {fresh['value']}")
+        next(a for a in attempts if a["candidate"] == kind)["outcome"] = (
+            "accepted-stale"
+        )
+        return accept(kind, raw, retrieval, fresh)
+    raise SourceError(
+        f"{source['id']}: no usable candidate ("
+        + ", ".join(
+            f"{a['candidate']} {a.get('outcome')}"
+            + (f" {a['httpStatus']}" if a.get("outcome") == "http" else "")
+            for a in attempts
+        )
+        + ")"
+    )
 
 
 def reusable_source(state, identity, source_id, raw_sha):
@@ -609,9 +1268,18 @@ def _prepare(config, state, attempt, validator):
         ("gtfsURL" in config) != ("gtfsRecipe" in config),
         "choose exactly one of gtfsURL or gtfsRecipe",
     )
+    credentials = config.get("credentials", [])
+    require(
+        isinstance(credentials, list)
+        and all(
+            isinstance(c, str) and ENVIRONMENT_NAME.fullmatch(c) for c in credentials
+        ),
+        "credentials must be a list of environment names",
+    )
     if "gtfsRecipe" in config:
         definition, root, identity = recipe(config, state, attempt)
     else:
+        SECRET_ENVIRONMENT.clear()
         definition = {
             "city": config.get("city", "vilnius"),
             "timezone": config.get("timezone", "Europe/Vilnius"),
@@ -633,16 +1301,40 @@ def _prepare(config, state, attempt, validator):
         == {s["id"] for s in sources},
         "incomplete recipe components",
     )
+    version = definition.get("schemaVersion", 1)
+    today = datetime.now(ZoneInfo(definition["timezone"])).date()
+    floors = {
+        s["id"]: freshness_floor(config, state, s["id"])
+        for s in sources
+        if version == 2 and "freshness" in s
+    }
+    require(
+        not set(credentials)
+        & (RESERVED_ENVIRONMENT | set(definition.get("requiredEnvironment", []))),
+        "host credentials cannot be reserved or recipe-required variables",
+    )
+    # Every host credential stays out of steps, the validator and compaction,
+    # whether or not this recipe uses it.
+    SECRET_ENVIRONMENT.update(credentials)
     records = []
     for source in sources:
         source_id = source["id"]
         require(re.fullmatch("[a-z0-9_-]+", source_id), "invalid source ID")
         directory = attempt / source_id
         directory.mkdir()
-        url = source_url(source, state, directory)
-        raw, retrieval = fetch(
-            url, state / "raw", allow_http=source.get("allowHTTP", False)
-        )
+        if version == 2 and "url" in source:
+            raw, retrieval = acquire(
+                source,
+                state,
+                today=today,
+                floor=floors.get(source_id),
+                credentials=credentials,
+            )
+        else:
+            url = source_url(source, state, directory)
+            raw, retrieval = fetch(
+                url, state / "raw", allow_http=source.get("allowHTTP", False)
+            )
         shutil.copyfile(raw, directory / "raw.zip")
         write_json(directory / "retrieval.json", retrieval)
         check_zip(raw)
@@ -679,6 +1371,7 @@ def _prepare(config, state, attempt, validator):
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     timeout=1800,
+                    env=child_environment(),
                 )
             check_zip(target)
             current = target
@@ -721,6 +1414,7 @@ def _prepare(config, state, attempt, validator):
                 ],
                 check=True,
                 timeout=1800,
+                env=child_environment(),
             )
     if validator is None:
         validator, _ = fetch(VALIDATOR_URL, state / "validator")
@@ -755,8 +1449,13 @@ def _prepare(config, state, attempt, validator):
         day: any(r["serviceCoverage"][day] for r in records)
         for day in records[0]["serviceCoverage"]
     }
+    # A source with a mirror needs seven days by itself, so a stale mirror
+    # cannot hide behind other components; other sources keep the city rule.
+    mirrored = {s["id"] for s in sources if version == 2 and "mirror" in s}
     passed = all(
-        not r["canonicalErrors"] and any(r["serviceCoverage"].values()) for r in records
+        not r["canonicalErrors"]
+        and (all if r["sourceId"] in mirrored else any)(r["serviceCoverage"].values())
+        for r in records
     ) and all(city_coverage.values())
     result = {
         "schemaVersion": 1,

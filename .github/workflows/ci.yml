@@ -41,6 +41,10 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           cache-profile: release-native
+      - name: Check Rust formatting
+        run: |
+          rustup component add rustfmt
+          cargo fmt --all --check
       - name: Build the browser engine
         working-directory: crates/pt-wasm
         env:
@@ -52,7 +56,7 @@ jobs:
       - name: Build and test source
         run: |
           pnpm install --frozen-lockfile
-          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
+          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs scripts/app-version.test.mjs scripts/build-info.test.mjs
           PT_WASM_BASELINE_TEST_PKG="$PWD/crates/pt-wasm/pkg-web/pt_wasm.js" \
             node --test --test-concurrency=1 crates/pt-wasm/tests/baseline_*.test.mjs crates/pt-wasm/tests/temporal_baseline.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'

@@ -35,7 +35,7 @@ export function TransitLegInfo({ progress, headsign }: TransitLegInfoProps) {
       )}
       {headsign && !progress.currentStopName && (
         <span className="text-fg-muted truncate">
-          {headsign}
+          {t("route.toward_headsign", "toward {headsign}").replace("{headsign}", headsign)}
         </span>
       )}
     </div>

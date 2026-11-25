@@ -10,6 +10,9 @@ COPY packages/backend/src/health/feedStaleConstants.ts ./packages/backend/src/he
 COPY packages/shared/src/constants/defaults.ts ./packages/shared/src/constants/defaults.ts
 COPY packages/shared/src/poi/tileParams.ts ./packages/shared/src/poi/tileParams.ts
 ENV CARGO_INCREMENTAL=0
+# PT_VERSION: version from scripts/app-version.mjs; unset → X.Y.0-dev.
+ARG PT_VERSION=
+ENV PT_VERSION=${PT_VERSION}
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     cargo build --release --locked -p pt-serve -p pt-producer -p pt-artifacts -p pt-walk --features pt-walk/build && \

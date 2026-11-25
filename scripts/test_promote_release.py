@@ -104,13 +104,16 @@ class PromotionTests(unittest.TestCase):
             (root / 'release-evidence.json').write_text(json.dumps(evidence))
             for asset in release['assets']:
                 asset['digest'] = 'sha256:' + hashlib.sha256((root / asset['name']).read_bytes()).hexdigest()
+            stable_draft = {**release, 'tag_name': 'v0.2.0', 'draft': True}
+            listing = json.dumps([[{'tag_name': 'v0.2.0-rc.1', 'draft': False}, stable_draft]])
             with patch.dict('os.environ', GH_REPO='example/ptn'), patch.object(promote, 'api', side_effect=[
-                    release, {'sha': REV}, {'sha': REV}, *runs, release]), patch.object(promote, 'gh') as gh, \
+                    release, {'sha': REV}, {'sha': REV}, *runs]), \
+                    patch.object(promote, 'gh', side_effect=lambda *args: listing if args[:2] == ('api', '--paginate') else '') as gh, \
                     patch.object(promote.tempfile, 'TemporaryDirectory') as temporary:
                 temporary.return_value.__enter__.return_value = directory
                 with patch('sys.argv', ['promote-release.py', 'v0.2.0', '--from-rc', 'v0.2.0-rc.1']):
                     promote.main()
-                return directory, [call.args for call in gh.call_args_list]
+                return directory, [call.args for call in gh.call_args_list if call.args[0] != 'api']
 
     def test_promotion_copies_every_asset_without_workflow_dispatch(self):
         for events in (('workflow_dispatch', 'workflow_dispatch'), ('workflow_dispatch', 'push')):
@@ -120,6 +123,13 @@ class PromotionTests(unittest.TestCase):
                 uploaded = {Path(arg).name for arg in calls[1] if arg.startswith(directory + '/')}
                 self.assertEqual(uploaded, promote.ARCHIVES | promote.EVIDENCE)
                 self.assertIn('--draft', calls[1])
+
+    def test_stable_draft_is_found_although_tag_lookup_skips_drafts(self):
+        listing = json.dumps([[{'tag_name': 'v0.2.3', 'draft': False}], [{'tag_name': 'v0.2.3', 'draft': True, 'id': 7}]])
+        with patch.object(promote, 'gh', return_value=listing):
+            self.assertEqual(promote.draft_release('example/ptn', 'v0.2.3')['id'], 7)
+        with patch.object(promote, 'gh', return_value='[[]]'), self.assertRaisesRegex(RuntimeError, 'found 0'):
+            promote.draft_release('example/ptn', 'v0.2.3')
 
     def test_regression_proof_from_push_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'trusted exact-commit'):
@@ -133,6 +143,75 @@ class PromotionTests(unittest.TestCase):
                     promote.main()
             gh.assert_not_called()
 
+
+    def in_place(self, *, evidence_version='0.2.44', published=None, after=None, check_only=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release = self.files(root)
+            release.update({'tag_name': 'v0.2.44', 'body': 'PTN 0.2.44 fixes things.', **(published or {})})
+            runs = [{'status': 'completed', 'conclusion': 'success', 'event': 'workflow_dispatch',
+                     'head_branch': 'main', 'head_sha': REV, 'display_title': f'{title} {REV}',
+                     'path': f'.github/workflows/{workflow}'}
+                    for workflow, title in [('regression.yml', 'Regression gates'), ('release.yml', 'Release validation')]]
+            proof = {'schemaVersion': 1, 'revision': REV, 'passed': True, 'sourceDirty': False,
+                     'runId': '1', 'runner': 'Linux', 'checks': {name: 'success' for name in
+                     ('identity', 'wasm', 'parity', 'rss', 'index', 'bundle', 'heap', 'coldstart', 'cityswitch')}}
+            (root / 'regression.json').write_text(json.dumps(proof))
+            evidence = json.loads((root / 'release-evidence.json').read_text())
+            evidence.update(regressionRunId='1', releaseRunId='2')
+            if evidence_version:
+                evidence['version'] = evidence_version
+            evidence['sha256']['regression.json'] = hashlib.sha256((root / 'regression.json').read_bytes()).hexdigest()
+            (root / 'release-evidence.json').write_text(json.dumps(evidence))
+            for asset in release['assets']:
+                asset['digest'] = 'sha256:' + hashlib.sha256((root / asset['name']).read_bytes()).hexdigest()
+            stable = {**copy.deepcopy(release), 'prerelease': False, **(after or {})}
+            argv = ['promote-release.py', 'v0.2.44'] + (['--check-only'] if check_only else [])
+            with patch.dict('os.environ', GH_REPO='example/ptn'), patch.object(promote, 'api', side_effect=[
+                    release, {'sha': REV}, *runs, stable]), patch.object(promote, 'gh') as gh, \
+                    patch.object(promote.tempfile, 'TemporaryDirectory') as temporary, patch('builtins.print'), \
+                    patch('sys.argv', argv):
+                temporary.return_value.__enter__.return_value = directory
+                promote.main()
+                return [call.args for call in gh.call_args_list]
+
+    def test_release_tag_is_promoted_in_place_without_copying_assets(self):
+        calls = self.in_place()
+        self.assertEqual(calls[0][:3], ('release', 'download', 'v0.2.44'))
+        self.assertEqual(calls[1], ('release', 'edit', 'v0.2.44', '--repo', 'example/ptn', '--prerelease=false', '--latest',
+                                    '--title', 'PTN v0.2.44'))
+        self.assertEqual(len(calls), 2)
+
+    def test_check_only_does_not_edit(self):
+        self.assertEqual([call[:2] for call in self.in_place(check_only=True)], [('release', 'download')])
+
+    def test_in_place_requires_a_published_immutable_prerelease(self):
+        for field, value in [('draft', True), ('prerelease', False), ('immutable', False)]:
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'published immutable prerelease'):
+                self.in_place(published={field: value})
+
+    def test_in_place_requires_matching_evidence_version(self):
+        for recorded in ('0.2.43', None):
+            with self.subTest(recorded=recorded), self.assertRaisesRegex(RuntimeError, 'records version'):
+                self.in_place(evidence_version=recorded)
+
+    def test_notes_with_template_placeholders_are_not_promoted(self):
+        for body in ('PTN 0.2.44 {{SUMMARY}}\n\n{{CHANGES}}', '', None):
+            with self.subTest(body=body), self.assertRaisesRegex(RuntimeError, 'placeholders|no release notes'):
+                self.in_place(published={'body': body})
+
+    def test_check_only_also_checks_the_notes(self):
+        with self.assertRaisesRegex(RuntimeError, 'UPGRADING'):
+            self.in_place(published={'body': 'PTN 0.2.44 ok.\n\n{{UPGRADING}}'}, check_only=True)
+
+    def test_flag_change_that_alters_assets_is_reported(self):
+        with self.assertRaisesRegex(RuntimeError, 'unchanged assets'):
+            self.in_place(after={'assets': []})
+
+    def test_release_tag_shape(self):
+        for tag in ('v0.2', 'v0.2.44-rc.1', 'v01.2.3'):
+            with self.subTest(tag=tag), self.assertRaisesRegex(RuntimeError, 'Expected a release tag'):
+                promote.validate_published(self.release(), tag, REV)
 
 if __name__ == '__main__':
     unittest.main()

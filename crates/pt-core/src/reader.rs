@@ -4016,8 +4016,6 @@ mod tests {
         ));
     }
 
-
-
     /// A small valid SoA bundle: 3 stops, 2 routes, 1 trip on route 0
     /// (single-route carry topology). Coords are asymmetric/signed.
     fn soa_bundle() -> alloc::vec::Vec<u8> {
@@ -4456,8 +4454,6 @@ mod tests {
             "unset bit at day-offset 300 ⇒ inactive, and the read must not panic"
         );
     }
-
-
 
     /// SoA reader SELF-CONSISTENCY: every decoded field round-trips the KNOWN input literals (and
     /// re-runs the producer's own quantizer for coords). That the SoA encoding is
@@ -4921,7 +4917,6 @@ mod tests {
 
     #[test]
     fn from_bytes_rejects_soa_lat_out_of_range() {
-
         let mut b = soa_bundle();
         // lat_e7[0] (column 2) := 2e9 (> 90e7).
         let at = soa_u32_col_at(&b, 2, 3, 0);

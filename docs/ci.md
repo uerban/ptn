@@ -6,9 +6,9 @@ Routine checks and release preparation have different costs and purposes.
 | --- | --- | --- |
 | **CI** | Pull requests, manual | Classify changed paths; build/test source and smoke-test all five native platforms when needed; advisory Chromium browser tests |
 | **Regression gates** | Manual exact-commit run; PR with `ci:regression` label | Performance, memory safeguards, WASM and PTB parity budgets |
-| **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Sole main build: build/test source, build all installable platforms, validate native/Docker fresh-host lifecycle, security scans and retain archives |
-| **Draft release from validated artifacts** | RC tag or manual existing RC tag | Require matching regression evidence and validated archives before creating an RC draft |
-| **Promote immutable RC to stable draft** | Manual on main | Copy the published RC assets and proof unchanged; no builds |
+| **Release candidate validation** | Pushes to main; manual exact-commit run, including dispatch by release preparation | Sole main build: derive the version once, build/test source, build all installable platforms, validate native/Docker fresh-host lifecycle, security scans and retain archives |
+| **Draft release from validated artifacts** | `v*` tag or manual existing tag | Require matching regression evidence and validated archives built as the tagged version before creating a prerelease draft |
+| **Promote prerelease to stable** | Manual on main | Verify the published prerelease, then clear its prerelease flag (legacy RCs: copy to a stable draft); no builds |
 
 ## Routine CI
 
@@ -52,8 +52,8 @@ flake. Run `pnpm --filter @pt/frontend e2e:pr` locally to cover WebKit.
 Routine checks do not fetch reference-city OSM/GTFS inputs, package release
 archives or run deployment lifecycle checks. Those remain mandatory during
 release candidate validation. Routine platform outputs cannot be promoted as
-release assets; RC archives are built/validated once and later copied unchanged
-during stable promotion.
+release assets; release archives are built/validated once and promoted
+unchanged.
 
 ## Run regressions when needed
 
@@ -151,11 +151,19 @@ Every push to main runs only `release.yml` (build once): it builds and tests the
 source, packages all five platforms, scans for secrets/vulnerable dependencies and
 uploads the validated archives with 30-day retention. `ci.yml` does not run on
 main, so the same commit is never compiled by two workflows. Tagging that exact
-commit reuses those archives; if validation is still running, RC preparation waits
-for it.
+commit reuses those archives; if validation is still running, draft preparation
+waits for it.
 Release validation is also manually dispatchable for commits without retained builds.
 
-RC preparation selects an eligible run of each workflow for the tag's exact
+Its first job, `version`, checks out the source revision with full history and
+derives the application version with the workflow's own `scripts/app-version.mjs`
+(see [release platforms](release-platforms.md#versions)). Build and platform jobs
+receive it as `PT_VERSION`, so the frontend, backend, pt-serve and `release.json`
+of every archive report the same `X.Y.N`; `verify-release-tools.py --version`
+and the hosting validations check it. A push to main that resolves to a `-dev`
+version fails. Re-dispatching an older revision reproduces its version.
+
+Draft preparation selects an eligible run of each workflow for the tag's exact
 source commit. A dispatch's `head_sha` identifies workflow code, so source identity
 is checked from the explicit revision and downloaded evidence instead. Gate control
 scripts come from the workflow commit in a separate checkout, so the selected
@@ -226,53 +234,51 @@ private signing keys and builder scratch data stay on the preparation runner.
 Each validator initializes its own GTFS state and derives its own route probe.
 Both must pass before the installable Linux archive is retained for release.
 
-## Build once: RC, staging and stable promotion
+## Build once: prerelease, staging and stable promotion
 
-The release channel is separate from the artifact's source and embedded component
-versions. Build the intended final component versions before tagging an RC;
-never edit an archive to replace an RC label during promotion.
+The release tag is the version the build already carries: never edit an archive
+or retag to change it.
 
-1. Tag the intended source commit `vX.Y.Z-rc.N`. The RC draft workflow requires
-   exact-commit regression evidence and all validated platform archives. It builds
-   only when those inputs are unbuilt or expired. Review the draft, then publish
-   it as an **immutable prerelease**. The draft includes `regression.json` and
-   `release-evidence.json` with the original run IDs, source SHA and asset hashes.
-2. Install the pinned RC assets on staging. Retain the archive hashes and
+1. Tag a validated main commit `vX.Y.N`, using the version its release run
+   derived. The draft workflow requires exact-commit regression evidence and all
+   validated platform archives, and every archive's `release.json` must report
+   `X.Y.N`. It builds only when those inputs are unbuilt or expired. The draft
+   is titled `PTN vX.Y.N` and its notes come from the release-notes template
+   (see [release notes](release-platforms.md#release-notes)). Review the
+   draft, then publish it as an **immutable prerelease**. The draft includes
+   `regression.json` and `release-evidence.json` with the original run IDs,
+   source SHA, version and asset hashes.
+2. Install the pinned prerelease assets on staging. Retain the archive hashes and
    environment acceptance results in the private ops deployment record. Exercise
    every enabled city, searches, routing, refresh/restart, upgrade and rollback
    against the intended data. CI's reference-city checks do not replace this.
-3. Once accepted, create `vX.Y.Z` on **the same commit**, then run:
+3. Once accepted, run:
 
    ```sh
-   gh workflow run promote-release.yml --ref main \
-     -f source-rc=vX.Y.Z-rc.N -f tag=vX.Y.Z
+   gh workflow run promote-release.yml --ref main -f tag=vX.Y.N
    ```
 
-   This copies the immutable RC's assets unchanged into a separate stable draft.
-   It requires the matching RC/version/commit, complete original proof, successful
-   trusted exact-commit validation runs and matching GitHub/download/upload
-   SHA-256 digests. It never dispatches a build or falls back to rebuilding.
-   Expiry of Actions artifacts does not require rebuilding a published RC.
-4. Review and publish the stable draft, marking it latest when appropriate.
-   Deploy the same archive hashes to production. Keep environment acceptance,
+   This re-downloads the release, checks GitHub and evidence SHA-256 digests,
+   the recorded version, the trusted exact-commit validation runs and that no
+   release-notes placeholder is left, then clears the prerelease flag, names the
+   release `PTN vX.Y.N` and marks it latest. Assets and tag stay as they
+   are; it never dispatches a build. Expiry of Actions artifacts does not matter.
+4. Deploy the same archive hashes to production. Keep environment acceptance,
    immutable data inputs and rollback state in ops; public release promotion does
    not switch production or claim operator acceptance.
 
-For a hotfix, install the immutable RC directly on production after the required
-acceptance checks, then promote that RC to the stable version later. Update the
-ops release identity after verifying matching hashes; the running application
-does not need to be rebuilt or replaced just to change the public version tag.
-A code or asset change requires a new RC and fresh acceptance.
-
-Stable tags do not trigger the build/draft workflow. Manual stable drafting is
-rejected unless it uses the explicit RC promotion workflow. Existing published
-releases remain unchanged. To validate a proposed promotion without writing:
+A fix is merged to main and released under its own, higher `N`, with fresh
+acceptance. There are no release branches: a tag on a commit that is not on main
+builds as a `-dev` version and is rejected. To validate a promotion without
+writing:
 
 ```sh
-GH_REPO=uerban/ptn python3 scripts/promote-release.py vX.Y.Z \
-  --from-rc vX.Y.Z-rc.N --check-only
+GH_REPO=uerban/ptn python3 scripts/promote-release.py vX.Y.N --check-only
 ```
 
+Legacy `vX.Y.Z-rc.N` releases are still drafted, and promoted by copying their
+assets to a stable `vX.Y.Z` draft (`-f source-rc=vX.Y.Z-rc.N -f tag=vX.Y.Z`).
+Pushing such a stable tag does not draft it.
+
 GitHub locks published immutable release assets and tags, but allows editing
-release notes and prerelease/latest flags. Stable publication uses a separate
-release/tag, preserving the RC. See [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
+release notes and prerelease/latest flags. See [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).

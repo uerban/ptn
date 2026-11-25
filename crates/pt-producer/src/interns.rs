@@ -295,7 +295,6 @@ mod tests {
         assert_eq!(dest[wh_b + 1], 0);
     }
 
-
     #[test]
     fn write_stops_soa_rejects_out_of_range_lat() {
         let keys = vec!["S0".to_string()];

@@ -208,7 +208,7 @@ function AppliedArriveBy({ origin, destination, deadlineMs, onSelect, findLaterP
           ? t("arriveBy.limited", "Latest departure found. Other route options couldn’t be calculated.")
           : (closest
             ? t("arriveBy.closest_complete", "Closest arrival by {time}")
-            : t("arriveBy.complete", "Arriving by {time}: latest departure first, then by departure time."))
+            : t("arriveBy.ordered_results", "Arrive by {time}. Latest departure first. Your preference breaks departure-time ties between the remaining journeys."))
           .replace("{time}", deadlineText);
     body = (
       <>

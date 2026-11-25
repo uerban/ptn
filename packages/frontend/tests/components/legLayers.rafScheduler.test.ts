@@ -48,6 +48,26 @@ function makeGeom(coords: [number, number][] = [[0, 0], [1, 1]]): any {
 describe("rafScheduler", () => {
   beforeEach(() => __resetScheduler());
 
+  it("dashes a transit leg drawn without its shape and solidifies it once the shape resolves", async () => {
+    const { map, layers } = fakeMap();
+    const paints: Array<[string, string, unknown]> = [];
+    map.setPaintProperty = (id: string, name: string, value: unknown) => paints.push([id, name, value]);
+    enqueueSetData(map, 0, "transit", makeLeg(0), { ...makeGeom(), source: "intermediate" }, 1);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(layers.get("guidance-leg-layer-0").paint["line-dasharray"]).toEqual([3, 1.5]);
+
+    enqueueSetData(map, 0, "transit", makeLeg(0), makeGeom(), 1);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(paints).toContainEqual(["guidance-leg-layer-0", "line-dasharray", undefined]);
+  });
+
+  it("draws a shape-following transit leg solid", async () => {
+    const { map, layers } = fakeMap();
+    enqueueSetData(map, 0, "transit", makeLeg(0), makeGeom(), 1);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(layers.get("guidance-leg-layer-0").paint["line-dasharray"]).toBeUndefined();
+  });
+
   it("batches multiple enqueues within one frame into a single rAF callback", async () => {
     const { map, sources } = fakeMap();
     const raf = vi.spyOn(window, "requestAnimationFrame");

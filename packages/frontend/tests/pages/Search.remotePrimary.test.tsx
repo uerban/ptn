@@ -169,6 +169,7 @@ describe("Search remote-primary flow", () => {
     renderSearch();
 
     const transitousPrimary = await screen.findByTestId("transitous-primary");
+    expect(screen.queryByTestId("sort-summary")).not.toBeInTheDocument();
     expect(searchSpy).not.toHaveBeenCalled();
     fireEvent.click(transitousPrimary);
 
@@ -177,6 +178,7 @@ describe("Search remote-primary flow", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("transitous-primary")).not.toBeInTheDocument(),
     );
+    expect(screen.getByTestId("sort-summary")).toBeInTheDocument();
   });
 
   it("never shows Transitous plans while a route filter is active", async () => {

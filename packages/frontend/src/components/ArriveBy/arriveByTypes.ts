@@ -15,6 +15,7 @@ export interface ArriveByToolbarProps {
   readonly onDepartAt?: (at: Date | null) => void;
   /** Search's sort chip; it shares the row of the time summary. */
   readonly sort?: ReactNode;
+  readonly arriveBySort?: ReactNode;
   /** Search's vehicle filter chips, on the row below. */
   readonly filters?: ReactNode;
 }

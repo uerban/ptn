@@ -85,7 +85,11 @@ describe("LegRow", () => {
   it("names where a current ride goes while it has not left yet", () => {
     // No progress until the vehicle leaves — the row must still say which bus.
     render(<LegRow leg={transitLeg} status="current" transitProgress={null} />, { wrapper: Wrapper });
-    expect(screen.getByText("Central Station")).toBeInTheDocument();
+    // The stop to get off at leads; the headsign is labelled as the
+    // direction, so it is not read as the destination of the ride.
+    expect(screen.getByText("Stop B")).toBeInTheDocument();
+    expect(screen.getByText("toward Central Station")).toBeInTheDocument();
+    expect(screen.queryByText("Central Station")).not.toBeInTheDocument();
   });
 
   it("renders future leg dimmed", () => {

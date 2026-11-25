@@ -19,6 +19,37 @@ const STATUS_OPACITY: Record<LegStatus, number> = {
 };
 
 const LAYER_PREFIX = "guidance-leg-layer-";
+const LEG_LAYER_PREFIXES = ["guidance-leg-preview-layer-", LAYER_PREFIX] as const;
+const STOPS_CLUSTER_LAYER = "stops-clusters";
+
+const isLegLayer = (id: string): boolean => LEG_LAYER_PREFIXES.some((p) => id.startsWith(p));
+
+/**
+ * Lift the leg layers back above the basemap after it was merged in later.
+ *
+ * The external basemap is added to the running map before `stops-clusters`
+ * once it loads (styleBuilder `mergeCartoIntoRunningMap`). Legs drawn before
+ * that — a guidance session started before the basemap arrived, or after the
+ * one-time detailed-map prompt — end up under its opaque background and the
+ * route vanishes while its layers still exist, so the missing-layer check
+ * never fires. Whenever a non-leg layer sits above a leg layer below the stop
+ * clusters, move every leg layer, in order, to just below the clusters. Once
+ * moved nothing foreign sits above them, so the `styledata` this fires
+ * returns without moving again.
+ */
+export function reanchorLegLayers(map: maplibregl.Map): void {
+  const layers = map.getStyle()?.layers ?? [];
+  const clusterIdx = layers.findIndex((l) => l.id === STOPS_CLUSTER_LAYER);
+  if (clusterIdx === -1) return;
+  const below = layers.slice(0, clusterIdx);
+  const firstLeg = below.findIndex((l) => isLegLayer(l.id));
+  if (firstLeg === -1) return;
+  const buried = below.slice(firstLeg + 1).some((l) => !isLegLayer(l.id));
+  if (!buried) return;
+  for (const layer of below) {
+    if (isLegLayer(layer.id)) map.moveLayer(layer.id, STOPS_CLUSTER_LAYER);
+  }
+}
 
 /**
  * RouteOverlay: delegates to per-mode leg-layer children.
@@ -58,7 +89,9 @@ export function RouteOverlay({ map, itinerary, legStatuses }: RouteOverlayProps)
       );
       if (!hasAny) {
         setStyleRev((r) => r + 1);
+        return;
       }
+      reanchorLegLayers(map);
     };
     map.on("styledata", onStyleData);
     return () => {

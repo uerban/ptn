@@ -14,6 +14,10 @@ pnpm dev   # frontend at http://localhost:5173
 - Vitest for TypeScript tests, `cargo test` for Rust
 - Tailwind CSS for styling, Zustand for client state
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, ...)
+- Versions: never set the patch by hand; it is derived from main history. Raise
+  major.minor (`pnpm version:bump X.Y.0`) in the PR that starts a new minor, e.g. a
+  user-visible feature set or a breaking change to data or APIs. See
+  [release platforms](docs/release-platforms.md#versions).
 
 ## Developer Certificate of Origin
 
@@ -36,6 +40,7 @@ AGPL-3.0-or-later.
 pnpm typecheck
 pnpm lint
 pnpm test
+cargo fmt --all --check  # when Rust changed
 cargo test --workspace   # when Rust changed
 ```
 

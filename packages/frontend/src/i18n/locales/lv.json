@@ -255,6 +255,7 @@
   "route.board_from_walk": "No pieturas {stop} · {n} m",
   "route.aria_board_here": "Iekāpiet šeit",
   "route.aria_leg": "{vehicle} līdz pieturai {stop}",
+  "route.toward_headsign": "{headsign} virzienā",
   "route.aria_then": "pēc tam",
   "route.aria_walk_leg": "kājām {n} min",
   "route.aria_duration_arrival": "{n} min, ierašanās {time}",

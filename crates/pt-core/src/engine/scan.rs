@@ -1562,8 +1562,6 @@ mod tests {
         );
     }
 
-
-
     // Express-skip IMPROVE case (mirrors raptor.test.ts:321-354). The boarded
     // trip is an express that skips the middle stop; a later local trip serves
     // it, so the alt-trip fallback fills in the skipped stop's arrival.

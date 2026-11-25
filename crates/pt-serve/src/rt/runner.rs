@@ -141,6 +141,7 @@ pub fn run_cycle(
             BROKEN_BODY_RETRY_DELAY,
         );
     }
+    poller.expire_unavailable_updates(now_ms(clock));
     let mut merged = poller.merged_updates();
     let stats = resolve_time_predictions(&mut merged, current_gen().as_deref());
     state.publish(
@@ -308,6 +309,26 @@ mod tests {
         assert!(snap.health[0].last_fetched_at.unwrap() > 0);
         assert!(snap.health[0].entry_count > 0);
         assert_eq!(snap.merged["trip-1"].delay_seconds, 60);
+    }
+
+    #[test]
+    fn cycle_drops_updates_after_a_sustained_outage() {
+        let state = RtState::from_urls(vec![URL.to_string()]);
+        let mut poller = RtPoller::new(vec![URL.to_string()]).unwrap();
+        let clock = pt_shared::clock::MockClock::new(std::time::UNIX_EPOCH);
+        poller.apply_fetch_result(URL, Ok(feed_bytes()), now_ms(&clock));
+        clock.advance(Duration::from_secs(90));
+        run_cycle(
+            &mut poller,
+            &state,
+            &clock,
+            LogFormat::Text,
+            &mut |_| Err("HTTP 503".to_string()),
+            &|| None,
+        );
+        let snapshot = state.load();
+        assert_eq!(snapshot.health[0].status, FeedStatus::Failed);
+        assert!(snapshot.merged.is_empty());
     }
 
     #[test]

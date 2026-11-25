@@ -2,11 +2,12 @@ name: Draft release from validated artifacts
 
 on:
   push:
-    tags: ["v*-rc.*"]
+    # vX.Y.N on a validated main commit; legacy vX.Y.Z-rc.N still accepted.
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing RC tag to release (vX.Y.Z-rc.N)
+        description: Existing release tag to draft (vX.Y.N, or legacy vX.Y.Z-rc.N)
         required: true
         type: string
 

@@ -28,10 +28,48 @@ defaults:
     working-directory: source
 
 jobs:
+  version:
+    name: Compute application version
+    # Computed once from full history and injected into every build as
+    # PT_VERSION, so all artifacts of a run report the same version.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_REVISION }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: gate-tools
+          persist-credentials: false
+      - id: compute
+        name: Derive the version from main's first-parent history
+        env:
+          PT_VERSION: ""
+          PT_VERSION_MAIN_REF: origin/main
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          version="$(node "$GITHUB_WORKSPACE/gate-tools/scripts/app-version.mjs" "$RELEASE_REVISION")"
+          if [[ "$EVENT_NAME" == push && "$version" == *-dev* ]]; then
+            echo "::error::main push $RELEASE_REVISION resolved to development version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Application version: \`$version\` (revision \`$RELEASE_REVISION\`)" >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build and test release
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      PT_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -74,7 +112,7 @@ jobs:
           PTN_ARRIVE_BY_EXPERIMENT: "1"
         run: |
           pnpm install --frozen-lockfile
-          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs
+          node --test scripts/hosting-navigation.test.mjs scripts/ci-gates.test.mjs scripts/app-version.test.mjs scripts/build-info.test.mjs
           PT_WASM_BASELINE_TEST_PKG="$PWD/crates/pt-wasm/pkg-web/pt_wasm.js" \
             node --test --test-concurrency=1 crates/pt-wasm/tests/baseline_*.test.mjs crates/pt-wasm/tests/temporal_baseline.test.mjs
           python3 -m unittest discover -s scripts -p 'test_*.py'
@@ -110,7 +148,7 @@ jobs:
           python3 scripts/package-release.py --platform linux-x86_64 \
             --bin-dir target/x86_64-unknown-linux-musl/release
           tar -xzf release/ptn-linux-x86_64.tar.gz -C release
-          python3 scripts/verify-release-tools.py --bundle release/ptn-linux-x86_64 --revision "$RELEASE_REVISION"
+          python3 scripts/verify-release-tools.py --bundle release/ptn-linux-x86_64 --revision "$RELEASE_REVISION" --version "$PT_VERSION"
           cd release/ptn-linux-x86_64
           sha256sum --check SHA256SUMS
           python3 -c 'import json, os; r = json.load(open("release.json")); assert not r["sourceDirty"]; assert r["revision"] == os.environ["RELEASE_REVISION"]'
@@ -134,9 +172,11 @@ jobs:
 
   platforms:
     name: Package and smoke-test ${{ matrix.platform }}
-    needs: build
+    needs: [version, build]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    env:
+      PT_VERSION: ${{ needs.version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -219,7 +259,7 @@ jobs:
         run: |
           python3 scripts/package-release.py --platform "$PLATFORM" --bin-dir "target/$TARGET/release"
           tar -xzf "release/ptn-$PLATFORM.tar.gz" -C release
-          python3 scripts/verify-release-tools.py --bundle "release/ptn-$PLATFORM" --runner "$EMULATOR" --revision "$RELEASE_REVISION"
+          python3 scripts/verify-release-tools.py --bundle "release/ptn-$PLATFORM" --runner "$EMULATOR" --revision "$RELEASE_REVISION" --version "$PT_VERSION"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptn-${{ matrix.platform }}

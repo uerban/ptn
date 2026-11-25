@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Promote validated archives for one exact tag commit; never rebuild partial runs."""
+"""Draft a prerelease from validated archives for one exact tag commit; never rebuild partial runs.
+
+Release tags are vX.Y.N, set by a human on a validated main commit; N must be
+the version the release run derived for that commit (release.json). Legacy
+vX.Y.Z-rc.N tags are still accepted for the 0.2.3 line."""
 import argparse
 import hashlib
 import json
@@ -42,6 +46,89 @@ def validate_regression_proof(proof, revision, run_id):
             or set(checks) != REGRESSION_CHECKS
             or any(value != 'success' for value in checks.values())):
         raise RuntimeError('Regression evidence is incomplete, failed or for another source revision')
+
+
+VERSION_TAG = r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+LEGACY_RC_TAG = r'v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*'
+
+
+def tag_version(tag):
+    """X.Y.N for a release tag, None for a legacy RC tag; anything else is rejected."""
+    if re.fullmatch(VERSION_TAG, tag):
+        return tag[1:]
+    if re.fullmatch(LEGACY_RC_TAG, tag):
+        return None
+    raise RuntimeError('Expected a release tag vX.Y.N (or a legacy vX.Y.Z-rc.N)')
+
+
+def check_archive_version(meta, version, name):
+    if version is not None and meta.get('version') != version:
+        raise RuntimeError(f'{name} was built as version {meta.get("version")!r}, not {version}: '
+                           'tag the main commit whose derived version matches the tag')
+
+
+TEMPLATE = Path(__file__).resolve().parent.parent / 'docs' / 'templates' / 'release-notes.md'
+PLACEHOLDER = re.compile(r'\{\{([A-Z_]+)\}\}')
+# Filled by a person before promotion; promote-release.py refuses them.
+EDITORIAL = ('SUMMARY', 'ATTENTION', 'RIDERS', 'SELF_HOSTING', 'UPGRADING')
+
+
+def release_title(tag):
+    return f'PTN {tag}'
+
+
+def render_notes(template, values):
+    """Fill the release-notes template; editorial placeholders stay for review."""
+    text = re.sub(r'<!--.*?-->\n?', '', template, flags=re.S)
+    unknown = set(PLACEHOLDER.findall(text)) - set(values) - set(EDITORIAL)
+    if unknown:
+        raise RuntimeError(f'Release-notes template has unknown placeholders: {", ".join(sorted(unknown))}')
+    return PLACEHOLDER.sub(lambda m: values.get(m[1], m[0]), text).strip() + '\n'
+
+
+PR_GROUPS = ('Breaking changes', 'Security and dependencies', 'Features', 'Fixes', 'Documentation', 'Maintenance')
+CONVENTIONAL = re.compile(r'(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<breaking>!)?: ')
+
+
+def pr_group(title):
+    """Group a pull request by its Conventional Commits title; other titles count as fixes."""
+    match = CONVENTIONAL.match(title)
+    kind, scope = (match['type'], match['scope'] or '') if match else ('fix', '')
+    if match and match['breaking']:
+        return 'Breaking changes'
+    if kind == 'security' or scope == 'deps' or re.search(r'\b(RUSTSEC|CVE|GHSA)-', title):
+        return 'Security and dependencies'
+    if kind in ('feat', 'perf'):
+        return 'Features'
+    if kind == 'fix':
+        return 'Fixes'
+    if kind == 'docs':
+        return 'Documentation'
+    return 'Maintenance'
+
+
+def group_pull_requests(body):
+    """GitHub's generated notes, grouped under headings; new contributors are kept."""
+    groups = {name: [] for name in PR_GROUPS}
+    contributors, section = [], None
+    for line in body.splitlines():
+        if line.startswith('## '):
+            section = line[3:].strip()
+        elif line.startswith('* ') and section == 'New Contributors':
+            contributors.append(line)
+        elif line.startswith('* '):
+            groups[pr_group(line[2:].split(' by @')[0])].append(line)
+    parts = [f'### {name}\n\n' + '\n'.join(lines) for name, lines in groups.items() if lines]
+    if contributors:
+        parts.append('### New contributors\n\n' + '\n'.join(contributors))
+    return '\n\n'.join(parts) or 'No pull requests.'
+
+
+def pull_requests(repo, tag, previous):
+    """Merged pull requests between the previous stable release and tag."""
+    generated = json.loads(gh('api', '-X', 'POST', f'repos/{repo}/releases/generate-notes',
+                              '-f', f'tag_name={tag}', '-f', f'previous_tag_name={previous}'))
+    return group_pull_requests(generated['body'])
 
 
 def eligible_run(run, revision, title, allow_main_push=False):
@@ -98,13 +185,12 @@ def main():
     parser.add_argument('tag')
     parser.add_argument('--check-only', action='store_true')
     args = parser.parse_args()
-    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?', args.tag):
-        raise RuntimeError('Expected a version tag such as v0.1.1')
-    if '-' not in args.tag:
-        raise RuntimeError('Stable releases must be promoted from an immutable RC using promote-release.py')
-    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*', args.tag):
-        raise RuntimeError('Expected an RC tag such as v0.2.0-rc.1')
+    version = tag_version(args.tag)
     repo = os.environ['GH_REPO']
+    if version is not None and api(f'repos/{repo}/git/matching-refs/tags/{args.tag}-rc.'):
+        # A legacy stable tag (its RC line exists): drafting it would dispatch
+        # gates for archives that carry no version. Promote the RC instead.
+        raise RuntimeError(f'{args.tag} is a legacy stable tag; use promote-release.py {args.tag} --from-rc <rc tag>')
     revision = api(f'repos/{repo}/commits/{args.tag}')['sha']
     gate = ensure_validation(repo, revision, 'regression.yml', 'Regression gates',
                              {'regression-proof'}, args.check_only)
@@ -133,9 +219,18 @@ def main():
             meta = json.load(bundle.extractfile(f'ptn-{platform}/release.json'))
         if meta['revision'] != revision or meta['sourceDirty'] or meta['platform'] != platform:
             raise RuntimeError(f'Archive source mismatch: {name}')
-    notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\nSource commit: {revision}\n\n'
-             'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
-             'ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
+        check_archive_version(meta, version, name)
+    if version is None:
+        notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\n'
+                 f'Source commit: {revision}\n\nIncludes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon '
+                 'and Intel. ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
+    else:
+        previous = api(f'repos/{repo}/releases/latest')['tag_name']
+        notes = render_notes(TEMPLATE.read_text(), {
+            'VERSION': version, 'TAG': args.tag, 'PREVIOUS_TAG': previous,
+            'VALIDATION_RUN_URL': run['html_url'], 'REGRESSION_RUN_URL': gate['html_url'],
+            'SOURCE_SHA': revision, 'SHORT_SHA': revision[:7],
+            'PULL_REQUESTS': pull_requests(repo, args.tag, previous)})
     (dest / 'regression.json').write_text(json.dumps(proof, indent=2) + '\n')
     hashes = {}
     for path in sorted(dest.iterdir()):
@@ -144,10 +239,11 @@ def main():
     (dest / 'release-evidence.json').write_text(json.dumps({
         'schemaVersion': 1, 'revision': revision, 'releaseRunId': str(run['id']),
         'regressionRunId': str(gate['id']), 'sha256': hashes,
+        **({'version': version} if version else {}),
     }, indent=2) + '\n')
     flags = ['--prerelease']
     gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--draft', *flags,
-       '--title', args.tag, '--notes', notes,
+       '--title', release_title(args.tag), '--notes', notes,
        *(str(path) for path in sorted(dest.iterdir())))
 
 
