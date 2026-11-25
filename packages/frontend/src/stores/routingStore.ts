@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
 import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
@@ -87,7 +88,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: { routeId: string; direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -110,7 +111,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   origin: null,
   destination: null,
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: { routeId: string; direct: boolean } }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: FirstRideConstraint & { direct: boolean } }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -235,7 +236,8 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destination: endpointCoord(destination),
         departureTime,
         ranking,
-        firstRouteId: firstRide?.direct === false ? firstRide.routeId : undefined,
+        firstRide: firstRide && { routeId: firstRide.routeId, boardStopId: firstRide.boardStopId,
+          alightStopId: firstRide.alightStopId },
         originStopId: origin.kind === "stop" ? origin.stopId : undefined,
         destStopId: destination.kind === "stop" ? destination.stopId : undefined,
         originStopIds: origin.kind === "stopGroup" ? [...origin.stopIds] : undefined,

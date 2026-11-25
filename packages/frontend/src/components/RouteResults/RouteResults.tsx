@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import { useRef, useCallback, useMemo, useState } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
 import { Link } from "react-router-dom";
@@ -65,7 +66,7 @@ interface RouteResultsProps {
   /** The leave time the rider chose, when it is not now. Cards never recommend leaving before it. */
   departAt?: Date | null;
   arriveByMs?: number;
-  findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: { routeId: string; direct: boolean }) => Promise<Itinerary[]>;
+  findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
   /** Destination endpoint; see `origin`. */

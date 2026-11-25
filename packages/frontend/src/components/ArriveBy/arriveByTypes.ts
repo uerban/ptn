@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import type { ReactNode } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
 
@@ -25,7 +26,7 @@ export interface ArriveByResultsProps {
   readonly origin: BaseEndpoint | null;
   readonly destination: BaseEndpoint | null;
   readonly onSelect: (itinerary: Itinerary) => void;
-  readonly findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: { routeId: string; direct: boolean }) => Promise<Itinerary[]>;
+  readonly findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
   /** Search's normal results, shown while no arrive-by deadline is applied. */
   readonly children: ReactNode;
 }

@@ -8,6 +8,12 @@ export type MobilityProfile = "default" | "wheelchair" | "vision_impaired" | "bi
 export type EngineMobilityProfile = "default" | "wheelchair" | "bicycle";
 export type RoutingPreference = "default" | "easy_path" | "night" | "custom";
 
+export interface FirstRideConstraint {
+  routeId: string;
+  boardStopId: string;
+  alightStopId: string;
+}
+
 export interface RaptorQuery {
   entryStops: { stopId: string; walkSecs: number }[];
   exitStops: { stopId: string; walkSecs: number }[];
@@ -19,8 +25,8 @@ export interface RaptorQuery {
   excludedModes?: TransportMode[];
   /** Generic hard route exclusions, applied before candidate generation. */
   excludedRouteIds?: string[];
-  /** On-device PTB v2 only. Constrains the first boarding, leaving transfers open. */
-  firstRouteId?: string;
+  /** On-device PTB v2 only. Constrains the first ride, leaving transfers open. */
+  firstRide?: FirstRideConstraint;
   /** Walking speed (m/s) for the engine's own transfer walks; the entry and
    *  exit walks above already carry it. Absent: the engine profile's speed. */
   walkSpeedMps?: number;

@@ -78,7 +78,7 @@ export function makeRemoteStopPlanner(
   isAllowed: () => boolean = isRemoteRoutingAllowed,
 ): StopPlanner {
   return (query, date) => {
-    if (query.firstRouteId || query.excludedRouteIds?.length) {
+    if (query.firstRide || query.excludedRouteIds?.length) {
       return Promise.reject(new Error("Use on-device planning with route filters."));
     }
     return gateRemoteRouting(() => plan(planRequestFromQuery(query, date)), isAllowed);

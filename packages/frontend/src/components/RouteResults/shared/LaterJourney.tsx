@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import { useEffect, useState } from "react";
 import type { Itinerary } from "@pt/shared";
 import { useFirstRideLive } from "../../../hooks/useLiveRt.ts";
@@ -17,7 +18,7 @@ interface Props {
   departAtMs?: number;
   arriveByMs?: number;
   feedTz?: string;
-  findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: { routeId: string; direct: boolean }) => Promise<Itinerary[]>;
+  findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
 }
 
 export function LaterJourney({
@@ -56,9 +57,14 @@ export function LaterJourney({
     const departureFloor = Math.max(serverTime.now(), departAtMs ?? -Infinity, primaryLeaveMs + 1_000);
     if (arriveByMs !== undefined && departureFloor >= arriveByMs) return;
     const rides = primary.legs.filter((leg) => leg.mode !== "WALK");
-    const routeId = rides[0]?.routeId;
-    if (!routeId) return;
-    void findLaterPlans(new Date(departureFloor), controller.signal, { routeId, direct: rides.length === 1 }).then((plans) => {
+    const ride = rides[0];
+    const routeId = ride?.routeId;
+    const boardStopId = ride?.from.stopId;
+    const alightStopId = ride?.to.stopId;
+    if (!routeId || !boardStopId || !alightStopId) return;
+    void findLaterPlans(new Date(departureFloor), controller.signal, {
+      routeId, boardStopId, alightStopId, direct: rides.length === 1,
+    }).then((plans) => {
       if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, plans });
     }, () => {});
     return () => controller.abort();

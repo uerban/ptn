@@ -38,13 +38,44 @@ pub struct WasmQuery {
     pub excluded_modes: Option<Vec<u16>>,
     /// Generic route exclusions, resolved before the engine scans any patterns.
     pub excluded_route_ids: Option<Vec<String>>,
-    pub first_route_id: Option<String>,
+    pub first_ride: Option<WasmFirstRide>,
     /// The rider's walking speed in m/s, for the engine's transfer walks.
     /// Absent: the mobility's speed (wheelchair 0.8, otherwise 1.25).
     pub walk_speed_mps: Option<f64>,
     /// The minimum transfer in seconds wherever no GTFS `transfers.txt` rule
     /// sets one. Absent: 120.
     pub min_transfer_secs: Option<u32>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WasmFirstRide {
+    pub route_id: String,
+    pub board_stop_id: String,
+    pub alight_stop_id: String,
+}
+
+impl WasmFirstRide {
+    pub(crate) fn resolve<B>(
+        &self,
+        reader: &Reader<B>,
+    ) -> Result<pt_core::engine::v2::FirstRide, JsError>
+    where
+        B: AsRef<[u8]> + Send + Sync + 'static,
+    {
+        let stop = |id: &str| {
+            reader
+                .stop_index(id)
+                .ok_or_else(|| JsError::new(&format!("unknown first-ride stopId: {id}")))
+        };
+        let route = resolve_route_id(reader, &self.route_id)?
+            .ok_or_else(|| JsError::new(&format!("unknown first routeId: {}", self.route_id)))?;
+        Ok(pt_core::engine::v2::FirstRide {
+            route,
+            board: stop(&self.board_stop_id)?,
+            alight: stop(&self.alight_stop_id)?,
+        })
+    }
 }
 
 pub fn deserialize_query(value: JsValue) -> Result<WasmQuery, JsError> {

@@ -108,24 +108,21 @@ impl PtRouter {
             return Err(JsError::new("plan() called on freed PtRouter"));
         }
         let wq = query::deserialize_query(query)?;
-        let first_route = wq
-            .first_route_id
-            .as_deref()
-            .map(|id| {
-                query::resolve_route_id(&self.reader, id)?
-                    .ok_or_else(|| JsError::new(&format!("unknown first routeId: {id}")))
-            })
+        let first_ride = wq
+            .first_ride
+            .as_ref()
+            .map(|ride| ride.resolve(&self.reader))
             .transpose()?;
         let q = query::build_engine_query(&self.reader, wq)?;
         // Both engines receive the installed footpaths. Legacy PTB v1 keeps
         // its unrestricted scan; the caller still checks the first ride.
-        let itineraries = match first_route {
-            Some(route) if self.reader.is_v2() => pt_core::engine::v2::plan_v2_with_first_route(
+        let itineraries = match first_ride {
+            Some(ride) if self.reader.is_v2() => pt_core::engine::v2::plan_v2_with_first_ride(
                 &self.reader,
                 &self.index,
                 self.transfers.as_ref(),
                 &q,
-                route,
+                ride,
             ),
             _ => pt_core::plan(
                 &self.reader,

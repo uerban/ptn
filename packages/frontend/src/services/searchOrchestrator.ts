@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import {captureTransferFloorState} from "./transferFloorState.ts";
 import {SearchPipelineCapture, type PipelineCapture} from "./searchPipelineCapture.ts";
 import { effectiveTransferFloor } from "./effectiveTransferRule.ts";
@@ -103,7 +104,7 @@ export interface SearchQuery {
   departureTime: Date;
   ranking: RankingCriteria;
   maxRounds?: number;
-  firstRouteId?: string;
+  firstRide?: FirstRideConstraint;
   /**
    * Stop id the origin coordinate resolves to, when the caller's endpoint
    * was a `stop`-kind endpoint. Used by the OSM-walk override on
@@ -334,7 +335,7 @@ export class SearchOrchestrator {
       mobilityProfile: this.config.mobilityProfile,
       excludedModes: this.config.excludedModes,
       excludedRouteIds: this.config.excludedRouteIds,
-      ...(query.firstRouteId ? { firstRouteId: query.firstRouteId } : {}),
+      ...(query.firstRide ? { firstRide: query.firstRide } : {}),
       // The engine's transfer walks at the rider's pace, as the entry and exit
       // walks above, and the profile's minimum transfer.
       walkSpeedMps: riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps),

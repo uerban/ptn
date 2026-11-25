@@ -1,3 +1,4 @@
+import type { FirstRideConstraint } from "@pt/shared";
 import { encodePolyline } from "../utils/polyline.ts";
 import { captureCityData, StaleCityDataError, useCityDataStore } from "../services/cityData.ts";
 import { useEffectiveExcludedModes } from "../hooks/useEffectiveExcludedModes.ts";
@@ -836,7 +837,7 @@ export function SearchPage() {
     () => (paginationTime ?? new Date()).toISOString(),
     [paginationTime, fromLat, fromLon, toLat, toLon],
   );
-  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal, firstRide: { routeId: string; direct: boolean }): Promise<Itinerary[]> => {
+  const findLaterPlans = useCallback(async (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }): Promise<Itinerary[]> => {
     if (!fromEndpoint || !toEndpoint) return [];
     const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, firstRide });
     if (!results || signal.aborted) return [];

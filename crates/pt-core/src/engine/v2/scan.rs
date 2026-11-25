@@ -181,7 +181,7 @@ struct Ctx<'a, B: AsRef<[u8]> + Send + Sync + 'static> {
     walk_speed_mm_s: u32,
     min_transfer: i64,
     excluded_routes: &'a [u32],
-    first_route: Option<u32>,
+    first_ride: Option<FirstRide>,
     excluded_mask: u32,
     origin_unix: i64,
     deadline: i64,
@@ -284,13 +284,21 @@ where
     plan_v2_with(reader, index, transfers, query, abort, true, true).map(|(out, _)| out)
 }
 
-/// Plan with a required parent GTFS route on the first boarding.
-pub fn plan_v2_with_first_route<B>(
+/// Required parent GTFS route and platforms for the first transit leg.
+#[derive(Clone, Copy)]
+pub struct FirstRide {
+    pub route: u32,
+    pub board: u32,
+    pub alight: u32,
+}
+
+/// Plan with a required first ride and ordinary onward routing.
+pub fn plan_v2_with_first_ride<B>(
     reader: &Reader<B>,
     index: &Index,
     transfers: Option<&Transfers>,
     query: &Query,
-    first_route: u32,
+    first_ride: FirstRide,
 ) -> Result<Vec<Itinerary>, EngineError>
 where
     B: AsRef<[u8]> + Send + Sync + 'static,
@@ -303,7 +311,7 @@ where
         None,
         true,
         true,
-        Some(first_route),
+        Some(first_ride),
     )
     .map(|(out, _)| out)
 }
@@ -337,7 +345,7 @@ fn plan_impl<'a, B: AsRef<[u8]> + Send + Sync + 'static>(
     abort: Option<&core::sync::atomic::AtomicBool>,
     cutoff: bool,
     shortcuts: bool,
-    first_route: Option<u32>,
+    first_ride: Option<FirstRide>,
 ) -> Result<(Vec<Itinerary>, usize), EngineError> {
     let v2 = index.v2.as_deref().ok_or(EngineError::UnsupportedVersion)?;
     let frame = time::query_frame(reader, query.date, query.departure_secs, v2.max_event_secs)?;
@@ -372,7 +380,7 @@ fn plan_impl<'a, B: AsRef<[u8]> + Send + Sync + 'static>(
         walk_speed_mm_s: query.transfer_walk_speed_mm_s(),
         min_transfer: query.min_transfer_floor_secs(),
         excluded_routes: &query.excluded_routes,
-        first_route,
+        first_ride,
         excluded_mask,
         origin_unix: frame.origin_unix,
         deadline: frame.timeline(deadline_unix)?,
@@ -838,9 +846,9 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
             let route = &index.routes[r as usize];
             if !self.route_allowed(r)
                 || (l.kind == Kind::Origin
-                    && self
-                        .first_route
-                        .is_some_and(|required| required != route.reader_route_idx))
+                    && self.first_ride.is_some_and(|ride| {
+                        ride.route != route.reader_route_idx || ride.board != l.stop
+                    }))
             {
                 continue;
             }
@@ -1327,6 +1335,9 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
                 break;
             }
             let stop = route.stop_ids[q];
+            if k == 1 && self.first_ride.is_some_and(|ride| ride.alight != stop) {
+                continue;
+            }
             let terminal = q as u32 == ti.last_pos;
             let mut stay_only = false;
             if drop_off_forbidden_at(self.reader, rt, q) || self.stop_inaccessible(stop)? {
