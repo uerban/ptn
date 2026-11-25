@@ -467,6 +467,7 @@
   "search.no_alternate_ride": "No other verified departure found",
   "search.looking_for_departures": "Checking departures…",
   "search.check_other_departures": "Check other departures",
+  "search.alternate_arrival": "Arrives {time}",
   "search.alternate_ride": "Take {line} toward {headsign} at {time} instead",
   "search.later_journey": "Also leaves at {departure} · arrives at {arrival}",
   "search.next": "Next",

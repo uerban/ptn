@@ -52,8 +52,15 @@ describe("RouteResults", () => {
     ] };
     const onSelect = vi.fn();
     try {
-      render(<BrowserRouter><RouteResults itineraries={[primary, candidate]} onSelect={onSelect} feedTz="UTC" /></BrowserRouter>);
-      fireEvent.click(screen.getByRole("button", { name: /Take 4 toward Centre at .* instead/ }));
+      const alternate = { ...candidate, legs: [
+        { ...candidate.legs[0], routeId: "bus22", routeShortName: "22", tripId: "replacement-22", headsign: "Lazdynai" },
+        ...candidate.legs.slice(1),
+      ] };
+      const duplicate = { ...candidate, legs: [{ ...candidate.legs[0], tripId: "duplicate" }, ...candidate.legs.slice(1)] };
+      render(<BrowserRouter><RouteResults itineraries={[primary, candidate, duplicate, alternate]}
+        onSelect={onSelect} feedTz="UTC" /></BrowserRouter>);
+      expect(screen.getByRole("button", { name: /Take 22 toward Lazdynai.*Arrives/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Take 4 toward Centre at .* instead.*Arrives/ }));
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(candidate);
     } finally {
       now.mockRestore();
