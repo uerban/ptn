@@ -97,6 +97,7 @@ export interface RtStoreLite {
 }
 
 export interface NextDeparture {
+  tripId: string;
   minutesUntil: number;
   /** The departure itself, epoch ms, RT delay included — to the second, where minutesUntil floors. */
   departureMs: number;
@@ -506,6 +507,7 @@ function finishDeparture(
 
   const minutesUntil = Math.max(0, Math.floor((scheduledSecs - nowSecs) / 60));
   return {
+    tripId: earliestTripId,
     minutesUntil,
     departureMs: nowMs + (scheduledSecs - nowSecs) * 1000,
     routeShortName,

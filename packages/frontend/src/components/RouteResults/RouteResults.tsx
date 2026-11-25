@@ -1,3 +1,4 @@
+import { BranchDepartureWarning } from "./shared/BranchDepartureWarning.tsx";
 import type { FirstRideConstraint } from "@pt/shared";
 import { useRef, useCallback, useMemo, useState } from "react";
 import type { BaseEndpoint, Itinerary } from "@pt/shared";
@@ -288,9 +289,12 @@ export function RouteResults({
         arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />
     )}
     {import.meta.env.VITE_PTN_INTERCHANGEABLE_DEPARTURES === "1" && (
-      <InterchangeableDeparture itineraries={itineraries} onSelect={onSelect}
-        earliestLeaveMs={Math.max(referenceNowMs, departAt?.getTime() ?? -Infinity)}
-        arriveByMs={arriveByMs} feedTz={feedTz} />
+      <>
+        <InterchangeableDeparture itineraries={itineraries} onSelect={onSelect}
+          earliestLeaveMs={Math.max(referenceNowMs, departAt?.getTime() ?? -Infinity)}
+          arriveByMs={arriveByMs} feedTz={feedTz} />
+        <BranchDepartureWarning itinerary={itineraries[0]} nowMs={referenceNowMs} feedTz={feedTz} />
+      </>
     )}
   </>;
 

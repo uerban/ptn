@@ -71,6 +71,7 @@ describe("makeGetNextDeparture", () => {
     // minutesUntil = floor(500/60) = 8. headsign comes from the winning
     // trip (T1).
     expect(dep).toEqual({
+      tripId: "T1",
       minutesUntil: 8,
       departureMs: PINNED_MS + 500_000,
       routeShortName: "R1",

@@ -463,6 +463,7 @@
   "search.earlier": "Earlier",
   "search.landmark_badge": "Landmark",
   "search.later": "Later",
+  "search.branch_departure_warning": "Take {line} toward {planned} at {time}. The {otherTime} toward {other} skips {stop}.",
   "search.alternate_ride": "Take {line} toward {headsign} at {time} instead",
   "search.later_journey": "Also leaves at {departure} · arrives at {arrival}",
   "search.next": "Next",
