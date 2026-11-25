@@ -85,6 +85,36 @@ class ArtifactPolicyTests(unittest.TestCase):
             draft.artifact_state(artifacts)
 
 
+class ReleaseNotesTests(unittest.TestCase):
+    values = {'VERSION': '0.2.50', 'TAG': 'v0.2.50', 'PREVIOUS_TAG': 'v0.2.49',
+              'VALIDATION_RUN_URL': 'https://example.test/runs/2', 'REGRESSION_RUN_URL': 'https://example.test/runs/1',
+              'SOURCE_SHA': 'a' * 40, 'SHORT_SHA': 'a' * 7, 'PULL_REQUESTS': '* fix: one by @someone in #1'}
+
+    def test_draft_title_names_the_product(self):
+        self.assertEqual(draft.release_title('v0.2.50'), 'PTN v0.2.50')
+
+    def test_template_renders_provenance_and_keeps_editorial_placeholders(self):
+        notes = draft.render_notes(draft.TEMPLATE.read_text(), self.values)
+        self.assertTrue(notes.startswith('PTN 0.2.50 {{SUMMARY}}'))
+        self.assertNotIn('<!--', notes)
+        self.assertEqual(set(draft.PLACEHOLDER.findall(notes)), set(draft.EDITORIAL))
+        for expected in ('https://example.test/runs/2', 'https://example.test/runs/1', 'a' * 40,
+                         '/blob/v0.2.50/docker/README.md', 'compare/v0.2.49...v0.2.50', '* fix: one by @someone in #1'):
+            self.assertIn(expected, notes)
+
+    def test_unknown_template_placeholder_is_refused(self):
+        with self.assertRaisesRegex(RuntimeError, 'unknown placeholders: TYPO'):
+            draft.render_notes('PTN {{VERSION}} {{TYPO}}', self.values)
+
+    def test_pull_requests_come_from_generated_notes_since_previous_release(self):
+        body = "## What's Changed\n* feat: a by @x in https://example.test/pull/1\n* fix: b by @x in https://example.test/pull/2\n\n**Full Changelog**: ..."
+        with patch.object(draft, 'gh', return_value=json.dumps({'name': 'v0.2.50', 'body': body})) as gh:
+            self.assertEqual(draft.pull_requests('example/ptn', 'v0.2.50', 'v0.2.49'),
+                             '* feat: a by @x in https://example.test/pull/1\n* fix: b by @x in https://example.test/pull/2')
+        self.assertEqual(gh.call_args.args, ('api', '-X', 'POST', 'repos/example/ptn/releases/generate-notes',
+                                             '-f', 'tag_name=v0.2.50', '-f', 'previous_tag_name=v0.2.49'))
+
+
 class RegressionGateTests(unittest.TestCase):
     revision = 'a' * 40
 

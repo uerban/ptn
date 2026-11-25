@@ -106,10 +106,21 @@ def verify_evidence(repo, tag, release, revision, directory):
     return evidence
 
 
+def validate_notes(release, tag):
+    """Stable notes are the reviewed template: no placeholder may survive."""
+    left = sorted(set(re.findall(r'\{\{([A-Z_]+)\}\}', release.get('body') or '')))
+    if left:
+        raise RuntimeError(f'{tag} release notes still contain placeholders: {", ".join(left)}; '
+                           'edit the prerelease notes (docs/templates/release-notes.md) first')
+    if not (release.get('body') or '').strip():
+        raise RuntimeError(f'{tag} has no release notes')
+
+
 def promote_in_place(repo, tag, check_only):
     release = api(f'repos/{repo}/releases/tags/{tag}')
     revision = api(f'repos/{repo}/commits/{tag}')['sha']
     validate_published(release, tag, revision)
+    validate_notes(release, tag)
     with tempfile.TemporaryDirectory(prefix='ptn-promotion-') as work:
         evidence = verify_evidence(repo, tag, release, revision, Path(work))
     if evidence.get('version') != tag[1:]:
@@ -117,7 +128,7 @@ def promote_in_place(repo, tag, check_only):
     if check_only:
         print(f'PASS: {tag} can be promoted in place at {revision}')
         return
-    gh('release', 'edit', tag, '--repo', repo, '--prerelease=false', '--latest')
+    gh('release', 'edit', tag, '--repo', repo, '--prerelease=false', '--latest', '--title', f'PTN {tag}')
     after = api(f'repos/{repo}/releases/tags/{tag}')
     if (after.get('prerelease') is not False or after.get('immutable') is not True
             or {a['name']: a.get('digest') for a in after.get('assets', [])}

@@ -1,20 +1,26 @@
 <!--
-Copy this file for a release. Replace every {{placeholder}} and remove these
-instructions, unused sections, and rows for platforms not actually attached.
-Describe only changes in the tagged commit compared with the previous release.
-{{VERSION}} is the tag's X.Y.N: the version every component of the tagged
-commit reports (scripts/version.py current <tag>).
-Verify validation claims against the successful run and attached assets.
-Keep limitations specific to what was actually tested. Do not include work
-that exists only on unmerged branches. Edit the draft before publication.
--->
+Release notes template. The draft workflow (scripts/prepare-release-draft.py)
+renders it into every new draft titled "PTN vX.Y.N": it fills the version,
+tag, previous release, validation runs and merged pull requests, and removes
+these comments. Before promotion, edit the draft and replace the remaining
+placeholders: {{SUMMARY}}, {{CHANGES}} and {{UPGRADING}}. Promotion refuses
+notes that still contain a placeholder.
 
-PTN {{VERSION}} {{ONE_SENTENCE_USER_FACING_SUMMARY}}.
+- {{SUMMARY}}: one sentence after "PTN X.Y.N", user-facing.
+- {{CHANGES}}: bullets for what users and self-hosters notice, grouped by
+  theme, each with its effect. Use the pull request list as the source. Only
+  changes in the tagged commit compared with the previous release.
+- {{UPGRADING}}: required steps, migrations or compatibility notes. Delete the
+  whole section when there are none.
+
+Verify every claim against the tagged source and the successful runs. Keep
+limitations specific to what was actually tested.
+-->
+PTN {{VERSION}} {{SUMMARY}}
 
 ## Changes
 
-- {{CHANGE_AND_ITS_USER_VISIBLE_EFFECT}}
-- {{FIX_AND_THE_BEHAVIOR_IT_CORRECTS}}
+{{CHANGES}}
 
 ## Downloads and hosting
 
@@ -40,22 +46,28 @@ for setup, compatibility, and prerequisites.
 
 ## Upgrading
 
-<!-- Keep this section when users must act or compatibility changes. -->
-
-{{REQUIRED_STEPS_MIGRATIONS_OR_COMPATIBILITY_NOTES}}
+{{UPGRADING}}
 
 ## Validation
 
 [Validation run]({{VALIDATION_RUN_URL}}) passed for source commit
 [`{{SHORT_SHA}}`](https://github.com/uerban/ptn/commit/{{SOURCE_SHA}}).
 
-{{CHECKS_THAT_ACTUALLY_PASSED_AND_THE_PLATFORMS_THEY_COVER}}
+The run built and tested the release, ran secret and dependency security scans,
+packaged all five archives, smoke-tested the ARM and macOS builds, and validated
+native and Docker hosting on a fresh Linux x86_64 host, including that the
+served version matches each archive. The [regression gates]({{REGRESSION_RUN_URL}})
+for performance, memory and routing parity passed on the same commit.
 
-{{KNOWN_LIMITATIONS_OR_UNTESTED_HOST_SPECIFIC_BEHAVIOR}}
+ARM execution smoke checks use QEMU; this does not prove real-device memory
+capacity or performance. Full Linux x86_64 hosting checks do not establish full
+hosting validation on ARM or macOS.
 
-<!-- When applicable: ARM execution smoke checks use QEMU; this does not prove
-real-device memory capacity or performance. Full Linux x86_64 hosting checks do
-not establish full hosting validation on ARM or macOS. Local TLS tests do not
-establish public DNS/ACME configuration. -->
+Archives are promoted unchanged: `release-evidence.json` records the source
+commit, run IDs and SHA-256 of every archive.
+
+## Pull requests
+
+{{PULL_REQUESTS}}
 
 [Changes since {{PREVIOUS_TAG}}](https://github.com/uerban/ptn/compare/{{PREVIOUS_TAG}}...{{TAG}}).

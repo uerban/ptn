@@ -67,6 +67,33 @@ def check_archive_version(meta, version, name):
                            'tag the main commit whose derived version matches the tag')
 
 
+TEMPLATE = Path(__file__).resolve().parent.parent / 'docs' / 'templates' / 'release-notes.md'
+PLACEHOLDER = re.compile(r'\{\{([A-Z_]+)\}\}')
+# Filled by a person before promotion; promote-release.py refuses them.
+EDITORIAL = ('SUMMARY', 'CHANGES', 'UPGRADING')
+
+
+def release_title(tag):
+    return f'PTN {tag}'
+
+
+def render_notes(template, values):
+    """Fill the release-notes template; editorial placeholders stay for review."""
+    text = re.sub(r'<!--.*?-->\n?', '', template, flags=re.S)
+    unknown = set(PLACEHOLDER.findall(text)) - set(values) - set(EDITORIAL)
+    if unknown:
+        raise RuntimeError(f'Release-notes template has unknown placeholders: {", ".join(sorted(unknown))}')
+    return PLACEHOLDER.sub(lambda m: values.get(m[1], m[0]), text).strip() + '\n'
+
+
+def pull_requests(repo, tag, previous):
+    """Merged pull requests between the previous stable release and tag, as GitHub lists them."""
+    generated = json.loads(gh('api', '-X', 'POST', f'repos/{repo}/releases/generate-notes',
+                              '-f', f'tag_name={tag}', '-f', f'previous_tag_name={previous}'))
+    lines = [line for line in generated['body'].splitlines() if line.startswith('* ')]
+    return '\n'.join(lines) or 'No pull requests.'
+
+
 def eligible_run(run, revision, title, allow_main_push=False):
     return (run['event'] == 'workflow_dispatch' and run['head_branch'] == 'main'
             and run['display_title'] == f'{title} {revision}') or (
@@ -156,10 +183,17 @@ def main():
         if meta['revision'] != revision or meta['sourceDirty'] or meta['platform'] != platform:
             raise RuntimeError(f'Archive source mismatch: {name}')
         check_archive_version(meta, version, name)
-    notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\nSource commit: {revision}\n\n'
-             + (f'Version: {version}\n\n' if version else '')
-             + 'Includes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon and Intel. '
-             'ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
+    if version is None:
+        notes = (f'Validated archives from {run["html_url"]}\n\nRegression gates: {gate["html_url"]}\n\n'
+                 f'Source commit: {revision}\n\nIncludes Linux x86_64, ARMv6 and AArch64, and macOS Apple Silicon '
+                 'and Intel. ARM smoke checks use QEMU; full native and Docker lifecycle checks run on Linux x86_64.')
+    else:
+        previous = api(f'repos/{repo}/releases/latest')['tag_name']
+        notes = render_notes(TEMPLATE.read_text(), {
+            'VERSION': version, 'TAG': args.tag, 'PREVIOUS_TAG': previous,
+            'VALIDATION_RUN_URL': run['html_url'], 'REGRESSION_RUN_URL': gate['html_url'],
+            'SOURCE_SHA': revision, 'SHORT_SHA': revision[:7],
+            'PULL_REQUESTS': pull_requests(repo, args.tag, previous)})
     (dest / 'regression.json').write_text(json.dumps(proof, indent=2) + '\n')
     hashes = {}
     for path in sorted(dest.iterdir()):
@@ -172,7 +206,7 @@ def main():
     }, indent=2) + '\n')
     flags = ['--prerelease']
     gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--draft', *flags,
-       '--title', args.tag, '--notes', notes,
+       '--title', release_title(args.tag), '--notes', notes,
        *(str(path) for path in sorted(dest.iterdir())))
 
 

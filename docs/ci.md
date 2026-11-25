@@ -242,7 +242,9 @@ or retag to change it.
 1. Tag a validated main commit `vX.Y.N`, using the version its release run
    derived. The draft workflow requires exact-commit regression evidence and all
    validated platform archives, and every archive's `release.json` must report
-   `X.Y.N`. It builds only when those inputs are unbuilt or expired. Review the
+   `X.Y.N`. It builds only when those inputs are unbuilt or expired. The draft
+   is titled `PTN vX.Y.N` and its notes come from the release-notes template
+   (see [release notes](release-platforms.md#release-notes)). Review the
    draft, then publish it as an **immutable prerelease**. The draft includes
    `regression.json` and `release-evidence.json` with the original run IDs,
    source SHA, version and asset hashes.
@@ -257,8 +259,9 @@ or retag to change it.
    ```
 
    This re-downloads the release, checks GitHub and evidence SHA-256 digests,
-   the recorded version and the trusted exact-commit validation runs, then clears
-   the prerelease flag and marks the release latest. Assets and tag stay as they
+   the recorded version, the trusted exact-commit validation runs and that no
+   release-notes placeholder is left, then clears the prerelease flag, names the
+   release `PTN vX.Y.N` and marks it latest. Assets and tag stay as they
    are; it never dispatches a build. Expiry of Actions artifacts does not matter.
 4. Deploy the same archive hashes to production. Keep environment acceptance,
    immutable data inputs and rollback state in ops; public release promotion does
