@@ -1,3 +1,4 @@
+import { transferWaitingLabel } from "./shared/transferWaiting.ts";
 import { memo, useCallback, useMemo } from "react";
 import type { Itinerary, Leg } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
@@ -186,6 +187,7 @@ const AccessibleCard = memo(function AccessibleCard({
   const nextDepartureInMin = useNextDepartureInMin(it, display, referenceNowMs);
   const duration = toMinutes(span.durationSeconds);
   const risk = useMemo(() => transferRisk(display.segments), [display.segments]);
+  const transferWait = transferWaitingLabel(it, display, t);
   const liveDelay = peakDelayMinutes(it);
   const stepFree = mobility === "wheelchair";
 
@@ -243,6 +245,7 @@ const AccessibleCard = memo(function AccessibleCard({
               `${it.walkingDistanceEstimated ? "~" : ""}${Math.round(it.walkingDistanceMeters)}`,
             )}
           </div>
+          {transferWait && <div>{transferWait}</div>}
         </div>
       </div>
 

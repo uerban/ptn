@@ -1,3 +1,4 @@
+import { transferWaitingLabel } from "./shared/transferWaiting.ts";
 import { memo, useCallback, useMemo } from "react";
 import type { Itinerary, Leg } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
@@ -150,6 +151,7 @@ const ConsumerCard = memo(function ConsumerCard({
   const duration = toMinutes(span.durationSeconds);
   const onBoard = toMinutes(rideSeconds(it));
   const risk = useMemo(() => transferRisk(display.segments), [display.segments]);
+  const transferWait = transferWaitingLabel(it, display, t);
   const liveDelay = peakDelayMinutes(it);
   const eco = useMemo(() => computeEcoScore(it.legs), [it.legs]);
 
@@ -280,6 +282,7 @@ const ConsumerCard = memo(function ConsumerCard({
             t("route.transfer_many", "transfers"),
           )}
         </span>
+        {transferWait && <span>{transferWait}</span>}
         {it.walkingDistanceMeters > 0 && (
           <span>
             {t("unit.meters", "{n} m").replace(

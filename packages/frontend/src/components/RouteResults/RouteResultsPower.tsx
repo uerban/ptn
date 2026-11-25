@@ -1,3 +1,4 @@
+import { transferWaitingLabel } from "./shared/transferWaiting.ts";
 import { memo, useCallback, useMemo } from "react";
 import type { Itinerary } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
@@ -206,6 +207,7 @@ const PowerCard = memo(function PowerCard({
       )
     : "var(--color-divider)";
   const risk = transferRisk(display.segments);
+  const transferWait = transferWaitingLabel(it, display, t);
   const delay = peakDelayMinutes(it);
   // The header counts from the leave time — see shownTripSpan.
   const span = shownTripSpan(it, display);
@@ -317,6 +319,7 @@ const PowerCard = memo(function PowerCard({
           <span>
             {it.transfers} {t("route.tr_short", "tr")}
           </span>
+          {transferWait && <span>{transferWait}</span>}
           {delay.minutes >= 2 && risk !== "miss" && (
             <span className="text-warning font-bold">
               ⚠ {delay.line ?? ""} +

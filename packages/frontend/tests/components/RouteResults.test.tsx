@@ -39,6 +39,20 @@ function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
 }
 
 describe("RouteResults", () => {
+  it("announces transfer waiting alongside arrival when the comparison is enabled", () => {
+    vi.stubEnv("VITE_PTN_TRANSFER_WAIT_COMPARISON", "1");
+    const itinerary = makeMixedItinerary();
+    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(itinerary.departureTime) - 60_000);
+    try {
+      render(<BrowserRouter><RouteResults itineraries={[itinerary]} onSelect={() => {}} feedTz="UTC" /></BrowserRouter>);
+      expect(screen.getByText("2 min waiting between vehicles")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /arrives .*2 min waiting between vehicles/i })).toBeInTheDocument();
+    } finally {
+      now.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("opens guidance for the whole itinerary when a verified replacement is selected", () => {
     vi.stubEnv("VITE_PTN_INTERCHANGEABLE_DEPARTURES", "1");
     const primary = makeMixedItinerary();

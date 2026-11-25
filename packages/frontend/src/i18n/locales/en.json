@@ -115,6 +115,8 @@
   "search.locating": "Finding your location…",
   "search.search_on_server": "Search on the server instead",
   "search.appearance_link": "Appearance…",
+  "route.transfer_wait_minutes": "{n} min waiting between vehicles",
+  "route.transfer_wait_under_minute": "Under 1 min between vehicles",
   "route.transfer_one": "transfer",
   "route.transfer_few": "transfers",
   "route.transfer_many": "transfers",

@@ -1,3 +1,4 @@
+import { transferWaitingLabel } from "./transferWaiting.ts";
 import type { Itinerary } from "@pt/shared";
 import { pluralize } from "../../../i18n/plurals.ts";
 import { modeLabel } from "../../../utils/modeLabels.ts";
@@ -252,6 +253,8 @@ export function itineraryAriaLabel(
       t("route.transfer_many", "transfers"),
     )}`,
   ];
+  const transferWait = transferWaitingLabel(it, display, t);
+  if (transferWait) meta.push(transferWait);
   // The access walk already stated its distance. When it accounts for
   //    essentially all the walking — the common single-leg case — repeating the
   //    same number as a total is pure duplication in an utterance that is
