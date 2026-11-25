@@ -12,8 +12,11 @@ function hasExactRide(leg: Leg): boolean {
 
 function hasValidTimeline(itinerary: Itinerary, earliestLeaveMs: number, deadlineMs: number): boolean {
   let previousArrival = Date.parse(itinerary.departureTime);
-  if (itinerary.legs.length === 0 || !(previousArrival >= earliestLeaveMs)) return false;
-  if (Date.parse(itinerary.legs[0].departureTime) !== previousArrival) return false;
+  const firstLeg = itinerary.legs[0];
+  // A plan starting at its boarding stop can carry search-window waiting
+  // before the first leg. The first actual movement must still be reachable.
+  if (!firstLeg || !Number.isFinite(previousArrival) ||
+    !(Date.parse(firstLeg.departureTime) >= earliestLeaveMs)) return false;
 
   for (const leg of itinerary.legs) {
     const departure = Date.parse(leg.departureTime);

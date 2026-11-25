@@ -71,7 +71,7 @@ export function LaterJourney({
   }, [findLaterPlans, needsFallback, primary, retainedLater, primaryLeaveMs, departAtMs, arriveByMs]);
 
   if (!later) return null;
-  const departure = formatTime(later.departureTime, formattingLocale, feedTz);
+  const departure = formatTime(later.legs[0].departureTime, formattingLocale, feedTz);
   const arrival = formatTime(later.arrivalTime, formattingLocale, feedTz);
   return (
     <div className="px-3 pb-2">

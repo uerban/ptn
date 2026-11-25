@@ -31,6 +31,11 @@ describe("selectVerifiedLaterJourney", () => {
     expect(selectVerifiedLaterJourney(primary, [primary, journey(15, "other"), viable], constraints)).toBe(viable);
   });
 
+  it("allows an initial wait at the boarding stop before the first leg", () => {
+    const waiting = { ...viable, departureTime: shift(viable.departureTime, -8) };
+    expect(selectVerifiedLaterJourney(primary, [waiting], constraints)).toBe(waiting);
+  });
+
   it("skips a same-line branch that does not serve the planned stop occurrence", () => {
     const wrongBranch = journey(4, "branch");
     wrongBranch.legs[0].patternStopIds = ["s1", "branch-stop"];
