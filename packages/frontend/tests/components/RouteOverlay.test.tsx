@@ -249,3 +249,46 @@ describe("RouteOverlay", () => {
     expect(getLayer).toHaveBeenCalled();
   });
 });
+
+describe("reanchorLegLayers", () => {
+  function layerMap(ids: string[]) {
+    const order = [...ids];
+    const moves: string[] = [];
+    const map = {
+      getStyle: () => ({ layers: order.map((id) => ({ id })) }),
+      moveLayer: (id: string, beforeId: string) => {
+        moves.push(id);
+        order.splice(order.indexOf(id), 1);
+        order.splice(order.indexOf(beforeId), 0, id);
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return { map, order, moves };
+  }
+
+  it("lifts legs buried under a basemap merged in after them, keeping their order", async () => {
+    const { reanchorLegLayers } = await import("../../src/components/Map/RouteOverlay.tsx");
+    // Real staging order: legs drawn, then the basemap merged in before the stops.
+    const { map, order } = layerMap([
+      "local-bg", "guidance-leg-preview-layer-0", "guidance-leg-layer-0", "guidance-leg-layer-1",
+      "background", "water", "building", "stops-clusters", "stops-dot",
+    ]);
+    reanchorLegLayers(map);
+    expect(order).toEqual([
+      "local-bg", "background", "water", "building",
+      "guidance-leg-preview-layer-0", "guidance-leg-layer-0", "guidance-leg-layer-1",
+      "stops-clusters", "stops-dot",
+    ]);
+    // Settled: the styledata the moves fire must not move anything again.
+    const again = layerMap(order);
+    reanchorLegLayers(again.map);
+    expect(again.moves).toEqual([]);
+  });
+
+  it("leaves legs that already sit right below the stops alone", async () => {
+    const { reanchorLegLayers } = await import("../../src/components/Map/RouteOverlay.tsx");
+    const { map, moves } = layerMap(["background", "guidance-leg-layer-0", "stops-clusters"]);
+    reanchorLegLayers(map);
+    expect(moves).toEqual([]);
+  });
+});
