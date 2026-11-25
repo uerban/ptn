@@ -1,3 +1,4 @@
+import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
@@ -38,6 +39,28 @@ function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
 }
 
 describe("RouteResults", () => {
+  it("opens guidance for the whole itinerary when a verified replacement is selected", () => {
+    vi.stubEnv("VITE_PTN_INTERCHANGEABLE_DEPARTURES", "1");
+    const primary = makeMixedItinerary();
+    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(primary.departureTime) - 60_000);
+    for (const leg of primary.legs.filter((item) => item.mode !== "WALK")) {
+      Object.assign(leg, { boardStopIdx: 0, alightStopIdx: 1, patternStopIds: [leg.from.stopId, leg.to.stopId] });
+    }
+    const candidate = { ...primary, legs: [
+      { ...primary.legs[0], routeId: "alternate", routeShortName: "4", tripId: "replacement", headsign: "Centre" },
+      ...primary.legs.slice(1),
+    ] };
+    const onSelect = vi.fn();
+    try {
+      render(<BrowserRouter><RouteResults itineraries={[primary, candidate]} onSelect={onSelect} feedTz="UTC" /></BrowserRouter>);
+      fireEvent.click(screen.getByRole("button", { name: /Take 4 toward Centre at .* instead/ }));
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(candidate);
+    } finally {
+      now.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("opens the exact later plan after a missed departure, within the arrival deadline", async () => {
     vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
     const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse("2026-03-03T10:01:00Z"));

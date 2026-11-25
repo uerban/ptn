@@ -18,6 +18,7 @@ import { TransitousPanel, type TransitousPanelProps } from "./TransitousPanel.ts
 import { RouteResultsConsumer } from "./RouteResultsConsumer.tsx";
 import { RouteResultsPower } from "./RouteResultsPower.tsx";
 import { RouteResultsAccessible } from "./RouteResultsAccessible.tsx";
+import { InterchangeableDeparture } from "./shared/InterchangeableDeparture.tsx";
 import { LaterJourney } from "./shared/LaterJourney.tsx";
 import { LeaveFloorContext } from "./shared/leaveFloor.ts";
 import { ServiceAlertsPanel } from "../ServiceAlerts/ServiceAlertsPanel.tsx";
@@ -280,11 +281,18 @@ export function RouteResults({
     );
   }
 
-  const afterPrimary = import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" ? (
-    <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
-      bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
-      arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />
-  ) : null;
+  const afterPrimary = <>
+    {import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" && (
+      <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
+        bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
+        arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />
+    )}
+    {import.meta.env.VITE_PTN_INTERCHANGEABLE_DEPARTURES === "1" && (
+      <InterchangeableDeparture itineraries={itineraries} onSelect={onSelect}
+        earliestLeaveMs={Math.max(referenceNowMs, departAt?.getTime() ?? -Infinity)}
+        arriveByMs={arriveByMs} feedTz={feedTz} />
+    )}
+  </>;
 
   return (
     <>

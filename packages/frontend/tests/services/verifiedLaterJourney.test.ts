@@ -1,6 +1,6 @@
 import type { Itinerary } from "@pt/shared";
 import { describe, expect, it } from "vitest";
-import { selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
+import { interchangeableRide, selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
 import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 
 const shift = (time: string, minutes: number) =>
@@ -58,5 +58,34 @@ describe("selectVerifiedLaterJourney", () => {
       journey(2, "missed"), { ...viable, cancelled: true }, { ...viable, timingUnreliable: true },
       journey(0.5, "too-early"),
     ], constraints)).toBeNull();
+  });
+});
+
+describe("interchangeableRide", () => {
+  const primary = journey(8, "first");
+  const constraints = { earliestLeaveMs: Date.parse(primary.departureTime) - 60_000 };
+  const withReplacement = () => {
+    const candidate = journey(8, "other");
+    candidate.legs[1] = { ...primary.legs[1] };
+    candidate.legs[0].routeId = "r4";
+    return candidate;
+  };
+
+  it("keeps the fixed onward trip and selects a concrete ride on another line", () => {
+    const candidate = withReplacement();
+    expect(interchangeableRide(primary, candidate, constraints)).toBe(candidate.legs[0]);
+  });
+
+  it("rejects a changed onward trip, wrong branch, impossible transfer or late arrival", () => {
+    expect(interchangeableRide(primary, journey(8, "both changed"), constraints)).toBeNull();
+    const wrongBranch = withReplacement();
+    wrongBranch.legs[0].patternStopIds = ["s1", "wrong"];
+    expect(interchangeableRide(primary, wrongBranch, constraints)).toBeNull();
+    const missed = withReplacement();
+    missed.legs[0].arrivalTime = shift(missed.legs[1].departureTime, 1);
+    expect(interchangeableRide(primary, missed, constraints)).toBeNull();
+    expect(interchangeableRide(primary, withReplacement(), {
+      ...constraints, arriveByMs: Date.parse(primary.arrivalTime) - 1,
+    })).toBeNull();
   });
 });

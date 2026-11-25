@@ -66,3 +66,43 @@ export function selectVerifiedLaterJourney(
   }
   return best;
 }
+
+
+/** Find an already validated itinerary that replaces exactly one ride.
+ * Fixed rides keep their trip, stop occurrences and effective times.
+ */
+export function interchangeableRide(
+  primary: Itinerary,
+  candidate: Itinerary,
+  { earliestLeaveMs, arriveByMs = Infinity }: LaterJourneyConstraints,
+): Leg | null {
+  if (primary.legs.length !== candidate.legs.length || candidate.cancelled || candidate.timingUnreliable ||
+    !hasValidTimeline(candidate, earliestLeaveMs, arriveByMs)) return null;
+
+  let replacement: Leg | null = null;
+  let fixedRides = 0;
+  for (const [i, original] of primary.legs.entries()) {
+    const next = candidate.legs[i];
+    if (original.from.stopId !== next.from.stopId || original.to.stopId !== next.to.stopId ||
+      original.from.location.lat !== next.from.location.lat || original.from.location.lon !== next.from.location.lon ||
+      original.to.location.lat !== next.to.location.lat || original.to.location.lon !== next.to.location.lon) return null;
+
+    if (original.mode === "WALK" || next.mode === "WALK") {
+      if (original.mode !== next.mode || original.durationSeconds !== next.durationSeconds ||
+        !!original.runToCatch !== !!next.runToCatch) return null;
+      continue;
+    }
+
+    if (!hasExactRide(original) || !original.routeId || !next.routeId) return null;
+    if (original.tripId === next.tripId) {
+      if (original.routeId !== next.routeId || original.boardStopIdx !== next.boardStopIdx ||
+        original.alightStopIdx !== next.alightStopIdx || original.departureTime !== next.departureTime ||
+        original.arrivalTime !== next.arrivalTime) return null;
+      fixedRides++;
+      continue;
+    }
+    if (replacement) return null;
+    replacement = next;
+  }
+  return fixedRides > 0 ? replacement : null;
+}
