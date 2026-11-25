@@ -165,6 +165,7 @@ interface SettingsState {
   searchProvider: SearchProvider;
   /** Temporary Search UI choices, retained while device feedback settles defaults. */
   searchActiveFieldOnly: boolean;
+  showJourneyAlternatives: boolean;
   searchKeyboardFit: boolean;
   searchCompactRows: boolean;
   searchDismissOnScroll: boolean;
@@ -220,6 +221,7 @@ interface SettingsState {
   setGpsGranted: (granted: boolean) => void;
   setSearchProvider: (provider: SearchProvider) => void;
   setSearchActiveFieldOnly: (enabled: boolean) => void;
+  setShowJourneyAlternatives: (enabled: boolean) => void;
   setSearchKeyboardFit: (enabled: boolean) => void;
   setSearchCompactRows: (enabled: boolean) => void;
   setSearchDismissOnScroll: (enabled: boolean) => void;
@@ -409,6 +411,7 @@ export const useSettingsStore = create<SettingsState>()(
       gpsGranted: false,
       searchProvider: "local" satisfies SearchProvider,
       searchActiveFieldOnly: true,
+      showJourneyAlternatives: true,
       searchKeyboardFit: true,
       searchCompactRows: true,
       searchDismissOnScroll: true,
@@ -563,6 +566,7 @@ export const useSettingsStore = create<SettingsState>()(
       setGpsMode: (gpsMode) => set(gpsMode === "enabled" ? { gpsMode } : { gpsMode, gpsGranted: false }),
       setGpsGranted: (gpsGranted) => { if (get().gpsGranted !== gpsGranted) set({ gpsGranted }); },
       setSearchActiveFieldOnly: (enabled) => set({ searchActiveFieldOnly: enabled }),
+      setShowJourneyAlternatives: (enabled) => set({ showJourneyAlternatives: enabled }),
       setSearchKeyboardFit: (enabled) => set({ searchKeyboardFit: enabled }),
       setSearchCompactRows: (enabled) => set({ searchCompactRows: enabled }),
       setSearchDismissOnScroll: (enabled) => set({ searchDismissOnScroll: enabled }),
@@ -742,6 +746,7 @@ export const useSettingsStore = create<SettingsState>()(
           poiIncludeLooseTier: poiLooseCategories.length > 0,
           poiIncludeLooseTierUserSet: stored?.poiIncludeLooseTierUserSet === true,
           searchActiveFieldOnly: coerceBool(stored?.searchActiveFieldOnly, current.searchActiveFieldOnly),
+          showJourneyAlternatives: coerceBool(stored?.showJourneyAlternatives, current.showJourneyAlternatives),
           searchKeyboardFit: coerceBool(stored?.searchKeyboardFit, current.searchKeyboardFit),
           searchCompactRows: coerceBool(stored?.searchCompactRows, current.searchCompactRows),
           searchDismissOnScroll: coerceBool(stored?.searchDismissOnScroll, current.searchDismissOnScroll),

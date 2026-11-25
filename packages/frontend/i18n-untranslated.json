@@ -30,6 +30,8 @@
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
     "settings.scheme_tritanopia",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "time.h",
     "time.min",
     "unit.meters"
@@ -64,6 +66,8 @@
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
     "settings.scheme_tritanopia",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "time.h",
     "time.min",
     "unit.meters"
@@ -88,6 +92,8 @@
     "search.poi_badge",
     "search.show_journey_alternatives",
     "settings.mode_metro",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "time.min",
     "unit.meters"
   ],
@@ -119,6 +125,8 @@
     "search.sort_tie_breaker",
     "settings.mode_funicular",
     "settings.mode_metro",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "time.h",
     "time.min",
     "unit.meters"
@@ -155,6 +163,8 @@
     "settings.mode_funicular",
     "settings.mode_scooter",
     "settings.scheme_tritanopia",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "theme.system",
     "time.min",
     "unit.meters"
@@ -197,6 +207,8 @@
     "settings.scheme_deuteranopia",
     "settings.scheme_protanopia",
     "settings.scheme_tritanopia",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "time.min",
     "unit.meters",
     "walk.step.arrive"
@@ -222,6 +234,8 @@
     "search.sort_arrive_by_help",
     "search.sort_departure_help",
     "search.sort_tie_breaker",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "walk.step.arrive"
   ],
   "sv": [
@@ -256,6 +270,8 @@
     "search.sort_departure_help",
     "search.sort_tie_breaker",
     "settings.mode_scooter",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc",
     "theme.system",
     "time.min",
     "unit.meters"
@@ -280,7 +296,9 @@
     "search.show_journey_alternatives",
     "search.sort_arrive_by_help",
     "search.sort_departure_help",
-    "search.sort_tie_breaker"
+    "search.sort_tie_breaker",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc"
   ],
   "be": [
     "arriveBy.ordered_results",
@@ -299,6 +317,8 @@
     "search.show_journey_alternatives",
     "search.sort_arrive_by_help",
     "search.sort_departure_help",
-    "search.sort_tie_breaker"
+    "search.sort_tie_breaker",
+    "settings.show_journey_alternatives",
+    "settings.show_journey_alternatives_desc"
   ]
 }

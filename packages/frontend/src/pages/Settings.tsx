@@ -134,6 +134,7 @@ export function SettingsPage() {
     startupLocate, setStartupLocate,
     tripNotificationsEnabled, setTripNotificationsEnabled,
     routeSearchVariant, setRouteSearchVariant,
+    showJourneyAlternatives, setShowJourneyAlternatives,
     searchProvider,
     maxPopupLines, setMaxPopupLines,
   } = useSettingsStore();
@@ -293,6 +294,18 @@ export function SettingsPage() {
               </label>
             ))}
           </div>
+          {import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1" && (
+            <label className="mt-3 flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={showJourneyAlternatives}
+                onChange={(event) => setShowJourneyAlternatives(event.target.checked)} className="accent-accent mt-1" />
+              <span>
+                <span className="block text-sm text-fg">{t("settings.show_journey_alternatives", "Show alternatives")}</span>
+                <span className="block text-xs text-fg-muted">
+                  {t("settings.show_journey_alternatives_desc", "Let me look for a later departure when Search finds one journey.")}
+                </span>
+              </span>
+            </label>
+          )}
         </section>
 
         <GpsSettings />

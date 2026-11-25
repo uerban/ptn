@@ -2,6 +2,7 @@ import type { FirstRideConstraint } from "@pt/shared";
 import { useEffect, useState } from "react";
 import type { Itinerary } from "@pt/shared";
 import { useFirstRideLive } from "../../../hooks/useLiveRt.ts";
+import { useSettingsStore } from "../../../stores/settingsStore.ts";
 import { useRtStore } from "../../../stores/rtStore.ts";
 import { useTranslation } from "../../../i18n/index.ts";
 import { serverTime } from "../../../services/serverTime.ts";
@@ -34,7 +35,8 @@ export function LaterJourney({
   const completed = probe?.primary === primary && probe.find === findLaterPlans;
   const additional = completed ? probe.plans : [];
   const firstRide = primary.legs.find((leg) => leg.mode !== "WALK");
-  const canRequest = import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1" &&
+  const showJourneyAlternatives = useSettingsStore((state) => state.showJourneyAlternatives);
+  const canRequest = import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1" && showJourneyAlternatives &&
     itineraries.length === 1 && !!findLaterPlans && !!firstRide?.routeId && !!firstRide.from.stopId &&
     !!firstRide.to.stopId && !primary.cancelled && !primary.timingUnreliable;
   const live = useFirstRideLive(primary);
