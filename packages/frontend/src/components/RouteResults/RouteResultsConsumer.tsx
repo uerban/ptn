@@ -28,7 +28,7 @@ import { deriveItineraryDisplay, shownTripSpan } from "./shared/itineraryDisplay
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
-import { routeDistinctions } from "./shared/routeDistinctions.ts";
+import { useRouteDistinctions } from "./shared/routeDistinctions.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 
 interface Props {
@@ -59,7 +59,7 @@ export function RouteResultsConsumer({
 }: Props) {
   const { t } = useTranslation();
   const alerts = useListAlerts(itineraries);
-  const distinctions = routeDistinctions(itineraries, t);
+  const distinctions = useRouteDistinctions(itineraries, t, referenceNowMs);
 
   return (
     <div className="flex flex-col gap-2.5 px-3 pb-3">

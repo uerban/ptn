@@ -21,7 +21,7 @@ import {
 } from "./shared/itineraryDisplay.ts";
 import { useLeaveFloorMs } from "./shared/leaveFloor.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
-import { routeDistinctions } from "./shared/routeDistinctions.ts";
+import { useRouteDistinctions } from "./shared/routeDistinctions.ts";
 import { LeaveHint } from "./shared/LeaveHint.tsx";
 import {
   peakDelayMinutes,
@@ -72,7 +72,7 @@ export function RouteResultsPower({
   const topDelay = delays[0];
   const alerts = useListAlerts(itineraries);
 
-  const distinctions = routeDistinctions(itineraries, t);
+  const distinctions = useRouteDistinctions(itineraries, t, referenceNowMs);
 
   return (
     <div className="font-mono">

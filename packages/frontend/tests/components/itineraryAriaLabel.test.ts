@@ -1,3 +1,4 @@
+import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 import { describe, it, expect } from "vitest";
 import type { Itinerary } from "@pt/shared";
 import { itineraryAriaLabel } from "../../src/components/RouteResults/shared/itineraryAriaLabel.ts";
@@ -451,4 +452,17 @@ describe("itineraryAriaLabel — trip length", () => {
     ]);
     expect(label(trip)).toContain("29 min, arrives");
   });
+});
+
+it("updates direct comparisons with live arrival shifts and skips uncertain connections", () => {
+  const transfer = makeMixedItinerary();
+  const directRide = { ...transfer.legs[0], tripId: "direct", arrivalTime: "2026-04-23T12:24:00Z" };
+  const direct = { ...transfer, legs: [directRide], transfers: 0, arrivalTime: directRide.arrivalTime };
+  const nowMs = Date.parse(transfer.departureTime) - 60000;
+  const delayed = { delaySeconds: 120, cancelled: false };
+  const t = (_: string, fallback: string) => fallback;
+  const labels = routeDistinctions([direct, transfer], t, { nowMs, getTripDelay: (trip) => trip === "direct" ? delayed : null });
+  expect(labels[0]).toContain("Direct · arrives 6 min later");
+  expect(routeDistinctions([direct, transfer], t, { nowMs, getTripDelay: (trip) => trip === "direct" ? null : delayed })[0])
+    .not.toContain("Direct · arrives 4 min later");
 });

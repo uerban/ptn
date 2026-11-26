@@ -45,6 +45,7 @@ describe("RouteResults", () => {
     const transfer = makeItinerary({ transfers: 2 });
     direct.legs[0] = { ...direct.legs[0], tripId: "direct", arrivalTime: direct.arrivalTime };
     transfer.legs[0] = { ...transfer.legs[0], tripId: "transfer" };
+    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(direct.departureTime) - 60_000);
     try {
       render(<BrowserRouter><RouteResults itineraries={[direct, transfer]} onSelect={() => {}} feedTz="UTC" /></BrowserRouter>);
       const [directCard, transferCard] = screen.getAllByTestId("itinerary-card");
@@ -52,6 +53,7 @@ describe("RouteResults", () => {
       expect(transferCard).not.toHaveTextContent("arrives 4 min later");
       expect(directCard).toHaveAccessibleName(/Direct.*arrives 4 min later/i);
     } finally {
+      now.mockRestore();
       vi.unstubAllEnvs();
     }
   });
