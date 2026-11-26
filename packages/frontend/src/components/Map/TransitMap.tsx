@@ -1229,7 +1229,9 @@ export const TransitMap = forwardRef<maplibregl.Map | null, TransitMapProps>(
           return !!rect && rect.width > 0 && rect.height > 0 && rect.right > canvasRect.left &&
             rect.left < canvasRect.right && rect.bottom > canvasRect.top && rect.top < canvasRect.bottom;
         },
-        reducedMotion: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        reducedMotion: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+          (import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" &&
+            useSettingsStore.getState().searchPowerMode === "battery-saver"),
         opacity: (id, opacity, exiting) => {
           if (map.getSource(SOURCE_ID)) map.setFeatureState({ source: SOURCE_ID, id }, { exitOpacity: opacity });
           const marker = markersRef.current.get(id);

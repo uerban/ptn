@@ -474,7 +474,7 @@
   "settings.search_power_mode": "Search power mode",
   "settings.power_balanced": "Balanced",
   "settings.power_battery_saver": "Battery saver",
-  "settings.search_power_mode_desc": "Battery saver waits for you to request alternatives and checks one later departure.",
+  "settings.search_power_mode_desc": "Battery saver checks one later departure on request and skips map stop fades.",
   "settings.show_journey_alternatives": "Show alternatives",
   "settings.show_journey_alternatives_desc": "Let me look for a later departure when Search finds one journey.",
   "search.different_journey": "Take {lines} · leaves {departure} · arrives {arrival}",
