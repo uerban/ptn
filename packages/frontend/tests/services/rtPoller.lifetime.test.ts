@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RtRouteUpdate } from "@pt/shared";
+import { useSettingsStore } from "../../src/stores/settingsStore.ts";
 import { RtPoller } from "../../src/services/rtPoller.ts";
 import { api } from "../../src/services/api.ts";
 import { allowFlow, resetFlows } from "../../src/test-helpers/networkDecisions.ts";
@@ -84,4 +85,31 @@ it("keeps a still-active identical subscription and repeated start idempotent", 
   await vi.advanceTimersByTimeAsync(0);
   expect(callback).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(1);
+});
+
+it("reduces idle refreshes in Battery saver and refreshes immediately when guidance starts", async () => {
+  const previous = useSettingsStore.getState().searchPowerMode;
+  useSettingsStore.getState().setSearchPowerMode("battery-saver");
+  vi.stubEnv("VITE_PTN_SEARCH_POWER_MODES", "1");
+  try {
+    poller.subscribe("r1", vi.fn());
+    poller.start();
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(2);
+    poller.setMode("navigating");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(4);
+    poller.setMode("transfer");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(5);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(api.fetchRouteRt).toHaveBeenCalledTimes(6);
+  } finally {
+    vi.unstubAllEnvs();
+    useSettingsStore.getState().setSearchPowerMode(previous);
+  }
 });

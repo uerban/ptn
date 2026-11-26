@@ -1,3 +1,4 @@
+import { useSettingsStore } from "../stores/settingsStore.ts";
 import { api } from "./api.ts";
 import { canUse } from "../privacy/canUse.ts";
 import { REALTIME_FLOW } from "./departuresPolicy.ts";
@@ -58,7 +59,10 @@ export class RtPoller {
   }
 
   getIntervalMs(): number {
-    return INTERVALS[this.mode];
+    const base = INTERVALS[this.mode];
+    if (this.mode === "idle" && import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" &&
+        useSettingsStore.getState().searchPowerMode === "battery-saver") return base * 2;
+    return base;
   }
 
   start(): void {

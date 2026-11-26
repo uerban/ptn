@@ -316,7 +316,7 @@ export function SettingsPage() {
                 <option value="battery-saver">{t("settings.power_battery_saver", "Battery saver")}</option>
               </select>
               <span className="text-xs text-fg-muted">
-                {t("settings.search_power_mode_desc", "Battery saver checks one later departure on request and skips map stop fades.")}
+                {t("settings.search_power_mode_desc", "Battery saver checks one later departure on request, skips map stop fades, and refreshes live arrivals less often outside guidance.")}
               </span>
             </label>
           )}
