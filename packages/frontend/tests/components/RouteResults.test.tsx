@@ -14,6 +14,7 @@ import {
   resetPersonalStorage,
 } from "../../src/test-helpers/personalStorage.ts";
 import { serverTime } from "../../src/services/serverTime.ts";
+import { useSettingsStore } from "../../src/stores/settingsStore.ts";
 import { usePrivacyStore } from "../../src/stores/privacyStore.ts";
 
 function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
@@ -101,10 +102,15 @@ describe("RouteResults", () => {
     }
   });
 
-  it("finds later and different journeys only after Show alternatives is selected", async () => {
+  it.each(["balanced", "battery-saver"] as const)("bounds requested alternatives in %s mode", async (searchPowerMode) => {
+    const previousMode = useSettingsStore.getState().searchPowerMode;
+    useSettingsStore.setState({ searchPowerMode });
+    vi.stubEnv("VITE_PTN_SEARCH_POWER_MODES", "1");
+    vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
+    const batterySaver = searchPowerMode === "battery-saver";
     vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
     const primary = makeItinerary();
-    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(primary.departureTime) - 60_000);
+    const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(primary.departureTime) + (batterySaver ? 60_000 : -60_000));
     Object.assign(primary.legs[0], {
       tripId: "original", routeId: "42", boardStopIdx: 0, alightStopIdx: 1,
       patternStopIds: ["A", "B"],
@@ -128,13 +134,18 @@ describe("RouteResults", () => {
       expect(findDifferentPlans).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "Show alternatives" }));
       fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
-      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date("2026-03-03T10:00:01Z"), expect.any(AbortSignal),
+      expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date(batterySaver ? "2026-03-03T10:01:00Z" : "2026-03-03T10:00:01Z"), expect.any(AbortSignal),
         { routeId: "42", boardStopId: "A", alightStopId: "B", direct: true });
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(later);
+      if (batterySaver) {
+        expect(findDifferentPlans).not.toHaveBeenCalled();
+        return;
+      }
       fireEvent.click(screen.getByRole("button", { name: /Take 43.*Transfers: 0/i }));
       expect(onSelect).toHaveBeenLastCalledWith(different);
       expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(primary.departureTime), expect.any(AbortSignal), "42");
     } finally {
+      useSettingsStore.setState({ searchPowerMode: previousMode });
       now.mockRestore();
       vi.unstubAllEnvs();
     }

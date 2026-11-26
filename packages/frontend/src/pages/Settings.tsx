@@ -135,6 +135,7 @@ export function SettingsPage() {
     tripNotificationsEnabled, setTripNotificationsEnabled,
     routeSearchVariant, setRouteSearchVariant,
     showJourneyAlternatives, setShowJourneyAlternatives,
+    searchPowerMode, setSearchPowerMode,
     searchProvider,
     maxPopupLines, setMaxPopupLines,
   } = useSettingsStore();
@@ -303,6 +304,19 @@ export function SettingsPage() {
                 <span className="block text-xs text-fg-muted">
                   {t("settings.show_journey_alternatives_desc", "Let me look for a later departure when Search finds one journey.")}
                 </span>
+              </span>
+            </label>
+          )}
+          {import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" && (
+            <label className="mt-3 flex flex-col gap-1 text-sm text-fg">
+              {t("settings.search_power_mode", "Search power mode")}
+              <select value={searchPowerMode} className="w-fit rounded border border-divider bg-surface-raised px-2 py-1"
+                onChange={(event) => setSearchPowerMode(event.target.value === "battery-saver" ? "battery-saver" : "balanced")}>
+                <option value="balanced">{t("settings.power_balanced", "Balanced")}</option>
+                <option value="battery-saver">{t("settings.power_battery_saver", "Battery saver")}</option>
+              </select>
+              <span className="text-xs text-fg-muted">
+                {t("settings.search_power_mode_desc", "Battery saver waits for you to request alternatives and checks one later departure.")}
               </span>
             </label>
           )}

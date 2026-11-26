@@ -36,6 +36,8 @@ export function LaterJourney({
   const completed = probe?.primary === primary && probe.find === findLaterPlans && probe.differentFinder === findDifferentPlans;
   const additional = completed ? probe.plans : [];
   const firstRide = primary.legs.find((leg) => leg.mode !== "WALK");
+  const powerMode = useSettingsStore((state) => state.searchPowerMode);
+  const batterySaver = import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" && powerMode === "battery-saver";
   const showJourneyAlternatives = useSettingsStore((state) => state.showJourneyAlternatives);
   const canRequest = import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1" && showJourneyAlternatives &&
     itineraries.length === 1 && !!findLaterPlans && !!firstRide?.routeId && !!firstRide.from.stopId &&
@@ -48,7 +50,10 @@ export function LaterJourney({
   });
   const missed = display.catchStatus === "departed" || display.catchStatus === "likely-miss";
   const needsFallback = import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" && missed;
+  // A retained fallback is free to show in either mode. Battery saver
+  // avoids dispatching speculative work for a missed departure.
   const showAlternative = needsFallback || (canRequest && requested);
+  const canProbe = (needsFallback && !batterySaver) || (canRequest && requested);
   const eligible = (plan: Itinerary, state: ReturnType<typeof useRtStore.getState>) => plan.legs.every((leg) => {
     const live = leg.tripId ? state.getTripDelay(leg.tripId) : null;
     return !live || (!live.cancelled && !live.deleted && live.delaySeconds === (leg.appliedDelaySeconds ?? 0));
@@ -68,7 +73,7 @@ export function LaterJourney({
   const withinDeadline = arriveByMs === undefined ||
     Math.max(referenceNowMs, departAtMs ?? -Infinity, lookupFloor) < arriveByMs;
   useEffect(() => {
-    if (!findLaterPlans || !showAlternative || retainedLater || !Number.isFinite(probeFloor) || !withinDeadline) return;
+    if (!findLaterPlans || !canProbe || retainedLater || !Number.isFinite(probeFloor) || !withinDeadline) return;
     const controller = new AbortController();
     // A rider asking for another option can search explicitly after the
     // planned boarding. A missed departure keeps the earlier access floor.
@@ -89,7 +94,7 @@ export function LaterJourney({
       // the latest-departure recommendation.
       const differentAt = Math.max(serverTime.now(), departAtMs ?? -Infinity,
         arriveByMs === undefined ? primaryLeaveMs : -Infinity);
-      const differentPlans = requested && canRequest && findDifferentPlans &&
+      const differentPlans = !batterySaver && requested && canRequest && findDifferentPlans &&
         (arriveByMs === undefined || differentAt < arriveByMs)
         ? await findDifferentPlans(new Date(differentAt), controller.signal, routeId).catch(() => [])
         : [];
@@ -97,10 +102,10 @@ export function LaterJourney({
     })();
 
     return () => controller.abort();
-  }, [findLaterPlans, showAlternative, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs]);
+  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs, batterySaver]);
 
   if (!later && !different) {
-    if (!canRequest || missed || !Number.isFinite(probeFloor) || !withinDeadline ||
+    if (!canRequest || (missed && !batterySaver) || !Number.isFinite(probeFloor) || !withinDeadline ||
       display.catchStatus === "cancelled" || display.catchStatus === "removed") return null;
     return (
       <div className="px-3 pb-2">

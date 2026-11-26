@@ -166,6 +166,7 @@ interface SettingsState {
   /** Temporary Search UI choices, retained while device feedback settles defaults. */
   searchActiveFieldOnly: boolean;
   showJourneyAlternatives: boolean;
+  searchPowerMode: "balanced" | "battery-saver";
   searchKeyboardFit: boolean;
   searchCompactRows: boolean;
   searchDismissOnScroll: boolean;
@@ -222,6 +223,7 @@ interface SettingsState {
   setSearchProvider: (provider: SearchProvider) => void;
   setSearchActiveFieldOnly: (enabled: boolean) => void;
   setShowJourneyAlternatives: (enabled: boolean) => void;
+  setSearchPowerMode: (mode: SettingsState["searchPowerMode"]) => void;
   setSearchKeyboardFit: (enabled: boolean) => void;
   setSearchCompactRows: (enabled: boolean) => void;
   setSearchDismissOnScroll: (enabled: boolean) => void;
@@ -412,6 +414,7 @@ export const useSettingsStore = create<SettingsState>()(
       searchProvider: "local" satisfies SearchProvider,
       searchActiveFieldOnly: true,
       showJourneyAlternatives: true,
+      searchPowerMode: "balanced",
       searchKeyboardFit: true,
       searchCompactRows: true,
       searchDismissOnScroll: true,
@@ -567,6 +570,7 @@ export const useSettingsStore = create<SettingsState>()(
       setGpsGranted: (gpsGranted) => { if (get().gpsGranted !== gpsGranted) set({ gpsGranted }); },
       setSearchActiveFieldOnly: (enabled) => set({ searchActiveFieldOnly: enabled }),
       setShowJourneyAlternatives: (enabled) => set({ showJourneyAlternatives: enabled }),
+      setSearchPowerMode: (mode) => set({ searchPowerMode: mode }),
       setSearchKeyboardFit: (enabled) => set({ searchKeyboardFit: enabled }),
       setSearchCompactRows: (enabled) => set({ searchCompactRows: enabled }),
       setSearchDismissOnScroll: (enabled) => set({ searchDismissOnScroll: enabled }),
@@ -747,6 +751,7 @@ export const useSettingsStore = create<SettingsState>()(
           poiIncludeLooseTierUserSet: stored?.poiIncludeLooseTierUserSet === true,
           searchActiveFieldOnly: coerceBool(stored?.searchActiveFieldOnly, current.searchActiveFieldOnly),
           showJourneyAlternatives: coerceBool(stored?.showJourneyAlternatives, current.showJourneyAlternatives),
+          searchPowerMode: stored?.searchPowerMode === "battery-saver" ? "battery-saver" : current.searchPowerMode,
           searchKeyboardFit: coerceBool(stored?.searchKeyboardFit, current.searchKeyboardFit),
           searchCompactRows: coerceBool(stored?.searchCompactRows, current.searchCompactRows),
           searchDismissOnScroll: coerceBool(stored?.searchDismissOnScroll, current.searchDismissOnScroll),
