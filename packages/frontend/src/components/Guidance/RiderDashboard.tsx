@@ -1,5 +1,6 @@
 import type { Leg, UpcomingStop, ConnectionAtStop } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
+import { LiveTransferOffer } from "./LiveTransferOffer.tsx";
 import { Icon } from "../Icon.tsx";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeMinWidth } from "../../utils/appearance.ts";
@@ -55,6 +56,8 @@ export function RiderDashboard({
           <Icon name="close" className="text-fg-muted" />
         </button>
       </div>
+
+      {import.meta.env.VITE_PTN_LIVE_TRANSFER_REPLAN === "1" && <LiveTransferOffer />}
 
       {/* Upcoming stops with connecting line */}
       <div className="overflow-y-auto flex-1 px-4 py-3">
