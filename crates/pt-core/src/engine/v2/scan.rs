@@ -290,6 +290,7 @@ pub struct FirstRide {
     pub route: u32,
     pub board: u32,
     pub alight: u32,
+    pub trip: Option<u32>,
 }
 
 /// Plan with a required first ride and ordinary onward routing.
@@ -841,7 +842,14 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
         let mut scratch = core::mem::take(&mut self.buf_scratch);
         let mut taken = core::mem::take(&mut self.buf_taken);
         let mut limits = core::mem::take(&mut self.buf_limits);
-        let uniform = self.uniform_ready(&l);
+        let exact_trip = (l.kind == Kind::Origin)
+            .then(|| self.first_ride.and_then(|ride| ride.trip))
+            .flatten();
+        let uniform = if exact_trip.is_none() {
+            self.uniform_ready(&l)
+        } else {
+            None
+        };
         for &(r, p) in pairs {
             let route = &index.routes[r as usize];
             if !self.route_allowed(r)
@@ -962,6 +970,9 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Ctx<'_, B> {
                 }
             }
             for (si, rt) in route.trips.iter().enumerate() {
+                if exact_trip.is_some_and(|trip| trip != rt.trip_idx) {
+                    continue;
+                }
                 let ti = self.v2.trips[rt.trip_idx as usize];
                 if ti.route != r || ti.slot != si as u32 {
                     continue;

@@ -12,6 +12,8 @@ export interface FirstRideConstraint {
   routeId: string;
   boardStopId: string;
   alightStopId: string;
+  /** Require this scheduled GTFS trip on the first ride. */
+  tripId?: string;
 }
 
 export interface RaptorQuery {

@@ -53,6 +53,7 @@ pub struct WasmFirstRide {
     pub route_id: String,
     pub board_stop_id: String,
     pub alight_stop_id: String,
+    pub trip_id: Option<String>,
 }
 
 impl WasmFirstRide {
@@ -70,10 +71,21 @@ impl WasmFirstRide {
         };
         let route = resolve_route_id(reader, &self.route_id)?
             .ok_or_else(|| JsError::new(&format!("unknown first routeId: {}", self.route_id)))?;
+        let trip = self
+            .trip_id
+            .as_ref()
+            .map(|id| {
+                (0..reader.num_trips())
+                    .find(|&i| reader.trip_id(i).is_ok_and(|candidate| candidate == id))
+                    .map(|i| i as u32)
+                    .ok_or_else(|| JsError::new(&format!("unknown first-ride tripId: {id}")))
+            })
+            .transpose()?;
         Ok(pt_core::engine::v2::FirstRide {
             route,
             board: stop(&self.board_stop_id)?,
             alight: stop(&self.alight_stop_id)?,
+            trip,
         })
     }
 }

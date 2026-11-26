@@ -240,7 +240,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         ranking,
         ...(firstRide?.direct ? { maxRounds: 1 } : {}),
         firstRide: firstRide && { routeId: firstRide.routeId, boardStopId: firstRide.boardStopId,
-          alightStopId: firstRide.alightStopId },
+          alightStopId: firstRide.alightStopId, ...(firstRide.tripId ? { tripId: firstRide.tripId } : {}) },
         originStopId: origin.kind === "stop" ? origin.stopId : undefined,
         destStopId: destination.kind === "stop" ? destination.stopId : undefined,
         originStopIds: origin.kind === "stopGroup" ? [...origin.stopIds] : undefined,

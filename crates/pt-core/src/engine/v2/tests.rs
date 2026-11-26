@@ -268,6 +268,7 @@ fn first_ride_constraint_keeps_onward_routes_available() {
     net.trip(0, &[(3, 105), (1, 180)]); // Same line, wrong boarding platform.
     net.trip(1, &[(1, 350), (2, 500)]);
     net.trip(2, &[(0, 150), (2, 300)]); // Faster, different first line.
+    net.trip(0, &[(0, 130), (1, 210)]); // Same platforms, different vehicle.
     let reader = Reader::from_bytes(net.bytes()).unwrap();
     let index = Index::build(&reader, PatternMode::CoveringMerge).unwrap();
     let mut q = query(0, 2, 90, 2);
@@ -283,6 +284,7 @@ fn first_ride_constraint_keeps_onward_routes_available() {
         route: 0,
         board: 0,
         alight: 1,
+        trip: None,
     };
     let constrained =
         super::plan_v2_with_first_ride(&reader, &index, None, &q, first_ride).unwrap();
@@ -299,7 +301,25 @@ fn first_ride_constraint_keeps_onward_routes_available() {
         .collect();
     assert_eq!(routes, vec![0, 1]);
     assert_eq!(constrained[0].legs[0].from_stop, 0);
+    let exact = super::FirstRide {
+        trip: Some(5),
+        ..first_ride
+    };
+    let exact_plans = super::plan_v2_with_first_ride(&reader, &index, None, &q, exact).unwrap();
+    assert_eq!(frontier(&exact_plans), vec![(500, 1)]);
+    assert!(matches!(
+        exact_plans[0].legs[0].kind,
+        LegKind::Transit { trip_idx: 5, .. }
+    ));
     for wrong in [
+        super::FirstRide {
+            trip: Some(0),
+            ..first_ride
+        },
+        super::FirstRide {
+            trip: Some(3),
+            ..first_ride
+        },
         super::FirstRide {
             board: 2,
             ..first_ride
