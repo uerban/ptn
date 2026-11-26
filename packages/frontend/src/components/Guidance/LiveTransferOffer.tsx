@@ -37,6 +37,7 @@ export function LiveTransferOffer() {
   const realtimeAllowed = useCanUse(REALTIME_FLOW);
   const batterySaver = useSettingsStore((state) => import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" &&
     state.searchPowerMode === "battery-saver");
+  const raptorIndex = useGtfsDataStore((state) => state.raptorIndex);
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const itinerary = useGuidanceStore((s) => s.itinerary);
   const index = useGuidanceStore((s) => s.currentLegIndex);
@@ -64,11 +65,12 @@ export function LiveTransferOffer() {
     };
   }, [itinerary, index, riderTripId, realtimeAllowed, stopsRemaining]);
 
-  const eligible = realtimeAllowed && itinerary && active?.tripId && active.routeId && active.to.stopId &&
+  const eligible = realtimeAllowed && raptorIndex && itinerary && active?.tripId && active.routeId && active.to.stopId &&
     destination && active.tripId === riderTripId && stopsRemaining === 1 && remaining?.every((leg) => leg.mode === "WALK");
 
   const request = async () => {
     if (!eligible || !remaining || controller.current ||
+        useGtfsDataStore.getState().raptorIndex !== raptorIndex ||
         (attempted.current?.itinerary === itinerary && attempted.current.index === index)) return;
     const now = Date.now();
     const delay = useRtStore.getState().getTripDelay(active.tripId!)?.delaySeconds;
@@ -84,8 +86,6 @@ export function LiveTransferOffer() {
     let releaseDiscovery: (() => void) | undefined;
     try {
       const city = useCityStore.getState().activeCity;
-      const raptorIndex = useGtfsDataStore.getState().raptorIndex;
-      if (!raptorIndex) return;
       const settings = useSettingsStore.getState();
       const data = captureCityData();
       const stops = await data.gtfsStops.toArray();
