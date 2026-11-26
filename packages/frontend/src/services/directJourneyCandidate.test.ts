@@ -29,3 +29,26 @@ it("finds an alternate exact direct trip using the door-arrival deadline and rou
     ...input, excludedRoutes: new Set(), departureMs: input.departureMs + 1000,
   })).toBeUndefined();
 });
+
+it.each([
+  { departure: "2026-11-21T00:05:00Z", deadline: "2026-11-21T00:30:00Z", board: 87_000, arrival: 88_200,
+    serviceDate: "20261120" },
+  { departure: "2026-11-20T23:55:00Z", deadline: "2026-11-21T00:30:00Z", board: 600, arrival: 1_800,
+    serviceDate: "20261121" },
+])("finds a direct option across the service-day boundary for $departure", ({ departure, deadline, board, arrival, serviceDate }) => {
+  const route = makeRoute("overnight", arrival);
+  route.trips[0].departureSecs[0] = board;
+  const index: RaptorIndex = {
+    routes: [route], patterns: [route], patternsAtStop: new Map([["origin", [0]]]),
+    routeIdToIdx: new Map(), routesAtStop: new Map(),
+    services: new Map([["weekday", { serviceId: "weekday", days: Array(7).fill(true),
+      startDate: serviceDate, endDate: serviceDate, exceptions: {} }]]),
+  };
+  const input = {
+    index, entry: [{ stopId: "origin", walkSecs: 60 }], exit: [{ stopId: "destination", walkSecs: 30 }],
+    departureMs: Date.parse(departure), deadlineMs: Date.parse(deadline),
+    excludedRoutes: new Set<string>(), excludedModes: new Set<"BUS">(), feedTz: "UTC", wheelchair: false,
+  };
+  expect(findDirectJourneyCandidate(input)?.tripId).toBe("overnight-trip");
+  expect(findDirectJourneyCandidate({ ...input, deadlineMs: input.deadlineMs - 1000 })).toBeUndefined();
+});
