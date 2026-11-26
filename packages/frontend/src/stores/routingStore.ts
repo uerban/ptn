@@ -102,7 +102,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; shownRoutes?: readonly string[]; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
   probeLiveTransfer: (request: LiveTransferProbe) => Promise<{ journey: RtComposedItinerary; queryTime: Date } | null>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
@@ -164,7 +164,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     return journey ? { journey, queryTime: at } : null;
   },
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; firstRide?: FirstRideConstraint & { direct: boolean } }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; shownRoutes?: readonly string[]; firstRide?: FirstRideConstraint & { direct: boolean } }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -221,7 +221,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         ? findDirectJourneyCandidate({
           index: raptorIndex, entry: originStops, exit: destStops,
           departureMs: departureTime.getTime(), deadlineMs: opts.arriveByMs, feedTz: city.tz,
-          excludedRoutes: new Set(excludedRouteIds), excludedModes: new Set(excludedModes),
+          excludedRoutes: new Set([...excludedRouteIds, ...(opts.shownRoutes ?? [])]), excludedModes: new Set(excludedModes),
           wheelchair: mobilityProfile === "wheelchair",
         })
         : undefined;

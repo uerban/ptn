@@ -395,7 +395,7 @@ describe("Arrive-by results", () => {
       emit(state("complete", [LATEST]));
       fireEvent.click(await screen.findByRole("button", { name: "Show alternatives" }));
       fireEvent.click(await screen.findByRole("button", { name: /Take early.*arrives/i }));
-      expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "r-L1", deadline);
+      expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "r-L1", deadline, ["r-L1"]);
       expect(screen.queryByRole("button", { name: /Take overrun/i })).toBeNull();
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(earlier);
       expect(order()).toEqual(["L1"]);

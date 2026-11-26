@@ -19,7 +19,7 @@ interface Props {
   departAtMs?: number;
   arriveByMs?: number;
   feedTz?: string;
-  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number) => Promise<Itinerary[]>;
+  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number, shownRoutes?: readonly string[]) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
 }
 
@@ -40,7 +40,7 @@ export function LaterJourney({
   const batterySaver = import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" && powerMode === "battery-saver";
   const showJourneyAlternatives = useSettingsStore((state) => state.showJourneyAlternatives);
   const canRequest = import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1" && showJourneyAlternatives &&
-    itineraries.length === 1 && !!findLaterPlans && !!firstRide?.routeId && !!firstRide.from.stopId &&
+    (itineraries.length === 1 || (arriveByMs !== undefined && !!findDifferentPlans)) && !!findLaterPlans && !!firstRide?.routeId && !!firstRide.from.stopId &&
     !!firstRide.to.stopId && !primary.cancelled && !primary.timingUnreliable;
   const live = useFirstRideLive(primary);
   const display = deriveItineraryDisplay(primary, {
@@ -62,8 +62,14 @@ export function LaterJourney({
   const later = useRtStore((state) => showAlternative
     ? selectVerifiedLaterJourney(primary, [...itineraries, ...additional].filter((plan) => eligible(plan, state)), constraints)
     : null);
+  const shownRoutesKey = JSON.stringify([...new Set(itineraries.flatMap(plan => {
+    const routeId = plan.legs.find(leg => leg.mode !== "WALK")?.routeId;
+    return routeId ? [routeId] : [];
+  }))].sort());
+  const shownFirstRoutes: string[] = JSON.parse(shownRoutesKey);
   const different = useRtStore((state) => showAlternative && canRequest && requested && completed && firstRide?.routeId
-    ? selectVerifiedDifferentJourney(firstRide.routeId, probe.differentPlans.filter((plan) => eligible(plan, state)), constraints)
+    ? selectVerifiedDifferentJourney(firstRide.routeId, probe.differentPlans.filter((plan) => eligible(plan, state) &&
+      !shownFirstRoutes.includes(plan.legs.find(leg => leg.mode !== "WALK")?.routeId ?? "")), constraints)
     : null);
   const retainedLater = later !== null && itineraries.includes(later);
   const primaryLeaveMs = Date.parse(primary.departureTime);
@@ -98,13 +104,13 @@ export function LaterJourney({
         (arriveByMs === undefined || differentAt < arriveByMs)
         ? await (arriveByMs === undefined
           ? findDifferentPlans(new Date(differentAt), controller.signal, routeId)
-          : findDifferentPlans(new Date(differentAt), controller.signal, routeId, arriveByMs)).catch(() => [])
+          : findDifferentPlans(new Date(differentAt), controller.signal, routeId, arriveByMs, JSON.parse(shownRoutesKey))).catch(() => [])
         : [];
       if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, differentFinder: findDifferentPlans, plans, differentPlans });
     })();
 
     return () => controller.abort();
-  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs, batterySaver]);
+  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs, batterySaver, shownRoutesKey]);
 
   if (!later && !different) {
     if (!canRequest || (missed && !batterySaver) || !Number.isFinite(probeFloor) || !withinDeadline ||

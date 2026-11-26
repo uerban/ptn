@@ -659,9 +659,9 @@ export function SearchPage() {
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
   }, [fromEndpoint, toEndpoint, feedTz, endpointLabels, cityId, ranking, excludedModes, excludedRouteGroupsByCity]);
 
-  const findDifferentPlans = useCallback(async (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number): Promise<Itinerary[]> => {
+  const findDifferentPlans = useCallback(async (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number, shownRoutes?: readonly string[]): Promise<Itinerary[]> => {
     if (!fromEndpoint || !toEndpoint) return [];
-    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, excludeRouteId, arriveByMs });
+    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, excludeRouteId, arriveByMs, shownRoutes });
     if (!results || signal.aborted) return [];
     return convertRaptorResults(results, at, { lat: fromEndpoint.lat, lon: fromEndpoint.lon },
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
