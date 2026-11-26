@@ -39,6 +39,23 @@ function makeItinerary(overrides: Partial<Itinerary> = {}): Itinerary {
 }
 
 describe("RouteResults", () => {
+  it("compares direct arrival against the earliest journey independent of the order", () => {
+    vi.stubEnv("VITE_PTN_DIRECT_TRADEOFF", "1");
+    const direct = makeItinerary({ arrivalTime: "2026-03-03T10:19:00Z" });
+    const transfer = makeItinerary({ transfers: 2 });
+    direct.legs[0] = { ...direct.legs[0], tripId: "direct", arrivalTime: direct.arrivalTime };
+    transfer.legs[0] = { ...transfer.legs[0], tripId: "transfer" };
+    try {
+      render(<BrowserRouter><RouteResults itineraries={[direct, transfer]} onSelect={() => {}} feedTz="UTC" /></BrowserRouter>);
+      const [directCard, transferCard] = screen.getAllByTestId("itinerary-card");
+      expect(directCard).toHaveTextContent("Direct · arrives 4 min later");
+      expect(transferCard).not.toHaveTextContent("arrives 4 min later");
+      expect(directCard).toHaveAccessibleName(/Direct.*arrives 4 min later/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("announces transfer waiting alongside arrival when the comparison is enabled", () => {
     vi.stubEnv("VITE_PTN_TRANSFER_WAIT_COMPARISON", "1");
     const itinerary = makeMixedItinerary();
