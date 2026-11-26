@@ -54,11 +54,20 @@ export function LaterJourney({
   // avoids dispatching speculative work for a missed departure.
   const showAlternative = needsFallback || (canRequest && requested);
   const canProbe = (needsFallback && !batterySaver) || (canRequest && requested);
-  const eligible = (plan: Itinerary, state: ReturnType<typeof useRtStore.getState>) => plan.legs.every((leg) => {
-    const live = leg.tripId ? state.getTripDelay(leg.tripId) : null;
-    return !live || (!live.cancelled && !live.deleted && live.delaySeconds === (leg.appliedDelaySeconds ?? 0));
-  });
-  const constraints = { earliestLeaveMs: Math.max(referenceNowMs, departAtMs ?? referenceNowMs), arriveByMs };
+  const constraints = { earliestLeaveMs: departAtMs ?? -Infinity, arriveByMs };
+  const eligible = (plan: Itinerary, state: ReturnType<typeof useRtStore.getState>) => {
+    if (!plan.legs.every((leg) => {
+      const live = leg.tripId ? state.getTripDelay(leg.tripId) : null;
+      return !live || (!live.cancelled && !live.deleted && live.delaySeconds === (leg.appliedDelaySeconds ?? 0));
+    })) return false;
+    // The planner anchors an access walk at the lookup time. It can still
+    // be retimed until there is no longer enough time to reach the first ride.
+    const { catchStatus } = deriveItineraryDisplay(plan, {
+      referenceNowMs: Math.max(referenceNowMs, constraints.earliestLeaveMs),
+      bufferSeconds, runSpeedRatio,
+    });
+    return catchStatus === "on-time" || catchStatus === "tight" || catchStatus === "hurry";
+  };
   const later = useRtStore((state) => showAlternative
     ? selectVerifiedLaterJourney(primary, [...itineraries, ...additional].filter((plan) => eligible(plan, state)), constraints)
     : null);

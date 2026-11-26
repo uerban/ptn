@@ -1,6 +1,6 @@
 import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import "@testing-library/jest-dom";
 import "fake-indexeddb/auto";
@@ -179,6 +179,45 @@ describe("RouteResults", () => {
       expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "42", deadline, ["42"]);
     } finally {
       clock.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("keeps a verified alternative while its access walk still fits", async () => {
+    vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
+    vi.useFakeTimers();
+    const start = Date.parse("2026-03-03T09:59:00Z");
+    const clock = vi.spyOn(serverTime, "now").mockReturnValue(start);
+    const primary = makeItinerary();
+    const ride = primary.legs[0];
+    Object.assign(ride, {
+      tripId: "primary", routeId: "42", boardStopIdx: 0, alightStopIdx: 1,
+      patternStopIds: ["A", "B"], from: { ...ride.from, stopId: "A" }, to: { ...ride.to, stopId: "B" },
+    });
+    const departureTime = "2026-03-03T10:00:01Z";
+    const arrivalTime = "2026-03-03T10:23:00Z";
+    const later: Itinerary = { ...primary, departureTime, arrivalTime, legs: [
+      { mode: "WALK", from: { ...ride.from, stopId: undefined }, to: ride.from,
+        departureTime, arrivalTime: "2026-03-03T10:02:01Z", durationSeconds: 120 },
+      { ...ride, tripId: "later", departureTime: "2026-03-03T10:08:00Z", arrivalTime },
+    ] };
+    const findLaterPlans = vi.fn(async () => [later]);
+    try {
+      render(<BrowserRouter><RouteResults itineraries={[primary]} onSelect={() => {}}
+        findLaterPlans={findLaterPlans} feedTz="UTC" /></BrowserRouter>);
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "Show alternatives" })));
+      const option = { name: /also leaves at .* arrives at/i };
+      expect(screen.getByRole("button", option)).toBeInTheDocument();
+      clock.mockReturnValue(Date.parse("2026-03-03T10:03:00Z"));
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(screen.getByRole("button", option)).toBeInTheDocument();
+      clock.mockReturnValue(Date.parse("2026-03-03T10:07:00Z"));
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(screen.queryByRole("button", option)).not.toBeInTheDocument();
+      expect(findLaterPlans).toHaveBeenCalledTimes(1);
+    } finally {
+      clock.mockRestore();
+      vi.useRealTimers();
       vi.unstubAllEnvs();
     }
   });
