@@ -151,6 +151,38 @@ describe("RouteResults", () => {
     }
   });
 
+  it("uses the retained later trip while still checking for a distinct Arrive By option", async () => {
+    vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
+    const makeRide = (routeId: string, tripId: string, departureTime: string, arrivalTime: string) => {
+      const plan = makeItinerary({ departureTime, arrivalTime });
+      const leg = plan.legs[0];
+      Object.assign(leg, { routeId, routeShortName: routeId, tripId, departureTime, arrivalTime,
+        boardStopIdx: 0, alightStopIdx: 1, patternStopIds: ["A", "B"],
+        from: { ...leg.from, stopId: "A" }, to: { ...leg.to, stopId: "B" } });
+      return plan;
+    };
+    const primary = makeRide("42", "primary", "2026-03-03T10:00:00Z", "2026-03-03T10:15:00Z");
+    const later = makeRide("42", "later", "2026-03-03T10:08:00Z", "2026-03-03T10:23:00Z");
+    const different = makeRide("43", "different", "2026-03-03T10:02:00Z", "2026-03-03T10:17:00Z");
+    const nowMs = Date.parse(primary.departureTime) - 60_000;
+    const deadline = Date.parse(later.arrivalTime);
+    const clock = vi.spyOn(serverTime, "now").mockReturnValue(nowMs);
+    const findLaterPlans = vi.fn(async () => []);
+    const findDifferentPlans = vi.fn(async () => [different]);
+    try {
+      render(<BrowserRouter><RouteResults itineraries={[primary, later]} onSelect={() => {}}
+        arriveByMs={deadline} findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans} feedTz="UTC" /></BrowserRouter>);
+      fireEvent.click(screen.getByRole("button", { name: "Show alternatives" }));
+      expect(await screen.findByRole("button", { name: /Take 43.*Transfers: 0/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /also leaves at .* arrives at/i })).toBeInTheDocument();
+      expect(findLaterPlans).not.toHaveBeenCalled();
+      expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "42", deadline, ["42"]);
+    } finally {
+      clock.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("opens the exact later plan after a missed departure, within the arrival deadline", async () => {
     vi.stubEnv("VITE_PTN_VERIFIED_LATER_JOURNEY", "1");
     const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse("2026-03-03T10:01:00Z"));

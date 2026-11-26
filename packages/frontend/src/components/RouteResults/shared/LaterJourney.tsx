@@ -78,8 +78,10 @@ export function LaterJourney({
   const lookupFloor = canRequest && !missed ? explicitBoardingFloor : probeFloor;
   const withinDeadline = arriveByMs === undefined ||
     Math.max(referenceNowMs, departAtMs ?? -Infinity, lookupFloor) < arriveByMs;
+  const canProbeDifferent = !batterySaver && requested && canRequest && !!findDifferentPlans;
   useEffect(() => {
-    if (!findLaterPlans || !canProbe || retainedLater || !Number.isFinite(probeFloor) || !withinDeadline) return;
+    if (!findLaterPlans || !canProbe || !Number.isFinite(probeFloor) || !withinDeadline ||
+        (retainedLater && !canProbeDifferent)) return;
     const controller = new AbortController();
     // A rider asking for another option can search explicitly after the
     // planned boarding. A missed departure keeps the earlier access floor.
@@ -92,7 +94,7 @@ export function LaterJourney({
     const alightStopId = ride?.to.stopId;
     if (!routeId || !boardStopId || !alightStopId) return;
     void (async () => {
-      const plans = await findLaterPlans(new Date(departureFloor), controller.signal, {
+      const plans = retainedLater ? [] : await findLaterPlans(new Date(departureFloor), controller.signal, {
         routeId, boardStopId, alightStopId, direct: rides.length === 1,
       }).catch(() => []);
       if (controller.signal.aborted) return;
@@ -100,7 +102,7 @@ export function LaterJourney({
       // the latest-departure recommendation.
       const differentAt = Math.max(serverTime.now(), departAtMs ?? -Infinity,
         arriveByMs === undefined ? primaryLeaveMs : -Infinity);
-      const differentPlans = !batterySaver && requested && canRequest && findDifferentPlans &&
+      const differentPlans = canProbeDifferent &&
         (arriveByMs === undefined || differentAt < arriveByMs)
         ? await (arriveByMs === undefined
           ? findDifferentPlans(new Date(differentAt), controller.signal, routeId)
@@ -110,8 +112,13 @@ export function LaterJourney({
     })();
 
     return () => controller.abort();
-  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs, batterySaver, shownRoutesKey]);
+  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, canProbeDifferent, findDifferentPlans, primaryLeaveMs, shownRoutesKey]);
 
+  const requestButton = <button type="button" className="text-sm text-accent underline" disabled={requested}
+    onClick={() => setRequest({ primary, find: findLaterPlans })}>
+    {requested ? t("search.looking_for_departures", "Checking departures…") :
+      t("search.show_journey_alternatives", "Show alternatives")}
+  </button>;
   if (!later && !different) {
     if (!canRequest || (missed && !batterySaver) || !Number.isFinite(probeFloor) || !withinDeadline ||
       display.catchStatus === "cancelled" || display.catchStatus === "removed") return null;
@@ -119,16 +126,14 @@ export function LaterJourney({
       <div className="px-3 pb-2">
         {requested && completed ? <p role="status" className="text-sm text-fg-secondary">
           {t("search.no_journey_alternative", "No verified alternative found")}
-        </p> : <button type="button" className="text-sm text-accent underline" disabled={requested}
-          onClick={() => setRequest({ primary, find: findLaterPlans })}>
-          {requested ? t("search.looking_for_departures", "Checking departures…") :
-            t("search.show_journey_alternatives", "Show alternatives")}
-        </button>}
+        </p> : requestButton}
       </div>
     );
   }
   return (
     <div className="flex flex-col items-start gap-1 px-3 pb-2">
+      {retainedLater && !different && canRequest && !batterySaver && !!findDifferentPlans &&
+        withinDeadline && !completed && requestButton}
       {later && <button type="button" onClick={() => onSelect(later)} className="text-left text-sm text-accent underline">
         {t("search.later_journey", "Also leaves at {departure} · arrives at {arrival}")
           .replace("{departure}", formatTime(later.legs[0].departureTime, formattingLocale, feedTz))
