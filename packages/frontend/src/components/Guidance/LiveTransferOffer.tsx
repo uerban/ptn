@@ -38,6 +38,7 @@ export function LiveTransferOffer() {
   const remaining = itinerary?.legs.slice(index + 1);
   const destination = remaining?.at(-1)?.to;
   const controller = useRef<AbortController | null>(null);
+  const releaseOfferRoute = useRef<(() => void) | null>(null);
   const [result, setResult] = useState<{ replacement: Itinerary; tail: Itinerary; walkSaved: number; valid: () => boolean }>();
   const [status, setStatus] = useState<"idle" | "busy" | "empty">("idle");
 
@@ -47,6 +48,8 @@ export function LiveTransferOffer() {
     return () => {
       controller.current?.abort();
       controller.current = null;
+      releaseOfferRoute.current?.();
+      releaseOfferRoute.current = null;
     };
   }, [itinerary, index, riderTripId]);
 
@@ -109,6 +112,8 @@ export function LiveTransferOffer() {
           legs.slice(0, index + 1).some((leg) => leg.mode === "WALK" && leg.distanceMeters === undefined),
         transfers: legs.filter((leg) => leg.tripId && !leg.inSeat).length - 1,
       };
+      if (!first.routeId) return;
+      releaseOfferRoute.current = useRtStore.getState().retainRoutes([first.routeId]);
       setResult({ replacement, tail, walkSaved, valid });
     } catch {
       // The optional check never interrupts active guidance.
@@ -126,6 +131,8 @@ export function LiveTransferOffer() {
       <button type="button" className="w-full px-4 py-2 text-left text-accent"
         onClick={() => {
           if (result.valid()) useGuidanceStore.getState().replaceRemainingJourney(itinerary, index, result.replacement);
+          releaseOfferRoute.current?.();
+          releaseOfferRoute.current = null;
           setResult(undefined);
         }}>
         {t("guidance.live_transfer_take", "Take {line} toward {headsign} at {departure} · Arrive {arrival} · {minutes} min less walking")
