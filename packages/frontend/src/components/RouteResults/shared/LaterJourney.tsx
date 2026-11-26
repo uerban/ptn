@@ -8,7 +8,7 @@ import { useTranslation } from "../../../i18n/index.ts";
 import { serverTime } from "../../../services/serverTime.ts";
 import { selectVerifiedDifferentJourney, selectVerifiedLaterJourney } from "../../../services/verifiedLaterJourney.ts";
 import { formatTime } from "./format.ts";
-import { deriveItineraryDisplay } from "./itineraryDisplay.ts";
+import { deriveItineraryDisplay, shownTripSpan } from "./itineraryDisplay.ts";
 
 interface Props {
   itineraries: Itinerary[];
@@ -130,19 +130,22 @@ export function LaterJourney({
       </div>
     );
   }
+  const formatDeparture = (plan: Itinerary) => formatTime(shownTripSpan(plan, deriveItineraryDisplay(plan, {
+    referenceNowMs, bufferSeconds, runSpeedRatio, earliestLeaveMs: departAtMs,
+  })).departureTime, formattingLocale, feedTz);
   return (
     <div className="flex flex-col items-start gap-1 px-3 pb-2">
       {retainedLater && !different && canRequest && !batterySaver && !!findDifferentPlans &&
         withinDeadline && !completed && requestButton}
       {later && <button type="button" onClick={() => onSelect(later)} className="text-left text-sm text-accent underline">
         {t("search.later_journey", "Also leaves at {departure} · arrives at {arrival}")
-          .replace("{departure}", formatTime(later.legs[0].departureTime, formattingLocale, feedTz))
+          .replace("{departure}", formatDeparture(later))
           .replace("{arrival}", formatTime(later.arrivalTime, formattingLocale, feedTz))}
       </button>}
       {different && <button type="button" onClick={() => onSelect(different)} className="text-left text-sm text-accent underline">
         {t("search.different_journey", "Take {lines} · leaves {departure} · arrives {arrival}")
           .replace("{lines}", different.legs.filter((leg) => leg.mode !== "WALK").map((leg) => leg.routeShortName ?? leg.mode).join(" → "))
-          .replace("{departure}", formatTime(different.legs[0].departureTime, formattingLocale, feedTz))
+          .replace("{departure}", formatDeparture(different))
           .replace("{arrival}", formatTime(different.arrivalTime, formattingLocale, feedTz))}
         {" · "}{t("search.alternative_transfer_count", "Transfers: {n}").replace("{n}", String(different.transfers))}
       </button>}
