@@ -56,17 +56,23 @@ export function findDirectJourneyCandidate(input: {
           if (isTripUnavailable?.(trip.tripId)) continue;
           for (const { active, shift } of days) {
             if (!active.has(trip.serviceId) || dep + shift < frame.nowSecs + walkSecs || dep + shift > deadline) continue;
+            // Compare departures by deadline proximity only after finding the
+            // quickest finish for this boarding occurrence.
+            let finish: { stop: string; arrival: number; walking: number } | undefined;
             for (const { stop, pos, walk } of downstream) {
               const arrival = trip.departureSecs[pos] - (trip.dwellSecs?.[pos] ?? 0);
               if (!Number.isFinite(arrival) || arrival < dep || (trip.dropOffTypes?.[pos] ?? 0) !== 0) continue;
               const doorArrival = arrival + walk + shift;
               const walking = walkSecs + walk;
-              if (doorArrival > deadline || (best && (doorArrival < best.arrival ||
-                  (doorArrival === best.arrival && walking >= best.walking)))) continue;
-              best = { arrival: doorArrival, walking, ride: {
-                routeId: pattern.id, boardStopId: stopId, alightStopId: stop, tripId: trip.tripId,
-              } };
+              if (doorArrival > deadline || (finish && (doorArrival > finish.arrival ||
+                  (doorArrival === finish.arrival && walking >= finish.walking)))) continue;
+              finish = { stop, arrival: doorArrival, walking };
             }
+            if (!finish || (best && (finish.arrival < best.arrival ||
+                (finish.arrival === best.arrival && finish.walking >= best.walking)))) continue;
+            best = { arrival: finish.arrival, walking: finish.walking, ride: {
+              routeId: pattern.id, boardStopId: stopId, alightStopId: finish.stop, tripId: trip.tripId,
+            } };
           }
         }
       }

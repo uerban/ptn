@@ -24,6 +24,15 @@ it("finds an alternate exact direct trip using the door-arrival deadline and rou
   expect(findDirectJourneyCandidate({ ...input, excludedRoutes: new Set() })).toEqual({
     routeId: "best", tripId: "best-trip", boardStopId: "origin", alightStopId: "destination",
   });
+  // A slower walk from another stop on the same ride must not move
+  // that boarding closer to the deadline or change the chosen exit.
+  routes[0].stopIds.splice(1, 0, "long-walk");
+  routes[0].trips[0].departureSecs.splice(1, 0, 36_600);
+  routes[0].trips[0].dwellSecs!.splice(1, 0, 0);
+  expect(findDirectJourneyCandidate({
+    ...input, deadlineMs: input.deadlineMs + 60_000, excludedRoutes: new Set(["overrun"]),
+    exit: [...input.exit, { stopId: "long-walk", walkSecs: 660 }],
+  })?.alightStopId).toBe("destination");
   expect(findDirectJourneyCandidate({ ...input, excludedRoutes: new Set(["best"]) })?.tripId).toBe("backup-trip");
   expect(findDirectJourneyCandidate({
     ...input, excludedRoutes: new Set(), isTripUnavailable: tripId => tripId === "best-trip",
