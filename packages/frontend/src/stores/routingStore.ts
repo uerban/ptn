@@ -1,4 +1,7 @@
-import type { FirstRideConstraint } from "@pt/shared";
+import type { FirstRideConstraint, RaptorTransitLeg } from "@pt/shared";
+import { minTransferSecsFor } from "@pt/shared/routing";
+import { findLiveTransferCandidate } from "../services/liveTransferCandidate.ts";
+import { serviceDayFrame } from "../services/serviceDayFrame.ts";
 import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
 import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
 import { captureCityData, StaleCityDataError } from "../services/cityData.ts";
@@ -45,6 +48,16 @@ function isEngineError(err: unknown): boolean {
     || err instanceof PtWasmTransfersError;
 }
 
+interface LiveTransferProbe {
+  incoming: Pick<RaptorTransitLeg, "toStopId" | "routeId" | "tripId">;
+  incomingScheduledArrivalMs: number;
+  origin: Extract<BaseEndpoint, { kind: "stop" }>;
+  destination: BaseEndpoint;
+  alightStopIds: ReadonlySet<string>;
+  latestBoardMs: number;
+  signal: AbortSignal;
+}
+
 interface RoutingState {
   results: RtComposedItinerary[];
   loading: boolean;
@@ -89,6 +102,7 @@ interface RoutingState {
    * planner (the per-event "Search on the server" consent; ).
    */
   search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
+  probeLiveTransfer: (request: LiveTransferProbe) => Promise<{ journey: RtComposedItinerary; queryTime: Date } | null>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -110,6 +124,44 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   backendAssist: false,
   origin: null,
   destination: null,
+
+  async probeLiveTransfer(request) {
+    const { raptorIndex, loadedCityId } = useGtfsDataStore.getState();
+    const city = useCityStore.getState().activeCity;
+    if (request.signal.aborted || request.origin.stopId !== request.incoming.toStopId ||
+        !raptorIndex || (loadedCityId != null && loadedCityId !== city.id)) return null;
+    const settings = useSettingsStore.getState();
+    const excludedRouteIds = new Set(excludedRouteIdsForCity(raptorIndex, city, settings));
+    const excludedModes = new Set(effectiveExcludedModes(settings, city.defaultExcludedModes));
+    const discover = () => findLiveTransferCandidate({
+      ...request, excludedRouteIds, excludedModes, index: raptorIndex, realtime: useRtStore.getState(), feedTz: city.tz,
+      minTransferSecs: minTransferSecsFor(settings.mobilityProfile), nowMs: Date.now(),
+    });
+    const candidate = discover();
+    if (!candidate) return null;
+    const at = new Date(candidate.scheduledBoardMs);
+    const results = await get().search(request.origin, request.destination, at, {
+      probe: request.signal, firstRide: { ...candidate.firstRide, direct: false },
+    });
+    if (!results || request.signal.aborted || useCityStore.getState().activeCity.id !== city.id ||
+        useGtfsDataStore.getState().raptorIndex !== raptorIndex || useSettingsStore.getState() !== settings) return null;
+    const refreshed = discover();
+    if (!refreshed || refreshed.firstRide.tripId !== candidate.firstRide.tripId ||
+        refreshed.firstRide.alightStopId !== candidate.firstRide.alightStopId ||
+        refreshed.scheduledBoardMs !== candidate.scheduledBoardMs ||
+        refreshed.predictedBoardMs !== candidate.predictedBoardMs ||
+        refreshed.predictedAlightMs !== candidate.predictedAlightMs) return null;
+    const frame = serviceDayFrame(at.getTime() / 1000, city.tz);
+    const originMs = at.getTime() - frame.nowSecs * 1000;
+    const journey = results.find(({ legs }) => {
+      const first = legs[0];
+      return first?.type === "transit" && first.tripId === candidate.firstRide.tripId &&
+        first.fromStopId === candidate.firstRide.boardStopId && first.toStopId === candidate.firstRide.alightStopId &&
+        originMs + first.departSecs * 1000 === candidate.predictedBoardMs &&
+        originMs + first.arriveSecs * 1000 === candidate.predictedAlightMs;
+    });
+    return journey ? { journey, queryTime: at } : null;
+  },
 
   async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) {
     const probe = opts?.probe;
