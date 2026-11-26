@@ -1,8 +1,6 @@
-import { findDirectJourneyCandidate } from "../services/directJourneyCandidate.ts";
 import type { FirstRideConstraint, RaptorTransitLeg } from "@pt/shared";
 import { minTransferSecsFor } from "@pt/shared/routing";
 import { findLiveTransferCandidate } from "../services/liveTransferCandidate.ts";
-import { NEXT_DEPARTURE_FRESHNESS_WINDOW_MS } from "../services/nextDeparture.ts";
 import { serviceDayFrame } from "../services/serviceDayFrame.ts";
 import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
 import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
@@ -218,27 +216,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
       const excludedProbeRoute = probe ? opts?.excludeRouteId : undefined;
       if (excludedProbeRoute && !excludedRouteIds.includes(excludedProbeRoute)) excludedRouteIds.push(excludedProbeRoute);
-      const realtime = useRtStore.getState();
-      const realtimeNow = Date.now();
-      const directCandidate = excludedProbeRoute && opts?.arriveByMs !== undefined
-        ? findDirectJourneyCandidate({
-          index: raptorIndex, entry: originStops, exit: destStops,
-          departureMs: departureTime.getTime(), deadlineMs: opts.arriveByMs, feedTz: city.tz,
-          excludedRoutes: new Set([...excludedRouteIds, ...(opts.shownRoutes ?? [])]), excludedModes: new Set(excludedModes),
-          wheelchair: mobilityProfile === "wheelchair",
-          isTripUnavailable: tripId => {
-            const update = realtime.getTripDelay(tripId);
-            if (update?.deleted) return true;
-            if (!update?.cancelled) return false;
-            const receivedAt = realtime.getReceivedAt(tripId);
-            return receivedAt == null || realtimeNow - receivedAt < NEXT_DEPARTURE_FRESHNESS_WINDOW_MS;
-          },
-        })
-        : undefined;
-      // Multi-result Arrive By already has a portfolio. Spend the extra
-      // planner call only on an identified direct ride that it lacks.
-      if (excludedProbeRoute && (opts?.shownRoutes?.length ?? 0) > 1 && !directCandidate) return [];
-      const firstRide = probe ? opts?.firstRide ?? (directCandidate && { ...directCandidate, direct: true }) : undefined;
+      const firstRide = probe ? opts?.firstRide : undefined;
       if (firstRide && excludedRouteIds.includes(firstRide.routeId)) return;
       if (firstRide?.direct) {
         // Other lines can dominate the result set even when a later trip on
@@ -312,6 +290,9 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         destination: endpointCoord(destination),
         departureTime,
         ranking,
+        ...(excludedProbeRoute && opts?.arriveByMs !== undefined ? {
+          directAlternative: { deadlineMs: opts.arriveByMs, shownRoutes: opts.shownRoutes ?? [] },
+        } : {}),
         ...(firstRide?.direct ? { maxRounds: 1 } : {}),
         firstRide: firstRide && { routeId: firstRide.routeId, boardStopId: firstRide.boardStopId,
           alightStopId: firstRide.alightStopId, ...(firstRide.tripId ? { tripId: firstRide.tripId } : {}) },

@@ -1,3 +1,5 @@
+import { findDirectJourneyCandidate } from "./directJourneyCandidate.ts";
+import { NEXT_DEPARTURE_FRESHNESS_WINDOW_MS } from "./nextDeparture.ts";
 import type { FirstRideConstraint } from "@pt/shared";
 import {captureTransferFloorState} from "./transferFloorState.ts";
 import {SearchPipelineCapture, type PipelineCapture} from "./searchPipelineCapture.ts";
@@ -66,6 +68,7 @@ export interface SearchConfig {
   getDelay: (tripId: string) => {
     delaySeconds: number;
     cancelled: boolean;
+    deleted?: boolean;
     receivedAt?: number;
   } | null;
   osrm: Pick<OsrmWasmClient, "isReady" | "table" | "init">;
@@ -105,6 +108,7 @@ export interface SearchQuery {
   ranking: RankingCriteria;
   maxRounds?: number;
   firstRide?: FirstRideConstraint;
+  directAlternative?: { deadlineMs: number; shownRoutes: readonly string[] };
   /**
    * Stop id the origin coordinate resolves to, when the caller's endpoint
    * was a `stop`-kind endpoint. Used by the OSM-walk override on
@@ -296,6 +300,24 @@ export class SearchOrchestrator {
     await this.awaitOsrm();
 
     const { entryStops, exitStops } = await this.findEndpointStops(query, trace);
+    const { directAlternative } = query;
+    const realtimeNow = Date.now();
+    const direct = directAlternative && findDirectJourneyCandidate({
+      index: raptorIndex, entry: entryStops, exit: exitStops,
+      departureMs: query.departureTime.getTime(), deadlineMs: directAlternative.deadlineMs,
+      feedTz: this.config.feedTz ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      excludedRoutes: new Set([...(this.config.excludedRouteIds ?? []), ...directAlternative.shownRoutes]),
+      excludedModes: new Set(this.config.excludedModes),
+      wheelchair: this.config.mobilityProfile === "wheelchair",
+      isTripUnavailable: tripId => {
+        const update = this.config.getDelay(tripId);
+        return !!(update?.deleted || (update?.cancelled &&
+          (update.receivedAt === undefined || realtimeNow - update.receivedAt < NEXT_DEPARTURE_FRESHNESS_WINDOW_MS)));
+      },
+    });
+    // A diverse portfolio only needs a probe when it lacks an identified direct ride.
+    if (!direct && directAlternative && directAlternative.shownRoutes.length > 1) return [];
+    const firstRide = query.firstRide ?? direct;
     const pedestrianRoute = this.config.directWalkRoute
       ? await optionalPedestrianRoute(() => this.config.directWalkRoute!(query.origin, query.destination)) : null;
     trace?.direct(pedestrianRoute);
@@ -331,11 +353,11 @@ export class SearchOrchestrator {
       exitStops: exitStops.map((s) => ({ stopId: s.stopId, walkSecs: s.walkSecs })),
       departureSecs,
       activeServiceIds,
-      maxRounds: query.maxRounds,
+      maxRounds: direct ? 1 : query.maxRounds,
       mobilityProfile: this.config.mobilityProfile,
       excludedModes: this.config.excludedModes,
       excludedRouteIds: this.config.excludedRouteIds,
-      ...(query.firstRide ? { firstRide: query.firstRide } : {}),
+      ...(firstRide ? { firstRide } : {}),
       // The engine's transfer walks at the rider's pace, as the entry and exit
       // walks above, and the profile's minimum transfer.
       walkSpeedMps: riderWalkSpeedMps(this.config.mobilityProfile, walkSpeedMps),
