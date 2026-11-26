@@ -105,7 +105,7 @@ export function LaterJourney({
     return (
       <div className="px-3 pb-2">
         {requested && completed ? <p role="status" className="text-sm text-fg-secondary">
-          {t("search.no_later_journey", "No later journey found")}
+          {t("search.no_journey_alternative", "No verified alternative found")}
         </p> : <button type="button" className="text-sm text-accent underline" disabled={requested}
           onClick={() => setRequest({ primary, find: findLaterPlans })}>
           {requested ? t("search.looking_for_departures", "Checking departures…") :
