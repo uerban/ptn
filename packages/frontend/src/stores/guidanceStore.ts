@@ -26,6 +26,7 @@ interface GuidanceState {
   completedItinerary: Itinerary | null;
 
   startNavigation: (itinerary: Itinerary) => void;
+  replaceRemainingJourney: (expected: Itinerary, legIndex: number, replacement: Itinerary) => boolean;
   stopNavigation: () => void;
   advanceLeg: () => void;
   enterRiderMode: (activation: RiderModeActivation, tripId: string) => void;
@@ -47,6 +48,11 @@ function computeLegStatuses(
     if (i === currentIndex + 1) return "upcoming";
     return "future";
   });
+}
+
+function subscribeItineraryRoutes(itinerary: Itinerary, fromLeg = 0): void {
+  const routes = itinerary.legs.slice(fromLeg).flatMap((leg) => leg.tripId && leg.routeId ? [leg.routeId] : []);
+  useRtStore.getState().subscribeRoutes([...new Set(routes)]);
 }
 
 const initialState = {
@@ -81,15 +87,26 @@ export const useGuidanceStore = create<GuidanceState>()((set, get) => ({
     // endpoint is /rt/<routeId> and answers with every trip on that route;
     // subscribing trip ids asked for routes that don't exist, so guidance
     // never received live data at all.
-    const routeIds = [
-      ...new Set(
-        itinerary.legs.filter((leg) => leg.tripId && leg.routeId).map((leg) => leg.routeId!),
-      ),
-    ];
-    // Replace guidance's previous routes even for a walk-only itinerary.
-    // The RT store preserves routes independently retained by other surfaces.
-    useRtStore.getState().subscribeRoutes(routeIds);
+    // Independent route holds in the RT store survive replacing this list.
+    subscribeItineraryRoutes(itinerary);
     useRtStore.getState().setMode("navigating");
+  },
+
+  replaceRemainingJourney: (expected, legIndex, replacement) => {
+    const state = get();
+    const current = expected.legs[legIndex];
+    const next = replacement.legs[legIndex + 1];
+    if (state.itinerary !== expected || state.currentLegIndex !== legIndex ||
+        state.phase !== "riderMode" || !current?.tripId || current.tripId !== state.riderTripId ||
+        !current.to.stopId || next?.from.stopId !== current.to.stopId || !next.tripId || next.mode === "WALK" ||
+        replacement.cancelled || replacement.timingUnreliable ||
+        expected.legs.slice(0, legIndex + 1).some((leg, index) => replacement.legs[index] !== leg)) return false;
+    set({
+      itinerary: replacement,
+      legStatuses: computeLegStatuses(replacement.legs.length, legIndex),
+    });
+    subscribeItineraryRoutes(replacement, legIndex);
+    return true;
   },
 
   stopNavigation: () => {

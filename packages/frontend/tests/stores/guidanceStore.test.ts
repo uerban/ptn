@@ -91,6 +91,32 @@ describe("guidanceStore", () => {
     expect(state.legStatuses).toEqual(["completed", "current", "upcoming"]);
   });
 
+  it("switches the remaining legs without losing the current ride or its live subscription", () => {
+    const ride = { ...mockItinerary.legs[1], routeId: "original" };
+    const droppedRide = { ...ride, routeId: "dropped", tripId: "old", from: ride.to };
+    const plan = { ...mockItinerary, legs: [mockItinerary.legs[0], ride, droppedRide] };
+    const connection = { ...ride, routeId: "connection", tripId: "new", from: ride.to,
+      departureTime: "2026-03-28T10:22:00Z", arrivalTime: "2026-03-28T10:25:00Z" };
+    const replacement = { ...plan, legs: [plan.legs[0], ride, connection] };
+    const subscribeRoutes = vi.spyOn(useRtStore.getState(), "subscribeRoutes");
+    try {
+      useGuidanceStore.getState().startNavigation(plan);
+      useGuidanceStore.getState().advanceLeg();
+      expect(useGuidanceStore.getState().replaceRemainingJourney(plan, 1, replacement)).toBe(false);
+      useGuidanceStore.getState().enterRiderMode("manual", "trip_1");
+      const progress = useGuidanceStore.getState().transitProgress;
+      expect(useGuidanceStore.getState().replaceRemainingJourney(plan, 1, replacement)).toBe(true);
+      expect(useGuidanceStore.getState()).toMatchObject({
+        itinerary: replacement, currentLegIndex: 1, phase: "riderMode",
+        riderTripId: "trip_1", transitProgress: progress, legStatuses: ["completed", "current", "upcoming"],
+      });
+      expect(subscribeRoutes).toHaveBeenLastCalledWith(["original", "connection"]);
+      expect(useGuidanceStore.getState().replaceRemainingJourney(plan, 1, replacement)).toBe(false);
+    } finally {
+      subscribeRoutes.mockRestore();
+    }
+  });
+
   it("advanceLeg marks upcoming legs correctly", () => {
     useGuidanceStore.getState().startNavigation(mockItinerary);
     useGuidanceStore.getState().advanceLeg();
