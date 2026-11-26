@@ -85,7 +85,10 @@ export function LaterJourney({
         routeId, boardStopId, alightStopId, direct: rides.length === 1,
       }).catch(() => []);
       if (controller.signal.aborted) return;
-      const differentAt = Math.max(serverTime.now(), departAtMs ?? -Infinity, primaryLeaveMs);
+      // A valid Arrive By alternative can require leaving earlier than
+      // the latest-departure recommendation.
+      const differentAt = Math.max(serverTime.now(), departAtMs ?? -Infinity,
+        arriveByMs === undefined ? primaryLeaveMs : -Infinity);
       const differentPlans = requested && canRequest && findDifferentPlans &&
         (arriveByMs === undefined || differentAt < arriveByMs)
         ? await findDifferentPlans(new Date(differentAt), controller.signal, routeId).catch(() => [])

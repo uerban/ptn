@@ -367,6 +367,43 @@ describe("Arrive-by results", () => {
     }
   });
 
+  it("offers an earlier different route on request while enforcing the applied deadline", async () => {
+    vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
+    const deadline = Date.parse("2026-10-12T07:00:00Z");
+    const nowMs = Date.parse("2026-10-12T06:00:00Z");
+    const clock = vi.spyOn(serverTime, "now").mockReturnValue(nowMs);
+    const ctx = {
+      serviceDate: SCOPE.serviceDate, tz: TZ, origin: ORIGIN, destination: DEST,
+      labels: { origin: "A", destination: "B" }, stops: new Map(), headsigns: new Map(),
+      routeColors: new Map(), runToCatchStops: new Set<string>(),
+    };
+    const earlier = arriveByItinerary(option("early", 32700, 3240, []), ctx);
+    const overrun = arriveByItinerary(option("overrun", 32700, 3360, []), ctx);
+    const findLaterPlans = vi.fn(async () => []);
+    const findDifferentPlans = vi.fn(async () => [overrun, earlier]);
+    const onSelect = vi.fn();
+    useArriveByUi.setState({ appliedMs: deadline });
+    try {
+      render(<MemoryRouter>
+        <ArriveByResults origin={ORIGIN} destination={DEST} onSelect={onSelect}
+          findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans}><div /></ArriveByResults>
+      </MemoryRouter>);
+      await waitFor(() => expect(runs).toHaveLength(1));
+      emit(state("latest", [LATEST]));
+      await waitFor(() => expect(order()).toEqual(["L1"]));
+      expect(screen.queryByRole("button", { name: "Show alternatives" })).toBeNull();
+      emit(state("complete", [LATEST]));
+      fireEvent.click(await screen.findByRole("button", { name: "Show alternatives" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Take early.*arrives/i }));
+      expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "r-L1");
+      expect(screen.queryByRole("button", { name: /Take overrun/i })).toBeNull();
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(earlier);
+      expect(order()).toEqual(["L1"]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("switches the applied search to closest arrival and renders its result", async () => {
     vi.stubEnv("VITE_PTN_CLOSEST_ARRIVAL", "1");
     render(<Page />);

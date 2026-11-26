@@ -1910,7 +1910,7 @@ export function SearchPage() {
         ) : ArriveByResults ? (
           // Opt-in build only: an applied arrive-by deadline replaces the list.
           <ArriveByResults origin={fromEndpoint} destination={toEndpoint} onSelect={handleItinerarySelect}
-            findLaterPlans={findLaterPlans}>
+            findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans}>
             {normalResults}
           </ArriveByResults>
         ) : (
