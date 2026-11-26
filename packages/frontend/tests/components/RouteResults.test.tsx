@@ -166,18 +166,25 @@ describe("RouteResults", () => {
     const different = makeRide("43", "different", "2026-03-03T10:02:00Z", "2026-03-03T10:17:00Z");
     const nowMs = Date.parse(primary.departureTime) - 60_000;
     const deadline = Date.parse(later.arrivalTime);
+    vi.useFakeTimers();
     const clock = vi.spyOn(serverTime, "now").mockReturnValue(nowMs);
     const findLaterPlans = vi.fn(async () => []);
     const findDifferentPlans = vi.fn(async () => [different]);
     try {
       render(<BrowserRouter><RouteResults itineraries={[primary, later]} onSelect={() => {}}
         arriveByMs={deadline} findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans} feedTz="UTC" /></BrowserRouter>);
-      fireEvent.click(screen.getByRole("button", { name: "Show alternatives" }));
-      expect(await screen.findByRole("button", { name: /Take 43.*Transfers: 0/i })).toBeInTheDocument();
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "Show alternatives" })));
+      expect(screen.getByRole("button", { name: /Take 43.*Transfers: 0/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /also leaves at .* arrives at/i })).toBeInTheDocument();
       expect(findLaterPlans).not.toHaveBeenCalled();
       expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "42", deadline, ["42"]);
+      clock.mockReturnValue(Date.parse("2026-03-03T10:09:00Z"));
+      await act(async () => vi.advanceTimersByTime(10_000));
+      expect(screen.queryByRole("button", { name: /also leaves at/i })).not.toBeInTheDocument();
+      expect(findLaterPlans).not.toHaveBeenCalled();
+      expect(findDifferentPlans).toHaveBeenCalledTimes(1);
     } finally {
+      vi.useRealTimers();
       clock.mockRestore();
       vi.unstubAllEnvs();
     }

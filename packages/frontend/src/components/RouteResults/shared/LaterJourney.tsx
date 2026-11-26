@@ -31,9 +31,12 @@ export function LaterJourney({
   const [request, setRequest] = useState<{ primary: Itinerary; find: Props["findLaterPlans"] }>();
   const requested = request?.primary === primary && request.find === findLaterPlans;
   const [probe, setProbe] = useState<{
-    primary: Itinerary; find: NonNullable<Props["findLaterPlans"]>; differentFinder: Props["findDifferentPlans"]; plans: Itinerary[]; differentPlans: Itinerary[];
+    primary: Itinerary; find: NonNullable<Props["findLaterPlans"]>; differentFinder: Props["findDifferentPlans"]; requested: boolean; plans: Itinerary[]; differentPlans: Itinerary[];
   }>();
   const completed = probe?.primary === primary && probe.find === findLaterPlans && probe.differentFinder === findDifferentPlans;
+  // An automatic fallback can be followed by a rider request, but a
+  // completed lookup must not restart when an option expires.
+  const completedForTrigger = completed && (!requested || probe.requested);
   const additional = completed ? probe.plans : [];
   const firstRide = primary.legs.find((leg) => leg.mode !== "WALK");
   const powerMode = useSettingsStore((state) => state.searchPowerMode);
@@ -89,7 +92,7 @@ export function LaterJourney({
     Math.max(referenceNowMs, departAtMs ?? -Infinity, lookupFloor) < arriveByMs;
   const canProbeDifferent = !batterySaver && requested && canRequest && !!findDifferentPlans;
   useEffect(() => {
-    if (!findLaterPlans || !canProbe || !Number.isFinite(probeFloor) || !withinDeadline ||
+    if (completedForTrigger || !findLaterPlans || !canProbe || !Number.isFinite(probeFloor) || !withinDeadline ||
         (retainedLater && !canProbeDifferent)) return;
     const controller = new AbortController();
     // A rider asking for another option can search explicitly after the
@@ -117,11 +120,11 @@ export function LaterJourney({
           ? findDifferentPlans(new Date(differentAt), controller.signal, routeId)
           : findDifferentPlans(new Date(differentAt), controller.signal, routeId, arriveByMs, JSON.parse(shownRoutesKey))).catch(() => [])
         : [];
-      if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, differentFinder: findDifferentPlans, plans, differentPlans });
+      if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, differentFinder: findDifferentPlans, requested, plans, differentPlans });
     })();
 
     return () => controller.abort();
-  }, [findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, canProbeDifferent, findDifferentPlans, primaryLeaveMs, shownRoutesKey]);
+  }, [completedForTrigger, requested, findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, canProbeDifferent, findDifferentPlans, primaryLeaveMs, shownRoutesKey]);
 
   const requestButton = <button type="button" className="text-sm text-accent underline" disabled={requested}
     onClick={() => setRequest({ primary, find: findLaterPlans })}>
