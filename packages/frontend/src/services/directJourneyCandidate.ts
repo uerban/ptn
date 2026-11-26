@@ -18,8 +18,9 @@ export function findDirectJourneyCandidate(input: {
   excludedRoutes: ReadonlySet<string>;
   excludedModes: ReadonlySet<TransportMode>;
   wheelchair: boolean;
+  isTripUnavailable?: (tripId: string) => boolean;
 }): FirstRideConstraint | undefined {
-  const { index, entry, exit, departureMs, deadlineMs, feedTz, excludedRoutes, excludedModes, wheelchair } = input;
+  const { index, entry, exit, departureMs, deadlineMs, feedTz, excludedRoutes, excludedModes, wheelchair, isTripUnavailable } = input;
   if (!index.patterns || !index.patternsAtStop || deadlineMs <= departureMs) return;
   const start = Math.floor(departureMs / 1000);
   const frame = serviceDayFrame(start, feedTz);
@@ -52,6 +53,7 @@ export function findDirectJourneyCandidate(input: {
               (trip.pickupTypes?.[board] ?? 0) !== 0 ||
               (wheelchair && trip.wheelchairAccessible === 2) ||
               (trip.ptbTripIdx !== undefined && index.frequenciesByTrip?.has(trip.ptbTripIdx))) continue;
+          if (isTripUnavailable?.(trip.tripId)) continue;
           for (const { active, shift } of days) {
             if (!active.has(trip.serviceId) || dep + shift < frame.nowSecs + walkSecs || dep + shift > deadline) continue;
             for (const { stop, pos, walk } of downstream) {

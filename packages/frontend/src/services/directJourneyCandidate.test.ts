@@ -26,6 +26,9 @@ it("finds an alternate exact direct trip using the door-arrival deadline and rou
   });
   expect(findDirectJourneyCandidate({ ...input, excludedRoutes: new Set(["best"]) })?.tripId).toBe("backup-trip");
   expect(findDirectJourneyCandidate({
+    ...input, excludedRoutes: new Set(), isTripUnavailable: tripId => tripId === "best-trip",
+  })?.tripId).toBe("backup-trip");
+  expect(findDirectJourneyCandidate({
     ...input, excludedRoutes: new Set(), departureMs: input.departureMs + 1000,
   })).toBeUndefined();
 });

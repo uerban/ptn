@@ -2,6 +2,7 @@ import { findDirectJourneyCandidate } from "../services/directJourneyCandidate.t
 import type { FirstRideConstraint, RaptorTransitLeg } from "@pt/shared";
 import { minTransferSecsFor } from "@pt/shared/routing";
 import { findLiveTransferCandidate } from "../services/liveTransferCandidate.ts";
+import { NEXT_DEPARTURE_FRESHNESS_WINDOW_MS } from "../services/nextDeparture.ts";
 import { serviceDayFrame } from "../services/serviceDayFrame.ts";
 import { optionalPedestrianRoute } from "../services/pedestrianEvidence.ts";
 import { walkGraphClient, walkProfileFor } from "../services/walkGraphClient.ts";
@@ -217,12 +218,21 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
       const excludedProbeRoute = probe ? opts?.excludeRouteId : undefined;
       if (excludedProbeRoute && !excludedRouteIds.includes(excludedProbeRoute)) excludedRouteIds.push(excludedProbeRoute);
+      const realtime = useRtStore.getState();
+      const realtimeNow = Date.now();
       const directCandidate = excludedProbeRoute && opts?.arriveByMs !== undefined
         ? findDirectJourneyCandidate({
           index: raptorIndex, entry: originStops, exit: destStops,
           departureMs: departureTime.getTime(), deadlineMs: opts.arriveByMs, feedTz: city.tz,
           excludedRoutes: new Set([...excludedRouteIds, ...(opts.shownRoutes ?? [])]), excludedModes: new Set(excludedModes),
           wheelchair: mobilityProfile === "wheelchair",
+          isTripUnavailable: tripId => {
+            const update = realtime.getTripDelay(tripId);
+            if (update?.deleted) return true;
+            if (!update?.cancelled) return false;
+            const receivedAt = realtime.getReceivedAt(tripId);
+            return receivedAt == null || realtimeNow - receivedAt < NEXT_DEPARTURE_FRESHNESS_WINDOW_MS;
+          },
         })
         : undefined;
       // Multi-result Arrive By already has a portfolio. Spend the extra
