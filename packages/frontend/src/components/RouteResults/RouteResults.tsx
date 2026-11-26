@@ -69,7 +69,7 @@ interface RouteResultsProps {
   departAt?: Date | null;
   arriveByMs?: number;
   findInterchangeablePlans?: (primary: Itinerary, signal: AbortSignal) => Promise<Itinerary[]>;
-  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string) => Promise<Itinerary[]>;
+  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;

@@ -19,7 +19,7 @@ interface Props {
   departAtMs?: number;
   arriveByMs?: number;
   feedTz?: string;
-  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string) => Promise<Itinerary[]>;
+  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string, arriveByMs?: number) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
 }
 
@@ -96,7 +96,9 @@ export function LaterJourney({
         arriveByMs === undefined ? primaryLeaveMs : -Infinity);
       const differentPlans = !batterySaver && requested && canRequest && findDifferentPlans &&
         (arriveByMs === undefined || differentAt < arriveByMs)
-        ? await findDifferentPlans(new Date(differentAt), controller.signal, routeId).catch(() => [])
+        ? await (arriveByMs === undefined
+          ? findDifferentPlans(new Date(differentAt), controller.signal, routeId)
+          : findDifferentPlans(new Date(differentAt), controller.signal, routeId, arriveByMs)).catch(() => [])
         : [];
       if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, differentFinder: findDifferentPlans, plans, differentPlans });
     })();

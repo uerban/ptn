@@ -1,3 +1,4 @@
+import { findDirectJourneyCandidate } from "../services/directJourneyCandidate.ts";
 import type { FirstRideConstraint, RaptorTransitLeg } from "@pt/shared";
 import { minTransferSecsFor } from "@pt/shared/routing";
 import { findLiveTransferCandidate } from "../services/liveTransferCandidate.ts";
@@ -101,7 +102,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
   probeLiveTransfer: (request: LiveTransferProbe) => Promise<{ journey: RtComposedItinerary; queryTime: Date } | null>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
@@ -163,7 +164,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     return journey ? { journey, queryTime: at } : null;
   },
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; arriveByMs?: number; firstRide?: FirstRideConstraint & { direct: boolean } }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -216,7 +217,15 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
       const excludedProbeRoute = probe ? opts?.excludeRouteId : undefined;
       if (excludedProbeRoute && !excludedRouteIds.includes(excludedProbeRoute)) excludedRouteIds.push(excludedProbeRoute);
-      const firstRide = probe ? opts?.firstRide : undefined;
+      const directCandidate = excludedProbeRoute && opts?.arriveByMs !== undefined
+        ? findDirectJourneyCandidate({
+          index: raptorIndex, entry: originStops, exit: destStops,
+          departureMs: departureTime.getTime(), deadlineMs: opts.arriveByMs, feedTz: city.tz,
+          excludedRoutes: new Set(excludedRouteIds), excludedModes: new Set(excludedModes),
+          wheelchair: mobilityProfile === "wheelchair",
+        })
+        : undefined;
+      const firstRide = probe ? opts?.firstRide ?? (directCandidate && { ...directCandidate, direct: true }) : undefined;
       if (firstRide && excludedRouteIds.includes(firstRide.routeId)) return;
       if (firstRide?.direct) {
         // Other lines can dominate the result set even when a later trip on
