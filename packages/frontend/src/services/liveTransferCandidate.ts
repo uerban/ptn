@@ -35,6 +35,45 @@ function freshDelay(realtime: RtStoreLite, tripId: string, nowMs: number): numbe
   return update.delaySeconds;
 }
 
+function transferServiceDays(index: RaptorIndex, nowMs: number, feedTz: string) {
+  const nowSecs = Math.floor(nowMs / 1000);
+  const frame = serviceDayFrame(nowSecs, feedTz);
+  const todayOrigin = (nowSecs - frame.nowSecs) * 1000;
+  return [
+    { origin: todayOrigin, active: resolveActiveServicesForYmd(index.services, frame.todayYmd) },
+    { origin: todayOrigin - frame.yesterdayShiftSecs * 1000, active: resolveActiveServicesForYmd(index.services, frame.yesterdayYmd) },
+  ];
+}
+
+/** Limit optional acquisition to the two lines with eligible timetable
+ * departures closest to the incoming scheduled arrival. */
+export function liveTransferRouteIds(index: RaptorIndex, board: string, alight: ReadonlySet<string>,
+  excludedRoutes: ReadonlySet<string>, excludedModes: ReadonlySet<TransportMode>, arrivalMs: number,
+  latestBoardMs: number, feedTz: string): string[] {
+  const routes = new Map<string, number>();
+  const serviceDays = transferServiceDays(index, arrivalMs, feedTz);
+  for (const i of index.patternsAtStop?.get(board) ?? []) {
+    const pattern = index.patterns?.[i];
+    if (!pattern || excludedRoutes.has(pattern.id) || excludedModes.has(pattern.mode)) continue;
+    for (const [position, stopId] of pattern.stopIds.entries()) {
+      if (stopId !== board || !pattern.stopIds.slice(position + 1).some(stop => stop !== board && alight.has(stop))) continue;
+      for (const trip of pattern.trips) {
+        const seconds = trip.departureSecs[position];
+        if (!Number.isFinite(seconds) || seconds < 0 || trip.pickupTypes?.[position] === 1) continue;
+        for (const { origin, active } of serviceDays) {
+          if (!active.has(trip.serviceId)) continue;
+          const departure = origin + seconds * 1000;
+          if (departure > latestBoardMs || departure < arrivalMs - 1_800_000) continue;
+          const distance = Math.abs(departure - arrivalMs);
+          if (distance < (routes.get(pattern.id) ?? Infinity)) routes.set(pattern.id, distance);
+        }
+      }
+    }
+  }
+  return [...routes].sort(([a, aDistance], [b, bDistance]) => aDistance - bDistance || a.localeCompare(b))
+    .slice(0, 2).map(([routeId]) => routeId);
+}
+
 /** Discover one exact, same-platform realtime opportunity. A planner must
  * still validate mobility and the remainder of the door-to-door journey. */
 export function findLiveTransferCandidate(input: LiveTransferInput): LiveTransferCandidate | null {
@@ -44,13 +83,7 @@ export function findLiveTransferCandidate(input: LiveTransferInput): LiveTransfe
   const arrivalMs = input.incomingScheduledArrivalMs + incomingDelay * 1000;
   if (!Number.isFinite(arrivalMs) || arrivalMs < nowMs || input.latestBoardMs < arrivalMs) return null;
 
-  const nowSecs = Math.floor(nowMs / 1000);
-  const frame = serviceDayFrame(nowSecs, input.feedTz);
-  const todayOrigin = (nowSecs - frame.nowSecs) * 1000;
-  const serviceDays = [
-    { origin: todayOrigin, active: resolveActiveServicesForYmd(index.services, frame.todayYmd) },
-    { origin: todayOrigin - frame.yesterdayShiftSecs * 1000, active: resolveActiveServicesForYmd(index.services, frame.yesterdayYmd) },
-  ];
+  const serviceDays = transferServiceDays(index, nowMs, input.feedTz);
   let best: LiveTransferCandidate | null = null;
   for (const patternIdx of index.patternsAtStop.get(incoming.toStopId) ?? []) {
     const pattern = index.patterns[patternIdx];

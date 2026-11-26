@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { findLiveTransferCandidate } from "./liveTransferCandidate.ts";
+import { findLiveTransferCandidate, liveTransferRouteIds } from "./liveTransferCandidate.ts";
 import type { RaptorIndex, RaptorIndexRoute } from "./raptorIndex.ts";
 
 const nowMs = Date.parse("2026-11-20T13:17:00Z");
@@ -52,4 +52,18 @@ it.each([
   { alightStop: "wrong-branch" },
 ])("rejects an ineligible delayed departure with %j", (overrides) => {
   expect(discover(overrides)).toBeNull();
+});
+
+it("prioritizes timetable proximity before capping live route acquisition", () => {
+  const makePattern = (id: string, boardSecs: number): RaptorIndexRoute => ({
+    ...pattern, id, trips: [{ ...pattern.trips[0], departureSecs: [boardSecs, boardSecs + 240] }],
+  });
+  const patterns = [makePattern("far", 54_000), makePattern("close", 55_080), makePattern("next", 55_200)];
+  const feed = { ...index, patterns, patternsAtStop: new Map([["5264", [0, 1, 2]]]) };
+  const choose = (excludedRoutes: string[] = []) => liveTransferRouteIds(
+    feed, "5264", new Set(["683"]), new Set(excludedRoutes), new Set(),
+    scheduled, scheduled + 600_000, "Europe/Vilnius",
+  );
+  expect(choose()).toEqual(["close", "next"]);
+  expect(choose(["close"])).toEqual(["next", "far"]);
 });

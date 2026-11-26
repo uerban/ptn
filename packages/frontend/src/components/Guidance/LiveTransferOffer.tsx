@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { BaseEndpoint, Itinerary, Leg } from "@pt/shared";
+import { canUse, useCanUse } from "../../privacy/canUse.ts";
+import { api } from "../../services/api.ts";
+import { REALTIME_FLOW } from "../../services/departuresPolicy.ts";
+import { liveTransferRouteIds } from "../../services/liveTransferCandidate.ts";
+import { excludedRouteIdsForCity } from "../../services/routeGroups.ts";
 import { useTranslation } from "../../i18n/index.ts";
 import { captureCityData } from "../../services/cityData.ts";
 import { convertRaptorResults, serviceDateYmdFor } from "../../services/convertRaptorResults.ts";
@@ -10,7 +15,7 @@ import { useGtfsDataStore } from "../../stores/gtfsDataStore.ts";
 import { useGuidanceStore } from "../../stores/guidanceStore.ts";
 import { useRoutingStore } from "../../stores/routingStore.ts";
 import { useRtStore } from "../../stores/rtStore.ts";
-import { useSettingsStore } from "../../stores/settingsStore.ts";
+import { effectiveExcludedModes, useSettingsStore } from "../../stores/settingsStore.ts";
 
 function realtimeStillMatches(leg: Leg, delay: number, now: number, requiresLive: boolean): boolean {
   if (!leg.tripId) return !requiresLive;
@@ -29,6 +34,7 @@ function walkingSeconds(legs: Leg[]): number {
 
 export function LiveTransferOffer() {
   const { t, formattingLocale } = useTranslation();
+  const realtimeAllowed = useCanUse(REALTIME_FLOW);
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const itinerary = useGuidanceStore((s) => s.itinerary);
   const index = useGuidanceStore((s) => s.currentLegIndex);
@@ -51,9 +57,9 @@ export function LiveTransferOffer() {
       releaseOfferRoute.current?.();
       releaseOfferRoute.current = null;
     };
-  }, [itinerary, index, riderTripId]);
+  }, [itinerary, index, riderTripId, realtimeAllowed, stopsRemaining]);
 
-  if (!itinerary || !active?.tripId || !active.routeId || !active.to.stopId || !destination ||
+  if (!realtimeAllowed || !itinerary || !active?.tripId || !active.routeId || !active.to.stopId || !destination ||
       active.tripId !== riderTripId || stopsRemaining !== 1 || !remaining?.every((leg) => leg.mode === "WALK")) return null;
 
   const request = async () => {
@@ -68,9 +74,11 @@ export function LiveTransferOffer() {
     const task = new AbortController();
     controller.current = task;
     setStatus("busy");
+    let releaseDiscovery: (() => void) | undefined;
     try {
       const city = useCityStore.getState().activeCity;
       const raptorIndex = useGtfsDataStore.getState().raptorIndex;
+      if (!raptorIndex) return;
       const settings = useSettingsStore.getState();
       const data = captureCityData();
       const stops = await data.gtfsStops.toArray();
@@ -84,6 +92,25 @@ export function LiveTransferOffer() {
       const incomingScheduledArrivalMs = Date.parse(active.arrivalTime) - (active.appliedDelaySeconds ?? 0) * 1000;
       const remainingWalk = walkingSeconds(remaining);
       const currentArrival = incomingScheduledArrivalMs + delay * 1000 + remainingWalk * 1000;
+      const excludedRoutes = new Set(excludedRouteIdsForCity(raptorIndex, city, settings));
+      excludedRoutes.add(active.routeId!);
+      const batterySaver = import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" && settings.searchPowerMode === "battery-saver";
+      const routeIds = liveTransferRouteIds(raptorIndex, origin.stopId, alightStopIds, excludedRoutes,
+        new Set(effectiveExcludedModes(settings, city.defaultExcludedModes)), incomingScheduledArrivalMs, currentArrival, city.tz).slice(0, batterySaver ? 1 : 2);
+      const mayReadLive = () => !task.signal.aborted && document.visibilityState !== "hidden" &&
+        canUse(REALTIME_FLOW) && useCityStore.getState().activeCity.id === city.id;
+      if (!mayReadLive()) return;
+      const realtime = useRtStore.getState();
+      releaseDiscovery = realtime.retainRoutes(routeIds);
+      await Promise.allSettled(routeIds.map(async (routeId) => {
+        const alreadyFresh = useRtStore.getState().updates.get(routeId)?.some((trip) =>
+          trip.receivedAt !== undefined && trip.receivedAt <= now &&
+          now - trip.receivedAt < NEXT_DEPARTURE_FRESHNESS_WINDOW_MS);
+        if (alreadyFresh || !mayReadLive()) return;
+        const response = await api.fetchRouteRt(routeId, task.signal);
+        if (mayReadLive() && response.routeId === routeId) useRtStore.getState().applyUpdate(response);
+      }));
+      if (!mayReadLive()) return;
       const found = await useRoutingStore.getState().probeLiveTransfer({
         incoming: { tripId: active.tripId!, routeId: active.routeId!, toStopId: origin.stopId },
         incomingScheduledArrivalMs, origin, destination: target, alightStopIds, latestBoardMs: currentArrival, signal: task.signal,
@@ -95,7 +122,7 @@ export function LiveTransferOffer() {
       const walkSaved = remainingWalk - (tail ? walkingSeconds(tail.legs) : remainingWalk);
       const valid = () => {
         const checkedAt = Date.now();
-        return !!first && Date.parse(first.departureTime) > checkedAt && document.visibilityState !== "hidden" &&
+        return !!first && Date.parse(first.departureTime) > checkedAt && mayReadLive() &&
           useCityStore.getState().activeCity.id === city.id && useGtfsDataStore.getState().raptorIndex === raptorIndex &&
           useSettingsStore.getState() === settings && realtimeStillMatches(active, delay, checkedAt, true) &&
           tail.legs.every((leg, i) => realtimeStillMatches(leg, leg.appliedDelaySeconds ?? 0, checkedAt, i === 0));
@@ -118,6 +145,7 @@ export function LiveTransferOffer() {
     } catch {
       // The optional check never interrupts active guidance.
     } finally {
+      releaseDiscovery?.();
       if (!task.signal.aborted) setStatus("empty");
     }
   };

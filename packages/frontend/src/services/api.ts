@@ -242,13 +242,13 @@ export const api = {
     return fetchJson(`${getBaseUrl()}/health`);
   },
 
-  async fetchRouteRt(routeId: string): Promise<RtRouteUpdate> {
+  async fetchRouteRt(routeId: string, signal?: AbortSignal): Promise<RtRouteUpdate> {
     // URL parsers normalize even percent-encoded dot-only path segments.
     if (routeId === "." || routeId === "..") throw new Error("Dot-only route ID cannot be requested");
     // Keep allowed colons literal for older servers that do not decode IDs.
     const encodedId = encodeURIComponent(routeId).replace(/%3A/g, ":");
     const url = new URL(`${getBaseUrl()}/rt/${encodedId}`, window.location.origin);
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), signal ? { signal } : undefined);
     if (!res.ok) throw new Error(friendlyErrorMessage(res.status));
     const buffer = await res.arrayBuffer();
     const { decodeRouteUpdate } = await import("@pt/shared/proto");
