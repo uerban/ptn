@@ -69,6 +69,7 @@ interface RouteResultsProps {
   departAt?: Date | null;
   arriveByMs?: number;
   findInterchangeablePlans?: (primary: Itinerary, signal: AbortSignal) => Promise<Itinerary[]>;
+  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
   /** Origin endpoint; when set alongside `destination`, enables "Save this pair". */
   origin?: BaseEndpoint | null;
@@ -108,6 +109,7 @@ export function RouteResults({
   departAt,
   arriveByMs,
   findLaterPlans,
+  findDifferentPlans,
   findInterchangeablePlans,
   origin,
   destination,
@@ -288,7 +290,7 @@ export function RouteResults({
     {(import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" || import.meta.env.VITE_PTN_SHOW_JOURNEY_ALTERNATIVES === "1") && (
       <LaterJourney itineraries={itineraries} onSelect={onSelect} referenceNowMs={referenceNowMs}
         bufferSeconds={bufferSeconds} runSpeedRatio={runSpeedRatio} departAtMs={departAt?.getTime()}
-        arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} />
+        arriveByMs={arriveByMs} feedTz={feedTz} findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans} />
     )}
     {import.meta.env.VITE_PTN_INTERCHANGEABLE_DEPARTURES === "1" && (
       <>

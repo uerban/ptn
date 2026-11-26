@@ -106,3 +106,14 @@ export function interchangeableRide(
   }
   return fixedRides > 0 ? replacement : null;
 }
+
+/** Select a route-disjoint candidate already validated for the same journey query. */
+export function selectVerifiedDifferentJourney(
+  excludedRouteId: string, planned: readonly Itinerary[],
+  { earliestLeaveMs, arriveByMs = Infinity }: LaterJourneyConstraints,
+): Itinerary | null {
+  return planned.find((candidate) => !candidate.cancelled && !candidate.timingUnreliable &&
+    candidate.legs.some((leg) => leg.mode !== "WALK") &&
+    candidate.legs.every((leg) => leg.mode === "WALK" || (!!leg.routeId && leg.routeId !== excludedRouteId)) &&
+    hasValidTimeline(candidate, earliestLeaveMs, arriveByMs)) ?? null;
+}

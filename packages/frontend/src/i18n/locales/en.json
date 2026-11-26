@@ -473,6 +473,8 @@
   "guidance.stay_on_board": "Stay on board",
   "settings.show_journey_alternatives": "Show alternatives",
   "settings.show_journey_alternatives_desc": "Let me look for a later departure when Search finds one journey.",
+  "search.different_journey": "Take {lines} · leaves {departure} · arrives {arrival}",
+  "search.alternative_transfer_count": "Transfers: {n}",
   "search.show_journey_alternatives": "Show alternatives",
   "search.no_later_journey": "No later journey found",
   "search.alternate_ride": "Take {line} toward {headsign} at {time} instead",

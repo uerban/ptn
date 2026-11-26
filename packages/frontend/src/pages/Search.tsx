@@ -848,6 +848,14 @@ export function SearchPage() {
       { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
   }, [fromEndpoint, toEndpoint, feedTz, endpointLabels, cityId, ranking, excludedModes, excludedRouteGroupsByCity]);
 
+  const findDifferentPlans = useCallback(async (at: Date, signal: AbortSignal, excludeRouteId: string): Promise<Itinerary[]> => {
+    if (!fromEndpoint || !toEndpoint) return [];
+    const results = await useRoutingStore.getState().search(fromEndpoint, toEndpoint, at, { probe: signal, excludeRouteId });
+    if (!results || signal.aborted) return [];
+    return convertRaptorResults(results, at, { lat: fromEndpoint.lat, lon: fromEndpoint.lon },
+      { lat: toEndpoint.lat, lon: toEndpoint.lon }, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
+  }, [fromEndpoint, toEndpoint, feedTz, endpointLabels, cityId, ranking, excludedModes, excludedRouteGroupsByCity]);
+
   const findInterchangeablePlans = useCallback(async (primary: Itinerary, signal: AbortSignal) => {
     if (!raptorIndex) return [];
     const city = useCityStore.getState().activeCity;
@@ -1550,6 +1558,7 @@ export function SearchPage() {
         onLater={handleLater}
         onNext={handleNext}
         findLaterPlans={routingMode === "on-device" ? findLaterPlans : undefined}
+        findDifferentPlans={routingMode === "on-device" ? findDifferentPlans : undefined}
         findInterchangeablePlans={routingMode === "on-device" ? findInterchangeablePlans : undefined}
         departAt={paginationTime}
         origin={fromEndpoint}

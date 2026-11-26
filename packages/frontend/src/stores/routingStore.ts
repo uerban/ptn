@@ -88,7 +88,7 @@ interface RoutingState {
    * `opts.remote` opts this single search into the gated pt-serve remote
    * planner (the per-event "Search on the server" consent; ).
    */
-  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
+  search: (origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) => Promise<RtComposedItinerary[] | void>;
   setRanking: (ranking: RankingCriteria) => void;
   setBackendAssist: (enabled: boolean) => void;
   setOrigin: (endpoint: BaseEndpoint) => void;
@@ -111,7 +111,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
   origin: null,
   destination: null,
 
-  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; firstRide?: FirstRideConstraint & { direct: boolean } }) {
+  async search(origin: BaseEndpoint, destination: BaseEndpoint, departureTime: Date, opts?: { remote?: boolean; probe?: AbortSignal; excludeRouteId?: string; firstRide?: FirstRideConstraint & { direct: boolean } }) {
     const probe = opts?.probe;
     const token = probe ? latestSearchToken : ++latestSearchToken;
     const isCurrent = () => token === latestSearchToken && !probe?.aborted;
@@ -162,6 +162,8 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
       const city = useCityStore.getState().activeCity;
       const searchCityId = city.id;
       const excludedRouteIds = excludedRouteIdsForCity(raptorIndex, city, useSettingsStore.getState());
+      const excludedProbeRoute = probe ? opts?.excludeRouteId : undefined;
+      if (excludedProbeRoute && !excludedRouteIds.includes(excludedProbeRoute)) excludedRouteIds.push(excludedProbeRoute);
       const firstRide = probe ? opts?.firstRide : undefined;
       if (firstRide && excludedRouteIds.includes(firstRide.routeId)) return;
       if (firstRide?.direct) {

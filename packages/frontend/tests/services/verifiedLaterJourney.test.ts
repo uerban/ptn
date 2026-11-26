@@ -1,6 +1,6 @@
 import type { Itinerary } from "@pt/shared";
 import { describe, expect, it } from "vitest";
-import { interchangeableRide, selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
+import { interchangeableRide, selectVerifiedDifferentJourney, selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
 import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 
 const shift = (time: string, minutes: number) =>
@@ -88,4 +88,14 @@ describe("interchangeableRide", () => {
       ...constraints, arriveByMs: Date.parse(primary.arrivalTime) - 1,
     })).toBeNull();
   });
+});
+
+it("only offers the different-route journey when every ride avoids the excluded line and meets the deadline", () => {
+  const candidate = journey(8, "different");
+  const excluded = "primary-line";
+  const constraints = { earliestLeaveMs: Date.parse(candidate.departureTime), arriveByMs: Date.parse(candidate.arrivalTime) };
+  const shared = { ...candidate, legs: [candidate.legs[0], { ...candidate.legs[1], routeId: excluded }, candidate.legs[2]] };
+  expect(selectVerifiedDifferentJourney(excluded, [shared, candidate], constraints)).toBe(candidate);
+  expect(selectVerifiedDifferentJourney(excluded, [candidate], { ...constraints, arriveByMs: constraints.arriveByMs - 1 })).toBeNull();
+  expect(selectVerifiedDifferentJourney(excluded, [candidate], { ...constraints, earliestLeaveMs: constraints.earliestLeaveMs + 1 })).toBeNull();
 });

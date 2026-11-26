@@ -82,7 +82,7 @@ describe("RouteResults", () => {
     }
   });
 
-  it("finds a single later journey only after Show alternatives is selected", async () => {
+  it("finds later and different journeys only after Show alternatives is selected", async () => {
     vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
     const primary = makeItinerary();
     const now = vi.spyOn(serverTime, "now").mockReturnValue(Date.parse(primary.departureTime) - 60_000);
@@ -97,16 +97,24 @@ describe("RouteResults", () => {
       { ...primary.legs[0], tripId: "later", departureTime, arrivalTime },
     ] };
     const findLaterPlans = vi.fn(async () => [later]);
+    const different = { ...later, legs: [{
+      ...later.legs[0], routeId: "43", routeShortName: "43", tripId: "different",
+    }] };
+    const findDifferentPlans = vi.fn(async () => [different]);
     const onSelect = vi.fn();
     try {
       render(<BrowserRouter><RouteResults itineraries={[primary]} onSelect={onSelect}
-        findLaterPlans={findLaterPlans} feedTz="UTC" /></BrowserRouter>);
+        findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans} feedTz="UTC" /></BrowserRouter>);
       expect(findLaterPlans).not.toHaveBeenCalled();
+      expect(findDifferentPlans).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "Show alternatives" }));
       fireEvent.click(await screen.findByRole("button", { name: /also leaves at .* arrives at/i }));
       expect(findLaterPlans).toHaveBeenCalledExactlyOnceWith(new Date("2026-03-03T10:00:01Z"), expect.any(AbortSignal),
         { routeId: "42", boardStopId: "A", alightStopId: "B", direct: true });
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(later);
+      fireEvent.click(screen.getByRole("button", { name: /Take 43.*Transfers: 0/i }));
+      expect(onSelect).toHaveBeenLastCalledWith(different);
+      expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(primary.departureTime), expect.any(AbortSignal), "42");
     } finally {
       now.mockRestore();
       vi.unstubAllEnvs();

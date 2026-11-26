@@ -6,7 +6,7 @@ import { useSettingsStore } from "../../../stores/settingsStore.ts";
 import { useRtStore } from "../../../stores/rtStore.ts";
 import { useTranslation } from "../../../i18n/index.ts";
 import { serverTime } from "../../../services/serverTime.ts";
-import { selectVerifiedLaterJourney } from "../../../services/verifiedLaterJourney.ts";
+import { selectVerifiedDifferentJourney, selectVerifiedLaterJourney } from "../../../services/verifiedLaterJourney.ts";
 import { formatTime } from "./format.ts";
 import { deriveItineraryDisplay } from "./itineraryDisplay.ts";
 
@@ -19,20 +19,21 @@ interface Props {
   departAtMs?: number;
   arriveByMs?: number;
   feedTz?: string;
+  findDifferentPlans?: (at: Date, signal: AbortSignal, excludeRouteId: string) => Promise<Itinerary[]>;
   findLaterPlans?: (at: Date, signal: AbortSignal, firstRide: FirstRideConstraint & { direct: boolean }) => Promise<Itinerary[]>;
 }
 
 export function LaterJourney({
-  itineraries, onSelect, referenceNowMs, bufferSeconds, runSpeedRatio, departAtMs, arriveByMs, feedTz, findLaterPlans,
+  itineraries, onSelect, referenceNowMs, bufferSeconds, runSpeedRatio, departAtMs, arriveByMs, feedTz, findLaterPlans, findDifferentPlans,
 }: Props) {
   const { t, formattingLocale } = useTranslation();
   const primary = itineraries[0];
   const [request, setRequest] = useState<{ primary: Itinerary; find: Props["findLaterPlans"] }>();
   const requested = request?.primary === primary && request.find === findLaterPlans;
   const [probe, setProbe] = useState<{
-    primary: Itinerary; find: NonNullable<Props["findLaterPlans"]>; plans: Itinerary[];
+    primary: Itinerary; find: NonNullable<Props["findLaterPlans"]>; differentFinder: Props["findDifferentPlans"]; plans: Itinerary[]; differentPlans: Itinerary[];
   }>();
-  const completed = probe?.primary === primary && probe.find === findLaterPlans;
+  const completed = probe?.primary === primary && probe.find === findLaterPlans && probe.differentFinder === findDifferentPlans;
   const additional = completed ? probe.plans : [];
   const firstRide = primary.legs.find((leg) => leg.mode !== "WALK");
   const showJourneyAlternatives = useSettingsStore((state) => state.showJourneyAlternatives);
@@ -48,16 +49,17 @@ export function LaterJourney({
   const missed = display.catchStatus === "departed" || display.catchStatus === "likely-miss";
   const needsFallback = import.meta.env.VITE_PTN_VERIFIED_LATER_JOURNEY === "1" && missed;
   const showAlternative = needsFallback || (canRequest && requested);
-  const later = useRtStore((state) => {
-    if (!showAlternative) return null;
-    const currentPlans = [...itineraries, ...additional].filter((plan) => plan.legs.every((leg) => {
-      const live = leg.tripId ? state.getTripDelay(leg.tripId) : null;
-      return !live || (!live.cancelled && !live.deleted && live.delaySeconds === (leg.appliedDelaySeconds ?? 0));
-    }));
-    return selectVerifiedLaterJourney(primary, currentPlans, {
-      earliestLeaveMs: Math.max(referenceNowMs, departAtMs ?? referenceNowMs), arriveByMs,
-    });
+  const eligible = (plan: Itinerary, state: ReturnType<typeof useRtStore.getState>) => plan.legs.every((leg) => {
+    const live = leg.tripId ? state.getTripDelay(leg.tripId) : null;
+    return !live || (!live.cancelled && !live.deleted && live.delaySeconds === (leg.appliedDelaySeconds ?? 0));
   });
+  const constraints = { earliestLeaveMs: Math.max(referenceNowMs, departAtMs ?? referenceNowMs), arriveByMs };
+  const later = useRtStore((state) => showAlternative
+    ? selectVerifiedLaterJourney(primary, [...itineraries, ...additional].filter((plan) => eligible(plan, state)), constraints)
+    : null);
+  const different = useRtStore((state) => showAlternative && canRequest && requested && completed && firstRide?.routeId
+    ? selectVerifiedDifferentJourney(firstRide.routeId, probe.differentPlans.filter((plan) => eligible(plan, state)), constraints)
+    : null);
   const retainedLater = later !== null && itineraries.includes(later);
   const primaryLeaveMs = Date.parse(primary.departureTime);
   const explicitBoardingFloor = firstRide ? Date.parse(firstRide.departureTime) + 1_000 : NaN;
@@ -78,17 +80,23 @@ export function LaterJourney({
     const boardStopId = ride?.from.stopId;
     const alightStopId = ride?.to.stopId;
     if (!routeId || !boardStopId || !alightStopId) return;
-    void findLaterPlans(new Date(departureFloor), controller.signal, {
-      routeId, boardStopId, alightStopId, direct: rides.length === 1,
-    }).then((plans) => {
-      if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, plans });
-    }, () => {
-      if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, plans: [] });
-    });
-    return () => controller.abort();
-  }, [findLaterPlans, showAlternative, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline]);
+    void (async () => {
+      const plans = await findLaterPlans(new Date(departureFloor), controller.signal, {
+        routeId, boardStopId, alightStopId, direct: rides.length === 1,
+      }).catch(() => []);
+      if (controller.signal.aborted) return;
+      const differentAt = Math.max(serverTime.now(), departAtMs ?? -Infinity, primaryLeaveMs);
+      const differentPlans = requested && canRequest && findDifferentPlans &&
+        (arriveByMs === undefined || differentAt < arriveByMs)
+        ? await findDifferentPlans(new Date(differentAt), controller.signal, routeId).catch(() => [])
+        : [];
+      if (!controller.signal.aborted) setProbe({ primary, find: findLaterPlans, differentFinder: findDifferentPlans, plans, differentPlans });
+    })();
 
-  if (!later) {
+    return () => controller.abort();
+  }, [findLaterPlans, showAlternative, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, requested, canRequest, findDifferentPlans, primaryLeaveMs]);
+
+  if (!later && !different) {
     if (!canRequest || missed || !Number.isFinite(probeFloor) || !withinDeadline ||
       display.catchStatus === "cancelled" || display.catchStatus === "removed") return null;
     return (
@@ -103,14 +111,20 @@ export function LaterJourney({
       </div>
     );
   }
-  const departure = formatTime(later.legs[0].departureTime, formattingLocale, feedTz);
-  const arrival = formatTime(later.arrivalTime, formattingLocale, feedTz);
   return (
-    <div className="px-3 pb-2">
-      <button type="button" onClick={() => onSelect(later)} className="text-sm text-accent underline">
+    <div className="flex flex-col items-start gap-1 px-3 pb-2">
+      {later && <button type="button" onClick={() => onSelect(later)} className="text-left text-sm text-accent underline">
         {t("search.later_journey", "Also leaves at {departure} · arrives at {arrival}")
-          .replace("{departure}", departure).replace("{arrival}", arrival)}
-      </button>
+          .replace("{departure}", formatTime(later.legs[0].departureTime, formattingLocale, feedTz))
+          .replace("{arrival}", formatTime(later.arrivalTime, formattingLocale, feedTz))}
+      </button>}
+      {different && <button type="button" onClick={() => onSelect(different)} className="text-left text-sm text-accent underline">
+        {t("search.different_journey", "Take {lines} · leaves {departure} · arrives {arrival}")
+          .replace("{lines}", different.legs.filter((leg) => leg.mode !== "WALK").map((leg) => leg.routeShortName ?? leg.mode).join(" → "))
+          .replace("{departure}", formatTime(different.legs[0].departureTime, formattingLocale, feedTz))
+          .replace("{arrival}", formatTime(different.arrivalTime, formattingLocale, feedTz))}
+        {" · "}{t("search.alternative_transfer_count", "Transfers: {n}").replace("{n}", String(different.transfers))}
+      </button>}
     </div>
   );
 }
