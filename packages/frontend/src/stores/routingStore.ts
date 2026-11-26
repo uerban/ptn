@@ -225,6 +225,9 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
           wheelchair: mobilityProfile === "wheelchair",
         })
         : undefined;
+      // Multi-result Arrive By already has a portfolio. Spend the extra
+      // planner call only on an identified direct ride that it lacks.
+      if (excludedProbeRoute && (opts?.shownRoutes?.length ?? 0) > 1 && !directCandidate) return [];
       const firstRide = probe ? opts?.firstRide ?? (directCandidate && { ...directCandidate, direct: true }) : undefined;
       if (firstRide && excludedRouteIds.includes(firstRide.routeId)) return;
       if (firstRide?.direct) {
