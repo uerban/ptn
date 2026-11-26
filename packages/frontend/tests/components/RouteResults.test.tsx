@@ -151,7 +151,7 @@ describe("RouteResults", () => {
     }
   });
 
-  it("uses the retained later trip while still checking for a distinct Arrive By option", async () => {
+  it.each([false, true])("keeps the Arrive By lookup budget when the retained trip expires (in flight: %s)", async (inFlight) => {
     vi.stubEnv("VITE_PTN_SHOW_JOURNEY_ALTERNATIVES", "1");
     const makeRide = (routeId: string, tripId: string, departureTime: string, arrivalTime: string) => {
       const plan = makeItinerary({ departureTime, arrivalTime });
@@ -169,12 +169,17 @@ describe("RouteResults", () => {
     vi.useFakeTimers();
     const clock = vi.spyOn(serverTime, "now").mockReturnValue(nowMs);
     const findLaterPlans = vi.fn(async () => []);
-    const findDifferentPlans = vi.fn(async () => [different]);
+    let resolveDifferent!: (plans: Itinerary[]) => void;
+    const pending = new Promise<Itinerary[]>(resolve => { resolveDifferent = resolve; });
+    const findDifferentPlans = vi.fn((_at: Date, _signal: AbortSignal) => pending);
     try {
       render(<BrowserRouter><RouteResults itineraries={[primary, later]} onSelect={() => {}}
         arriveByMs={deadline} findLaterPlans={findLaterPlans} findDifferentPlans={findDifferentPlans} feedTz="UTC" /></BrowserRouter>);
       await act(async () => fireEvent.click(screen.getByRole("button", { name: "Show alternatives" })));
-      expect(screen.getByRole("button", { name: /Take 43.*Transfers: 0/i })).toBeInTheDocument();
+      if (!inFlight) {
+        await act(async () => resolveDifferent([different]));
+        expect(screen.getByRole("button", { name: /Take 43.*Transfers: 0/i })).toBeInTheDocument();
+      }
       expect(screen.getByRole("button", { name: /also leaves at .* arrives at/i })).toBeInTheDocument();
       expect(findLaterPlans).not.toHaveBeenCalled();
       expect(findDifferentPlans).toHaveBeenCalledExactlyOnceWith(new Date(nowMs), expect.any(AbortSignal), "42", deadline, ["42"]);
@@ -183,6 +188,9 @@ describe("RouteResults", () => {
       expect(screen.queryByRole("button", { name: /also leaves at/i })).not.toBeInTheDocument();
       expect(findLaterPlans).not.toHaveBeenCalled();
       expect(findDifferentPlans).toHaveBeenCalledTimes(1);
+      if (inFlight) expect(findDifferentPlans.mock.calls[0][1].aborted).toBe(false);
+      if (inFlight) await act(async () => resolveDifferent([different]));
+      expect(screen.queryByRole("button", { name: /Take 43.*Transfers: 0/i })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
       clock.mockRestore();

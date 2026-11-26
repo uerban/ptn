@@ -28,7 +28,7 @@ export function LaterJourney({
 }: Props) {
   const { t, formattingLocale } = useTranslation();
   const primary = itineraries[0];
-  const [request, setRequest] = useState<{ primary: Itinerary; find: Props["findLaterPlans"] }>();
+  const [request, setRequest] = useState<{ primary: Itinerary; find: Props["findLaterPlans"]; skipSameLine: boolean }>();
   const requested = request?.primary === primary && request.find === findLaterPlans;
   const [probe, setProbe] = useState<{
     primary: Itinerary; find: NonNullable<Props["findLaterPlans"]>; differentFinder: Props["findDifferentPlans"]; requested: boolean; plans: Itinerary[]; differentPlans: Itinerary[];
@@ -84,6 +84,7 @@ export function LaterJourney({
       !shownFirstRoutes.includes(plan.legs.find(leg => leg.mode !== "WALK")?.routeId ?? "")), constraints)
     : null);
   const retainedLater = later !== null && itineraries.includes(later);
+  const skipSameLine = requested ? request.skipSameLine : retainedLater;
   const primaryLeaveMs = Date.parse(primary.departureTime);
   const explicitBoardingFloor = firstRide ? Date.parse(firstRide.departureTime) + 1_000 : NaN;
   const probeFloor = canRequest && requested ? explicitBoardingFloor : primaryLeaveMs + 1_000;
@@ -93,7 +94,7 @@ export function LaterJourney({
   const canProbeDifferent = !batterySaver && requested && canRequest && !!findDifferentPlans;
   useEffect(() => {
     if (completedForTrigger || !findLaterPlans || !canProbe || !Number.isFinite(probeFloor) || !withinDeadline ||
-        (retainedLater && !canProbeDifferent)) return;
+        (skipSameLine && !canProbeDifferent)) return;
     const controller = new AbortController();
     // A rider asking for another option can search explicitly after the
     // planned boarding. A missed departure keeps the earlier access floor.
@@ -106,7 +107,7 @@ export function LaterJourney({
     const alightStopId = ride?.to.stopId;
     if (!routeId || !boardStopId || !alightStopId) return;
     void (async () => {
-      const plans = retainedLater ? [] : await findLaterPlans(new Date(departureFloor), controller.signal, {
+      const plans = skipSameLine ? [] : await findLaterPlans(new Date(departureFloor), controller.signal, {
         routeId, boardStopId, alightStopId, direct: rides.length === 1,
       }).catch(() => []);
       if (controller.signal.aborted) return;
@@ -124,10 +125,16 @@ export function LaterJourney({
     })();
 
     return () => controller.abort();
-  }, [completedForTrigger, requested, findLaterPlans, canProbe, primary, retainedLater, probeFloor, departAtMs, arriveByMs, withinDeadline, canProbeDifferent, findDifferentPlans, primaryLeaveMs, shownRoutesKey]);
+  }, [completedForTrigger, requested, findLaterPlans, canProbe, primary, skipSameLine, probeFloor, departAtMs, arriveByMs, withinDeadline, canProbeDifferent, findDifferentPlans, primaryLeaveMs, shownRoutesKey]);
 
   const requestButton = <button type="button" className="text-sm text-accent underline" disabled={requested}
-    onClick={() => setRequest({ primary, find: findLaterPlans })}>
+    onClick={() => {
+      // Decide the work once per request. Clock ticks can change what is
+      // shown without restarting the plan already running for this tap.
+      const state = useRtStore.getState();
+      const retained = selectVerifiedLaterJourney(primary, itineraries.filter(plan => eligible(plan, state)), constraints);
+      setRequest({ primary, find: findLaterPlans, skipSameLine: retained !== null });
+    }}>
     {requested ? t("search.looking_for_departures", "Checking departures…") :
       t("search.show_journey_alternatives", "Show alternatives")}
   </button>;
