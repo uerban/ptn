@@ -23,12 +23,15 @@ const INTERVALS: Record<RtMode, number> = {
  * Live departures, resolved at every poll — the decision can change (also in
  * another tab) while the poller runs. Every live-data surface (guidance,
  * result cards, line preview) polls through here, so this is the one place
- * the decision has to hold. A hidden page never polls: the next tick after
- * it is shown again polls as usual.
+ * the decision has to hold. A hidden page stops its poll timer and resumes
+ * when shown again.
  */
-function pollingAllowed(): boolean {
-  if (!canUse(REALTIME_FLOW)) return false;
+function pageVisible(): boolean {
   return typeof document === "undefined" || document.visibilityState !== "hidden";
+}
+
+function pollingAllowed(): boolean {
+  return pageVisible() && canUse(REALTIME_FLOW);
 }
 
 export class RtPoller {
@@ -36,6 +39,7 @@ export class RtPoller {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private generation = 0;
+  private pollingGeneration: number | null = null;
   private mode: RtMode = "idle";
 
   subscribe(routeId: string, callback: RtCallback): void {
@@ -69,16 +73,39 @@ export class RtPoller {
     // A running loop includes its in-flight request, not only its timer.
     if (this.running) return;
     this.running = true;
-    const generation = ++this.generation;
-    void this.poll(generation).then(() => this.scheduleNext(generation));
+    ++this.generation;
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.onVisibility);
+    this.onVisibility();
   }
 
   stop(): void {
     this.running = false;
     this.generation++;
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.onVisibility);
+    this.clearTimer();
+  }
+
+  private clearTimer(): void {
+    if (this.timer === null) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private onVisibility = (): void => {
+    if (!pageVisible()) {
+      this.clearTimer();
+    } else if (this.running && this.timer === null && this.pollingGeneration !== this.generation) {
+      void this.runCycle(this.generation);
+    }
+  };
+
+  private async runCycle(generation: number): Promise<void> {
+    this.pollingGeneration = generation;
+    try {
+      await this.poll(generation);
+    } finally {
+      if (this.pollingGeneration === generation) this.pollingGeneration = null;
+      this.scheduleNext(generation);
     }
   }
 
@@ -87,13 +114,12 @@ export class RtPoller {
   }
 
   private scheduleNext(generation: number): void {
-    if (!this.isCurrent(generation)) return;
+    if (!this.isCurrent(generation) || !pageVisible()) return;
     const base = this.getIntervalMs();
     const jitter = base * 0.3 * (Math.random() * 2 - 1);
-    this.timer = setTimeout(async () => {
+    this.timer = setTimeout(() => {
       this.timer = null;
-      await this.poll(generation);
-      this.scheduleNext(generation);
+      void this.runCycle(generation);
     }, Math.round(base + jitter));
   }
 

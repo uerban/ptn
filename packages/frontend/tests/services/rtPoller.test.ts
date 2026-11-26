@@ -156,7 +156,13 @@ describe("RtPoller — the real-time decision", () => {
     await vi.advanceTimersByTimeAsync(120_000);
     expect(api.fetchRouteRt).not.toHaveBeenCalled();
     visibility.mockReturnValue("visible");
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(api.fetchRouteRt).toHaveBeenCalledWith("r1");
+    expect(vi.getTimerCount()).toBe(0);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.fetchRouteRt).toHaveBeenCalledExactlyOnceWith("r1");
+    expect(vi.getTimerCount()).toBe(1);
+    visibility.mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

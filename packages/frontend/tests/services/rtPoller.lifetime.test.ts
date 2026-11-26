@@ -113,3 +113,20 @@ it("reduces idle refreshes in Battery saver and refreshes immediately when guida
     useSettingsStore.getState().setSearchPowerMode(previous);
   }
 });
+
+it("does not overlap an in-flight request when the page returns to the foreground", async () => {
+  const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  const pending = deferred();
+  vi.mocked(api.fetchRouteRt).mockReturnValueOnce(pending.promise);
+  poller.subscribe("r1", vi.fn());
+  poller.start();
+  visibility.mockReturnValue("hidden");
+  document.dispatchEvent(new Event("visibilitychange"));
+  visibility.mockReturnValue("visible");
+  document.dispatchEvent(new Event("visibilitychange"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(api.fetchRouteRt).toHaveBeenCalledOnce();
+  pending.resolve(update());
+  await vi.advanceTimersByTimeAsync(0);
+  expect(vi.getTimerCount()).toBe(1);
+});
