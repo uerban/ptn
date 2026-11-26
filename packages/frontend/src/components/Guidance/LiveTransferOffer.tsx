@@ -35,15 +35,20 @@ function walkingSeconds(legs: Leg[]): number {
 export function LiveTransferOffer() {
   const { t, formattingLocale } = useTranslation();
   const realtimeAllowed = useCanUse(REALTIME_FLOW);
+  const batterySaver = useSettingsStore((state) => import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" &&
+    state.searchPowerMode === "battery-saver");
   const feedTz = useCityStore((s) => s.activeCity.tz);
   const itinerary = useGuidanceStore((s) => s.itinerary);
   const index = useGuidanceStore((s) => s.currentLegIndex);
   const stopsRemaining = useGuidanceStore((s) => s.transitProgress?.stopsRemaining);
   const riderTripId = useGuidanceStore((s) => s.riderTripId);
   const active = itinerary?.legs[index];
+  const incomingDelay = useRtStore((state) => active?.tripId ? state.getTripDelay(active.tripId)?.delaySeconds : undefined);
+  const incomingReceivedAt = useRtStore((state) => active?.tripId ? state.getReceivedAt(active.tripId) : null);
   const remaining = itinerary?.legs.slice(index + 1);
   const destination = remaining?.at(-1)?.to;
   const controller = useRef<AbortController | null>(null);
+  const attempted = useRef<{ itinerary: Itinerary; index: number } | null>(null);
   const releaseOfferRoute = useRef<(() => void) | null>(null);
   const [result, setResult] = useState<{ replacement: Itinerary; tail: Itinerary; walkSaved: number; valid: () => boolean }>();
   const [status, setStatus] = useState<"idle" | "busy" | "empty">("idle");
@@ -59,11 +64,12 @@ export function LiveTransferOffer() {
     };
   }, [itinerary, index, riderTripId, realtimeAllowed, stopsRemaining]);
 
-  if (!realtimeAllowed || !itinerary || !active?.tripId || !active.routeId || !active.to.stopId || !destination ||
-      active.tripId !== riderTripId || stopsRemaining !== 1 || !remaining?.every((leg) => leg.mode === "WALK")) return null;
+  const eligible = realtimeAllowed && itinerary && active?.tripId && active.routeId && active.to.stopId &&
+    destination && active.tripId === riderTripId && stopsRemaining === 1 && remaining?.every((leg) => leg.mode === "WALK");
 
   const request = async () => {
-    if (controller.current) return;
+    if (!eligible || !remaining || controller.current ||
+        (attempted.current?.itinerary === itinerary && attempted.current.index === index)) return;
     const now = Date.now();
     const delay = useRtStore.getState().getTripDelay(active.tripId!)?.delaySeconds;
     if (document.visibilityState === "hidden" || delay === undefined || delay >= 0 ||
@@ -73,6 +79,7 @@ export function LiveTransferOffer() {
     }
     const task = new AbortController();
     controller.current = task;
+    attempted.current = { itinerary, index };
     setStatus("busy");
     let releaseDiscovery: (() => void) | undefined;
     try {
@@ -94,7 +101,6 @@ export function LiveTransferOffer() {
       const currentArrival = incomingScheduledArrivalMs + delay * 1000 + remainingWalk * 1000;
       const excludedRoutes = new Set(excludedRouteIdsForCity(raptorIndex, city, settings));
       excludedRoutes.add(active.routeId!);
-      const batterySaver = import.meta.env.VITE_PTN_SEARCH_POWER_MODES === "1" && settings.searchPowerMode === "battery-saver";
       const routeIds = liveTransferRouteIds(raptorIndex, origin.stopId, alightStopIds, excludedRoutes,
         new Set(effectiveExcludedModes(settings, city.defaultExcludedModes)), incomingScheduledArrivalMs, currentArrival, city.tz).slice(0, batterySaver ? 1 : 2);
       const mayReadLive = () => !task.signal.aborted && document.visibilityState !== "hidden" &&
@@ -150,6 +156,20 @@ export function LiveTransferOffer() {
     }
   };
 
+  useEffect(() => {
+    if (batterySaver || !eligible || status !== "idle" || incomingDelay === undefined ||
+        incomingDelay >= 0 || incomingReceivedAt === null) return;
+    const check = () => {
+      if (!controller.current && document.visibilityState !== "hidden" &&
+          realtimeStillMatches(active, incomingDelay, Date.now(), true)) void request();
+    };
+    check();
+    document.addEventListener("visibilitychange", check);
+    return () => document.removeEventListener("visibilitychange", check);
+  });
+
+  if (!eligible || (status === "idle" && attempted.current?.itinerary === itinerary && attempted.current.index === index)) return null;
+
   if (result) {
     const ride = result.tail.legs[0];
     const formatTime = (value: string) => new Date(value).toLocaleTimeString(formattingLocale, {
@@ -170,6 +190,7 @@ export function LiveTransferOffer() {
       </button>
     );
   }
+  if (!batterySaver && status !== "busy") return null;
   if (status === "empty") return <p className="px-4 py-2 text-sm text-fg-muted">{t("guidance.live_transfer_none", "No verified connection found")}</p>;
   return (
     <button type="button" className="w-full px-4 py-2 text-left text-accent" disabled={status === "busy"} onClick={() => void request()}>
