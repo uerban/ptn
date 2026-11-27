@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Уведомления по этим маршрутам: {count}",
   "serviceAlerts.affectsLines": "Уведомление о сбое на линии {lines}",
   "serviceAlerts.sameAsAbove": "То же уведомление, что и выше",
-  "nearby.inHours": "через {time}"
+  "nearby.inHours": "через {time}",
+  "notices.free": "Бесплатный проезд",
+  "notices.seasonalUntil": "Специальная линия, курсирует до {date}",
+  "notices.eventOn": "Событие на борту транспортного средства, {date}",
+  "notices.listTitle": "Специальные линии в этом сезоне",
+  "notices.source": "Объявление",
+  "notices.legNotice": "Линия {line}: {notice}",
+  "notices.catchIt": "Сейчас этот транспортный средство",
+  "notices.catchItIntro": "Эти маршруты обслуживает один транспортный средство. Вы можете сесть на него на любой остановке по пути.",
+  "notices.tripAt": "Отправляется из {stop} в {time}",
+  "notices.liveOnMap": "Показать в режиме LIVE на карте",
+  "notices.remindMe": "Напомнить мне",
+  "notices.reminderSet": "Настроено напоминание на {time}",
+  "notices.cancelReminder": "Отменить напоминание",
+  "notices.reminderTitle": "Линия {line} отправляется в ближайшее время",
+  "notices.reminderBody": "{notice} отправляется от {stop} в {time}."
 }

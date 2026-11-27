@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Teated nendel marsruutidel: {count}",
   "serviceAlerts.affectsLines": "Teenuse teade liini {lines} kohta",
   "serviceAlerts.sameAsAbove": "Sama teade kui eespool",
-  "nearby.inHours": "{time} pärast"
+  "nearby.inHours": "{time} pärast",
+  "notices.free": "Tasuta sõit",
+  "notices.seasonalUntil": "Eritäisliin, sõidab kuni {date}",
+  "notices.eventOn": "Sündmus sõiduki pardal, {date}",
+  "notices.listTitle": "Selle hooaja eriliinid",
+  "notices.source": "Teadaanne",
+  "notices.legNotice": "Liin {line}: {notice}",
+  "notices.catchIt": "Võta see sõiduk",
+  "notices.catchItIntro": "Neid sõite teostab üks sõiduk. Sellele saab siseneda mis tahes peatuses marsruudil.",
+  "notices.tripAt": "Lahkub {stop} kell {time}",
+  "notices.liveOnMap": "Näita LIVE kaardil",
+  "notices.remindMe": "Meenuta mulle",
+  "notices.reminderSet": "Meeldetuletus seatud ajaks {time}",
+  "notices.cancelReminder": "Tühista meeldetuletus",
+  "notices.reminderTitle": "Liin {line} väljub varsti",
+  "notices.reminderBody": "{notice} lahkub {stop} kell {time}."
 }

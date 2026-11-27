@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Powiadomienia dotyczące tych tras: {count}",
   "serviceAlerts.affectsLines": "Powiadomienie serwisowe dotyczące linii {lines}",
   "serviceAlerts.sameAsAbove": "Ten sam komunikat co powyżej",
-  "nearby.inHours": "za {time}"
+  "nearby.inHours": "za {time}",
+  "notices.free": "Bezpłatny przejazd",
+  "notices.seasonalUntil": "Linia specjalna, kursuje do {date}",
+  "notices.eventOn": "Wydarzenie w pojeździe, {date}",
+  "notices.listTitle": "Specjalne linie w tym sezonie",
+  "notices.source": "Ogłoszenie",
+  "notices.legNotice": "Linia {line}: {notice}",
+  "notices.catchIt": "Wsiądź do tego pojazdu",
+  "notices.catchItIntro": "Te trasy obsługuje jeden pojazd. Możesz do niego wsiąść na dowolnym przystanku po drodze.",
+  "notices.tripAt": "Odjeżdża z {stop} o {time}",
+  "notices.liveOnMap": "Pokaż na mapie LIVE",
+  "notices.remindMe": "Przypomnij mi",
+  "notices.reminderSet": "Przypomnienie ustawione na {time}",
+  "notices.cancelReminder": "Odwołaj przypomnienie",
+  "notices.reminderTitle": "Linia {line} odjeżdża za chwilę",
+  "notices.reminderBody": "{notice} odjeżdża z {stop} o {time}."
 }

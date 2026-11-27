@@ -14,6 +14,8 @@ import { useTranslation } from "../../i18n/index.ts";
 import { waitClock, waitSpoken } from "../../utils/waitTime.ts";
 import { useAlertedDepartures } from "../../hooks/useServiceAlertSelection.ts";
 import { ServiceAlertIndicator } from "../ServiceAlerts/ServiceAlertIndicator.tsx";
+import { NoticeBadge } from "../ServiceNotices/NoticeBadge.tsx";
+import { useDepartureNotices } from "../../services/useNotices.ts";
 
 /** Whether a departure's line has an active service alert at its stop; null when none do. */
 type AlertedCheck = ((departure: PillDeparture["departure"], stopId: string) => boolean) | null;
@@ -161,6 +163,7 @@ function DepartureRow({
   const { departure, minutes, stop } = pill;
   const { formattingLocale, t } = useTranslation();
   const minutesOnly = useSettingsStore((s) => s.waitMinutesOnly);
+  const notices = useDepartureNotices(departure);
   const clock = minutes > 0
     ? waitClock(minutes, minutesOnly, { hour: t("time.h", "h"), minute: t("time.min", "min") })
     : null;
@@ -192,6 +195,7 @@ function DepartureRow({
         routeColor={departure.routeColor}
         className="text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
       />
+      <NoticeBadge notices={notices} compact />
       {alerted && <ServiceAlertIndicator className="w-5 h-5" />}
       <span className="flex-1 min-w-0">
         <span className="block text-sm text-fg truncate">{departure.headsign}</span>

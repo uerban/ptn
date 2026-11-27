@@ -133,5 +133,20 @@
   "serviceAlerts.lines": "Line {lines}",
   "serviceAlerts.onRoutes": "Alerts on these routes: {count}",
   "serviceAlerts.affectsLines": "Service alert affects line {lines}",
-  "serviceAlerts.sameAsAbove": "Same alert as above"
+  "serviceAlerts.sameAsAbove": "Same alert as above",
+  "notices.free": "Free ride",
+  "notices.seasonalUntil": "Special line, runs until {date}",
+  "notices.eventOn": "Event on board the vehicle, {date}",
+  "notices.listTitle": "Special lines this season",
+  "notices.source": "Announcement",
+  "notices.legNotice": "Line {line}: {notice}",
+  "notices.catchIt": "Catch this vehicle",
+  "notices.catchItIntro": "One vehicle runs these trips. You can board it at any stop on the way.",
+  "notices.tripAt": "Leaves {stop} at {time}",
+  "notices.liveOnMap": "Show live on map",
+  "notices.remindMe": "Remind me",
+  "notices.reminderSet": "Reminder set for {time}",
+  "notices.cancelReminder": "Cancel reminder",
+  "notices.reminderTitle": "Line {line} leaves soon",
+  "notices.reminderBody": "{notice} leaves {stop} at {time}."
 }

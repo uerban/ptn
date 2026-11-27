@@ -26,6 +26,8 @@ import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
 import { RouteAlertsForResult, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
+import { NoticeBadge } from "../ServiceNotices/NoticeBadge.tsx";
+import { useLegNotices } from "../../services/useNotices.ts";
 
 interface Props {
   itineraries: Itinerary[];
@@ -377,6 +379,7 @@ function AccessibleLegRow({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
       />
       <div className="flex-1 min-w-0">
         <LegDeparture leg={leg} feedTz={feedTz} />
+        <LegNotices leg={leg} />
         <div className="text-sm font-semibold flex items-center gap-2 flex-wrap">
           <span>
             {t("route.off_at_long", "Off at")}{" "}
@@ -403,4 +406,9 @@ function AccessibleLegRow({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
       </div>
     </div>
   );
+}
+
+function LegNotices({ leg }: { leg: Leg }) {
+  const notices = useLegNotices(leg);
+  return notices.length ? <div><NoticeBadge notices={notices} /></div> : null;
 }
