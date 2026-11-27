@@ -1,5 +1,6 @@
 export * from "./transit.js";
 export * from "./serviceAlert.js";
+export * from "./serviceNotices.js";
 export * from "./scheduleTile.js";
 export * from "./colorConfig.js";
 export * from "./adapter.js";

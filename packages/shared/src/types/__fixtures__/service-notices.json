@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "notices": [
+    {
+      "id": "vilnius-2026-christmas-bus",
+      "routeIds": ["vilnius_bus_201"],
+      "kind": "seasonal",
+      "free": true,
+      "windows": [{ "start": "2026-11-27T22:00:00Z", "end": "2026-12-31T22:00:00Z" }],
+      "displayUntil": "2026-12-31",
+      "text": { "lt": "Nemokamas Kalėdinis autobusas" },
+      "source": "https://example.org/christmas-bus"
+    },
+    {
+      "id": "vilnius-2026-tree-lighting-free",
+      "city": true,
+      "kind": "free",
+      "free": true,
+      "windows": [{ "start": "2026-11-28T13:00:00Z", "end": "2026-11-28T22:00:00Z" }],
+      "displayUntil": "2026-11-28",
+      "source": "https://example.org/tree-lighting"
+    },
+    {
+      "id": "vilnius-2026-choir",
+      "routeIds": ["vilnius_expressbus_1G"],
+      "kind": "event",
+      "free": false,
+      "windows": [
+        { "start": "2026-12-02T22:00:00Z", "end": "2026-12-03T22:00:00Z" },
+        { "start": "2026-12-13T22:00:00Z", "end": "2026-12-14T22:00:00Z" }
+      ],
+      "displayUntil": "2026-12-14",
+      "source": "https://example.org/choir"
+    }
+  ]
+}
