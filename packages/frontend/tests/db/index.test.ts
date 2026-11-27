@@ -34,8 +34,8 @@ describe("ptn database", () => {
 describe("schema declaration", () => {
   it("adds downloaded-city storage in version 2 without changing the version-1 schema", () => {
     const decls = migrationCoordinator.declaredMigrations();
-    expect(decls).toHaveLength(8);
-    const {offlineCities, offlineTransfers, offlineCityMetadata, personalUsage, cityUsageStats, cityArtifacts: _artifacts, cityArtifactMetadata: _artifactMetadata, cityCachePointers: _pointers, cityShapes: _shapes, sharedArtifactMetadata: _sharedMetadata, ...current} = STORES;
+    expect(decls).toHaveLength(9);
+    const {offlineCities, offlineTransfers, offlineCityMetadata, personalUsage, cityUsageStats, cityArtifacts: _artifacts, cityArtifactMetadata: _artifactMetadata, cityCachePointers: _pointers, cityShapes: _shapes, sharedArtifactMetadata: _sharedMetadata, serviceNotices, ...current} = STORES;
     expect(personalUsage).toBe("id");
     expect(cityUsageStats).toBe("id");
     expect(decls[0]).toMatchObject({id: "ptn", version: 1});
@@ -68,6 +68,8 @@ describe("schema declaration", () => {
       stores: {personalUsage: "id", recentLocations, savedLocations, usageStats, cityUsageStats: "id"},
     });
     expect([recentLocations, savedLocations, usageStats]).toEqual(["id", "id", "stopId"]);
+    expect(decls[8]).toMatchObject({id: "service-notices", version: 9, stores: {serviceNotices: "cityId"}});
+    expect(serviceNotices).toBe("cityId");
   });
 
   it("classifies every declared table in TABLE_KIND", () => {

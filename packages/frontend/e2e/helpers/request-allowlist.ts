@@ -73,12 +73,12 @@ export const REQUEST_RULES: readonly Rule[] = [
   {
     group: "transit-data",
     description:
-      "City catalog, timetable bundle and tiles, stops, shapes, transfers, colors, place data and walking graph.",
+      "City catalog, timetable bundle and tiles, stops, shapes, transfers, service notices, colors, place data and walking graph.",
     matches: (u) =>
       u.pathname === "/api/cities" ||
       /^\/api\/gtfs\/poi-tile\//.test(u.pathname) ||
       API(
-        "(?:gtfs/(?:manifest|schedule-tile/|shapes/)|raptor-bundle|ready$|version$|health|color-config|stops/all|transfers/fetch|route-geometry/fetch|departures|healthy-stops|address-search/(?:manifest|bundle))",
+        "(?:gtfs/(?:manifest|schedule-tile/|shapes/)|raptor-bundle|ready$|version$|health|color-config|stops/all|transfers/fetch|route-geometry/fetch|notices/fetch|departures|healthy-stops|address-search/(?:manifest|bundle))",
       ).test(u.pathname) ||
       /^\/(?:poi|osm|walk-graph)\//.test(u.pathname) ||
       u.pathname === "/geocoder-config.json",

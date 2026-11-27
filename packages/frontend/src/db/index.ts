@@ -307,6 +307,21 @@ export interface PoiTileGenerationRecord {
   manifestGeneratedAt?: number;
 }
 
+// ── Service notices ─────────────────────────────────────────────────────────
+
+/**
+ * Editor-approved service notices of a city's served generation
+ * (`/api/<city>/notices/fetch`), a few kilobytes. Replaced when a new
+ * generation advertises a different hash; deleted when it advertises none.
+ */
+export interface ServiceNoticesRecord {
+  cityId: string;
+  hash: string;
+  sizeBytes: number;
+  storedAt: number;
+  notices: import("@pt/shared").ServiceNotice[];
+}
+
 // ── Address-search bundle cache ────────────────────────────────────────────
 
 export interface AddressSearchArtifactRecord {
@@ -575,6 +590,7 @@ interface PtnTables {
   scheduleTileCache: EntityTable<ScheduleTileCacheRecord, "key">;
   gbfsSystems: EntityTable<GbfsSystemRow, "key">;
   addressSearchArtifacts: EntityTable<AddressSearchArtifactRecord, "cityId">;
+  serviceNotices: EntityTable<ServiceNoticesRecord, "cityId">;
 }
 
 export type PtnTableName = keyof PtnTables;
@@ -621,6 +637,7 @@ export const TABLE_KIND = {
   scheduleTileCache: "server-derived",
   gbfsSystems: "server-derived",
   addressSearchArtifacts: "server-derived",
+  serviceNotices: "server-derived",
   offlineCities: "retained-download",
   offlineTransfers: "retained-download",
   offlineCityMetadata: "retained-download",
@@ -662,6 +679,7 @@ export const STORES = {
   gbfsSystems: "key",
   poiTileGenerations: "cityId",
   addressSearchArtifacts: "cityId",
+  serviceNotices: "cityId",
 } as const satisfies Record<PtnTableName, string>;
 
 // Register schema versions through the coordinator so a subsystem that adds a
@@ -674,6 +692,7 @@ migrationCoordinator.reserve({
     ...Object.fromEntries(Object.entries(STORES).filter(([name]) => ![
       "offlineCities", "offlineTransfers", "offlineCityMetadata", "personalUsage", "cityUsageStats",
       "cityArtifacts", "cityArtifactMetadata", "cityCachePointers", "cityShapes", "sharedArtifactMetadata",
+      "serviceNotices",
     ].includes(name))),
     // Version-1 shape of the personal tables (changed in version 3 below).
     usageStats: "stopId, lastTapped",
@@ -738,6 +757,8 @@ migrationCoordinator.reserve({id: "personal-encrypted-storage", version: 8,
   stores: {...PERSONAL_SHAPES, cityUsageStats: "id"},
   upgrade: addLegacyOfflineCityMetadata,
 });
+
+migrationCoordinator.reserve({id: "service-notices", version: 9, stores: {serviceNotices: STORES.serviceNotices}});
 
 for (const decl of migrationCoordinator.declaredMigrations()) {
   const v = db.version(decl.version).stores(decl.stores);

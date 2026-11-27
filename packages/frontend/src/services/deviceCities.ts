@@ -5,6 +5,7 @@ import type {CityConfig} from "../config/cities.ts";
 import {collectCityArtifacts, hasCachedCityArtifact, pinCityArtifact, readCityArtifact} from "./cityArtifacts.ts";
 import {useCityDataStore} from "./cityData.ts";
 import {canonicalCityId} from "../utils/cityId.ts";
+import {clearServiceNotices} from "./serviceNoticesStore.ts";
 
 const SNAPSHOT_TABLES = ["gtfsRoutes", "gtfsTrips", "gtfsServices", "gtfsStops", "gtfsShapes", "gtfsSyncMeta", "stopGroups", "gtfsBundle", "ptbBytes"] as const;
 
@@ -87,6 +88,7 @@ export async function removeDeviceCity(cityId: string): Promise<void> {
     await db.offlineCities.delete(cityId);
     await db.offlineCityMetadata.delete(cityId);
   });
+  await clearServiceNotices(cityId);
   await collectCityArtifacts(null);
 }
 
