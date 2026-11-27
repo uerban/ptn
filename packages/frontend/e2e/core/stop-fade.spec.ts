@@ -5,6 +5,8 @@ import { mockApi } from "../helpers/mock-api";
 // presentation contract from timetable timing while exercising MapLibre and
 // the actual HTML-marker/feature-state integration.
 test("urban stop exit fades card and dot together without accepting clicks @mock-api", async ({ page }) => {
+  // This scenario mounts two maps and exercises several transitions before teardown.
+  test.setTimeout(60_000);
   const vite = await page.request.get("/@vite/client");
   test.skip(!vite.ok() || !(await vite.text()).includes("vite"), "Controlled component harness requires the Vite development server");
   const serviceTime = new Date("2026-05-05T12:00:00+03:00");
