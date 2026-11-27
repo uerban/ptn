@@ -6,7 +6,7 @@ import { useSettingsStore } from "../../../stores/settingsStore.ts";
 import { useRtStore } from "../../../stores/rtStore.ts";
 import { useTranslation } from "../../../i18n/index.ts";
 import { serverTime } from "../../../services/serverTime.ts";
-import { selectVerifiedDifferentJourney, selectVerifiedLaterJourney } from "../../../services/verifiedLaterJourney.ts";
+import { selectVerifiedDifferentJourneys, selectVerifiedLaterJourney } from "../../../services/verifiedLaterJourney.ts";
 import { formatTime } from "./format.ts";
 import { deriveItineraryDisplay, shownTripSpan } from "./itineraryDisplay.ts";
 
@@ -79,10 +79,12 @@ export function LaterJourney({
     return routeId ? [routeId] : [];
   }))].sort());
   const shownFirstRoutes: string[] = JSON.parse(shownRoutesKey);
-  const different = useRtStore((state) => showAlternative && canRequest && requested && completed && firstRide?.routeId
-    ? selectVerifiedDifferentJourney(firstRide.routeId, probe.differentPlans.filter((plan) => eligible(plan, state) &&
+  useRtStore((state) => canRequest && requested && completed ? state.updates : null);
+  const realtime = useRtStore.getState();
+  const different = showAlternative && canRequest && requested && completed && firstRide?.routeId
+    ? selectVerifiedDifferentJourneys(firstRide.routeId, probe.differentPlans.filter((plan) => eligible(plan, realtime) &&
       !shownFirstRoutes.includes(plan.legs.find(leg => leg.mode !== "WALK")?.routeId ?? "")), constraints)
-    : null);
+    : [];
   const retainedLater = later !== null && itineraries.includes(later);
   const skipSameLine = requested ? request.skipSameLine : retainedLater;
   const primaryLeaveMs = Date.parse(primary.departureTime);
@@ -138,7 +140,7 @@ export function LaterJourney({
     {requested ? t("search.looking_for_departures", "Checking departures…") :
       t("search.show_journey_alternatives", "Show alternatives")}
   </button>;
-  if (!later && !different) {
+  if (!later && different.length === 0) {
     if (!canRequest || (missed && !batterySaver) || !Number.isFinite(probeFloor) || !withinDeadline ||
       display.catchStatus === "cancelled" || display.catchStatus === "removed") return null;
     return (
@@ -154,20 +156,22 @@ export function LaterJourney({
   })).departureTime, formattingLocale, feedTz);
   return (
     <div className="flex flex-col items-start gap-1 px-3 pb-2">
-      {retainedLater && !different && canRequest && !batterySaver && !!findDifferentPlans &&
+      {retainedLater && different.length === 0 && canRequest && !batterySaver && !!findDifferentPlans &&
         withinDeadline && !completed && requestButton}
       {later && <button type="button" onClick={() => onSelect(later)} className="text-left text-sm text-accent underline">
         {t("search.later_journey", "Also leaves at {departure} · arrives at {arrival}")
           .replace("{departure}", formatDeparture(later))
           .replace("{arrival}", formatTime(later.arrivalTime, formattingLocale, feedTz))}
       </button>}
-      {different && <button type="button" onClick={() => onSelect(different)} className="text-left text-sm text-accent underline">
+      {different.map((different) => <button key={JSON.stringify(different.legs.map(leg => leg.routeId))} type="button" onClick={() => onSelect(different)} className="text-left text-sm text-accent underline">
         {t("search.different_journey", "Take {lines} · leaves {departure} · arrives {arrival}")
           .replace("{lines}", different.legs.filter((leg) => leg.mode !== "WALK").map((leg) => leg.routeShortName ?? leg.mode).join(" → "))
           .replace("{departure}", formatDeparture(different))
           .replace("{arrival}", formatTime(different.arrivalTime, formattingLocale, feedTz))}
         {" · "}{t("search.alternative_transfer_count", "Transfers: {n}").replace("{n}", String(different.transfers))}
-      </button>}
+        {" · "}{t("unit.meters", "{n} m").replace("{n}",
+          `${different.walkingDistanceEstimated ? "~" : ""}${Math.round(different.walkingDistanceMeters)}`)} {t("route.walk", "walk")}
+      </button>)}
     </div>
   );
 }

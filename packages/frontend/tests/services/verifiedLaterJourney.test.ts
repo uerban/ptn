@@ -1,6 +1,6 @@
 import type { Itinerary } from "@pt/shared";
 import { describe, expect, it } from "vitest";
-import { interchangeableRide, selectVerifiedDifferentJourney, selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
+import { interchangeableRide, selectVerifiedDifferentJourneys, selectVerifiedLaterJourney } from "../../src/services/verifiedLaterJourney.ts";
 import { makeMixedItinerary } from "../helpers/makeItinerary.ts";
 
 const shift = (time: string, minutes: number) =>
@@ -95,7 +95,14 @@ it("only offers the different-route journey when every ride avoids the excluded 
   const excluded = "primary-line";
   const constraints = { earliestLeaveMs: Date.parse(candidate.departureTime), arriveByMs: Date.parse(candidate.arrivalTime) };
   const shared = { ...candidate, legs: [candidate.legs[0], { ...candidate.legs[1], routeId: excluded }, candidate.legs[2]] };
-  expect(selectVerifiedDifferentJourney(excluded, [shared, candidate], constraints)).toBe(candidate);
-  expect(selectVerifiedDifferentJourney(excluded, [candidate], { ...constraints, arriveByMs: constraints.arriveByMs - 1 })).toBeNull();
-  expect(selectVerifiedDifferentJourney(excluded, [candidate], { ...constraints, earliestLeaveMs: constraints.earliestLeaveMs + 1 })).toBeNull();
+  expect(selectVerifiedDifferentJourneys(excluded, [shared, candidate], constraints)).toEqual([candidate]);
+  expect(selectVerifiedDifferentJourneys(excluded, [candidate], { ...constraints, arriveByMs: constraints.arriveByMs - 1 })).toEqual([]);
+  expect(selectVerifiedDifferentJourneys(excluded, [candidate], { ...constraints, earliestLeaveMs: constraints.earliestLeaveMs + 1 })).toEqual([]);
+  const lessWalking = { ...candidate, walkingDistanceMeters: 0, legs: candidate.legs.map(leg =>
+    leg.mode === "WALK" ? leg : { ...leg, routeId: "direct-choice" }) };
+  const longerWalk = { ...candidate, walkingDistanceMeters: 500 };
+  const sameChain = { ...candidate, walkingDistanceMeters: 10 };
+  expect(selectVerifiedDifferentJourneys(excluded, [longerWalk, sameChain, lessWalking], constraints))
+    .toEqual([longerWalk, lessWalking]);
+
 });

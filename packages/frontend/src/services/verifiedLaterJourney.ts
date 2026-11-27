@@ -107,13 +107,22 @@ export function interchangeableRide(
   return fixedRides > 0 ? replacement : null;
 }
 
-/** Select a route-disjoint candidate already validated for the same journey query. */
-export function selectVerifiedDifferentJourney(
+/** Keep the first verified choice and one distinct route with a walking or transfer benefit. */
+export function selectVerifiedDifferentJourneys(
   excludedRouteId: string, planned: readonly Itinerary[],
   { earliestLeaveMs, arriveByMs = Infinity }: LaterJourneyConstraints,
-): Itinerary | null {
-  return planned.find((candidate) => !candidate.cancelled && !candidate.timingUnreliable &&
+): Itinerary[] {
+  const eligible = planned.filter((candidate) => !candidate.cancelled && !candidate.timingUnreliable &&
     candidate.legs.some((leg) => leg.mode !== "WALK") &&
     candidate.legs.every((leg) => leg.mode === "WALK" || (!!leg.routeId && leg.routeId !== excludedRouteId)) &&
-    hasValidTimeline(candidate, earliestLeaveMs, arriveByMs)) ?? null;
+    hasValidTimeline(candidate, earliestLeaveMs, arriveByMs));
+  const first = eligible[0];
+  if (!first) return [];
+  const routeChain = (candidate: Itinerary) => JSON.stringify(candidate.legs
+    .filter(leg => leg.mode !== "WALK").map(leg => leg.routeId));
+  const firstChain = routeChain(first);
+  const tradeoff = eligible.slice(1).find(candidate =>
+    (candidate.transfers < first.transfers || candidate.walkingDistanceMeters < first.walkingDistanceMeters) &&
+    routeChain(candidate) !== firstChain);
+  return tradeoff ? [first, tradeoff] : [first];
 }
