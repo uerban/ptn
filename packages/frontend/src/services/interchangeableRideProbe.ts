@@ -85,6 +85,7 @@ export async function probeInterchangeableRide(primary: Itinerary, index: Raptor
   let remaining = MAX_ROUTE_PROBES;
   for (const routeId of routeIds) {
     if (signal.aborted) return [];
+    if (remaining === 0) break;
     const initialFloor = effectiveTransferFloor(index, { toStopId: board, tripId: previous.tripId, routeId: previous.routeId },
       { fromStopId: board, routeId }, minTransferSecs);
     const timed = earlierTimedTrip(index, { ...previous, tripId: previous.tripId, routeId: previous.routeId },
