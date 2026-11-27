@@ -58,6 +58,8 @@ struct SourceNotice {
     text: Option<BTreeMap<String, String>>,
     #[serde(default)]
     icon: Option<String>,
+    #[serde(default)]
+    trips: Option<Vec<String>>,
     source: String,
 }
 
@@ -84,6 +86,8 @@ struct Notice {
     text: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trips: Option<Vec<String>>,
     source: String,
 }
 
@@ -210,6 +214,34 @@ fn convert(notice: SourceNotice, zone: &TimeZone) -> Result<Notice> {
                 ))
             }
         };
+    let trips = match notice.trips {
+        None => None,
+        Some(starts) => {
+            let timed = windows.len() == 1 && notice.from.as_deref().is_some_and(|f| f.len() == 16);
+            let one_route = route_ids.as_ref().is_some_and(|r| r.len() == 1);
+            if notice.kind != "event" || !timed || !one_route || starts.is_empty() {
+                return Err(invalid(
+                    id,
+                    "trips need kind \"event\", exactly one route and a from/to datetime window",
+                ));
+            }
+            let mut resolved = starts
+                .iter()
+                .map(|start| instant(id, zone, parse_datetime(id, start)?))
+                .collect::<Result<Vec<_>>>()?;
+            resolved.sort();
+            if resolved.windows(2).any(|pair| pair[0] == pair[1]) {
+                return Err(invalid(id, "duplicate trip start"));
+            }
+            if let Some(outside) = resolved
+                .iter()
+                .find(|start| **start < windows[0].start || **start >= windows[0].end)
+            {
+                return Err(invalid(id, format!("trip {outside} is outside from/to")));
+            }
+            Some(resolved)
+        }
+    };
     Ok(Notice {
         id: notice.id,
         route_ids,
@@ -220,6 +252,7 @@ fn convert(notice: SourceNotice, zone: &TimeZone) -> Result<Notice> {
         display_until: display_until.to_string(),
         text: notice.text,
         icon: notice.icon,
+        trips,
         source: notice.source,
     })
 }
@@ -335,6 +368,33 @@ mod tests {
             json!([{"start": "2026-12-03T16:00:00Z", "end": "2026-12-03T17:27:00Z"}])
         );
         assert_eq!(notice["text"], json!({"lt": "Choras"}));
+    }
+
+    #[test]
+    fn trips_resolve_to_sorted_utc_first_stop_starts() {
+        let choir = |changes: Value| {
+            let mut notice = json!({"id": "choir-1g", "routes": ["r"], "kind": "event",
+                                    "from": "2026-12-03T18:00", "to": "2026-12-03T19:27",
+                                    "trips": ["2026-12-03T18:45", "2026-12-03T18:00"], "source": SOURCE});
+            for (key, value) in changes.as_object().unwrap() {
+                notice[key] = value.clone();
+            }
+            build(json!([notice]))
+        };
+        assert_eq!(
+            choir(json!({})).unwrap()["notices"][0]["trips"],
+            json!(["2026-12-03T16:00:00Z", "2026-12-03T16:45:00Z"])
+        );
+        for bad in [
+            json!({"routes": ["r", "s"]}),
+            json!({"kind": "seasonal"}),
+            json!({"trips": []}),
+            json!({"trips": ["2026-12-03T19:30"]}),
+            json!({"trips": ["2026-12-03T18:00", "2026-12-03T18:00"]}),
+            json!({"from": "2026-12-03", "to": "2026-12-03"}),
+        ] {
+            assert!(choir(bad.clone()).is_err(), "accepted {bad}");
+        }
     }
 
     #[test]

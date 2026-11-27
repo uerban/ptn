@@ -23,6 +23,7 @@ describe("service notices contract", () => {
     ];
     expect(Object.keys(body.notices[0]!).sort()).toEqual(keys);
     expect(body.notices.some((n) => n.city === true && n.routeIds === undefined)).toBe(true);
+    expect(body.notices.some((n) => n.trips?.length === 2 && n.routeIds?.length === 1)).toBe(true);
   });
 
   it("rejects an unknown schema version", () => {
@@ -47,6 +48,14 @@ describe("service notices contract", () => {
     ["empty icon", (n: Record<string, unknown>) => { n.icon = ""; }],
     ["word icon", (n: Record<string, unknown>) => { n.icon = "🎄 bus"; }],
     ["long icon", (n: Record<string, unknown>) => { n.icon = "🎄🎄🎄🎄🎄"; }],
+    ["non-UTC trip", (n: Record<string, unknown>) => { n.trips = ["2026-12-03T18:00"]; }],
+    ["trips on two routes", (n: Record<string, unknown>) => {
+      n.routeIds = ["a", "b"];
+      n.trips = ["2026-12-03T16:00:00Z"];
+    }],
+    ["duplicate trips", (n: Record<string, unknown>) => {
+      n.trips = ["2026-12-03T16:00:00Z", "2026-12-03T16:00:00Z"];
+    }],
   ])("rejects a malformed notice: %s", (_name, mutate) => {
     const body = clone(golden) as { notices: Record<string, unknown>[] };
     mutate(body.notices[0]!);

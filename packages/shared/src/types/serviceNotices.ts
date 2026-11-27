@@ -41,6 +41,13 @@ export interface ServiceNotice {
   text?: Record<string, string>;
   /** Optional editor-chosen badge, one emoji (🎄 Christmas bus, 🔔 choir trip). */
   icon?: string;
+  /**
+   * Scheduled first-stop departures (UTC instants) of the trips the notice
+   * rides, e.g. the one vehicle a choir sings on. Only with a single
+   * {@link routeIds} entry; when set, only those trips match, not every
+   * departure in the window.
+   */
+  trips?: string[];
   /** `https` link to the operator's announcement. */
   source: string;
 }
@@ -83,7 +90,7 @@ function isWindow(value: unknown): value is ServiceNoticeWindow {
 
 function isNotice(value: unknown): value is ServiceNotice {
   if (!isRecord(value)) return false;
-  const { id, routeIds, city, kind, free, windows, displayUntil, text, icon, source } = value;
+  const { id, routeIds, city, kind, free, windows, displayUntil, text, icon, trips, source } = value;
   const hasRoutes = routeIds !== undefined;
   if (hasRoutes === (city !== undefined)) return false;
   if (hasRoutes && !(Array.isArray(routeIds) && routeIds.length > 0 && routeIds.every(isNonEmptyString))) {
@@ -91,6 +98,11 @@ function isNotice(value: unknown): value is ServiceNotice {
   }
   if (!hasRoutes && city !== true) return false;
   if (icon !== undefined && !isIcon(icon)) return false;
+  if (trips !== undefined && !(
+    Array.isArray(routeIds) && routeIds.length === 1 &&
+    Array.isArray(trips) && trips.length > 0 && new Set(trips).size === trips.length &&
+    trips.every((t) => typeof t === "string" && UTC_INSTANT.test(t))
+  )) return false;
   if (text !== undefined && !(isRecord(text) && Object.values(text).every(isNonEmptyString))) return false;
   return (
     isNonEmptyString(id) &&
