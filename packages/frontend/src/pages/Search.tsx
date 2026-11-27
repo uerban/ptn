@@ -677,7 +677,7 @@ export function SearchPage() {
         const results = await useRoutingStore.getState().search(from, to, at, { probe: signal, firstRide: { ...firstRide, direct: true } });
         if (!results || signal.aborted) return [];
         return convertRaptorResults(results, at, from, to, feedTz, serviceDateYmdFor(at, feedTz), endpointLabels);
-      });
+      }, feedTz);
   }, [raptorIndex, excludedModes, excludedRouteGroupsByCity, feedTz, endpointLabels]);
 
   const transitousQueryKey =

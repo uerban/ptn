@@ -46,3 +46,37 @@ it("discovers a compatible line using the rider transfer floor and preserves the
   expect(await probeInterchangeableRide(primary, index, 120, new Set(), new Set(), signal, probe)).toEqual([]);
   expect(probe).not.toHaveBeenCalled();
 });
+
+it("discovers an earlier timed trip without admitting a competing trip below the broader floor", async () => {
+  const primary = makeMixedItinerary();
+  const fixed = primary.legs[0];
+  const timed = { ...primary.legs[1], routeId: "ALT", tripId: "timed",
+    departureTime: "2026-04-23T12:09:00Z", arrivalTime: "2026-04-23T12:17:00Z" };
+  const competing = { ...timed, tripId: "competing", departureTime: "2026-04-23T12:08:30Z" };
+  const index: RaptorIndex = {
+    routes: [], routesAtStop: new Map(), routeIdToIdx: new Map(),
+    services: new Map([["active", { serviceId: "active", days: Array(7).fill(true),
+      startDate: "20260423", endDate: "20260423", exceptions: {} }]]),
+    patternsAtStop: new Map([["s2", [0]]]),
+    patterns: [{ id: "ALT", shortName: "4", mode: "TRAM", stopIds: ["s2", "s3"], trips: [
+      { tripId: "competing", serviceId: "active", headsign: "C", departureSecs: [43710, 44220] },
+      { tripId: "timed", serviceId: "active", headsign: "C", departureSecs: [43740, 44220] },
+    ] }],
+    transferRulesTripScoped: new Map([[transferTripScopedKey("s2", "s2", fixed.tripId!, "timed"), { type: 1 }]]),
+  };
+  const probe = vi.fn<Parameters<typeof probeInterchangeableRide>[6]>(async (_from, _to, at, constraint) => {
+    const ride = constraint.tripId === timed.tripId ? timed : competing;
+    return Date.parse(ride.departureTime) >= at.getTime() ? [{ ...primary, legs: [ride] }] : [];
+  });
+  const options = await probeInterchangeableRide(primary, index, 120, new Set(), new Set(),
+    new AbortController().signal, probe, "UTC");
+  expect(options.map(plan => plan.legs[1].tripId)).toEqual(["timed"]);
+  expect(probe).toHaveBeenCalledTimes(1);
+
+  index.transferRulesRouteScoped = new Map([[transferRouteScopedKey("s2", "s2", fixed.routeId!, "ALT"), { type: 3 }]]);
+  probe.mockClear();
+  const allowed = await probeInterchangeableRide(primary, index, 120, new Set(), new Set(),
+    new AbortController().signal, probe, "UTC");
+  expect(allowed.map(plan => plan.legs[1].tripId)).toEqual(["timed"]);
+  expect(probe).toHaveBeenCalledTimes(1);
+});
