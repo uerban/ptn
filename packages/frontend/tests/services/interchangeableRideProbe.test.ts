@@ -47,7 +47,7 @@ it("discovers a compatible line using the rider transfer floor and preserves the
   expect(probe).not.toHaveBeenCalled();
 });
 
-it("discovers an earlier timed trip without admitting a competing trip below the broader floor", async () => {
+it.each([false, true])("discovers the usable timed trip when the earlier trip also has a scoped rule: %s", async (bothScoped) => {
   const primary = makeMixedItinerary();
   const fixed = primary.legs[0];
   const timed = { ...primary.legs[1], routeId: "ALT", tripId: "timed",
@@ -59,14 +59,15 @@ it("discovers an earlier timed trip without admitting a competing trip below the
       startDate: "20260423", endDate: "20260423", exceptions: {} }]]),
     patternsAtStop: new Map([["s2", [0]]]),
     patterns: [{ id: "ALT", shortName: "4", mode: "TRAM", stopIds: ["s2", "s3"], trips: [
-      { tripId: "competing", serviceId: "active", headsign: "C", departureSecs: [43710, 44220] },
+      { tripId: "competing", serviceId: "active", headsign: "C", departureSecs: [43710, 44220], dropOffTypes: [0, 1] },
       { tripId: "timed", serviceId: "active", headsign: "C", departureSecs: [43740, 44220] },
     ] }],
     transferRulesTripScoped: new Map([[transferTripScopedKey("s2", "s2", fixed.tripId!, "timed"), { type: 1 }]]),
   };
+  if (bothScoped) index.transferRulesTripScoped!.set(transferTripScopedKey("s2", "s2", fixed.tripId!, "competing"), { type: 1 });
   const probe = vi.fn<Parameters<typeof probeInterchangeableRide>[6]>(async (_from, _to, at, constraint) => {
     const ride = constraint.tripId === timed.tripId ? timed : competing;
-    return Date.parse(ride.departureTime) >= at.getTime() ? [{ ...primary, legs: [ride] }] : [];
+    return ride === timed && Date.parse(ride.departureTime) >= at.getTime() ? [{ ...primary, legs: [ride] }] : [];
   });
   const options = await probeInterchangeableRide(primary, index, 120, new Set(), new Set(),
     new AbortController().signal, probe, "UTC");

@@ -36,10 +36,13 @@ function earlierTimedTrip(index: RaptorIndex, previous: Leg & { tripId: string; 
     const pattern = index.patterns?.[id];
     if (!pattern || pattern.id !== routeId) continue;
     for (const [position, stopId] of pattern.stopIds.entries()) {
-      if (stopId !== board || pattern.stopIds.indexOf(alight, position + 1) === -1) continue;
+      if (stopId !== board) continue;
+      const alightPositions = pattern.stopIds.flatMap((id, i) => i > position && id === alight ? [i] : []);
+      if (!alightPositions.length) continue;
       for (const trip of pattern.trips) {
         if (!trip.tripId || (trip.pickupTypes?.[position] ?? 0) !== 0 ||
-            (trip.ptbTripIdx !== undefined && index.frequenciesByTrip?.has(trip.ptbTripIdx))) continue;
+            (trip.ptbTripIdx !== undefined && index.frequenciesByTrip?.has(trip.ptbTripIdx)) ||
+            (trip.dropOffTypes && alightPositions.every(i => trip.dropOffTypes?.[i] === 1))) continue;
         const required = effectiveTransferFloor(index, { toStopId: board, tripId: previous.tripId, routeId: previous.routeId },
           { fromStopId: board, routeId, tripId: trip.tripId }, minTransferSecs);
         if (required === null || (floor !== null && required >= floor)) continue;
