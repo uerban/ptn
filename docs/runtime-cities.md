@@ -150,6 +150,35 @@ additional schedule tiles and policy-permitted places can be warmed using
 Live updates and server-only place search still need a connection. A package
 does not promise every map, address or schedule detail is installed.
 
+## Service notices
+
+A generation may carry `service-notices.json`: editor-approved special
+services such as a free Christmas bus, a choir singing on one vehicle or a
+free-transport evening. The producer builds it from `--notices`
+(`notices/<city>.json` in the feed catalog), converts local times to UTC
+windows with the city zone, and adds the file's hash to the publication
+inputs, so a notices-only change publishes a new generation. Nothing is
+derived from the feed itself; a route never gets a notice unless an editor
+approved one.
+
+Notices are served by `pt-serve` only, at `GET /api/<city>/notices/fetch`
+(strong ETag, `If-None-Match` answers `304`, optional gzip). The
+`raptor-bundle` response advertises them with `X-PT-Notices-Artifact-Url`,
+`-Hash` and `-Size`; the headers are absent when the generation has none.
+Reverse proxies that allowlist API paths must include `notices/fetch` (see
+`examples/native/Caddyfile`).
+
+The app fetches the file only when the advertised hash changes, checks size
+and SHA-256, and keeps it with the city so badges work offline. A missing
+header clears the stored notices. Matching uses the scheduled boarding time
+against half-open windows: a route notice marks legs and departures of its
+routes, a city notice marks every transit leg, and a trip-level notice marks
+only the trips whose first-stop departure matches a listed start. Active
+notices also appear in a "Special this season" list with the trips to catch.
+An optional reminder asks for notification permission only when tapped, is
+hidden where notifications are unsupported, and is scheduled on the device;
+there is no server push.
+
 ## Deployment requirements
 
 Production deployments must publish the backend catalog at `/api/cities` and a

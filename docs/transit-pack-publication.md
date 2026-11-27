@@ -24,6 +24,11 @@ pack and generation, with no duplicate geometry choice. The command prints a
 receipt containing the city, allocated sequence, head hash and pack identity.
 A renewal of the same accepted exports receives a new sequence and expiry.
 
+A generation's optional `service-notices.json` is part of the signed inventory
+like any other generation file. Because its hash is a publication input, an
+editor's notices change alone yields a new generation and needs a new export
+and publication; see [service notices](runtime-cities.md#service-notices).
+
 Serve **only `/srv/transit-publisher/public`**. Keep the publisher root and its
 `private` subtree off the web server. The signing key remains outside the
 repository. Retain and back up the private ledger together with the public tree.
