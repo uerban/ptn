@@ -32,6 +32,16 @@ test.describe("Service notices @mock-api", () => {
     for (const url of calls) expect(new URL(url).search).toBe("");
   });
 
+  test("the home screen lists the special service with its source", async ({ page }) => {
+    await mockApi(page, { notices: NOTICES });
+    await page.goto("/");
+    const list = page.getByTestId("special-services");
+    await expect(list).toBeVisible({ timeout: 20_000 });
+    await expect(list).toContainText("Special lines this season");
+    await expect(list).toContainText("Free rides on the city's day");
+    await expect(list.getByRole("link", { name: /Announcement/ })).toHaveAttribute("href", "https://operator.example/free");
+  });
+
   test("no notices header, no request and no badge", async ({ page }) => {
     const calls: string[] = [];
     page.on("request", (r) => { if (r.url().includes("/notices/fetch")) calls.push(r.url()); });

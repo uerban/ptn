@@ -12,6 +12,7 @@ import { useWatchPosition } from "../hooks/useWatchPosition.ts";
 import { restoreReturnFocus, type TemporaryMap } from "../presentation/temporaryMap.ts";
 import { useShowMapAction } from "../presentation/ShowMapAction.tsx";
 import { WhatsNewCard } from "../components/WhatsNew/WhatsNewCard.tsx";
+import { SpecialServicesList } from "../components/ServiceNotices/SpecialServicesList.tsx";
 
 /**
  * A line opened from a departure list is shown on its own page here: the
@@ -75,6 +76,7 @@ export function TextHome({ temporaryMap, selectedStop, onSelectStop }: TextHomeP
     (showStop: (stop: Stop) => void) => (
       <>
         <WhatsNewCard placement="inline" />
+        <SpecialServicesList />
         <NearbyDepartures showStop={showStop} />
       </>
     ),

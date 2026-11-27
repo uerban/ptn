@@ -76,25 +76,33 @@ function previousDay(ymd: number): number {
   return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 
+/** One scheduled run of a trip a notice names: its trip, service date and first-stop instant. */
+export interface NoticeTripRun {
+  noticeId: string;
+  routeId: string;
+  tripId: string;
+  serviceDate: number;
+  startUnix: number;
+}
+
 /**
- * Resolve each trip-level notice's first-stop starts to trip ids: a trip
- * matches a start when it runs on that service date and leaves its first
- * stop exactly then. A start after midnight also tries the previous service
- * date (GTFS 24:xx times).
+ * Resolve each trip-level notice's first-stop starts to the bundle's trips:
+ * a trip matches a start when it runs on that service date and leaves its
+ * first stop exactly then. A start after midnight also tries the previous
+ * service date (GTFS 24:xx times). Runs come back in start order.
  */
-export function resolveNoticeTrips(
+export function resolveNoticeTripRuns(
   notices: readonly ServiceNotice[],
   routes: readonly RoutingBundleRoute[],
   calendar: readonly RoutingBundleService[],
   tz: string,
-): Map<string, Set<string>> {
+): NoticeTripRun[] {
   const services = new Map(calendar.map(s => [s.serviceId, s]));
-  const result = new Map<string, Set<string>>();
+  const runs: NoticeTripRun[] = [];
   for (const notice of notices) {
     if (!notice.trips || notice.routeIds?.length !== 1) continue;
     const route = routes.find(r => r.id === notice.routeIds![0]);
     if (!route) continue;
-    const found = new Set<string>();
     for (const start of notice.trips) {
       const unix = Date.parse(start) / 1000;
       const date = unixToServiceDate(unix, tz);
@@ -103,12 +111,27 @@ export function resolveNoticeTrips(
           const first = trip.departureSecs.find(secs => secs >= 0);
           const service = services.get(trip.serviceId);
           if (first !== undefined && service && serviceDayToUnix(ymd, first, tz) === unix && serviceActive(service, ymd)) {
-            found.add(trip.tripId);
+            runs.push({ noticeId: notice.id, routeId: route.id, tripId: trip.tripId, serviceDate: ymd, startUnix: unix });
           }
         }
       }
     }
-    if (found.size) result.set(notice.id, found);
+  }
+  return runs.sort((a, b) => a.startUnix - b.startUnix);
+}
+
+/** Notice id → the trip ids its starts resolved to (see `resolveNoticeTripRuns`). */
+export function resolveNoticeTrips(
+  notices: readonly ServiceNotice[],
+  routes: readonly RoutingBundleRoute[],
+  calendar: readonly RoutingBundleService[],
+  tz: string,
+): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  for (const run of resolveNoticeTripRuns(notices, routes, calendar, tz)) {
+    const set = result.get(run.noticeId) ?? new Set<string>();
+    set.add(run.tripId);
+    result.set(run.noticeId, set);
   }
   return result;
 }
