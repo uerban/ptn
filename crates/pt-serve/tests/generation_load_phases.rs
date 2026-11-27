@@ -151,6 +151,7 @@ const EXPECTED_PHASES: &[&str] = &[
     "page_warm",
     "schedule_tiles",
     "address_search",
+    "notices",
 ];
 
 fn phase_lines(stderr: &str) -> Vec<&str> {

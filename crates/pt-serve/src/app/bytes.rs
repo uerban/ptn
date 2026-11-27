@@ -49,6 +49,11 @@ pub fn raptor_bundle(
                 hash: h.trim_matches('"').to_string(),
                 size: gen.route_geometry_bytes_len(),
             }),
+        notices: gen.notices.as_ref().map(|n| ArtifactProvenance {
+            url: format!("/api/{city}/notices/fetch"),
+            hash: n.hash().to_string(),
+            size: n.body.len() as u64,
+        }),
     };
 
     if if_none_match == Some(etag.as_str()) {
@@ -120,6 +125,35 @@ pub fn transfers_fetch(gen: &Generation, if_none_match: Option<&str>, accept_gzi
             ptb_version,
             provenance: None,
         }
+    }
+}
+
+/// `GET /api/<city>/notices/fetch` — the generation's `service-notices.json`,
+/// revalidated on every use (`must-revalidate`) so a notices-only generation
+/// reaches clients without waiting out a cache lifetime.
+pub fn notices_fetch(gen: &Generation, if_none_match: Option<&str>, accept_gzip: bool) -> Resp {
+    let Some(notices) = gen.notices.as_ref() else {
+        return Resp::NotFoundEmpty;
+    };
+    if crate::app::response::if_none_match_hits(if_none_match, &notices.etag) {
+        return Resp::NotModified {
+            etag: notices.etag.clone(),
+            provenance: None,
+        };
+    }
+    let (body, gzipped) = if accept_gzip {
+        let gz = notices.gzip.get_or_init(|| Arc::from(gzip(&notices.body)));
+        (ByteBody::Gzip(Arc::clone(gz)), true)
+    } else {
+        (ByteBody::Raw(Arc::clone(&notices.body)), false)
+    };
+    Resp::CachedBytes {
+        status: 200,
+        body,
+        content_type: "application/json",
+        cache_control: "public, max-age=0, must-revalidate",
+        etag: Some(notices.etag.clone()),
+        gzipped,
     }
 }
 

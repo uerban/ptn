@@ -91,6 +91,8 @@ pub struct RaptorBundleProvenance {
     /// `Some` => emit the route-geometry artifact headers. The independent
     /// capability marker is emitted even when this is `None`.
     pub route_geometry: Option<ArtifactProvenance>,
+    /// `Some` => emit the `X-PT-Notices-Artifact-*` headers.
+    pub notices: Option<ArtifactProvenance>,
 }
 
 /// Response handed back by `app::*` handlers. Each variant carries the

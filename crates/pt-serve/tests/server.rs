@@ -178,7 +178,9 @@ fn seed_data_root_with_artifacts() -> (tempfile::TempDir, String, String) {
         "shapesBinSha256": shapes_bin_sha,
         "shapesJsonSha256": shapes_json_sha,
         "shapesJsonSizeBytes": shapes_json_size,
+        "noticesSha256": common::publisher::sha256_hex(TEST_NOTICES),
     });
+    std::fs::write(gen_dir.join("service-notices.json"), TEST_NOTICES).expect("write notices");
     std::fs::write(
         gen_dir.join("generation.json"),
         serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
@@ -1051,6 +1053,56 @@ fn transfers_fetch_404_when_absent() {
         404,
         "absent transfers must return 404"
     );
+}
+
+const TEST_NOTICES: &[u8] = br#"{"schemaVersion":1,"notices":[{"id":"n","city":true,"kind":"free","free":true,"windows":[{"start":"2026-11-28T13:00:00Z","end":"2026-11-28T22:00:00Z"}],"displayUntil":"2026-11-28","source":"https://example.org/n"}]}
+"#;
+
+#[test]
+fn notices_fetch_404_and_no_headers_when_absent() {
+    let s = spawn(false);
+    assert_eq!(
+        ureq_get(&format!("{}/api/vilnius/notices/fetch", s.base))
+            .unwrap()
+            .0,
+        404
+    );
+    let (_, headers, _) = ureq_get_full(&format!("{}/api/vilnius/raptor-bundle", s.base)).unwrap();
+    assert!(header(&headers, "x-pt-notices-artifact-url").is_none());
+}
+
+#[test]
+fn notices_provenance_fetch_json_and_304() {
+    let (s, _) = spawn_with_artifacts();
+    let hash = common::publisher::sha256_hex(TEST_NOTICES);
+    let (_, bundle_headers, _) =
+        ureq_get_full(&format!("{}/api/vilnius/raptor-bundle", s.base)).unwrap();
+    assert_eq!(
+        header(&bundle_headers, "x-pt-notices-artifact-url").as_deref(),
+        Some("/api/vilnius/notices/fetch")
+    );
+    assert_eq!(
+        header(&bundle_headers, "x-pt-notices-artifact-hash").as_deref(),
+        Some(hash.as_str())
+    );
+    assert_eq!(
+        header(&bundle_headers, "x-pt-notices-artifact-size").as_deref(),
+        Some(TEST_NOTICES.len().to_string().as_str())
+    );
+
+    let url = format!("{}/api/vilnius/notices/fetch", s.base);
+    let (code, headers, body) = ureq_get_full(&url).unwrap();
+    assert_eq!(code, 200);
+    assert_eq!(body, TEST_NOTICES);
+    assert_eq!(
+        header(&headers, "content-type").as_deref(),
+        Some("application/json")
+    );
+    let etag = header(&headers, "etag").expect("notices ETag");
+    assert_eq!(etag, format!("\"{hash}\""));
+    let (code, _, body) = ureq_get_inm(&url, &etag).unwrap();
+    assert_eq!(code, 304);
+    assert!(body.is_empty());
 }
 
 #[test]

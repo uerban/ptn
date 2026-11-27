@@ -120,6 +120,11 @@ fn provenance_headers(p: &RaptorBundleProvenance) -> Vec<Header> {
         headers.push(hdr("X-PT-Transfers-Artifact-Hash", &t.hash));
         headers.push(hdr("X-PT-Transfers-Artifact-Size", &t.size.to_string()));
     }
+    if let Some(n) = p.notices.as_ref() {
+        headers.push(hdr("X-PT-Notices-Artifact-Url", &n.url));
+        headers.push(hdr("X-PT-Notices-Artifact-Hash", &n.hash));
+        headers.push(hdr("X-PT-Notices-Artifact-Size", &n.size.to_string()));
+    }
     if let Some(g) = p.route_geometry.as_ref() {
         headers.push(hdr("X-PT-Route-Geometry-Artifact-Url", &g.url));
         headers.push(hdr("X-PT-Route-Geometry-Artifact-Hash", &g.hash));

@@ -213,6 +213,8 @@ pub struct Generation {
     /// the PTB bytes but generation-scoped so hot reloads swap the address
     /// corpus atomically with the served city generation.
     pub address_search: Option<AddressSearchSidecar>,
+    /// Optional editor-approved service notices (`service-notices.json`).
+    pub notices: Option<NoticesArtifact>,
 
     /// Monotonic generation counter. Workers compare this against their
     /// cached `ScanState.epoch` and rebuild scratch state on mismatch. The
@@ -284,6 +286,58 @@ fn read_optional_arc(p: &Path) -> Result<Option<Arc<[u8]>>, ValidationError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(ValidationError::Io(IoErr::from(e))),
     }
+}
+
+/// Loaded `service-notices.json`: editor-approved notices of this generation,
+/// served verbatim at `/api/<city>/notices/fetch`.
+pub struct NoticesArtifact {
+    pub body: Arc<[u8]>,
+    /// Quoted SHA-256 of `body`.
+    pub etag: String,
+    pub gzip: OnceLock<Arc<[u8]>>,
+}
+
+impl NoticesArtifact {
+    /// Unquoted lowercase hex, as advertised in `X-PT-Notices-Artifact-Hash`.
+    pub fn hash(&self) -> &str {
+        self.etag.trim_matches('"')
+    }
+}
+
+/// Load `<generation>/service-notices.json` iff the manifest advertises it.
+///
+/// The manifest's `noticesSha256` is the only switch: an unadvertised file is
+/// ignored, an advertised one must exist, hash to the advertised value and be
+/// a schema-1 body. A bad notices file fails the generation load like any
+/// other advertised artifact, so the previous generation keeps serving.
+pub(crate) fn load_notices_artifact(
+    gen_dir: &Path,
+    expected_sha256: Option<&str>,
+) -> Result<Option<NoticesArtifact>, ValidationError> {
+    const NAME: &str = "service-notices.json";
+    let Some(expected) = expected_sha256 else {
+        return Ok(None);
+    };
+    let Some(body) = read_optional_arc(&gen_dir.join(NAME))? else {
+        return Err(artifact_invalid(NAME, "advertised but missing".into()));
+    };
+    let sha256 = sha256_hex(body.as_ref());
+    if !sha256.eq_ignore_ascii_case(expected) {
+        return Err(artifact_invalid(
+            NAME,
+            format!("sha256 {sha256} does not match manifest {expected}"),
+        ));
+    }
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|e| artifact_invalid(NAME, e.to_string()))?;
+    if parsed.get("schemaVersion") != Some(&serde_json::json!(1)) || !parsed["notices"].is_array() {
+        return Err(artifact_invalid(NAME, "not a schema 1 notices body".into()));
+    }
+    Ok(Some(NoticesArtifact {
+        body,
+        etag: format!("\"{sha256}\""),
+        gzip: OnceLock::new(),
+    }))
 }
 
 /// Loaded `address-search.json` sidecar plus the pre-built endpoint manifest.
@@ -850,6 +904,7 @@ pub struct GenerationParts {
     pub gtfs_manifest_response: Option<GtfsManifestResponse>,
     /// Optional loaded `address-search.json` sidecar.
     pub address_search: Option<AddressSearchSidecar>,
+    pub notices: Option<NoticesArtifact>,
     pub epoch: u64,
     pub pattern_mode: pt_core::PatternMode,
 }
@@ -940,6 +995,7 @@ impl Generation {
             gtfs_manifest_response: parts.gtfs_manifest_response,
             schedule_tiles_dir: parts.schedule_tiles_dir,
             address_search: parts.address_search,
+            notices: parts.notices,
             epoch: parts.epoch,
             pattern_mode: parts.pattern_mode,
             metrics,
@@ -1024,6 +1080,12 @@ impl Generation {
                 .map_err(|e| format!("schedule tiles: {e}"))?;
         let address_search = load_address_search_artifact(gen_dir, &city, &generation_id)
             .map_err(|e| format!("address search: {e}"))?;
+        // No manifest on this path: serve a present file as-is, hashed here.
+        let notices = match std::fs::read(gen_dir.join("service-notices.json")) {
+            Ok(bytes) => load_notices_artifact(gen_dir, Some(&sha256_hex(&bytes)))
+                .map_err(|e| format!("notices: {e}"))?,
+            Err(_) => None,
+        };
 
         Ok(Generation::new(
             GenerationParts {
@@ -1061,6 +1123,7 @@ impl Generation {
                 schedule_tiles_dir,
                 gtfs_manifest_response,
                 address_search,
+                notices,
                 // Single-generation P3 baseline; the reload runner increments per generation.
                 epoch: 0,
                 pattern_mode,
@@ -1184,6 +1247,38 @@ mod tests {
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect()
+    }
+
+    const NOTICES: &[u8] = b"{\"schemaVersion\":1,\"notices\":[]}\n";
+
+    #[test]
+    fn notices_load_only_when_the_manifest_advertises_them() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("service-notices.json"), NOTICES).unwrap();
+        let sha = super::sha256_hex(NOTICES);
+        let loaded = super::load_notices_artifact(dir.path(), Some(&sha))
+            .expect("advertised notices load")
+            .expect("present");
+        assert_eq!(loaded.etag, format!("\"{sha}\""));
+        assert_eq!(&*loaded.body, NOTICES);
+        assert!(super::load_notices_artifact(dir.path(), None)
+            .expect("unadvertised file is ignored")
+            .is_none());
+    }
+
+    #[test]
+    fn advertised_notices_must_exist_match_and_parse() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sha = super::sha256_hex(NOTICES);
+        assert!(super::load_notices_artifact(dir.path(), Some(&sha)).is_err());
+        std::fs::write(dir.path().join("service-notices.json"), b"{}").unwrap();
+        assert!(super::load_notices_artifact(dir.path(), Some(&sha)).is_err());
+        let wrong_version = b"{\"schemaVersion\":2,\"notices\":[]}";
+        std::fs::write(dir.path().join("service-notices.json"), wrong_version).unwrap();
+        assert!(
+            super::load_notices_artifact(dir.path(), Some(&super::sha256_hex(wrong_version)))
+                .is_err()
+        );
     }
 
     #[test]

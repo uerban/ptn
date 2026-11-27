@@ -314,6 +314,11 @@ pub fn dispatch(
             if_none_match(&req).as_deref(),
             accepts_gzip(&req),
         )),
+        Route::NoticesFetch => adapter::to_tiny_http(app_bytes::notices_fetch(
+            &gen,
+            if_none_match(&req).as_deref(),
+            accepts_gzip(&req),
+        )),
         Route::AddressSearch => {
             let resp = app_address_search::search(query_of(req.url()), &gen);
             ctx.metrics

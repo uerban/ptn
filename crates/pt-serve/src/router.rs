@@ -24,6 +24,7 @@ pub enum Route {
     RaptorBundle,          // GET  /api/<city>/raptor-bundle
     TransfersFetch,        // GET  /api/<city>/transfers/fetch
     RouteGeometryFetch,    // GET  /api/<city>/route-geometry/fetch
+    NoticesFetch,          // GET  /api/<city>/notices/fetch
     AddressSearch,         // GET  /api/<city>/address-search
     AddressSearchManifest, // GET  /api/<city>/address-search/manifest
     AddressSearchBundle,   // GET  /api/<city>/address-search/bundle
@@ -371,6 +372,7 @@ pub fn resolve(method: &str, path: &str, city: &str, listener: ListenerKind) -> 
                 ("GET", "raptor-bundle") => Route::RaptorBundle,
                 ("GET", "transfers/fetch") => Route::TransfersFetch,
                 ("GET", "route-geometry/fetch") => Route::RouteGeometryFetch,
+                ("GET", "notices/fetch") => Route::NoticesFetch,
                 ("GET", "address-search") => Route::AddressSearch,
                 ("GET", "address-search/manifest") => Route::AddressSearchManifest,
                 ("GET", "address-search/bundle") => Route::AddressSearchBundle,
@@ -470,6 +472,15 @@ mod tests {
                 ListenerKind::Public
             ),
             Route::RouteGeometryFetch
+        );
+        assert_eq!(
+            resolve(
+                "GET",
+                "/api/vilnius/notices/fetch",
+                "vilnius",
+                ListenerKind::Public
+            ),
+            Route::NoticesFetch
         );
         assert_eq!(
             resolve(
@@ -824,6 +835,15 @@ mod tests {
             resolve(
                 "GET",
                 "/api/vilnius/route-geometry/fetch",
+                "vilnius",
+                ListenerKind::Loopback
+            ),
+            Route::NotFound
+        );
+        assert_eq!(
+            resolve(
+                "GET",
+                "/api/vilnius/notices/fetch",
                 "vilnius",
                 ListenerKind::Loopback
             ),
