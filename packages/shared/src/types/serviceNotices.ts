@@ -39,6 +39,8 @@ export interface ServiceNotice {
   displayUntil: string;
   /** Optional editor text by BCP-47 language tag. */
   text?: Record<string, string>;
+  /** Optional editor-chosen badge, one emoji (🎄 Christmas bus, 🔔 choir trip). */
+  icon?: string;
   /** `https` link to the operator's announcement. */
   source: string;
 }
@@ -61,6 +63,11 @@ const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Mirrors the producer: short, non-empty, no ASCII or whitespace. */
+const isIcon = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && new TextEncoder().encode(value).length <= 16 &&
+  !/[\x00-\x7f\s]/u.test(value);
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -76,13 +83,14 @@ function isWindow(value: unknown): value is ServiceNoticeWindow {
 
 function isNotice(value: unknown): value is ServiceNotice {
   if (!isRecord(value)) return false;
-  const { id, routeIds, city, kind, free, windows, displayUntil, text, source } = value;
+  const { id, routeIds, city, kind, free, windows, displayUntil, text, icon, source } = value;
   const hasRoutes = routeIds !== undefined;
   if (hasRoutes === (city !== undefined)) return false;
   if (hasRoutes && !(Array.isArray(routeIds) && routeIds.length > 0 && routeIds.every(isNonEmptyString))) {
     return false;
   }
   if (!hasRoutes && city !== true) return false;
+  if (icon !== undefined && !isIcon(icon)) return false;
   if (text !== undefined && !(isRecord(text) && Object.values(text).every(isNonEmptyString))) return false;
   return (
     isNonEmptyString(id) &&

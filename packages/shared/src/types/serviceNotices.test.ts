@@ -19,7 +19,7 @@ describe("service notices contract", () => {
     const body = golden as ServiceNoticesBody;
     expect(Object.keys(body).sort()).toEqual(["notices", "schemaVersion"]);
     const keys: (keyof ServiceNotice)[] = [
-      "displayUntil", "free", "id", "kind", "routeIds", "source", "text", "windows",
+      "displayUntil", "free", "icon", "id", "kind", "routeIds", "source", "text", "windows",
     ];
     expect(Object.keys(body.notices[0]!).sort()).toEqual(keys);
     expect(body.notices.some((n) => n.city === true && n.routeIds === undefined)).toBe(true);
@@ -44,6 +44,9 @@ describe("service notices contract", () => {
     ["bad displayUntil", (n: Record<string, unknown>) => { n.displayUntil = "31.12.2026"; }],
     ["non-https source", (n: Record<string, unknown>) => { n.source = "http://example.com"; }],
     ["empty text", (n: Record<string, unknown>) => { n.text = { lt: "" }; }],
+    ["empty icon", (n: Record<string, unknown>) => { n.icon = ""; }],
+    ["word icon", (n: Record<string, unknown>) => { n.icon = "🎄 bus"; }],
+    ["long icon", (n: Record<string, unknown>) => { n.icon = "🎄🎄🎄🎄🎄"; }],
   ])("rejects a malformed notice: %s", (_name, mutate) => {
     const body = clone(golden) as { notices: Record<string, unknown>[] };
     mutate(body.notices[0]!);

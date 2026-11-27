@@ -9,6 +9,7 @@
       "windows": [{ "start": "2026-11-27T22:00:00Z", "end": "2026-12-31T22:00:00Z" }],
       "displayUntil": "2026-12-31",
       "text": { "lt": "Nemokamas Kalėdinis autobusas" },
+      "icon": "🎄",
       "source": "https://example.org/christmas-bus"
     },
     {

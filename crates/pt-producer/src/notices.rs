@@ -56,6 +56,8 @@ struct SourceNotice {
     events: Option<Vec<String>>,
     #[serde(default)]
     text: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    icon: Option<String>,
     source: String,
 }
 
@@ -80,6 +82,8 @@ struct Notice {
     display_until: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<BTreeMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    icon: Option<String>,
     source: String,
 }
 
@@ -136,6 +140,12 @@ fn day_window(id: &str, zone: &TimeZone, first: Date, last: Date) -> Result<Wind
     })
 }
 
+/// A short non-ASCII badge (one emoji, possibly with modifiers); 16 bytes
+/// covers ZWJ pairs without admitting words.
+fn is_icon(icon: &str) -> bool {
+    !icon.is_empty() && icon.len() <= 16 && !icon.chars().any(|c| c.is_ascii() || c.is_whitespace())
+}
+
 fn convert(notice: SourceNotice, zone: &TimeZone) -> Result<Notice> {
     let id = notice.id.as_str();
     let (route_ids, city) = match (notice.scope.as_deref(), notice.routes) {
@@ -145,6 +155,11 @@ fn convert(notice: SourceNotice, zone: &TimeZone) -> Result<Notice> {
     };
     if !matches!(notice.kind.as_str(), "seasonal" | "event" | "free") {
         return Err(invalid(id, format!("unknown kind {:?}", notice.kind)));
+    }
+    if let Some(icon) = &notice.icon {
+        if !is_icon(icon) {
+            return Err(invalid(id, format!("icon {icon:?} must be one emoji")));
+        }
     }
     if !notice.source.starts_with("https://") {
         return Err(invalid(id, "source must be an https URL"));
@@ -204,6 +219,7 @@ fn convert(notice: SourceNotice, zone: &TimeZone) -> Result<Notice> {
         windows,
         display_until: display_until.to_string(),
         text: notice.text,
+        icon: notice.icon,
         source: notice.source,
     })
 }
@@ -322,6 +338,29 @@ mod tests {
     }
 
     #[test]
+    fn an_icon_is_carried_and_must_be_an_emoji() {
+        let notice = |icon: Value| {
+            build(
+                json!([{"id": "bus", "routes": ["r"], "from": "2026-11-28", "to": "2026-12-31",
+                          "kind": "seasonal", "icon": icon, "source": SOURCE}]),
+            )
+        };
+        assert_eq!(
+            notice(json!("🎄")).unwrap()["notices"][0]["icon"],
+            json!("🎄")
+        );
+        for bad in [
+            json!(""),
+            json!("X"),
+            json!("🎄 bus"),
+            json!("🎄🎄🎄🎄🎄"),
+            json!(1),
+        ] {
+            assert!(notice(bad.clone()).is_err(), "accepted {bad}");
+        }
+    }
+
+    #[test]
     fn dst_gap_is_rejected_and_fold_takes_the_first_occurrence() {
         let gap = build(
             json!([{"id": "gap", "scope": "city", "from": "2027-03-28T03:30",
@@ -395,7 +434,7 @@ mod tests {
         let ours = build(json!([
             {"id": "vilnius-2026-christmas-bus", "routes": ["vilnius_bus_201"], "from": "2026-11-28",
              "to": "2026-12-31", "kind": "seasonal", "free": true, "text": {"lt": "Nemokamas Kalėdinis autobusas"},
-             "source": "https://example.org/christmas-bus"}
+             "icon": "🎄", "source": "https://example.org/christmas-bus"}
         ]))
         .unwrap();
         assert_eq!(ours["schemaVersion"], golden["schemaVersion"]);
