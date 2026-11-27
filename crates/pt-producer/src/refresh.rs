@@ -120,6 +120,7 @@ fn publication_inputs(
     code_sha: Option<&str>,
     transfers: Option<TransfersSource<'_>>,
     addresses: Option<&Path>,
+    notices: Option<&Path>,
 ) -> Result<String> {
     fn file_hash(path: &Path) -> Result<String> {
         use std::io::Read;
@@ -182,6 +183,9 @@ fn publication_inputs(
     }
     if let Some(path) = addresses {
         inputs.insert("addresses".into(), file_hash(path)?);
+    }
+    if let Some(path) = notices {
+        inputs.insert("notices".into(), file_hash(path)?);
     }
     for name in [
         "PT_COLOR_BUILD",
@@ -256,6 +260,7 @@ pub fn publish_one_tick(
     anchor_date: Option<u32>,
     transfers_path: Option<TransfersSource<'_>>,
     address_search_path: Option<&Path>,
+    notices_path: Option<&Path>,
     max_retained_generations: usize,
     city_tz_offset_seconds: Option<i32>,
     city_tz_iana: Option<&str>,
@@ -310,6 +315,7 @@ pub fn publish_one_tick(
         anchor_date,
         transfers_path,
         address_search_path,
+        notices_path,
         max_retained_generations,
         city_tz_offset_seconds,
         city_tz_iana,
@@ -345,6 +351,7 @@ pub(crate) fn publish_inner(
     anchor_date: Option<u32>,
     transfers_path: Option<TransfersSource<'_>>,
     address_search_path: Option<&Path>,
+    notices_path: Option<&Path>,
     max_retained_generations: usize,
     city_tz_offset_seconds: Option<i32>,
     city_tz_iana: Option<&str>,
@@ -482,6 +489,10 @@ pub(crate) fn publish_inner(
     let anchor = anchor_date.unwrap_or_else(crate::date_utils::today_yyyymmdd);
     let iana = city_tz_iana
         .ok_or_else(|| Error::Config("PTB v2 publication requires a city IANA zone".into()))?;
+    // Malformed notices fail the tick before any build work.
+    if let Some(src) = notices_path {
+        crate::notices::build_service_notices(&std::fs::read(src)?, iana)?;
+    }
     // Inputs identical to the last build's produce the same bundle, so the
     // generation they produced is still current: skip the build instead of
     // rebuilding it only to throw it away at the Step 3 Noop check below.
@@ -490,6 +501,7 @@ pub(crate) fn publish_inner(
         crate::build_inputs::producer_code_sha(),
         transfers_path,
         address_search_path,
+        notices_path,
     )?;
     let inputs_key = match fault {
         Some(_) => None,
@@ -677,6 +689,20 @@ pub(crate) fn publish_inner(
             src.display()
         );
     }
+
+    // ---- Step 3b3: optional service-notices.json ---------------------------
+    //
+    // Editor-approved notices, converted from the catalog's local-time format
+    // to UTC windows (crate::notices). Generation-scoped like the address
+    // corpus; its source hash is part of the publication identity above.
+    let notices_sha256 = match notices_path {
+        Some(src) => Some(crate::notices::stage_service_notices(
+            src,
+            iana,
+            &staging_dir,
+        )?),
+        None => None,
+    };
 
     // ---- Step 3c: departures-idx.bin sidecar (Stage C C1b) ----------------
     // build_ptb produced the complete bytes (header + CSR). Write them into
@@ -1042,6 +1068,7 @@ pub(crate) fn publish_inner(
         // schedule-tile bundle when `Some`.
         trip_route_sha256,
         stop_cell_sha256,
+        notices_sha256,
     };
 
     let pack_manifest = build_pack_manifest(
@@ -1204,6 +1231,10 @@ pub(crate) fn publish_inner(
     for (name, expect) in [
         ("trip-route.json", manifest.trip_route_sha256.as_ref()),
         ("stop-cell.json", manifest.stop_cell_sha256.as_ref()),
+        (
+            crate::notices::SERVICE_NOTICES_FILENAME,
+            manifest.notices_sha256.as_ref(),
+        ),
     ] {
         if let Some(expect) = expect {
             let path = staging_dir.join(name);
@@ -1541,6 +1572,12 @@ fn build_pack_manifest(
             "stop-cell",
             "stop-cell.json",
             manifest.stop_cell_sha256.as_ref(),
+            "application/json",
+        ),
+        (
+            "service-notices",
+            crate::notices::SERVICE_NOTICES_FILENAME,
+            manifest.notices_sha256.as_ref(),
             "application/json",
         ),
     ] {
@@ -2320,10 +2357,10 @@ mod tests {
                 "/tests/fixtures/color-artifacts-stub.mjs"
             ),
         );
-        let unidentified = publication_inputs(None, None, None)
+        let unidentified = publication_inputs(None, None, None, None)
             .expect("an unreadable executable must not stop publishing");
-        let identified =
-            publication_inputs(Some(&"a".repeat(64)), None, None).expect("identified code hashes");
+        let identified = publication_inputs(Some(&"a".repeat(64)), None, None, None)
+            .expect("identified code hashes");
         assert_ne!(unidentified, identified);
         assert!(pt_shared::osm_manifest::valid_digest(&unidentified));
     }
@@ -2377,6 +2414,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -2419,6 +2457,7 @@ mod tests {
             dir.path(),
             "test",
             vec![], // no feed → the build fails AFTER the gate; we only assert the gate verdict
+            None,
             None,
             None,
             None,
@@ -2469,6 +2508,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -2508,6 +2548,7 @@ mod tests {
             dir.path(),
             "test",
             vec![],
+            None,
             None,
             None,
             None,
@@ -2563,6 +2604,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -2606,6 +2648,7 @@ mod tests {
             dir.path(),
             "test",
             vec![],
+            None,
             None,
             None,
             None,
@@ -2711,6 +2754,7 @@ mod tests {
             "test",
             vec![feed],
             Some(20260501),
+            None,
             None,
             None,
             10,
@@ -3169,6 +3213,7 @@ mod tests {
             Some(20260501), // matches tiny-gtfs calendar.txt min start_date
             None,
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -3225,6 +3270,7 @@ mod tests {
             &fixture_zip(),
             None,
             Some(20260501),
+            None,
             None,
             None,
             10,
@@ -3284,6 +3330,7 @@ mod tests {
             Some(20260501), // matches tiny-gtfs calendar.txt min start_date
             None,
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -3328,6 +3375,7 @@ mod tests {
             Some(20260501),
             Some(TransfersSource::WalkingGraph(&graph)),
             None,
+            None,
             10,
             None,
             Some("Europe/Vilnius"),
@@ -3356,6 +3404,102 @@ mod tests {
         assert_eq!(
             std::fs::read(first.join("transfers.bin")).unwrap(),
             transfers
+        );
+    }
+
+    #[test]
+    fn notices_only_change_publishes_a_new_generation_with_the_artifact() {
+        let _serial = TILE_BUILD_ENV_SERIAL
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join(PT_SERVE_VERSION_FILENAME),
+            format!("{}\n", pt_core::PTB_VERSION),
+        )
+        .unwrap();
+        std::env::set_var(
+            "PT_COLOR_ARTIFACTS_SCRIPT",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/color-artifacts-stub.mjs"
+            ),
+        );
+        let feed = crate::download::record_for_local(&fixture_zip()).unwrap();
+        let notices = dir.path().join("notices.json");
+        let source = |to: &str| {
+            format!(
+                r#"{{"notices":[{{"id":"n","scope":"city","from":"2026-12-01","to":"{to}","kind":"free","free":true,"source":"https://example.org/n"}}]}}"#
+            )
+        };
+        let clock = pt_shared::clock::MockClock::new(std::time::SystemTime::UNIX_EPOCH);
+        let tick = |with: bool| {
+            publish_inner(
+                dir.path(),
+                "test",
+                vec![feed.clone()],
+                Some(20260501),
+                None,
+                None,
+                with.then_some(notices.as_path()),
+                10,
+                None,
+                Some("Europe/Vilnius"),
+                crate::cli::DeriveInseat::Auto,
+                None,
+                None,
+                &clock,
+            )
+        };
+        let published = |outcome: Result<PublishOutcome>| match outcome.unwrap() {
+            PublishOutcome::Published { generation_id, .. } => generation_id,
+            other => panic!("expected publication, got {other:?}"),
+        };
+        let artifact = |generation: &str| {
+            let gen_dir = dir.path().join("generations").join(generation);
+            let manifest: GenerationManifest =
+                serde_json::from_slice(&std::fs::read(gen_dir.join("generation.json")).unwrap())
+                    .unwrap();
+            let pack: PackManifest =
+                serde_json::from_slice(&std::fs::read(gen_dir.join("pack.json")).unwrap()).unwrap();
+            let entry = pack
+                .artifacts
+                .iter()
+                .find(|a| a.kind == "service-notices")
+                .map(|a| a.sha256.clone());
+            let bytes = std::fs::read(gen_dir.join(crate::notices::SERVICE_NOTICES_FILENAME)).ok();
+            (manifest.notices_sha256, entry, bytes)
+        };
+
+        let bare = published(tick(false));
+        assert_eq!(artifact(&bare), (None, None, None));
+
+        std::fs::write(&notices, source("2026-12-01")).unwrap();
+        let first = published(tick(true));
+        assert_ne!(first, bare);
+        let (sha, entry, bytes) = artifact(&first);
+        let bytes = bytes.expect("service-notices.json staged");
+        assert_eq!(sha.as_deref(), Some(sha256_hex(&bytes).as_str()));
+        assert_eq!(entry, sha);
+        assert!(String::from_utf8(bytes).unwrap().contains(
+            r#""windows":[{"start":"2026-11-30T22:00:00Z","end":"2026-12-01T22:00:00Z"}]"#
+        ));
+        assert!(
+            matches!(tick(true).unwrap(), PublishOutcome::Noop { generation_id } if generation_id == first)
+        );
+
+        std::fs::write(&notices, source("2026-12-02")).unwrap();
+        let second = published(tick(true));
+        assert_ne!(second, first);
+
+        std::fs::write(&notices, source("2026-11-30")).unwrap();
+        assert!(
+            tick(true).is_err(),
+            "a malformed notices file must fail the tick"
+        );
+        assert_eq!(
+            current_generation_on_disk(dir.path()).as_deref(),
+            Some(second.as_str())
         );
     }
 
@@ -3407,6 +3551,7 @@ mod tests {
                 Some(20260501),
                 None,
                 Some(&address),
+                None,
                 10,
                 None,
                 Some("Europe/Vilnius"),
@@ -3508,6 +3653,7 @@ mod tests {
                 "test",
                 vec![feed.clone()],
                 Some(anchor),
+                None,
                 None,
                 None,
                 10,

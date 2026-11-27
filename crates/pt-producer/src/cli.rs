@@ -186,6 +186,14 @@ pub enum Command {
         #[arg(long, value_name = "PATH")]
         address_search: Option<PathBuf>,
 
+        /// Editor-approved service notices (`notices/<city>.json`, the feed
+        /// catalog format). Converted to UTC windows with the city zone and
+        /// staged as `service-notices.json` in every generation; its hash is
+        /// part of the publication identity, so a notices-only change
+        /// publishes a new generation. Absent: the generation carries none.
+        #[arg(long, value_name = "PATH")]
+        notices: Option<PathBuf>,
+
         /// osmium GeoJSONSeq walking graph (plain or `.gz`). When set, the
         /// producer BUILDS each generation's `transfers.bin` by pricing that
         /// generation's stops over this graph (pt-build-transfers defaults).
@@ -301,6 +309,14 @@ pub enum Command {
         /// dark until the next periodic tick.
         #[arg(long, value_name = "PATH")]
         address_search: Option<PathBuf>,
+
+        /// Editor-approved service notices (`notices/<city>.json`, the feed
+        /// catalog format). Converted to UTC windows with the city zone and
+        /// staged as `service-notices.json` in every generation; its hash is
+        /// part of the publication identity, so a notices-only change
+        /// publishes a new generation. Absent: the generation carries none.
+        #[arg(long, value_name = "PATH")]
+        notices: Option<PathBuf>,
 
         /// osmium GeoJSONSeq walking graph (plain or `.gz`). When set, the
         /// producer BUILDS each generation's `transfers.bin` by pricing that

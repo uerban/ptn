@@ -55,6 +55,8 @@ use std::path::Path;
 ///   generation with no address corpus, which takes
 ///   `/api/<city>/address-search*` dark until the next periodic tick stages
 ///   the sidecar again.
+/// - `notices_path` — optional editor-approved service notices
+///   (`notices/<city>.json`); staged as `service-notices.json`.
 /// - `max_retained_generations` — janitor cap.
 #[allow(clippy::too_many_arguments)]
 pub fn run_republish(
@@ -65,6 +67,7 @@ pub fn run_republish(
     anchor_date: Option<u32>,
     transfers_path: Option<crate::refresh::TransfersSource<'_>>,
     address_search_path: Option<&Path>,
+    notices_path: Option<&Path>,
     max_retained_generations: usize,
     city_tz_offset_seconds: Option<i32>,
     city_tz_iana: Option<&str>,
@@ -79,6 +82,7 @@ pub fn run_republish(
         anchor_date,
         transfers_path,
         address_search_path,
+        notices_path,
         max_retained_generations,
         city_tz_offset_seconds,
         city_tz_iana,
@@ -98,6 +102,7 @@ pub fn run_republish_many(
     anchor_date: Option<u32>,
     transfers_path: Option<crate::refresh::TransfersSource<'_>>,
     address_search_path: Option<&Path>,
+    notices_path: Option<&Path>,
     max_retained_generations: usize,
     city_tz_offset_seconds: Option<i32>,
     city_tz_iana: Option<&str>,
@@ -172,6 +177,7 @@ pub fn run_republish_many(
         anchor_date,
         transfers_path,
         address_search_path,
+        notices_path,
         max_retained_generations,
         city_tz_offset_seconds,
         city_tz_iana,

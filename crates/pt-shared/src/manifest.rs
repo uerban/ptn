@@ -165,6 +165,12 @@ pub struct GenerationManifest {
     /// ran; `None` otherwise (Postel rule — absent on the wire when None).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_cell_sha256: Option<String>,
+
+    /// SHA-256 (lowercase hex) of `service-notices.json`, the editor-approved
+    /// service notices of this generation (`--notices`). `None` when the
+    /// generation carries none (Postel rule — absent on the wire when None).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notices_sha256: Option<String>,
 }
 
 /// `skip_serializing_if` helper — omit `false` booleans from the wire so a
@@ -255,6 +261,7 @@ mod tests {
             schedule_tile_bundle_hash: None,
             trip_route_sha256: None,
             stop_cell_sha256: None,
+            notices_sha256: None,
         }
     }
 
@@ -289,6 +296,7 @@ mod tests {
             schedule_tile_bundle_hash: Some("bb".into()),
             trip_route_sha256: None,
             stop_cell_sha256: None,
+            notices_sha256: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let parsed: GenerationManifest = serde_json::from_str(&json).unwrap();
@@ -441,6 +449,7 @@ mod tests {
             schedule_tile_bundle_hash: None,
             trip_route_sha256: None,
             stop_cell_sha256: None,
+            notices_sha256: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(!json.contains("departuresIdxSha256"));
@@ -541,6 +550,7 @@ mod tests {
         let m = GenerationManifest {
             trip_route_sha256: Some("a".repeat(64)),
             stop_cell_sha256: Some("b".repeat(64)),
+            notices_sha256: None,
             ..sample_manifest()
         };
         let json = serde_json::to_string(&m).unwrap();
@@ -557,6 +567,7 @@ mod tests {
         let m = GenerationManifest {
             trip_route_sha256: None,
             stop_cell_sha256: None,
+            notices_sha256: None,
             ..sample_manifest()
         };
         let json = serde_json::to_string(&m).unwrap();

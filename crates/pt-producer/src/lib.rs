@@ -38,6 +38,7 @@ pub mod interns;
 pub mod janitor;
 pub mod layout;
 pub mod liveness;
+pub mod notices;
 pub mod pass1;
 pub mod pass2;
 pub mod pass3;
