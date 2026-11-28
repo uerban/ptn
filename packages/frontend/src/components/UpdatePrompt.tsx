@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { usePresentationText } from "../i18n/presentationStrings.ts";
+import { watchForUpdates } from "../sw/updateChecks.ts";
 
 /** **Not now** hides the prompt for the rest of this page session. */
 let dismissedThisSession = false;
+let watching = false;
+
+/** Starts the resume and hourly update checks once per page. */
+export function onRegisteredSW(_url: string, registration: ServiceWorkerRegistration | undefined): void {
+  if (!registration || watching) return;
+  watching = true;
+  watchForUpdates(registration);
+}
 
 /**
  * Offers a waiting app version. A polite status, not an alert: an available
@@ -14,7 +23,7 @@ export function UpdatePrompt() {
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({ onRegisteredSW });
   const text = usePresentationText();
   const [updating, setUpdating] = useState(false);
   const [dismissed, setDismissed] = useState(dismissedThisSession);
@@ -69,4 +78,5 @@ export function UpdatePrompt() {
 /** Test-only: forget this session's **Not now**. */
 export function __resetUpdatePromptForTests(): void {
   dismissedThisSession = false;
+  watching = false;
 }

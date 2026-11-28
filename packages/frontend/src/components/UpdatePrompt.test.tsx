@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { __resetUpdatePromptForTests, UpdatePrompt } from "./UpdatePrompt.tsx";
+import { __resetUpdatePromptForTests, onRegisteredSW, UpdatePrompt } from "./UpdatePrompt.tsx";
+import { watchForUpdates } from "../sw/updateChecks.ts";
+
+vi.mock("../sw/updateChecks.ts", () => ({ watchForUpdates: vi.fn(() => () => {}) }));
 
 const updateServiceWorker = vi.hoisted(() => vi.fn(async () => undefined));
 
@@ -22,6 +25,15 @@ afterEach(() => {
 });
 
 describe("UpdatePrompt", () => {
+  it("starts update checks once when the worker registers", () => {
+    const registration = { update: vi.fn() } as unknown as ServiceWorkerRegistration;
+    onRegisteredSW("/sw.js", undefined);
+    onRegisteredSW("/sw.js", registration);
+    onRegisteredSW("/sw.js", registration);
+    expect(vi.mocked(watchForUpdates)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(watchForUpdates)).toHaveBeenCalledWith(registration);
+  });
+
   it("is a polite status, not an alert", () => {
     render(<UpdatePrompt />);
     const prompt = screen.getByTestId("update-prompt");
