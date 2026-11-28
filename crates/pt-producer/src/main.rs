@@ -1266,7 +1266,11 @@ fn run_build_schedule_tiles(gen_dir: &Path, city: &str, gen_id: Option<&str>) ->
 }
 
 fn main() {
-    if let Err(e) = run() {
+    let result = run();
+    if let Some(kib) = pt_producer::peak_rss::peak_rss_kib() {
+        eprintln!("{}", pt_producer::peak_rss::line(kib));
+    }
+    if let Err(e) = result {
         eprintln!("[producer] FATAL: {e}");
         std::process::exit(1);
     }
