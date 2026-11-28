@@ -248,7 +248,23 @@ fn flush_mid_pass_regions_writes_csr_and_bitmasks_into_buffer() {
     );
     let out = tmp.path().join("p1.bin");
     let mut w = pt_producer::writer::open_writer(&out, layout.total_bytes()).unwrap();
-    flush_mid_pass_regions(&mut w, &layout, &p1, 90).unwrap();
+    let csr_len = flush_mid_pass_regions(&mut w, &layout, &p1, 90).unwrap();
+
+    // The packed CSR length lets the re-encode slice the region without
+    // rebuilding both CSRs (and without keeping the stop_time triples).
+    let (rt_off, rt_n) =
+        pt_producer::csr::route_trips::build_route_trips_csr(&p1.trips_attrs, p1.routes.len())
+            .unwrap();
+    let (sr_off, sr_n) = pt_producer::csr::stop_routes::build_stop_routes_csr(
+        &p1.trip_stop_triples,
+        &p1.trips_attrs,
+        p1.stops.len(),
+    )
+    .unwrap();
+    assert_eq!(
+        csr_len,
+        (rt_off.len() + rt_n.len() + sr_off.len() + sr_n.len()) as u64 * 4
+    );
 
     // Sanity: at least one byte in the bitmask region is non-zero (WD service
     // is active most days in the 90-day window starting at feed_start_date).

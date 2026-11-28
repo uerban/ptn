@@ -34,12 +34,15 @@ pub fn write_u32_slice(dest: &mut [u8], values: &[u32]) -> Result<()> {
 /// Overflow is a hard error: a truncated CSR or bitmask region produces
 /// a PTB that reads cleanly but routes wrong, and the bench would still
 /// report a passing peak/steady RSS.
+///
+/// Returns the packed CSR byte length (the region itself is page-aligned),
+/// so the re-encode can slice it without rebuilding both CSRs.
 pub fn flush_mid_pass_regions<W: WriteRegion>(
     w: &mut W,
     layout: &Layout,
     p1: &Pass1Result,
     window_days: u16,
-) -> Result<()> {
+) -> Result<u64> {
     let num_routes = p1.routes.len();
     let num_stops = p1.stops.len();
     let (rt_offsets, rt_neighbors) = build_route_trips_csr(&p1.trips_attrs, num_routes)?;
@@ -67,7 +70,7 @@ pub fn flush_mid_pass_regions<W: WriteRegion>(
         }
     }
 
-    {
+    let csr_len = {
         let csr = w.region_slice(layout, Region::Csr);
         // Layout: route_trips_offsets, route_trips_neighbors,
         // stop_routes_offsets, stop_routes_neighbors — packed back-to-back.
@@ -88,9 +91,10 @@ pub fn flush_mid_pass_regions<W: WriteRegion>(
             write_u32_slice(&mut csr[cursor..cursor + need], slice)?;
             cursor += need;
         }
-    }
+        cursor as u64
+    };
 
-    Ok(())
+    Ok(csr_len)
 }
 
 /// Write the temporary Transfers region: one fixed 32-byte record per GTFS

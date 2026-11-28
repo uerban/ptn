@@ -384,7 +384,7 @@ fn run() -> Result<()> {
     );
 
     let t_mid = Instant::now();
-    flush_mid_pass_regions(&mut w, &layout, &p1, window_days)?;
+    let csr_len = flush_mid_pass_regions(&mut w, &layout, &p1, window_days)?;
     eprintln!(
         "[producer] mid-pass done in {} ms — services={} bitmask_window_days={window_days}",
         t_mid.elapsed().as_millis(),
@@ -497,8 +497,9 @@ fn run() -> Result<()> {
     let temporary_bytes = std::fs::read(&tmp_bin)?;
     let (current_bytes, service_pool_count) =
         pt_producer::build::reencode_staging_bundle_as_current(
-            &temporary_bytes,
+            temporary_bytes,
             &layout,
+            csr_len,
             &p1,
             &pool,
             resolved_tz_offset,

@@ -300,7 +300,7 @@ pub fn build_ptb(
         write_trips_intern(trips_region, p1.trips.keys(), &p1.trips_attrs, &pool)?;
     }
 
-    flush_mid_pass_regions(&mut w, &layout, &p1, window_days)?;
+    let csr_len = flush_mid_pass_regions(&mut w, &layout, &p1, window_days)?;
 
     let trip_starts = pass1::compute_trip_starts(&p1);
     let mut write_cursor = trip_starts.clone();
@@ -386,6 +386,9 @@ pub fn build_ptb(
         )
         .map_err(|e| Error::Config(format!("departures-idx encode: {e}")))?
     };
+    // The triples (12 B per stop_time, ~136 MiB on Paris) have no reader past
+    // the CSRs and the sidecar above; free them before the re-encode peak.
+    p1.trip_stop_triples = Vec::new();
 
     let resolved_tz_offset =
         resolve_city_tz_offset(city_tz_offset_seconds, city_tz_iana, p1.feed_start_date)?;
@@ -396,7 +399,8 @@ pub fn build_ptb(
     // layout before any downstream hash, sidecar, or manifest sees the bundle.
     // The temporary bundle is mapped rather than read: its pages are clean file
     // cache the kernel can reclaim, not anonymous memory counted against the
-    // container limit. The map is dropped before the file is rewritten.
+    // container limit. The re-encode drops the map once it has copied the
+    // regions out, before the band build and the rewrite below.
     let service_pool_count = {
         let temporary = std::fs::File::open(bundle_dest)?;
         // SAFETY: the build owns `bundle_dest` until it returns; nothing else
@@ -404,15 +408,15 @@ pub fn build_ptb(
         // the rewrite below.
         let temporary = unsafe { memmap2::Mmap::map(&temporary)? };
         let (current_bytes, service_pool_count) = reencode_staging_bundle_as_current(
-            &temporary,
+            temporary,
             &layout,
+            csr_len,
             &p1,
             &pool,
             resolved_tz_offset,
             window_days,
             &frequencies,
         )?;
-        drop(temporary);
         std::fs::write(bundle_dest, &current_bytes)?;
         service_pool_count
     };
@@ -579,25 +583,29 @@ impl BBoxAccumulator {
 /// `layout.offset(region)` and the TIGHT content length is either the region's
 /// exact `layout.length(...)` (StopTimes/TripStarts/StringPool/Transfers) or
 /// the content-stride product (Trips/ServiceBitmasks) / packed CSR length
-/// (Csr) — the page-aligned region length over-reports those three, so we
-/// recompute their tight extents here.
+/// (Csr, as `flush_mid_pass_regions` returned it) — the page-aligned region
+/// length over-reports those three. It reads neither `p1.trip_stop_triples`
+/// nor rebuilds a CSR, so the caller may free the triples first.
 ///
 /// This is the single current-format boundary used by both producer modes.
-/// Returns the bundle bytes and the distinct service-bitfield count.
+/// It takes the temporary bundle by value and releases it once the body is
+/// assembled, before the pattern band is derived: the band build is the
+/// producer's memory peak. Returns the bundle bytes and the distinct
+/// service-bitfield count.
 #[allow(clippy::too_many_arguments)]
-pub fn reencode_staging_bundle_as_current(
-    temporary_bytes: &[u8],
+pub fn reencode_staging_bundle_as_current<T: AsRef<[u8]>>(
+    temporary: T,
     layout: &layout::Layout,
+    csr_len: u64,
     p1: &pass1::Pass1Result,
     pool: &strpool::StringPool,
     city_tz_offset_seconds: i32,
     window_days: u16,
     frequencies: &[pass1::FrequencyRow],
 ) -> Result<(Vec<u8>, Option<u32>)> {
-    use crate::csr::route_trips::build_route_trips_csr;
-    use crate::csr::stop_routes::build_stop_routes_csr;
     use crate::interns::TRIP_RECORD_BYTES;
 
+    let temporary_bytes = temporary.as_ref();
     let staging_region = |region: Region, len: u64| -> Result<&[u8]> {
         let off = layout.offset(region) as usize;
         let end = off + len as usize;
@@ -629,16 +637,6 @@ pub fn reencode_staging_bundle_as_current(
     let trip_starts_len = layout.length(Region::TripStarts);
     let string_pool_len = layout.length(Region::StringPool);
     let transfers_len = layout.length(Region::Transfers);
-
-    // Recompute the packed length current PTB needs by re-deriving the four
-    // arrays `flush_mid_pass_regions` packs back-to-back
-    // (route_trips_offsets, route_trips_neighbors, stop_routes_offsets,
-    // stop_routes_neighbors).
-    let (rt_off, rt_neighbors) = build_route_trips_csr(&p1.trips_attrs, num_routes)?;
-    let (sr_off, sr_neighbors) =
-        build_stop_routes_csr(&p1.trip_stop_triples, &p1.trips_attrs, num_stops)?;
-    let csr_len =
-        (rt_off.len() + rt_neighbors.len() + sr_off.len() + sr_neighbors.len()) as u64 * 4;
 
     let trips = staging_region(Region::TripsIntern, trips_len)?;
     let service_bitmasks = staging_region(Region::ServiceBitmasks, bitmasks_len)?;
@@ -672,7 +670,7 @@ pub fn reencode_staging_bundle_as_current(
         .flat_map(|i| i.to_le_bytes())
         .collect();
 
-    let bundle = crate::current_emit::build_current_bundle(
+    let body = crate::current_emit::assemble_current_body(
         p1.stops.keys(),
         &p1.stops_attrs,
         p1.routes.keys(),
@@ -697,8 +695,9 @@ pub fn reencode_staging_bundle_as_current(
         p1.feed_start_date,
         city_tz_offset_seconds,
         window_days,
-        frequencies,
     )?;
+    drop(temporary);
+    let bundle = crate::current_emit::finish_current_bundle(body, frequencies)?;
     Ok((bundle, Some(service_pool_count)))
 }
 
