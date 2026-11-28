@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { usePresentationText } from "../i18n/presentationStrings.ts";
-import { watchForUpdates } from "../sw/updateChecks.ts";
+import { watchForUpdates, type Registration } from "../sw/updateChecks.ts";
 
 /** **Not now** hides the prompt for the rest of this page session. */
 let dismissedThisSession = false;
 let watching = false;
 
-/** Starts the resume and hourly update checks once per page. */
+/** Starts the launch and hourly update checks once per page. */
 export function onRegisteredSW(_url: string, registration: ServiceWorkerRegistration | undefined): void {
   if (!registration || watching) return;
   watching = true;
-  watchForUpdates(registration);
+  watchForUpdates(registration as unknown as Registration);
 }
 
 /**
  * Offers a waiting app version. A polite status, not an alert: an available
  * update must not interrupt a screen reader. **Not now** hides it for this
- * session; the new version also takes over once every app window closes.
+ * session; a waiting version is applied at the next launch.
  */
 export function UpdatePrompt() {
   const {
