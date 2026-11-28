@@ -40,7 +40,10 @@ const wire = {
     { id: "201", shortName: "201", mode: "BUS", stopIds: ["a"], trips: [] },
     { id: "1G", shortName: "1G", mode: "BUS", stopIds: ["a", "b"], trips: [
       { tripId: "c1", serviceId: "all", headsign: "Katedra", departureSecs: [64800, 65400] },
-      { tripId: "c2", serviceId: "all", headsign: "Katedra", departureSecs: [67500, 68100] },
+    ] },
+    // The return trip, on the route's second stop pattern (same route id).
+    { id: "1G", shortName: "1G", mode: "BUS", stopIds: ["b", "a"], trips: [
+      { tripId: "c2", serviceId: "all", headsign: "Stotis", departureSecs: [67500, 68100] },
     ] },
   ],
   calendar: [{ serviceId: "all", days: Array(7).fill(true), startDate: "20261101", endDate: "20261231", exceptions: {} }],
@@ -76,6 +79,15 @@ describe("SpecialServicesList", () => {
     expect(card.querySelector("a")?.getAttribute("href")).toBe("https://example.org/xmas");
   });
 
+  it("names no line until the city's routes are loaded, never a raw route id", () => {
+    useServiceNoticesStore.setState({ byCity: { vilnius: [{ ...xmas, routeIds: ["vilnius_bus_201"] }] } });
+    useCityDataStore.setState({ active: null as never });
+    render(<SpecialServicesList nowMs={at("2026-12-10T10:00:00Z")} />, { wrapper: Wrapper });
+    const heading = screen.getByTestId("special-service").querySelector("h3")?.textContent ?? "";
+    expect(heading).not.toContain("vilnius_bus_201");
+    expect(heading).toContain("Special line, runs until 31 December");
+  });
+
   it("shows a free day from the day before", () => {
     render(<SpecialServicesList nowMs={at("2026-12-05T08:00:00Z")} />, { wrapper: Wrapper });
     expect(screen.getAllByTestId("special-service").map((c) => c.dataset.notice)).toEqual(["xmas", "free-day"]);
@@ -84,8 +96,18 @@ describe("SpecialServicesList", () => {
   it("the catch-it card lists each trip with its stop times", () => {
     render(<SpecialServicesList nowMs={at("2026-12-03T08:00:00Z")} />, { wrapper: Wrapper });
     const trips = screen.getAllByTestId("notice-trip");
-    expect(trips.map((t) => t.querySelector("summary")?.textContent)).toEqual(["Leaves Stotis at 18:00", "Leaves Stotis at 18:45"]);
+    expect(trips.map((t) => t.querySelector("summary")?.textContent)).toEqual(["Leaves Stotis at 18:00", "Leaves Katedra at 18:45"]);
     expect(trips[0]!.textContent).toContain("18:10 Katedra");
+    expect([...trips[1]!.querySelectorAll("ol li")].map((li) => li.textContent)).toEqual(["18:45 Katedra", "18:55 Stotis"]);
+  });
+
+  it("a city-wide free day without text says it is free, not a special line", () => {
+    useServiceNoticesStore.setState({ byCity: { vilnius: [{ ...freeDay, text: undefined }] } });
+    render(<SpecialServicesList nowMs={at("2026-12-05T08:00:00Z")} />, { wrapper: Wrapper });
+    const card = screen.getByTestId("special-service");
+    expect(card.querySelector("h3")?.textContent).toContain("Free ride");
+    expect(card.textContent).not.toContain("Special line");
+    expect(card.textContent?.match(/Free ride/g)).toHaveLength(1);
   });
 
   it("hides Remind me without notification support", () => {

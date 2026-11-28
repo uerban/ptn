@@ -110,6 +110,15 @@ describe("trip-level notices", () => {
     expect(noticesForLeg([choirTrips], leg("a-1800"))).toEqual([]); // unresolved: never guess
   });
 
+  it("finds a start on any of the route's stop patterns", () => {
+    // The wire carries one entry per stop pattern, all with the route's id:
+    // here the return trip lives on the second one.
+    const back: ServiceNotice = { ...choirTrips, id: "back", trips: ["2026-12-03T16:00:00Z", "2026-12-03T17:00:00Z"] };
+    const out: RoutingBundleRoute = { ...route, trips: [route.trips[0]!] };
+    const ret: RoutingBundleRoute = { ...route, stopIds: ["s2", "s1"], trips: [{ tripId: "r-1900", serviceId: "wk", headsign: "Z", departureSecs: [68400, 69000] }] };
+    expect([...(resolveNoticeTrips([back], [out, ret], calendar, TZ).get("back") ?? [])].sort()).toEqual(["a-1800", "r-1900"]);
+  });
+
   it("a start past midnight matches the previous service day at 24:xx", () => {
     const late: ServiceNotice = { ...choirTrips, id: "late", windows: [{ start: "2026-12-03T22:00:00Z", end: "2026-12-03T23:00:00Z" }], trips: ["2026-12-03T22:10:00Z"] };
     const night: RoutingBundleRoute = { ...route, trips: [{ tripId: "n-2410", serviceId: "wk", headsign: "N", departureSecs: [87000] }] };

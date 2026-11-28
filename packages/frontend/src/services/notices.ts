@@ -101,17 +101,17 @@ export function resolveNoticeTripRuns(
   const runs: NoticeTripRun[] = [];
   for (const notice of notices) {
     if (!notice.trips || notice.routeIds?.length !== 1) continue;
-    const route = routes.find(r => r.id === notice.routeIds![0]);
-    if (!route) continue;
+    // The wire splits a route into one entry per stop pattern, all with its id.
+    const patterns = routes.filter(r => r.id === notice.routeIds![0]);
     for (const start of notice.trips) {
       const unix = Date.parse(start) / 1000;
       const date = unixToServiceDate(unix, tz);
       for (const ymd of [date, previousDay(date)]) {
-        for (const trip of route.trips) {
+        for (const trip of patterns.flatMap(p => p.trips)) {
           const first = trip.departureSecs.find(secs => secs >= 0);
           const service = services.get(trip.serviceId);
           if (first !== undefined && service && serviceDayToUnix(ymd, first, tz) === unix && serviceActive(service, ymd)) {
-            runs.push({ noticeId: notice.id, routeId: route.id, tripId: trip.tripId, serviceDate: ymd, startUnix: unix });
+            runs.push({ noticeId: notice.id, routeId: notice.routeIds![0]!, tripId: trip.tripId, serviceDate: ymd, startUnix: unix });
           }
         }
       }

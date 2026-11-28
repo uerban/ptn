@@ -36,14 +36,20 @@ interface Formatters {
 
 function lineNames(notice: ServiceNotice, wire: RoutingBundleData | undefined): string {
   if (notice.city || !notice.routeIds) return "";
-  return notice.routeIds.map((id) => wire?.routes.find((r) => r.id === id)?.shortName ?? id).join(", ");
+  // Route ids are feed-internal: name only the lines the loaded bundle knows.
+  return notice.routeIds
+    .map((id) => wire?.routes.find((r) => r.id === id)?.shortName)
+    .filter(Boolean)
+    .join(", ");
 }
 
 function describe(notice: ServiceNotice, locale: string, text: PresentationText, fmt: Formatters): string {
   return noticeText(notice, locale)
     ?? (notice.kind === "event"
       ? text("notices.eventOn", { date: fmt.day(notice.displayUntil) })
-      : text("notices.seasonalUntil", { date: fmt.day(notice.displayUntil) }));
+      : notice.kind === "free"
+        ? text("notices.free")
+        : text("notices.seasonalUntil", { date: fmt.day(notice.displayUntil) }));
 }
 
 function CatchIt({ notice, runs, wire, line, nowMs, fmt }: {
@@ -59,14 +65,21 @@ function CatchIt({ notice, runs, wire, line, nowMs, fmt }: {
   const tz = useCityStore((s) => s.activeCity.tz);
   const reminder = useNoticeReminders((s) => s.byId[notice.id]);
   const [supported] = useState(remindersSupported);
-  const route = wire.routes.find((r) => r.id === runs[0]?.routeId);
   const stopName = (id: string) => wire.stops.find((s) => s.id === id)?.name ?? id;
   const upcoming = runs.find((run) => run.startUnix * 1000 > nowMs);
-  if (!route) return null;
+  // The wire carries one entry per stop pattern; a run's trip is on one of them.
+  const tripOf = (run: NoticeTripRun) => {
+    for (const route of wire.routes) {
+      if (route.id !== run.routeId) continue;
+      const trip = route.trips.find((t) => t.tripId === run.tripId);
+      if (trip) return { route, trip };
+    }
+    return undefined;
+  };
   const firstStop = (run: NoticeTripRun) => {
-    const trip = route.trips.find((t) => t.tripId === run.tripId);
-    const index = trip?.departureSecs.findIndex((secs) => secs >= 0) ?? -1;
-    return index >= 0 ? stopName(route.stopIds[index]!) : "";
+    const found = tripOf(run);
+    const index = found?.trip.departureSecs.findIndex((secs) => secs >= 0) ?? -1;
+    return found && index >= 0 ? stopName(found.route.stopIds[index]!) : "";
   };
 
   const remind = async () => {
@@ -84,8 +97,9 @@ function CatchIt({ notice, runs, wire, line, nowMs, fmt }: {
       <p className="text-xs text-fg-secondary">{text("notices.catchItIntro")}</p>
       <ul className="list-none m-0 p-0 mt-1 flex flex-col gap-1">
         {runs.map((run) => {
-          const trip = route.trips.find((t) => t.tripId === run.tripId);
-          if (!trip) return null;
+          const found = tripOf(run);
+          if (!found) return null;
+          const { route, trip } = found;
           return (
             <li key={`${run.tripId}-${run.serviceDate}`} data-testid="notice-trip">
               <details>
@@ -174,7 +188,9 @@ export function SpecialServicesList({ placement = "inline", nowMs }: { placement
                 <span aria-hidden="true">{noticeIcon(notice)} </span>
                 {line ? text("notices.legNotice", { line, notice: describe(notice, locale, text, fmt) }) : describe(notice, locale, text, fmt)}
               </h3>
-              {notice.free && <p className="text-sm text-success">{text("notices.free")}</p>}
+              {notice.free && !(notice.kind === "free" && !noticeText(notice, locale)) && (
+                <p className="text-sm text-success">{text("notices.free")}</p>
+              )}
               {href && (
                 <a href={href} target="_blank" rel="noopener noreferrer" className="text-xs underline">
                   {text("notices.source")} <span className="sr-only">{text("serviceAlerts.leavesApp")}</span>
