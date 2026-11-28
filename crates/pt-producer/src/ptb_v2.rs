@@ -585,7 +585,7 @@ fn hex(b: &[u8]) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn build_v2_bundle(
     v1_bytes: &[u8],
-    p1: &Pass1Result,
+    trips: &[crate::pass1::attrs::TripAttrs],
     rows: &[V2TransferRow],
     transfers_diag: TransferDiagnostics,
     frequencies: &V2Frequencies,
@@ -605,7 +605,11 @@ pub fn build_v2_bundle(
             "ptb v2: compatibility input is not PTB v1".into(),
         ));
     }
-    let header = reader.header();
+    // Only the header is needed past validation; drop the decoded copy of the
+    // v1 bundle instead of holding it through assembly.
+    let header = reader.header().clone();
+    drop(reader);
+    let header = &header;
     let feed_start = header.feed_start_date;
     let window_days = header.window_days;
 
@@ -631,10 +635,10 @@ pub fn build_v2_bundle(
     }
     let mut extra: Vec<String> = Vec::new();
     let mut trip_meta = region(TRIP_META)?.to_vec();
-    if trip_meta.len() != p1.trips_attrs.len() * 24 {
+    if trip_meta.len() != trips.len() * 24 {
         return Err(Error::Config("ptb v2: TripMeta row count".into()));
     }
-    for (t, a) in p1.trips_attrs.iter().enumerate() {
+    for (t, a) in trips.iter().enumerate() {
         if a.block_id.is_empty() {
             continue;
         }
@@ -708,13 +712,16 @@ pub fn build_v2_bundle(
     ];
     let staged = pt_core::rewrite_regions(v1_bytes, pt_core::PTB_VERSION_V2, flags, &edits)
         .map_err(|e| Error::Config(format!("ptb v2: assemble: {e}")))?;
-    let staged_reader = pt_core::Reader::from_bytes(staged.clone())
+    // Readers below take their bundle and hand it back, so no bundle is held
+    // twice.
+    let staged_reader = pt_core::Reader::from_bytes(staged)
         .map_err(|e| Error::Config(format!("ptb v2: staged decode: {e}")))?;
     let commitment = pt_core::engine::v2::recompute_block_commitment(
         &staged_reader,
         pt_core::engine::PatternMode::CoveringMerge,
     )
     .map_err(|e| Error::Config(format!("ptb v2: block commitment: {e:?}")))?;
+    let staged = staged_reader.into_bytes();
     let bundle = pt_core::rewrite_regions(
         &staged,
         pt_core::PTB_VERSION_V2,
@@ -725,11 +732,12 @@ pub fn build_v2_bundle(
         )],
     )
     .map_err(|e| Error::Config(format!("ptb v2: commit: {e}")))?;
+    drop(staged);
 
     // Post-write validation in a separate builder execution: the reader and
     // index must accept the bytes, and the guard must make the operational
     // anchor (feedStartDate + GUARD_DAYS) a complete query instant.
-    let final_reader = pt_core::Reader::from_bytes(bundle.clone())
+    let final_reader = pt_core::Reader::from_bytes(bundle)
         .map_err(|e| Error::Config(format!("ptb v2: final decode: {e}")))?;
     let final_index =
         pt_core::engine::Index::build(&final_reader, pt_core::engine::PatternMode::CoveringMerge)
@@ -737,6 +745,8 @@ pub fn build_v2_bundle(
     let (min_event, max_event) = final_index
         .v2_event_range()
         .ok_or_else(|| Error::Config("ptb v2: index has no v2 state".into()))?;
+    drop(final_index);
+    let bundle = final_reader.into_bytes();
     let anchor_origin = origins[GUARD_DAYS as usize];
     if anchor_origin < origins[0] + max_event {
         return Err(Error::Config(format!(
@@ -808,8 +818,12 @@ pub fn stage(
     let (rows, diag) = parse_transfers_v2(&feed_dirs, &p1, &boundaries)?;
     let (freqs, freq_diag) = parse_frequencies_v2(&feed_dirs, &p1)?;
     let derive = matches!(derive_inseat, crate::cli::DeriveInseat::Auto);
+    // Only the trips' block ids are read past here; the rest of pass1 (most of
+    // it the stop_times) would otherwise stay resident through the v2 assembly.
+    let trips = std::mem::take(&mut p1.trips_attrs);
+    drop(p1);
     let (bundle, gz, outcome) =
-        build_v2_bundle(&v1, &p1, &rows, diag, &freqs, freq_diag, iana, derive)?;
+        build_v2_bundle(&v1, &trips, &rows, diag, &freqs, freq_diag, iana, derive)?;
     std::fs::write(out_dir.join("bundle.ptb"), &bundle)?;
     std::fs::write(out_dir.join("bundle-v1.ptb.gz"), &gz)?;
     std::fs::write(
@@ -858,8 +872,12 @@ pub fn build_published(
     let (rows, diag) = parse_transfers_v2(&feed_dirs, &p1, &boundaries)?;
     let (freqs, freq_diag) = parse_frequencies_v2(&feed_dirs, &p1)?;
     let derive = matches!(derive_inseat, crate::cli::DeriveInseat::Auto);
+    // Only the trips' block ids are read past here; the rest of pass1 (most of
+    // it the stop_times) would otherwise stay resident through the v2 assembly.
+    let trips = std::mem::take(&mut p1.trips_attrs);
+    drop(p1);
     let (bundle, _gz, _v2) =
-        build_v2_bundle(&v1, &p1, &rows, diag, &freqs, freq_diag, iana, derive)?;
+        build_v2_bundle(&v1, &trips, &rows, diag, &freqs, freq_diag, iana, derive)?;
     std::fs::write(bundle_dest, &bundle)?;
     outcome.bundle_sha256 = crate::build::sha256_hex(&bundle);
     outcome.bundle_size_bytes = bundle.len() as u64;

@@ -85,8 +85,20 @@ fn align(n: usize, a: usize) -> usize {
 /// AoS StopTimes (12 B/row: dep u32@0, arr i16@4, stop_idx u32@6, seq u16@10) ->
 /// SoA columns (dep[0..], stop_idx[4N..], arr[8N..], seq[10N..]). Total bytes unchanged.
 pub fn transpose_stop_times_aos_to_soa(aos: &[u8]) -> Vec<u8> {
-    let n = aos.len() / 12;
     let mut soa = vec![0u8; aos.len()];
+    transpose_stop_times_aos_into(aos, &mut soa);
+    soa
+}
+
+/// [`transpose_stop_times_aos_to_soa`] into `soa` (same length as `aos`), so
+/// the caller can write the columns straight into the bundle body.
+pub fn transpose_stop_times_aos_into(aos: &[u8], soa: &mut [u8]) {
+    assert_eq!(
+        aos.len(),
+        soa.len(),
+        "StopTimes transpose needs equal lengths"
+    );
+    let n = aos.len() / 12;
     for i in 0..n {
         let o = i * 12;
         soa[4 * i..4 * i + 4].copy_from_slice(&aos[o..o + 4]); // dep
@@ -95,7 +107,6 @@ pub fn transpose_stop_times_aos_to_soa(aos: &[u8]) -> Vec<u8> {
         soa[10 * n + 2 * i..10 * n + 2 * i + 2].copy_from_slice(&aos[o + 10..o + 12]);
         // seq
     }
-    soa
 }
 
 /// Sparse (child_idx, parent_idx) pairs -> dense parent_idx[num_stops], with
@@ -183,8 +194,12 @@ fn route_side_body(
     ))
 }
 
+/// Copy the temporary regions into a v1-stamped body that still carries the
+/// temporary timetable regions and no pattern band. Nothing in the result
+/// borrows the inputs, so the caller can release the temporary bundle before
+/// [`finish_current_bundle`] (the Paris band build is the producer's peak).
 #[allow(clippy::too_many_arguments)]
-pub fn build_current_bundle(
+pub fn assemble_current_body(
     stop_keys: &[String],
     stops_attrs: &[crate::pass1::attrs::StopAttrs],
     route_keys: &[String],
@@ -209,13 +224,10 @@ pub fn build_current_bundle(
     feed_start_date: u32,
     city_tz_offset_seconds: i32,
     window_days: u16,
-    // GTFS `frequencies.txt` rows. The region is omitted when empty.
-    frequencies: &[crate::pass1::FrequencyRow],
 ) -> Result<Vec<u8>> {
-    // Transpose the temporary 12-byte AoS rows into the current SoA columns.
-    // Total length is unchanged.
-    let stop_times_owned = transpose_stop_times_aos_to_soa(stop_times);
-    let stop_times = stop_times_owned.as_slice();
+    // `stop_times` is the temporary 12-byte AoS rows. They are transposed into
+    // the current SoA columns straight into the body below (same length), so
+    // the ~140 MiB Paris StopTimes is never held as a second copy.
 
     // --- SoA column bodies (tight) -------------------------------------------
     let stops_soa_len = stop_keys.len() * STOPS_SOA_BYTES_PER_STOP;
@@ -375,7 +387,7 @@ pub fn build_current_bundle(
     buf[trips_off..trips_off + trips_b].copy_from_slice(trips);
     buf[svc_pool_off..svc_pool_off + svc_pool_b].copy_from_slice(&service_pool_region);
     buf[s2b_off..s2b_off + s2b_b].copy_from_slice(service_to_bitfield);
-    buf[st_off..st_off + st_b].copy_from_slice(stop_times);
+    transpose_stop_times_aos_into(stop_times, &mut buf[st_off..st_off + st_b]);
     buf[ts_off..ts_off + ts_b].copy_from_slice(trip_starts);
     buf[csr_off..csr_off + csr_b].copy_from_slice(csr);
     buf[pool_off..pool_off + pool_b].copy_from_slice(string_pool);
@@ -391,18 +403,32 @@ pub fn build_current_bundle(
         // from the zeroed buffer — no Step-B presumption).
         buf[window_meta_off..window_meta_off + 2].copy_from_slice(&window_days.to_le_bytes());
     }
+    Ok(buf)
+}
 
+/// Turn an [`assemble_current_body`] result into the published PTB v1 bundle:
+/// derive and append the pattern band, strip the temporary timetable regions
+/// and append the frequencies.
+pub fn finish_current_bundle(
+    mut buf: Vec<u8>,
+    // GTFS `frequencies.txt` rows. The region is omitted when empty.
+    frequencies: &[crate::pass1::FrequencyRow],
+) -> Result<Vec<u8>> {
     // The body assembled above is stamped v1 and still carries the temporary
-    // timetable regions. `append_pattern_band` needs them because it builds a
-    // Reader and derives the band from `Index::build(.., Unbounded)`. The band's seven
-    // region bodies are appended LAST (page-aligned so the frozen offsets above
-    // are unchanged), with their table entries after the carry entries; `0x12
-    // PatternSemantics` is omitted when the band reports it empty
-    // (omit-when-all-regular). The temporary regions are then stripped below.
-    // The band is the sole source of times, boarding, and trip bounds in a PTB v1
-    // bundle and is not optional; the resulting Reader decodes it. Do not
-    // reorder/remove `append_pattern_band`, and keep the strip AFTER it.
-    buf = append_pattern_band(buf)?;
+    // timetable regions. `derive_pattern_band` needs them because it builds a
+    // Reader and derives the band from `Index::build(.., Unbounded)`. The
+    // temporary regions are then stripped, and the band's seven region bodies
+    // appended LAST (page-aligned), with their table entries after the kept
+    // carry entries; `0x12 PatternSemantics` is omitted when the band reports
+    // it empty (omit-when-all-regular). Stripping before appending gives the
+    // same bytes as appending first (the strip lays every kept body out again,
+    // page-aligned, in table order) without growing the ~190 MiB Paris body to
+    // hold the band and then copying it whole. The band is the sole source of
+    // times, boarding, and trip bounds in a PTB v1 bundle and is not optional;
+    // the resulting Reader decodes it. Derive the band BEFORE the strip.
+    let band;
+    (buf, band) = derive_pattern_band(buf)?;
+
     buf = pt_core::strip_regions(
         buf,
         &[
@@ -413,6 +439,8 @@ pub fn build_current_bundle(
         ],
     )
     .map_err(|e| crate::error::Error::Config(format!("v1 carry strip: {e:?}")))?;
+    buf = append_pattern_band(buf, &band);
+    drop(band);
 
     // Append frequencies after repacking so the table is stable. The parser
     // already sorted rows by `(tripIdx, startSecs)`.
@@ -484,29 +512,34 @@ fn append_frequencies_region(mut buf: Vec<u8>, rows: &[crate::pass1::FrequencyRo
     buf
 }
 
-/// Append the pattern band to an already assembled PTB v1 bundle.
-/// `buf` is a v1-stamped body carrying the service pool but NO band yet; this
-/// builds a `pt_core::Reader` over it, runs `Index::build(.., Unbounded)`, calls
-/// `pt_core::pattern_emit::encode_pattern_band`, and appends the seven band
-/// region bodies (page-aligned, frozen offsets unchanged) with their table
-/// entries pushed after the existing carry entries. Returns the extended buffer.
+/// Derive the pattern band of an assembled PTB v1 body.
+/// `buf` is a v1-stamped body carrying the service pool and the temporary
+/// timetable regions but NO band yet; this builds a `pt_core::Reader` over it,
+/// runs `Index::build(.., Unbounded)` and calls
+/// `pt_core::pattern_emit::encode_pattern_band`. Returns the body unchanged
+/// with the band.
 ///
 /// SHARES the band layout with the committed-fixture and testkit writers via
 /// `encode_pattern_band` — NO duplicated band layout here. GTFS lasso/repeated
 /// -stop reference (the cursor's repeated-stop case):
 /// https://gtfs.org/documentation/schedule/schedule-best-practices/#lasso-routes
-fn append_pattern_band(mut buf: Vec<u8>) -> Result<Vec<u8>> {
+fn derive_pattern_band(mut buf: Vec<u8>) -> Result<(Vec<u8>, pt_core::pattern_emit::PatternBand)> {
+    // The reader takes the body and hands it back, so the bundle is never held
+    // twice (a Paris body is ~190 MiB).
     let band = {
-        let reader = pt_core::Reader::from_bytes(buf.clone()).map_err(|e| {
+        let reader = pt_core::Reader::from_bytes(buf).map_err(|e| {
             crate::error::Error::Config(format!("v1 band: reader over v1 body failed: {e:?}"))
         })?;
         let index =
             pt_core::Index::build(&reader, pt_core::PatternMode::Unbounded).map_err(|e| {
                 crate::error::Error::Config(format!("v1 band: Index::build (Unbounded): {e:?}"))
             })?;
-        pt_core::pattern_emit::encode_pattern_band(&reader, &index).map_err(|e| {
+        let band = pt_core::pattern_emit::encode_pattern_band(&reader, &index).map_err(|e| {
             crate::error::Error::Config(format!("v1 band: encode_pattern_band: {e:?}"))
-        })?
+        })?;
+        drop(index);
+        buf = reader.into_bytes();
+        band
     };
 
     // Observability: a trip whose span exceeds the i16 ~9.1h delta cap forces the
@@ -518,6 +551,13 @@ fn append_pattern_band(mut buf: Vec<u8>) -> Result<Vec<u8>> {
         );
     }
 
+    Ok((buf, band))
+}
+
+/// Append the band's region bodies to a page-aligned PTB v1 body (page-aligned,
+/// existing offsets unchanged), with their table entries pushed after the
+/// existing entries. Returns the extended buffer.
+fn append_pattern_band(mut buf: Vec<u8>, band: &pt_core::pattern_emit::PatternBand) -> Vec<u8> {
     // Find the table terminator (regionId 0) and the append cursor (buf is
     // page-aligned).
     let mut table_e = 32;
@@ -540,6 +580,12 @@ fn append_pattern_band(mut buf: Vec<u8>) -> Result<Vec<u8>> {
         (PATTERN_TRIPS, band.pattern_trips.as_slice()),
     ]);
 
+    // Grow the body once to its final size: `resize` alone doubles the
+    // capacity on the first region.
+    let band_total = band_regions
+        .iter()
+        .fold(cursor, |end, (_, body)| align(end + body.len(), PAGE));
+    buf.reserve_exact(band_total - buf.len());
     let mut appended: Vec<(u16, usize, usize)> = Vec::with_capacity(band_regions.len());
     for (id, body) in &band_regions {
         let off = cursor;
@@ -570,7 +616,7 @@ fn append_pattern_band(mut buf: Vec<u8>) -> Result<Vec<u8>> {
         buf[table_e + 16..table_e + 24].copy_from_slice(&(*len as u64).to_le_bytes());
         table_e += 24;
     }
-    Ok(buf)
+    buf
 }
 
 #[cfg(test)]
@@ -632,5 +678,11 @@ mod tests {
             &soa[20..24],
             &[1u16.to_le_bytes(), 2u16.to_le_bytes()].concat()
         );
+
+        // In place, into a caller's slice (the bundle body), it writes the
+        // same bytes, so the build needs no second StopTimes copy.
+        let mut into = vec![0xAAu8; aos.len()];
+        transpose_stop_times_aos_into(&aos, &mut into);
+        assert_eq!(into, soa);
     }
 }

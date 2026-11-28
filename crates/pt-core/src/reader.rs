@@ -912,6 +912,12 @@ impl<B: AsRef<[u8]> + Send + Sync + 'static> Reader<B> {
         }
     }
 
+    /// Consume the reader and hand back its buffer, so a caller that only
+    /// needed a transient view does not have to clone the bundle first.
+    pub fn into_bytes(self) -> B {
+        self.bytes
+    }
+
     /// Borrowed access to the parsed header. Used by pt-serve's loader
     /// (e.g. cross-namespace integrity checks at reload time).
     #[inline]
@@ -5048,6 +5054,13 @@ mod tests {
         );
         assert_eq!(view[0], expected_first, "view[0] matches input[0]");
         assert_eq!(view, &bytes[..], "view content matches input byte-for-byte");
+    }
+
+    #[test]
+    fn into_bytes_returns_the_owned_buffer() {
+        let bytes = crate::engine::testkit::build_n_trip_ptb(2, &[&[(1, 0, 100), (2, 1, 200)]]);
+        let reader = Reader::from_bytes(bytes.clone()).unwrap();
+        assert_eq!(reader.into_bytes(), bytes);
     }
 
     #[test]
