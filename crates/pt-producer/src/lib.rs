@@ -41,6 +41,7 @@ pub mod liveness;
 pub mod pass1;
 pub mod pass2;
 pub mod pass3;
+pub mod peak_rss;
 pub mod persist;
 pub mod producer_lock;
 pub mod ptb_v2;
