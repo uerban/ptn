@@ -43,6 +43,7 @@ import { useMapGuidance } from "../hooks/useMapGuidance.ts";
 import { useStopContextRiderPrompt } from "../hooks/useStopContextRiderPrompt.ts";
 import { useGuidanceSession } from "../components/Guidance/GuidanceSession.tsx";
 import { TextModeButton } from "../presentation/TextModeButton.tsx";
+import { SpecialServicesList } from "../components/ServiceNotices/SpecialServicesList.tsx";
 import { WhatsNewCard } from "../components/WhatsNew/WhatsNewCard.tsx";
 import { GuidanceAlerts } from "../components/Guidance/GuidanceAlerts.tsx";
 import { ETACards, type EtaStopInfo } from "../components/Map/ETACards.tsx";
@@ -400,6 +401,7 @@ export function HomePage({ onBackToText, onSwitchToMap, contextStop }: HomePageP
         </MapObstacle>
         {/* Map mode only: a temporary map leaves What's new to Text mode. */}
         {!onBackToText && <WhatsNewCard placement="overlay" />}
+        {!onBackToText && <SpecialServicesList placement="overlay" />}
       </div>
 
       {/* Map */}

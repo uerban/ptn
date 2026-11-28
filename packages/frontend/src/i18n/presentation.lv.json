@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Brīdinājumi par šiem maršrutiem: {count}",
   "serviceAlerts.affectsLines": "Pakalpojuma brīdinājums par līniju {lines}",
   "serviceAlerts.sameAsAbove": "Tāds pats brīdinājums kā iepriekš",
-  "nearby.inHours": "pēc {time}"
+  "nearby.inHours": "pēc {time}",
+  "notices.free": "Bezmaksas brauciens",
+  "notices.seasonalUntil": "Īpaša līnija, kursē līdz {date}",
+  "notices.eventOn": "Notikums transportlīdzeklī, {date}",
+  "notices.listTitle": "Šīs sezonas īpašās līnijas",
+  "notices.source": "Paziņojums",
+  "notices.legNotice": "Līnija {line}: {notice}",
+  "notices.catchIt": "Iekāpiet šajā transportlīdzeklī",
+  "notices.catchItIntro": "Šos maršrutus apkalpo viens transportlīdzeklis. Jūs varat iekāpt tajā jebkurā pieturā pa ceļam.",
+  "notices.tripAt": "Izbrauc no {stop} plkst. {time}",
+  "notices.liveOnMap": "Rādīt LIVE kartē",
+  "notices.remindMe": "Atgādināt man",
+  "notices.reminderSet": "Atgādinājums iestatīts uz {time}",
+  "notices.cancelReminder": "Atcelts atgādinājums",
+  "notices.reminderTitle": "Līnija {line} drīz atiet",
+  "notices.reminderBody": "{notice} izbrauc no {stop} plkst. {time}."
 }

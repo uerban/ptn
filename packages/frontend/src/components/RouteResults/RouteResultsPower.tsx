@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo } from "react";
-import type { Itinerary } from "@pt/shared";
+import type { Itinerary, Leg } from "@pt/shared";
 import { useTranslation } from "../../i18n/index.ts";
 import { useSettingsStore } from "../../stores/settingsStore.ts";
 import { getBadgeSize } from "../../utils/appearance.ts";
@@ -32,6 +32,8 @@ import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
 import { RtWarningBanner } from "./shared/RtWarningBanner.tsx";
 import { RouteAlertMarker, RouteAlertsSummary, useListAlerts } from "../ServiceAlerts/RouteAlerts.tsx";
+import { NoticeBadge } from "../ServiceNotices/NoticeBadge.tsx";
+import { useLegNotices } from "../../services/useNotices.ts";
 
 const EMPTY_OVERRIDES = {};
 
@@ -392,6 +394,7 @@ function LegStrip({
             routeColor={seg.leg.routeColor}
             size="sm"
           />
+          <LegNoticeBadge leg={seg.leg} />
           <LegDeparture leg={seg.leg} feedTz={feedTz} />
           <span className="text-[0.625rem] text-fg-muted tabular-nums">
             <span className="opacity-50" aria-hidden>
@@ -470,4 +473,8 @@ function LegStrip({
     );
   }
   return <div className="flex items-center gap-1 flex-wrap">{nodes}</div>;
+}
+
+function LegNoticeBadge({ leg }: { leg: Leg }) {
+  return <NoticeBadge notices={useLegNotices(leg)} compact />;
 }

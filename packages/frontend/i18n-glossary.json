@@ -2394,6 +2394,66 @@
           "status": "proposed"
         }
       }
+    },
+    "free ride": {
+      "note": "A ride the rider does not pay for (fare-free special service). Not 'free' as in available or empty.",
+      "match": [
+        "free ride"
+      ],
+      "enforce": "check",
+      "exceptions": [],
+      "locales": {
+        "lt": {
+          "term": "Nemokama kelionė",
+          "stem": "nemoka",
+          "status": "proposed"
+        },
+        "pl": {
+          "term": "Bezpłatny przejazd",
+          "stem": "bezpłat",
+          "status": "proposed"
+        },
+        "be": {
+          "term": "Бясплатны праезд",
+          "stem": "бясплат",
+          "status": "proposed"
+        },
+        "ru": {
+          "term": "Бесплатный проезд",
+          "stem": "бесплатн",
+          "status": "proposed"
+        },
+        "uk": {
+          "term": "Безкоштовна поїздка",
+          "stem": "безкоштов",
+          "status": "proposed"
+        },
+        "lv": {
+          "term": "Bezmaksas brauciens",
+          "stem": "bezmaks",
+          "status": "proposed"
+        },
+        "et": {
+          "term": "Tasuta sõit",
+          "stem": "tasu",
+          "status": "proposed"
+        },
+        "sv": {
+          "term": "Gratis resa",
+          "stem": "grat",
+          "status": "proposed"
+        },
+        "nb": {
+          "term": "Gratis tur",
+          "stem": "grat",
+          "status": "proposed"
+        },
+        "fi": {
+          "term": "Ilmainen matka",
+          "stem": "ilmain",
+          "status": "proposed"
+        }
+      }
     }
   }
 }

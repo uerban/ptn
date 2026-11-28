@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Повідомлення щодо цих маршрутів: {count}",
   "serviceAlerts.affectsLines": "Повідомлення про стан лінії {lines}",
   "serviceAlerts.sameAsAbove": "Те саме повідомлення, що й вище",
-  "nearby.inHours": "за {time}"
+  "nearby.inHours": "за {time}",
+  "notices.free": "Безкоштовна поїздка",
+  "notices.seasonalUntil": "Спеціальна лінія, курсує до {date}",
+  "notices.eventOn": "Подія на борту транспортного засобу, {date}",
+  "notices.listTitle": "Спеціальні лінії цього сезону",
+  "notices.source": "Оголошення",
+  "notices.legNotice": "Лінія {line}: лінія {notice}",
+  "notices.catchIt": "Сісти на цей транспортний засіб",
+  "notices.catchItIntro": "Ці маршрути обслуговує один транспортний засіб. Ви можете сісти на нього на будь-якій зупинці по дорозі.",
+  "notices.tripAt": "Виїжджає з {stop} о {time}",
+  "notices.liveOnMap": "Показати на карті в режимі LIVE",
+  "notices.remindMe": "Нагадати мені",
+  "notices.reminderSet": "Налаштовано нагадування на {time}",
+  "notices.cancelReminder": "Скасувати нагадування",
+  "notices.reminderTitle": "Лінія {line} незабаром відправляється",
+  "notices.reminderBody": "{notice} відправляється з {stop} о {time}."
 }

@@ -1,4 +1,5 @@
 import type { TransportMode } from "./transit.js";
+import type { RoutingBundleNoticesArtifact } from "./serviceNotices.js";
 import type { RouteDirectionPattern } from "../identity/routeSchedule.js";
 
 /**
@@ -200,5 +201,7 @@ export interface RoutingBundleData {
     agencies?: RoutingBundleAgency[];
     shapesArtifact?: RoutingBundleShapesArtifact;
     transfersArtifact?: RoutingBundleTransfersArtifact;
+    /** Editor-approved service notices (`serviceNotices.ts`); absent when the generation has none. */
+    noticesArtifact?: RoutingBundleNoticesArtifact;
   };
 }

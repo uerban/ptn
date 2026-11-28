@@ -8,6 +8,8 @@ import { useTripDelay } from "../../stores/rtStore.ts";
 import { useCityStore } from "../../stores/cityStore.ts";
 import { LegDeparture } from "../RouteResults/shared/LegDeparture.tsx";
 import { ServiceAlertNote } from "../ServiceAlerts/ServiceAlertItem.tsx";
+import { NoticeBadge } from "../ServiceNotices/NoticeBadge.tsx";
+import { useLegNotices } from "../../services/useNotices.ts";
 
 interface LegRowProps {
   leg: Leg;
@@ -41,6 +43,7 @@ export function LegRow({
   // The guidance itinerary's leg ISO times are feed-tz-anchored true instants
   // (produced by convertRaptorResults), so render them in the feed tz.
   const feedTz = useCityStore((s) => s.activeCity.tz);
+  const notices = useLegNotices(leg);
   const isWalking = leg.mode === "WALK" || leg.mode === "BIKE" || leg.mode === "SCOOTER";
   const depTime = new Date(leg.departureTime);
   const arrTime = new Date(leg.arrivalTime);
@@ -85,6 +88,7 @@ export function LegRow({
               {leg.routeShortName}
             </span>
           )}
+          <NoticeBadge notices={notices} compact />
         </div>
 
         {/* Time and destination */}

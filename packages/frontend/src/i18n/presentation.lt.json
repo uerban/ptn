@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Įspėjimai apie šiuos maršrutus: {count}",
   "serviceAlerts.affectsLines": "{lines} linijos paslaugos įspėjimas",
   "serviceAlerts.sameAsAbove": "Toks pat įspėjimas kaip ir aukščiau",
-  "nearby.inHours": "po {time}"
+  "nearby.inHours": "po {time}",
+  "notices.free": "Nemokama kelionė",
+  "notices.seasonalUntil": "Speciali linija, veikia iki {date}",
+  "notices.eventOn": "Įvykis transporto priemonėje, {date}",
+  "notices.listTitle": "Šio sezono specialiosios linijos",
+  "notices.source": "Pranešimas",
+  "notices.legNotice": "Linija {line}: {notice}",
+  "notices.catchIt": "Pasinaudokite šia transporto priemone",
+  "notices.catchItIntro": "Šias keliones vykdo viena transporto priemonė. Į ją galite įlipti bet kurioje stotelėje maršruto metu.",
+  "notices.tripAt": "Išvyksta iš {stop} į {time}",
+  "notices.liveOnMap": "Rodyti LIVE žemėlapyje",
+  "notices.remindMe": "Priminti man",
+  "notices.reminderSet": "Nustatytas priminimas {time}",
+  "notices.cancelReminder": "Atšaukti priminimą",
+  "notices.reminderTitle": "Linija {line} išvyks netrukus",
+  "notices.reminderBody": "{notice} išvyksta iš {stop} {time}."
 }

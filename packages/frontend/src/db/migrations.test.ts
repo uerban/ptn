@@ -7,10 +7,10 @@ describe("IndexedDB schema", () => {
     await Dexie.delete("ptn");
   });
 
-  it("creates a fresh DB at version 8 with every declared table", async () => {
+  it("creates a fresh DB at version 9 with every declared table", async () => {
     const { db, STORES } = await import("./index.ts");
     await db.open();
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(db.tables.map((t) => t.name).sort()).toEqual(Object.keys(STORES).sort());
     db.close();
   });
@@ -68,7 +68,7 @@ describe("IndexedDB schema", () => {
     v2.close();
 
     await current.db.open();
-    expect(current.db.verno).toBe(8);
+    expect(current.db.verno).toBe(9);
     for (const name of ["savedLocations", "recentLocations", "usageStats", "personalUsage"]) {
       expect(current.db.table(name).schema.indexes).toEqual([]);
     }
@@ -103,7 +103,7 @@ describe("IndexedDB schema", () => {
     v2.close();
 
     await current.db.open();
-    expect(current.db.verno).toBe(8);
+    expect(current.db.verno).toBe(9);
     expect(await current.db.offlineCityMetadata.get("riga")).toEqual({ cityId: "riga", state: "legacy" });
     expect(await current.db.sharedArtifactMetadata.get("transfers:t1")).toMatchObject({ hash: "t1" });
     for (const name of ["savedLocations", "recentLocations", "usageStats", "personalUsage", "cityUsageStats"]) {
@@ -133,7 +133,7 @@ describe("IndexedDB schema", () => {
     v3.close();
 
     await current.db.open();
-    expect(current.db.verno).toBe(8);
+    expect(current.db.verno).toBe(9);
     // Version 3 here was the encrypted-storage schema: the metadata upgrade
     // that shares its number never ran, so version 8 fills it.
     expect(await current.db.offlineCityMetadata.get("tallinn")).toEqual({ cityId: "tallinn", state: "legacy" });
@@ -164,7 +164,7 @@ describe("IndexedDB schema", () => {
     v7.close();
 
     await current.db.open();
-    expect(current.db.verno).toBe(8);
+    expect(current.db.verno).toBe(9);
     expect(await current.db.offlineCityMetadata.get("riga")).toMatchObject({ state: "complete", sizeBytes: 5 });
     for (const name of ["savedLocations", "recentLocations", "usageStats", "personalUsage", "cityUsageStats"]) {
       expect(current.db.table(name).schema.indexes).toEqual([]);

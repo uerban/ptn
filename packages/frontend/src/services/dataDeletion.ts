@@ -26,6 +26,7 @@ import { stopRecentsSweep } from "./recents.ts";
 import { stopStopUsageSweep } from "./stopUsage.ts";
 import {clearCityArtifactMemory} from "./cityArtifactMemory.ts";
 import {clearTransferArtifactMemory} from "./transfersArtifact.ts";
+import {useServiceNoticesStore} from "./serviceNoticesStore.ts";
 import {
   clearLocalReportsData,
   clearPersonalizationData,
@@ -185,6 +186,7 @@ export async function clearDownloadedData(
 ): Promise<void> {
   clearTransferArtifactMemory();
   clearCityArtifactMemory();
+  useServiceNoticesStore.setState({ byCity: {} });
   const stopRuntime =
     opts.stopDownloadedRuntime ??
     (async () => {

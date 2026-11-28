@@ -11,6 +11,7 @@ spec = importlib.util.spec_from_file_location('tools', Path(__file__).with_name(
 tools = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tools)
 REV = 'a' * 40
+CONTRACT = {'apiContract': 1, 'readerFormat': 2}
 
 
 class ToolValidationTests(unittest.TestCase):
@@ -21,7 +22,7 @@ class ToolValidationTests(unittest.TestCase):
         archive.write_bytes(b'fixture archive')
         archive.with_suffix('.gz.sha256').write_text(f'{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n')
         (bundle / 'release.json').write_text(json.dumps({
-            'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl'}))
+            'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl', **CONTRACT}))
         (bundle / 'fixture').write_bytes(b'payload')
         (bundle / 'SHA256SUMS').write_text(f'{hashlib.sha256(b"payload").hexdigest()}  fixture\n')
         return bundle
@@ -43,7 +44,7 @@ class ToolValidationTests(unittest.TestCase):
             bundle = self.bundle(Path(directory))
             for revision, dirty in [('b' * 40, False), (REV, True)]:
                 (bundle / 'release.json').write_text(json.dumps({
-                    'revision': revision, 'sourceDirty': dirty, 'rustTarget': 'x86_64-unknown-linux-musl'}))
+                    'revision': revision, 'sourceDirty': dirty, 'rustTarget': 'x86_64-unknown-linux-musl', **CONTRACT}))
                 with patch('sys.argv', ['verify', '--bundle', str(bundle), '--revision', REV]), \
                         patch.object(tools, 'verify_tools') as smoke, self.assertRaises(AssertionError):
                     tools.main()
@@ -53,7 +54,7 @@ class ToolValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             bundle = self.bundle(Path(directory))
             for recorded, ok in [('0.2.44', True), ('0.2.43', False), (None, False)]:
-                metadata = {'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl'}
+                metadata = {'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl', **CONTRACT}
                 if recorded:
                     metadata['version'] = recorded
                 (bundle / 'release.json').write_text(json.dumps(metadata))
@@ -66,6 +67,21 @@ class ToolValidationTests(unittest.TestCase):
                         with self.assertRaises(AssertionError):
                             tools.main()
                         smoke.assert_not_called()
+
+    def test_archive_must_record_api_contract_and_reader_format(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = self.bundle(Path(directory))
+            for key, value in [('apiContract', None), ('readerFormat', None), ('apiContract', '1'), ('readerFormat', 0), ('apiContract', True)]:
+                metadata = {'revision': REV, 'sourceDirty': False, 'rustTarget': 'x86_64-unknown-linux-musl', **CONTRACT}
+                if value is None:
+                    del metadata[key]
+                else:
+                    metadata[key] = value
+                (bundle / 'release.json').write_text(json.dumps(metadata))
+                with patch('sys.argv', ['verify', '--bundle', str(bundle), '--revision', REV]), \
+                        patch.object(tools, 'verify_tools') as smoke, self.assertRaises(AssertionError):
+                    tools.main()
+                smoke.assert_not_called()
 
     def test_direct_mode_rejects_wrong_binary_architecture_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:

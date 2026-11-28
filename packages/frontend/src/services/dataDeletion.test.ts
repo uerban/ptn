@@ -92,6 +92,7 @@ describe("privacy data deletion boundaries", () => {
     await db.offlineCityMetadata.put({cityId: "vilnius", state: "legacy"});
     await db.offlineTransfers.put({hash: "transfer", bytes: new Uint8Array([1])});
     await db.cityShapes.put({hash: "shape", bytes: new Uint8Array([2])});
+    await db.serviceNotices.put({cityId: "vilnius", hash: "h", sizeBytes: 2, storedAt: 1, notices: []});
     const caches = fakeCaches([
       "api-general-cache",
       "carto-tiles",
@@ -112,6 +113,7 @@ describe("privacy data deletion boundaries", () => {
     expect(await db.offlineCityMetadata.count()).toBe(0);
     expect(await db.offlineTransfers.count()).toBe(0);
     expect(await db.cityShapes.count()).toBe(0);
+    expect(await db.serviceNotices.count()).toBe(0);
     expect(await db.recentLocations.count()).toBe(1);
     expect(await db.savedLocations.count()).toBe(1);
     expect(await db.usageStats.count()).toBe(1);

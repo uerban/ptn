@@ -571,6 +571,15 @@ pub(crate) fn build_generation_with_policy(
         )],
     );
 
+    let notices = crate::bundle::generation::load_notices_artifact(
+        gen_dir,
+        inputs.manifest.notices_sha256.as_deref(),
+    )?;
+    phases.done(
+        "notices",
+        &[("present", if notices.is_some() { "true" } else { "false" })],
+    );
+
     let parts = GenerationParts {
         transfers_mmap: transfers_arc,
         bundle_mmap: bundle_arc,
@@ -602,6 +611,7 @@ pub(crate) fn build_generation_with_policy(
         schedule_tiles_dir,
         gtfs_manifest_response,
         address_search,
+        notices,
         epoch: inputs.epoch,
         pattern_mode: inputs.pattern_mode,
     };

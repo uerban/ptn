@@ -67,6 +67,7 @@ fn baseline_manifest(bundle: &[u8]) -> GenerationManifest {
         schedule_tile_bundle_hash: None,
         trip_route_sha256: None,
         stop_cell_sha256: None,
+        notices_sha256: None,
     }
 }
 

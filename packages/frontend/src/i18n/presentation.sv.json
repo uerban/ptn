@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Varningar på dessa rutter: {count}",
   "serviceAlerts.affectsLines": "Tjänstevarning för linje {lines}",
   "serviceAlerts.sameAsAbove": "Samma meddelande som ovan",
-  "nearby.inHours": "om {time}"
+  "nearby.inHours": "om {time}",
+  "notices.free": "Gratis resa",
+  "notices.seasonalUntil": "Speciallinje, går fram till {date}",
+  "notices.eventOn": "Händelse ombord på fordonet, {date}",
+  "notices.listTitle": "Särskilda linjer denna säsong",
+  "notices.source": "Meddelande",
+  "notices.legNotice": "Linje {line}: linje {notice}",
+  "notices.catchIt": "Ta detta fordon",
+  "notices.catchItIntro": "Dessa resor utförs av ett enda fordon. Du kan stiga på vid valfri hållplats längs vägen.",
+  "notices.tripAt": "Avgår från {stop} kl. {time}",
+  "notices.liveOnMap": "Visa LIVE på kartan",
+  "notices.remindMe": "Påminn mig",
+  "notices.reminderSet": "Påminnelse inställd för {time}",
+  "notices.cancelReminder": "Avbryt påminnelse",
+  "notices.reminderTitle": "Linje {line} avgår snart",
+  "notices.reminderBody": "{notice} avgår från {stop} kl. {time}."
 }

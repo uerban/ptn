@@ -120,6 +120,11 @@ fn provenance_headers(p: &RaptorBundleProvenance) -> Vec<Header> {
         headers.push(hdr("X-PT-Transfers-Artifact-Hash", &t.hash));
         headers.push(hdr("X-PT-Transfers-Artifact-Size", &t.size.to_string()));
     }
+    if let Some(n) = p.notices.as_ref() {
+        headers.push(hdr("X-PT-Notices-Artifact-Url", &n.url));
+        headers.push(hdr("X-PT-Notices-Artifact-Hash", &n.hash));
+        headers.push(hdr("X-PT-Notices-Artifact-Size", &n.size.to_string()));
+    }
     if let Some(g) = p.route_geometry.as_ref() {
         headers.push(hdr("X-PT-Route-Geometry-Artifact-Url", &g.url));
         headers.push(hdr("X-PT-Route-Geometry-Artifact-Hash", &g.hash));
@@ -222,7 +227,7 @@ pub fn to_tiny_http(resp: Resp) -> ResponseBox {
             let mut headers = vec![
                 hdr("Content-Type", content_type),
                 hdr("Cache-Control", cache_control),
-                hdr("X-API-Version", "1"),
+                hdr("X-API-Version", &crate::API_CONTRACT.to_string()),
             ];
             if let Some(e) = etag.as_deref() {
                 headers.push(hdr("ETag", e));
@@ -377,7 +382,7 @@ fn poi_response_headers() -> [Header; 3] {
     [
         hdr("X-App-Version", env!("PT_SERVE_APP_VERSION")),
         hdr("X-App-Commit", env!("PT_SERVE_GIT_SHA")),
-        hdr("X-API-Version", "1"),
+        hdr("X-API-Version", &crate::API_CONTRACT.to_string()),
     ]
 }
 

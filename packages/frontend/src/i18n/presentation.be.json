@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Абвесткі па гэтых маршрутах: {count}",
   "serviceAlerts.affectsLines": "Паведамленне аб абслугоўванні на лініі {lines}",
   "serviceAlerts.sameAsAbove": "Тое ж паведамленне, што і вышэй",
-  "nearby.inHours": "за {time}"
+  "nearby.inHours": "за {time}",
+  "notices.free": "Бясплатны праезд",
+  "notices.seasonalUntil": "Спецыяльны маршрут, працуе да {date}",
+  "notices.eventOn": "Падзея ў салоне транспартнага сродку, {date}",
+  "notices.listTitle": "Спецыяльныя лініі ў гэтым сезоне",
+  "notices.source": "Аб'ява",
+  "notices.legNotice": "Радок {line}: {notice}",
+  "notices.catchIt": "Злаві гэты транспарт",
+  "notices.catchItIntro": "Адна транспартная адзінка выконвае гэтыя рэйсы. Вы можаце сесці на яе на любой прыпынцы па дарозе.",
+  "notices.tripAt": "Пакідае {stop} у {time}",
+  "notices.liveOnMap": "Паказаць у рэальным часе на карце",
+  "notices.remindMe": "Нагадаць",
+  "notices.reminderSet": "Нагадаць праз {time}",
+  "notices.cancelReminder": "Скасаваць напамін",
+  "notices.reminderTitle": "Лінія {line} хутка адправіцца",
+  "notices.reminderBody": "Аўтобус {notice}   прыпынак {stop}   у {time}."
 }

@@ -146,3 +146,12 @@ it("rejects foreign legacy ownership before reading either large payload", async
   expect(raw).not.toHaveBeenCalled();
   expect(bundle).not.toHaveBeenCalled();
 });
+
+it("removing a city drops its service notices", async () => {
+  await seed(city.id); await saveDeviceCity(city);
+  await db.serviceNotices.put({cityId: city.id, hash: "h", sizeBytes: 2, storedAt: 1, notices: []});
+  await db.serviceNotices.put({cityId: "other", hash: "h", sizeBytes: 2, storedAt: 1, notices: []});
+  await removeDeviceCity(city.id);
+  expect(await db.serviceNotices.get(city.id)).toBeUndefined();
+  expect(await db.serviceNotices.get("other")).toBeDefined();
+});

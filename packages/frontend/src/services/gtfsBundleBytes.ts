@@ -4,6 +4,7 @@ import { db } from "../db/index.ts";
 import type { PtbBytesRecord, TransfersArtifactManifest } from "../db/index.ts";
 import { useCityStore } from "../stores/cityStore.ts";
 import { shouldWriteShapes } from "./gtfsQuotaGuard.ts";
+import { readNoticesArtifactHeaders, syncServiceNotices } from "./serviceNoticesStore.ts";
 
 /**
  * Parse the transfer-artifact provenance headers emitted by
@@ -308,6 +309,8 @@ async function doFetchPtbBytes(cityId: string, options: FetchPtbBytesOptions): P
 
   if (res.status === 304) {
     if (cached) {
+      // Notices ride on the generation: fire-and-forget, never blocks routing.
+      void syncServiceNotices(cityId, readNoticesArtifactHeaders(res.headers));
       // Resolve the transfer manifest under the rolling-deploy capability rule:
       // parsed headers win; else a provenance-capable server that sent no
       // transfer headers ⇒ clear stale (`undefined`); else a server without
@@ -385,6 +388,7 @@ async function doFetchPtbBytes(cityId: string, options: FetchPtbBytesOptions): P
   // capable server's 200 authoritatively resolves the transfer state.
   const transfersArtifact = readTransfersArtifactHeaders(res.headers);
   const transfersResolved = hasTransfersProvenanceCapability(res.headers);
+  void syncServiceNotices(cityId, readNoticesArtifactHeaders(res.headers));
   if (options.persist !== false && await shouldWriteShapes()) {
     await persistFreshBytes(cityId, bytes, etag, cityTzIana, transfersArtifact);
   }

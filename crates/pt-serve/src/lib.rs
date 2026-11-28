@@ -20,6 +20,14 @@
 //! 2. `app/`, `bundle/`, `ops/`,
 //! `router`, `mmap`, `wire` are tiny_http-free.
 
+/// Version of the HTTP API between the web app and city servers. Sent as
+/// `X-API-Version`, reported as `apiContract` by `/version` and recorded in the
+/// release archive's `release.json`. Raise it when a change breaks a web app or
+/// a city server of the previous value; deployments refuse to mix components
+/// whose values differ. Kept as a bare literal: `scripts/package-release.py`
+/// reads it with a `pub const API_CONTRACT: u16 = <n>` match.
+pub const API_CONTRACT: u16 = 1;
+
 pub mod app;
 pub mod bundle;
 pub mod domain;

@@ -163,6 +163,12 @@ interface MockApiOptions {
    * server does for a city without realtime kinds.
    */
   realtime?: string;
+  /**
+   * A service-notices body to announce on raptor-bundle responses
+   * (`X-PT-Notices-Artifact-*`) and serve from `/api/<city>/notices/fetch`.
+   * Absent sends no notices headers, as for a city without notices.
+   */
+  notices?: unknown;
 }
 
 /**
@@ -419,6 +425,19 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
   // receive 200 when the server ignores its validator. Use that response here
   // because Playwright route interception rejects 304 as redirect-class, while
   // retaining the shared-cache/revalidation behavior exercised by two-page E2E.
+  const noticesBytes = options.notices === undefined ? undefined : Buffer.from(JSON.stringify(options.notices) + "\n");
+  const noticesHeaders: Record<string, string> = noticesBytes
+    ? {
+        "X-PT-Notices-Artifact-Url": "/api/vilnius/notices/fetch",
+        "X-PT-Notices-Artifact-Hash": createHash("sha256").update(noticesBytes).digest("hex"),
+        "X-PT-Notices-Artifact-Size": String(noticesBytes.byteLength),
+        "Access-Control-Expose-Headers": "X-PT-Notices-Artifact-Url, X-PT-Notices-Artifact-Hash, X-PT-Notices-Artifact-Size",
+      }
+    : {};
+  if (noticesBytes) {
+    await page.route("**/api/*/notices/fetch", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: noticesBytes }));
+  }
   await page.route("**/api/**/raptor-bundle", (route) =>
     route.fulfill({
       status: 200,
@@ -427,6 +446,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
         etag: `"${catalogBundleSha256}"`,
         vary: "Accept-Encoding",
         "cache-control": "public, max-age=0, must-revalidate",
+        ...noticesHeaders,
       },
       body: catalogBytes,
     })

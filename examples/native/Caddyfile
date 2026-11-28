@@ -16,7 +16,7 @@
 		rewrite * /{re.aux.1}
 		reverse_proxy {$PTN_AUX:127.0.0.1:9001}
 	}
-	@transit path /api/vilnius/plan /api/vilnius/raptor-bundle /api/vilnius/transfers/fetch /api/vilnius/route-geometry/fetch /api/vilnius/stops/all /api/vilnius/stops/nearby /api/vilnius/departures-for-stop /api/vilnius/alerts /api/vilnius/color-config /api/vilnius/rt/* /api/vilnius/client-report /api/vilnius/gtfs/* /api/vilnius/address-search* /api/gtfs/poi-tile/*
+	@transit path /api/vilnius/plan /api/vilnius/raptor-bundle /api/vilnius/transfers/fetch /api/vilnius/route-geometry/fetch /api/vilnius/notices/fetch /api/vilnius/stops/all /api/vilnius/stops/nearby /api/vilnius/departures-for-stop /api/vilnius/alerts /api/vilnius/color-config /api/vilnius/rt/* /api/vilnius/client-report /api/vilnius/gtfs/* /api/vilnius/address-search* /api/gtfs/poi-tile/*
 	handle @transit {
 		request_body {
 			max_size 32768

@@ -84,6 +84,8 @@ def probe(binary_dir, work, store, inventory, key, manifest, plan):
                 kind, path = artifact["kind"], artifact["path"]
                 if kind == "ptb":
                     route = prefix + "/raptor-bundle"
+                elif kind == "service-notices":
+                    route = prefix + "/notices/fetch"
                 elif kind == "pedestrian-transfers-ptft":
                     route = prefix + "/transfers/fetch"
                 elif kind == "schedule-tile":

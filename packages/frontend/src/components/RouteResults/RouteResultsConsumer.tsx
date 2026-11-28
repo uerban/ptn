@@ -29,6 +29,8 @@ import { useFirstRideLive } from "../../hooks/useLiveRt.ts";
 import { itineraryAriaLabel } from "./shared/itineraryAriaLabel.ts";
 import { routeDistinctions } from "./shared/routeDistinctions.ts";
 import { useNextDepartureInMin } from "../../hooks/useNextDepartureAfter.ts";
+import { NoticeBadge } from "../ServiceNotices/NoticeBadge.tsx";
+import { useLegNotices } from "../../services/useNotices.ts";
 
 interface Props {
   itineraries: Itinerary[];
@@ -365,6 +367,7 @@ function renderLegChipsWithWaits(
 function LegChip({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
   const { t } = useTranslation();
   const badgeSize = useSettingsStore((s) => getBadgeSize(s.routeSearchVariant));
+  const notices = useLegNotices(leg);
   const isWalk = leg.mode === "WALK";
   if (isWalk) {
     const min = toMinutes(leg.durationSeconds);
@@ -385,6 +388,7 @@ function LegChip({ leg, feedTz }: { leg: Leg; feedTz?: string }) {
         routeColor={leg.routeColor}
         size="sm"
       />
+      <NoticeBadge notices={notices} compact />
       <LegDeparture leg={leg} feedTz={feedTz} />
       <LiveLegBadge leg={leg} compact size={badgeSize} />
     </span>

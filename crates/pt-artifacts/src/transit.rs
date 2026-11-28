@@ -106,6 +106,7 @@ pub fn inspect(root: &Path, geometry: bool) -> io::Result<TransitInventory> {
             | "schedule-tiles-manifest"
             | "trip-route"
             | "stop-cell"
+            | "service-notices"
             | "legacy-meta-json"
             | "legacy-shapes-json" => {}
             other => {
@@ -168,6 +169,11 @@ pub fn inspect(root: &Path, geometry: bool) -> io::Result<TransitInventory> {
             true,
         ),
         ("stop-cell.json", generation.stop_cell_sha256.as_ref(), true),
+        (
+            "service-notices.json",
+            generation.notices_sha256.as_ref(),
+            true,
+        ),
         (
             "schedule-tiles/manifest.json",
             generation.schedule_tile_bundle_sha256.as_ref(),

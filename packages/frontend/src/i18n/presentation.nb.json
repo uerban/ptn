@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Varsler på disse rutene: {count}",
   "serviceAlerts.affectsLines": "Tjenestevarsel for linje {lines}",
   "serviceAlerts.sameAsAbove": "Samme varsel som ovenfor",
-  "nearby.inHours": "om {time}"
+  "nearby.inHours": "om {time}",
+  "notices.free": "Gratis tur",
+  "notices.seasonalUntil": "Spesiallinje, kjører frem til {date}",
+  "notices.eventOn": "Hendelse om bord i kjøretøyet, {date}",
+  "notices.listTitle": "Spesielle linjer denne sesongen",
+  "notices.source": "Kunngjøring",
+  "notices.legNotice": "Linje {line}: {notice}",
+  "notices.catchIt": "Ta dette kjøretøyet",
+  "notices.catchItIntro": "Disse turene kjøres av ett kjøretøy. Du kan stige på ved hvilken som helst holdeplass underveis.",
+  "notices.tripAt": "Avgår fra {stop} kl. {time}",
+  "notices.liveOnMap": "Vis LIVE på kartet",
+  "notices.remindMe": "Påminn meg",
+  "notices.reminderSet": "Påminnelse satt til {time}",
+  "notices.cancelReminder": "Avbryt påminnelse",
+  "notices.reminderTitle": "Linje {line} avgår snart",
+  "notices.reminderBody": "{notice} forlater {stop} kl. {time}."
 }

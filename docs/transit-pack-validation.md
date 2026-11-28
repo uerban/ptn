@@ -35,6 +35,8 @@ The harness:
 - Compares HTTP PTB, PTFT (when present) and every advertised schedule tile with
   their source inventory hashes. It verifies full shapes when advertised and
   their intentional unavailability in minimal mode.
+- Compares `service-notices.json`, when the generation has it, with the bytes
+  served at `/api/<city>/notices/fetch`.
 - Optionally requires a non-empty `/plan` result and identical canonical JSON
   across variants. Without `--plan-request`, routing is **not** checked.
 - Rejects a tampered discovery document without changing city activation, rolls

@@ -133,5 +133,20 @@
   "serviceAlerts.onRoutes": "Ilmoitukset näillä reiteillä: {count}",
   "serviceAlerts.affectsLines": "Linjan {lines} palveluilmoitus",
   "serviceAlerts.sameAsAbove": "Sama ilmoitus kuin edellä",
-  "nearby.inHours": "{time} kuluttua"
+  "nearby.inHours": "{time} kuluttua",
+  "notices.free": "Ilmainen matka",
+  "notices.seasonalUntil": "Erityislinja, liikennöi {date} asti",
+  "notices.eventOn": "Tapahtuma ajoneuvossa, {date}",
+  "notices.listTitle": "Tämän kauden erikoislinjat",
+  "notices.source": "Ilmoitus",
+  "notices.legNotice": "Linja {line}: {notice}",
+  "notices.catchIt": "Nouse tähän kulkuvälineeseen",
+  "notices.catchItIntro": "Matkan hoitaa yksi ajoneuvo. Voit nousta kyytiin millä tahansa pysäkillä matkan varrella.",
+  "notices.tripAt": "Lähtee {stop} klo {time}",
+  "notices.liveOnMap": "Näytä LIVE-muodossa kartalla",
+  "notices.remindMe": "Muistuta minua",
+  "notices.reminderSet": "Muistutus asetettu ajankohdaksi {time}",
+  "notices.cancelReminder": "Peruuta muistutus",
+  "notices.reminderTitle": "Linja {line} lähtee pian",
+  "notices.reminderBody": "{notice} lähtee {stop}:sta klo {time}."
 }

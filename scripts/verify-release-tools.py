@@ -131,6 +131,9 @@ def main():
         assert metadata["revision"] == args.revision and metadata["sourceDirty"] is False
         if args.version:
             assert metadata.get("version") == args.version, (metadata.get("version"), args.version)
+        for key in ("apiContract", "readerFormat"):
+            value = metadata.get(key)
+            assert type(value) is int and value > 0, (key, value)
         for line in (bundle / "SHA256SUMS").read_text().splitlines():
             expected, name = line.split("  ", 1)
             assert hashlib.sha256((bundle / name).read_bytes()).hexdigest() == expected, name

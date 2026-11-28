@@ -36,6 +36,11 @@ const REAL_PTB_BYTES = new Uint8Array(
   ),
 );
 
+vi.mock("./serviceNoticesStore.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./serviceNoticesStore.ts")>()),
+  syncServiceNotices: vi.fn(async () => undefined),
+}));
+
 vi.mock("./gtfsQuotaGuard.ts", () => ({
   shouldWriteShapes: vi.fn(async () => true),
 }));
@@ -281,6 +286,35 @@ describe("fetchPtbBytes (network-first)", () => {
     });
     const row = await db.ptbBytes.get("vilnius");
     expect(row?.transfersArtifact).toEqual(result.transfersArtifact);
+  });
+
+  it("hands the notices headers of a 200 to the notices sync, and none when absent", async () => {
+    const { syncServiceNotices } = await import("./serviceNoticesStore.ts");
+    vi.mocked(syncServiceNotices).mockClear();
+    const bytes = new Uint8Array([0x50, 0x54, 0x42, 0x00]);
+    globalThis.fetch = mockBytes(bytes, '"v1"', {
+      "X-PT-Notices-Artifact-Url": "/api/vilnius/notices/fetch",
+      "X-PT-Notices-Artifact-Hash": "f".repeat(64),
+      "X-PT-Notices-Artifact-Size": "99",
+    });
+    await fetchPtbBytes("vilnius");
+    expect(syncServiceNotices).toHaveBeenLastCalledWith("vilnius",
+      { url: "/api/vilnius/notices/fetch", hash: "f".repeat(64), sizeBytes: 99 });
+    await db.ptbBytes.clear();
+    globalThis.fetch = mockBytes(bytes, '"v2"');
+    await fetchPtbBytes("vilnius");
+    expect(syncServiceNotices).toHaveBeenLastCalledWith("vilnius", undefined);
+  });
+
+  it("does not touch notices when the network is unreachable", async () => {
+    const { syncServiceNotices } = await import("./serviceNoticesStore.ts");
+    globalThis.fetch = mockBytes(new Uint8Array([0x50, 0x54, 0x42, 0x00]));
+    await fetchPtbBytes("vilnius");
+    vi.mocked(syncServiceNotices).mockClear();
+    globalThis.fetch = vi.fn(async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
+    const result = await fetchPtbBytes("vilnius");
+    expect(result.fromCache).toBe(true);
+    expect(syncServiceNotices).not.toHaveBeenCalled();
   });
 
   it("does not read the pre-rename X-PTN- header spelling", async () => {
