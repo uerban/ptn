@@ -370,18 +370,22 @@ pub fn build_ptb(
     // `trip_starts` is the same prefix-sum build_ptb already computed for the
     // StopTimes write (pass1::compute_trip_starts(&p1)); pass it so the sidecar
     // entries carry the exact absolute StopTimes row index.
-    let (dep_offsets, dep_entries) = pass3::departures_idx::build_departures_idx_csr(
-        &p1.trip_stop_triples,
-        p1.stops.len(),
-        &trip_starts,
-    )?;
-    let departures_idx_bytes = pt_shared::sidecar::encode_departures_idx(
-        &dep_offsets,
-        &dep_entries,
-        &trips_intern_sha,
-        &stops_intern_sha,
-    )
-    .map_err(|e| Error::Config(format!("departures-idx encode: {e}")))?;
+    // The CSR vectors are dropped once encoded; only the sidecar bytes outlive
+    // this block, so they are not held through the re-encode below.
+    let departures_idx_bytes = {
+        let (dep_offsets, dep_entries) = pass3::departures_idx::build_departures_idx_csr(
+            &p1.trip_stop_triples,
+            p1.stops.len(),
+            &trip_starts,
+        )?;
+        pt_shared::sidecar::encode_departures_idx(
+            &dep_offsets,
+            &dep_entries,
+            &trips_intern_sha,
+            &stops_intern_sha,
+        )
+        .map_err(|e| Error::Config(format!("departures-idx encode: {e}")))?
+    };
 
     let resolved_tz_offset =
         resolve_city_tz_offset(city_tz_offset_seconds, city_tz_iana, p1.feed_start_date)?;
@@ -390,17 +394,28 @@ pub fn build_ptb(
 
     // Reframe the temporary positional regions into the sole published PTB v1
     // layout before any downstream hash, sidecar, or manifest sees the bundle.
-    let temporary_bytes = std::fs::read(bundle_dest)?;
-    let (current_bytes, service_pool_count) = reencode_staging_bundle_as_current(
-        &temporary_bytes,
-        &layout,
-        &p1,
-        &pool,
-        resolved_tz_offset,
-        window_days,
-        &frequencies,
-    )?;
-    std::fs::write(bundle_dest, &current_bytes)?;
+    // The temporary bundle is mapped rather than read: its pages are clean file
+    // cache the kernel can reclaim, not anonymous memory counted against the
+    // container limit. The map is dropped before the file is rewritten.
+    let service_pool_count = {
+        let temporary = std::fs::File::open(bundle_dest)?;
+        // SAFETY: the build owns `bundle_dest` until it returns; nothing else
+        // writes the file while it is mapped, and the map is dropped before
+        // the rewrite below.
+        let temporary = unsafe { memmap2::Mmap::map(&temporary)? };
+        let (current_bytes, service_pool_count) = reencode_staging_bundle_as_current(
+            &temporary,
+            &layout,
+            &p1,
+            &pool,
+            resolved_tz_offset,
+            window_days,
+            &frequencies,
+        )?;
+        drop(temporary);
+        std::fs::write(bundle_dest, &current_bytes)?;
+        service_pool_count
+    };
     drop(pool);
 
     // Compute SHA-256 + size from the just-written file. The producer must

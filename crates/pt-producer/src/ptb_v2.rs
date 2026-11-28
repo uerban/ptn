@@ -605,7 +605,11 @@ pub fn build_v2_bundle(
             "ptb v2: compatibility input is not PTB v1".into(),
         ));
     }
-    let header = reader.header();
+    // Only the header is needed past validation; drop the decoded copy of the
+    // v1 bundle instead of holding it through assembly.
+    let header = reader.header().clone();
+    drop(reader);
+    let header = &header;
     let feed_start = header.feed_start_date;
     let window_days = header.window_days;
 
@@ -708,13 +712,16 @@ pub fn build_v2_bundle(
     ];
     let staged = pt_core::rewrite_regions(v1_bytes, pt_core::PTB_VERSION_V2, flags, &edits)
         .map_err(|e| Error::Config(format!("ptb v2: assemble: {e}")))?;
-    let staged_reader = pt_core::Reader::from_bytes(staged.clone())
+    // Readers below take their bundle and hand it back, so no bundle is held
+    // twice.
+    let staged_reader = pt_core::Reader::from_bytes(staged)
         .map_err(|e| Error::Config(format!("ptb v2: staged decode: {e}")))?;
     let commitment = pt_core::engine::v2::recompute_block_commitment(
         &staged_reader,
         pt_core::engine::PatternMode::CoveringMerge,
     )
     .map_err(|e| Error::Config(format!("ptb v2: block commitment: {e:?}")))?;
+    let staged = staged_reader.into_bytes();
     let bundle = pt_core::rewrite_regions(
         &staged,
         pt_core::PTB_VERSION_V2,
@@ -729,7 +736,7 @@ pub fn build_v2_bundle(
     // Post-write validation in a separate builder execution: the reader and
     // index must accept the bytes, and the guard must make the operational
     // anchor (feedStartDate + GUARD_DAYS) a complete query instant.
-    let final_reader = pt_core::Reader::from_bytes(bundle.clone())
+    let final_reader = pt_core::Reader::from_bytes(bundle)
         .map_err(|e| Error::Config(format!("ptb v2: final decode: {e}")))?;
     let final_index =
         pt_core::engine::Index::build(&final_reader, pt_core::engine::PatternMode::CoveringMerge)
@@ -737,6 +744,8 @@ pub fn build_v2_bundle(
     let (min_event, max_event) = final_index
         .v2_event_range()
         .ok_or_else(|| Error::Config("ptb v2: index has no v2 state".into()))?;
+    drop(final_index);
+    let bundle = final_reader.into_bytes();
     let anchor_origin = origins[GUARD_DAYS as usize];
     if anchor_origin < origins[0] + max_event {
         return Err(Error::Config(format!(

@@ -496,17 +496,22 @@ fn append_frequencies_region(mut buf: Vec<u8>, rows: &[crate::pass1::FrequencyRo
 /// -stop reference (the cursor's repeated-stop case):
 /// https://gtfs.org/documentation/schedule/schedule-best-practices/#lasso-routes
 fn append_pattern_band(mut buf: Vec<u8>) -> Result<Vec<u8>> {
+    // The reader takes the body and hands it back, so the bundle is never held
+    // twice (a Paris body is ~190 MiB).
     let band = {
-        let reader = pt_core::Reader::from_bytes(buf.clone()).map_err(|e| {
+        let reader = pt_core::Reader::from_bytes(buf).map_err(|e| {
             crate::error::Error::Config(format!("v1 band: reader over v1 body failed: {e:?}"))
         })?;
         let index =
             pt_core::Index::build(&reader, pt_core::PatternMode::Unbounded).map_err(|e| {
                 crate::error::Error::Config(format!("v1 band: Index::build (Unbounded): {e:?}"))
             })?;
-        pt_core::pattern_emit::encode_pattern_band(&reader, &index).map_err(|e| {
+        let band = pt_core::pattern_emit::encode_pattern_band(&reader, &index).map_err(|e| {
             crate::error::Error::Config(format!("v1 band: encode_pattern_band: {e:?}"))
-        })?
+        })?;
+        drop(index);
+        buf = reader.into_bytes();
+        band
     };
 
     // Observability: a trip whose span exceeds the i16 ~9.1h delta cap forces the
